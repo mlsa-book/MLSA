@@ -1,1 +1,219 @@
+{{< include _setup.qmd >}}
+
 # Survival Analysis
+
+\chapter[Survival Analysis and Machine Learning]{Survival Analysis and Machine\\Learning}
+\label{chap:surv}
+
+In their broadest and most basic definitions, survival analysis is the study of temporal data from a given origin until the occurrence of one or more events or `end-points'~\cite{Collett2014}, and machine learning is the study of models and algorithms that learn from data in order to make predictions or find patterns~\cite{Hastie2001}. Reducing either field to these definitions is ill-advised.
+
+This chapter collects terminology utilised in survival analysis \see{sec:surv_set} and machine learning \see{sec:surv_setml} in order that this thesis can cleanly discuss `machine learning survival analysis' \see{sec:surv_setmltask}. Once the mathematical setting is set up, the thesis scope is fully presented in \cref{sec:surv_scope}. Whilst the content of this chapter is not novel with respect to either survival analysis or machine learning separately, this does appear to be the first formulation of the survival analysis machine learning `task'~\cite{Kiraly2021}.
+
+\section{Survival Analysis}
+\label{sec:surv_set}
+
+Survival analysis is the field of Statistics concerned with the analysis of time-to-event data, which consists of covariates, a categorical (often binary) outcome, and the time until this outcome takes place (the `survival time'). As a motivating example of time-to-event data, say 100 patients are admitted to a COVID-19 ward and for each patient the following covariate data are collected: age, weight and sex; additionally for each patient the time until death or discharge is recorded. In the time-to-event dataset, which takes a standard tabular form, each of the 100 patients is a row, with columns consisting of age, weight, and sex measurements, as well as the outcome (death or discharge) and the time to outcome.
+
+Survival analysis is distinct from other areas of Statistics due to the incorporation of `censoring', a mechanism for capturing uncertainty around when an event occurs in the real-world. Continuing the above example, if a patient dies of COVID-19 five dies after admittance, then their outcome is exactly known: they \emph{died} after five days. Consider now a patient who is discharged after ten days. As death is a guaranteed event they have a true survival time but this may be decades later, therefore they are said to be \emph{censored} at ten days. This is a convenient method to express that the patient survives up to ten days and their survival status at any time after this point is unknown. Censoring is a unique challenge to survival analysis that attempts to incorporate as much information as possible without knowing the true outcome. This is a `challenge' as statistical models usually rely on learning from observed, i.e. known, outcome data; therefore censoring requires special treatment.
+
+Whilst survival analysis occurs in many fields, for example as `reliability analysis' in engineering and `duration analysis' in economics, in this thesis the term `survival' will always be used. Moreover the following terminology, analogous to a healthcare setting, are employed: survival analysis (or `survival' for short) refers to the field of study; the event of interest is the `event', or `death'; an observation that has not experienced an event is `censored' or `alive'; and observations are referred to as `observations', `subjects', or `patients'.
+
+Some of the biggest challenges in survival analysis stem from an unclear definition of a `survival analysis prediction' and different (sometimes conflicting) common notations. This thesis attempts to make discussions around survival analysis clearer and more precise by first describing the mathematical setting for survival analysis in \cref{sec:surv_set_math} and only then defining the prediction types to consider in \cref{sec:surv_set_types}.
+
+\subsection{Survival Data and Definitions}
+\label{sec:surv_set_math}
+
+Survival analysis has a more complicated data setting than other fields as the `true' data generating process is not directly modelled but instead engineered variables are defined to capture observed information. Let,
+\begin{itemize}
+\item $X \ \tvi \ \calX \subseteq \Reals^p, p \in \PNaturals$ be the generative random variable  representing the data \emph{features}/\emph{covariates}/\emph{independent variables}.
+\item $Y \ \tvi \ \calT \subseteq \NNReals$ be the (unobservable) \emph{true survival time}.
+\item $C \ \tvi \ \calT \subseteq \NNReals$ be the (unobservable) \emph{true censoring time}.
+\end{itemize}
+
+It is impossible to fully observe both $Y$ and $C$. This is clear by example: if an observation drops out of a study then their censoring time is observed but their event time is not, whereas if an observation dies then their true censoring time is unknown. Hence, two engineered variables are defined to represent observable outcomes. Let,
+
+\begin{itemize}
+\item $T := \min\{Y,C\}$ be the \emph{observed outcome time}.
+\item $\Delta := \II(Y = T) = \II(Y \leq C)$ be the \emph{survival indicator} (also known as the \emph{censoring} or \emph{event} indicator).\footnote{Indicators are usually named to reflect a positive condition in the function (in this case the event when $Y = T$), but counter to this convention the `censoring indicator' is possibly the most common term.}
+\end{itemize}
+
+Together $(T,\Delta)$ is referred to as the \emph{survival outcome} or \emph{survival tuple} and they form the dependent variables. The survival outcome provides a concise mechanism for representing the time of the \emph{observed} outcome and indicating which outcome (death or censoring) took place.
+
+Now the full generative template for survival analysis is given by \\ $(X, \Delta, C, Y, T) \ \tvi \ \calX \times \bset \times \calT \times \calT \times \calT$ and with $(X_i, \Delta_i, C_i, Y_i, T_i)$ jointly i.i.d. A \emph{survival dataset} is defined by $\calD = \{(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n)\}$ where $(X_i,T_i,\Delta_i) \iid (X,T,\Delta)$ and $X_i$ is a $p$-vector, $X_i = (X_{i;1},...,X_{i;p})$. Though unobservable, the true outcome times are defined by $(Y_1,C_1),...,(Y_n,C_n)$ where $(Y_i,C_i) \iid (Y,C)$.
+
+\Cref{tab:surv_data_abs} exemplifies a random survival dataset with $n$ observations (rows) and $p$ features.
+
+\begin{table}[H]
+\caption[Theoretical time-to-event dataset]{Theoretical time-to-event dataset. $(Y,C)$ are `hypothetical' as they can never be directly observed. Rows are individual observations, $X$ columns are features, $T$ is observed time-to-event, $\Delta$ is the censoring indicator, and $(Y,C)$ are hypothetical true survival and censoring times.}\label{tab:surv_data_abs}
+\centering
+\begin{tabular}{|c|c|c||c|c|||c|c|}
+\toprule
+\multicolumn{3}{|c||}{$X$} & $T$ & $\Delta$ & $Y$ & $C$ \\
+\hline
+$X_{11}$ & $\cdots$ & $X_{1p}$ & $T_1$ & $\Delta_1$ & $Y_1$ & $C_1$ \\
+$\vdots$ & $\ddots$ & $\vdots$ & $\vdots$ & $\vdots$ & $\vdots$ & $\vdots$ \\
+$X_{n1}$ & $\cdots$ & $X_{np}$ & $T_n$ & $\Delta_n$ & $Y_n$ & $C_n$ \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\Cref{tab:surv_data_rats} exemplifies an observed survival dataset with a modified version of the \code{rats} dataset~\cite{pkgsurvival}.
+
+\begin{table}[H]
+\caption[\code{rats} time-to-event dataset]{\code{rats}~\cite{pkgsurvival} time-to-event dataset with added hypothetical columns ($Y,C$). Rows are individual observations, $X$ columns are features, $T$ is observed time-to-event, $\Delta$ is the censoring indicator, and $(Y,C)$ are hypothetical (here arbitrary values dependent on $(T,\Delta)$) true survival and censoring times.}\label{tab:surv_data_rats}
+\centering
+\begin{tabular}{|c|c|c||c|c|||c|c|}
+\toprule
+\multicolumn{3}{|c||}{$X$} & $T$ & $\Delta$ & $Y$ & $C$ \\
+\hline
+\textbf{litter} $(X_{.;1})$ & \textbf{rx} $(X_{.;2})$ & \textbf{sexF} $(X_{.;3})$ & \textbf{time} & \textbf{status} & \textbf{survTime} & \textbf{censTime} \\ \hline
+1 & 1 & 1 & 101 & 0 & 105 & 101  \\
+1 & 0 & 1 & 49 & 1 & 49 & 55\\
+1 & 0 & 1 & 104 & 0 & 200 & 104 \\
+2 & 1 & 0 & 91 & 0 & 92 & 91 \\
+2 & 0 & 0 & 104 & 1 & 104 & 104 \\
+2 & 0 & 0 & 102 & 1 & 102 & 120 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+Both datasets includes two extra columns, on the right of the triple vertical line, which imagine hypothetical data for the unobserved true survival and censoring times.
+\\\\
+Finally the following terms are used frequently throughout this report. Let $(T_i, \Delta_i) \iid (T,\Delta), i = 1,...,n$, be random survival outcomes. Then,
+\begin{enumerate}[i)]
+\item The \emph{set of unique} or \emph{distinct time-points} refers to the set of time-points in which at least one observation dies or is censored, $\calU_O := \{T_i\}_{i \in \{1,...,n\}}$.
+\item The \emph{set of unique death times} refers to the set of unique time-points in which death (and not censoring) occurred, $\calU_D := \{T_i : \Delta_i = 1\}_{i \in \{1,...,n\}}$.
+\item The \emph{risk set} at a given time-point, $\tau$, is the set of subjects who are known to be alive (not dead or censored) just before that time, $\calR_\tau := \{i: T_i \geq \tau\}$ where $i$ is a unique row/subject in the data.
+\item The \emph{number of observations alive} at $\tau$ is the cardinality of the risk set, $|\calR_\tau|$, and is denoted by $n_\tau := \sum_i \II(T_i \geq \tau)$.
+\item The \emph{number of observations who die} at $\tau$ is denoted by $d_\tau := \sum_i \II(T_i = \tau, \Delta_i = 1)$.
+\item The Kaplan-Meier estimate of the average survival function of the training data \emph{survival distribution} is the Kaplan-Meier estimator \see{sec:surv_models_uncond} fit \see{sec:surv_setml_meth} on training data $(T_i, \Delta_i)$ and is denoted by $\KMS$.
+\item The Kaplan-Meier estimate of the average survival function of the training data \emph{censoring distribution} is the Kaplan-Meier estimator fit on training data $(T_i, 1 - \Delta_i)$ and is denoted by $\KMG$.
+\end{enumerate}
+
+Notation and definitions will be recapped at the start of each chapter for convenience.
+
+\subsection{Censoring}
+\label{sec:surv_set_cens}
+
+Censoring is now discussed in more detail and important concepts introduced. Given the survival generating process $(X,T,\Delta)$ with unobservable $(Y,C)$, the event is experienced if $Y \leq C$ and $\Delta = 1$ or censored if $\Delta = 0$.
+
+\noindent \paragraph{Censoring `Location'}
+Right-censoring is the most common form of censoring in survival models and it occurs either when a patient drops out (but doesn't experience the event) of the study before the end and thus their outcome is unknown, or if they experience the event at some unknown point after the study end. Formally let $[\tau_l, \tau_u]$ be the study period for some, $\tau_l,\tau_u \in \NNReals$. Then right-censoring occurs when either $Y > \tau_u$ or when $Y \in [\tau_l,\tau_u]$ and $C \leq Y$. In the first case $T = C = \tau_u$ and censoring is due to the true time of death being unknown as the observation period has finished. In the latter case, a separate censoring event, such as drop-out or another competing risk, is observed.
+
+Left-censoring is a rarer form of censoring and occurs when the event happens at some unknown time before the study start, $Y < \tau_l$. Interval-censoring occurs when the event takes place in some interval within the study period, but the exact time of event is unknown. \Cref{fig:survset_censor} shows a graphical representation of right-censoring.
+
+\begin{figure}
+\centering
+\includegraphics[width=14cm,height=8cm]{c2_set/censoring}
+\caption[Dead and censored subjects over time]{Dead and censored subjects (y-axis) over time (x-axis). Black diamonds indicate true death times and white circles indicate censoring times. Vertical line is the study end time. Subjects 1 and 2 die in the study time. Subject 3 is censored in the study and (unknown) dies within the study time. Subject 4 is censored in the study and (unknown) dies after the study. Subject 5 dies after the end of the study.}
+\label{fig:survset_censor}
+\end{figure}
+
+\paragraph{Censoring `Dependence'}
+Censoring is often defined as \emph{uninformative} if $Y \indep C$ and \emph{informative} otherwise however these definitions can be misleading as the term `uninformative' appears to be imply that censoring is independent of both $X$ and $Y$, and not just $Y$. Instead the following more precise definitions are used in this report.
+
+\begin{definition}
+\label{def:cens}
+Let $(X,T,\Delta,Y,C)$ be defined as above, then
+\begin{enumerate}[i)]
+\item If $C \indep X$, censoring is \emph{feature-independent}, otherwise censoring is \emph{feature-dependent}.
+\item If $C \indep Y$, then censoring is \emph{event-independent}, otherwise censoring is \emph{event-dependent}.
+\item If $(C \indep Y) | X$, censoring is conditionally independent of the event given covariates, or \emph{conditionally event-independent}.
+\item If $C \indep (X,Y)$ censoring is \emph{uninformative}, otherwise censoring is \emph{informative}.
+\end{enumerate}
+\end{definition}
+
+Non-informative censoring can generally be well-handled by models as true underlying patterns can still be detected and the reason for censoring does not affect model inference or predictions. However in the real-world, censoring is rarely non-informative as reasons for drop-out or missingness in outcomes tend to be related to the study of interest. Event-dependent censoring is a tricky case that, if not handled appropriately (by a competing-risks framework), can easily lead to poor model development; the reason for this can be made clear by example: Say a study is interested in predicting the time between relapses of stroke but a patient suffers a brain aneurysm due to some separate neurological condition, then there is a high possibility that a stroke may have occurred if the aneurysm had not. Therefore a survival model is unlikely to distinguish the censoring event (aneurysm) from the event of interest (stroke) and will confuse predictions. In practice, the majority of models and measures assume that censoring is conditionally event-independent and hence censoring can be predicted by the covariates whilst not directly depending on the event. For example if studying the survival time of ill pregnant patients in hospital, then dropping out of the study due to pregnancy is clearly dependent on how many weeks pregnant the patient is when the study starts (for the sake of argument assume no early/late pregnancy due to illness).
+
+\paragraph{Type I Censoring}
+Type I and Type II censoring are special-cases of right-censoring, only Type I is discussed in this thesis as it is more common in simulation experiments. Type I censoring occurs if a study has a set end-date, or maximum survival time, and a patient survives until the end of the study. If survival times are dependent on covariates (i.e. not random) and the study start date is known (or survival times are shifted to the same origin) then Type I censoring will usually be informative as censored patients will be those who survived the longest.
+
+\section{Thesis Scope}
+\label{sec:surv_scope}
+
+Now that the mathematical setting has been defined, the thesis scope is provided. For time and relevance the scope of this thesis is narrowed to the most parsimonious setting that is genuinely useful in modelling real-world scenarios. This is the setting that captures all assumptions made by the majority of proposed survival models and therefore is practical both theoretically and in application. This setting is defined by the following assumptions (with justifications):
+
+\begin{enumerate}[i)]
+\item Let $p$ be the proportion of censored observations in the data, then $p \in (0,1)$. This open interval prevents the case when $p = 0$, which is simply a regression problem \see{sec:surv_ml_regr}, or the case when $p = 1$, in which no useful models exist (as the event never occurs).
+\item Only right-censoring is observed in the data, no left- or interval-censoring. This accurately reflects most real-world data in which observations that have experienced the event before the study start (left-censoring) are usually not of interest, and close monitoring of patients means that interval-censoring is unlikely in practice. It is acknowledged that left-truncation is a common problem in medical datasets though this is often handled not by models but by data pre-processing, which is not part of the workflow discussed in this thesis.
+\item There is only one event of interest, an observation that does not experience this event is censored. This eliminates the `competing risk' setting in which multiple events of interest can be modelled.
+\item The event can happen at most once. For example the event could be death or initial diagnosis of a disease however cannot be recurrent such as seizure. In the case where the event could theoretically happen multiple times, only the time to one (usually the first) occurrence of the event is modelled.
+\item The event is guaranteed to happen at least once. This is an assumption implicitly made by all survival models as predictions are for the time until the true event, $Y$, and not the observed outcome, $T$.
+\end{enumerate}
+
+For both the multi-event and recurrent-event cases, simple reductions exist such that these settings can be handled by the models discussed in this paper however this is not discussed further here.
+
+No assumptions are made about whether censoring is dependent on the data but when models and measures make these assumptions, they will be explicitly discussed.
+\\\\
+The purpose of any statistical analysis is dependent on the research question. For example techniques are available for data analysis, imputation, exploration, prediction, and more. This thesis focuses on the predictive setting; other objectives, such as model inspection and data exploration can be achieved post-hoc via interpretable machine learning techniques~\cite{Molnar2019}.
+\\\\
+Finally, the methods in this thesis are restricted to frequentist statistics. Bayesian methods are not discussed as the frequentist setting is usually more parsimonious and additionally there are comparatively very few off-shelf implementations of Bayesian survival methods. Despite this, it is noted that Bayesian methods are particularly relevant to the research in this thesis, which is primarily concerned with uncertainty estimates and predictions of distributions. Therefore, a natural extension to the work in this thesis would be to fully explore the Bayesian setting.
+
+\section{Survival Prediction Problems}
+\label{sec:surv_set_types}
+
+This section continues by defining the survival problem narrowed to the scope described in the previous section. Defining a single `survival prediction problem' (or `task') is important mathematically as conflating survival problems could lead to confused interpretation and evaluation of models. Let $(X,T,\Delta)$ and $\calD$ be as defined above. A general survival prediction problem is one in which:
+\begin{lsti}
+\item a survival dataset, $\calD$, is split \see{sec:surv_setml_meth} for training, $\dtrain$, and testing, $\dtest$;
+\item a survival model is fit on $\dtrain$;
+\atem the model predicts some representation of the unknown true survival time, $Y$, given $\dtest$.
+\end{lsti}
+
+The process of `fitting' is model-dependent, and can range from simple maximum likelihood estimation of model coefficients, to complex algorithms.  The model fitting process is discussed in more abstract detail in \cref{sec:surv_setml} and then concrete algorithms are discussed in \cref{chap:review}. The different survival problems are separated by `prediction types' or `prediction problems', these can also be thought of as predictions of different `representations' of $Y$. Four prediction types are discussed in this paper, these may be the only possible survival prediction types and are certainly the most common as identified in chapters \ref{chap:review} and \ref{chap:eval}.  They are predicting:
+
+\begin{enumerate}[i)]
+\item The \emph{relative risk} of an individual experiencing an event -- A single continuous ranking.
+\item The \emph{time until an event} occurs -- A single continuous value.
+\item The \emph{prognostic index} for a model -- A single continuous value.
+\item An individual's \emph{survival distribution} -- A probability distribution.
+\end{enumerate}
+
+The first three of these are referred to as \emph{deterministic} problems as they predict a single value whereas the fourth is \emph{probabilistic} and returns a full survival distribution. Definitions of these are expanded on below.
+\\\\
+Survival predictions differ from other fields in two respects. Firstly, the predicted outcome, $Y$, is a different object than the outcome used for model training, $(T, \Delta)$. This differs from, say, regression in which the same object (a single continuous variable) is used for fitting and predicting. Secondly, with the exception of the time-to-event prediction, all other prediction types do not predict $Y$ but some other related quantity.
+
+Survival prediction problems must be clearly separated as they are inherently incompatible. For example it is not meaningful to compare a relative risk prediction from one observation to a survival distribution of another. Whilst these prediction types are separated above, they can be viewed as special cases of each other. Both (1) and (2) may be viewed as variants of (3); and (1), (2), and (3) can all be derived from (4); this is elaborated on below.
+
+\paragraph{Relative Risk/Ranking}
+This is perhaps the most common survival problem and is defined as predicting a continuous rank for an individual's `relative risk of experiencing the event'. For example, given three patients, $\{i,j,k\}$, a relative risk prediction may predict the `risk of event' as $\{0.1, 0.5, 10\}$ respectively. From these predictions, the following types of conclusions can be drawn:
+\begin{enumerate}[i)]
+\item Conclusions comparing patients. e.g. $i$ is at the least risk; the risk of $j$ is only slightly higher than that of $i$ but the risk of $k$ is considerably higher than $j$; the corresponding ranks for $i,j,k,$ are $1,2,3$.
+\item Conclusions comparing risk groups. e.g. thresholding risks at $1.0$ places $i$ and $j$ in a `low-risk' group and $k$ in a `high-risk' group
+\end{enumerate}
+So whilst many important conclusions can be drawn from these predictions, the values themselves have no meaning when not compared to other individuals. Interpretation of these rankings has historically been conflicting in implementation, with some software having the interpretation `higher ranking implies higher risk' whereas others may indicate `higher ranking implies lower risk' \see{sec:tools_mlr3proba_api_learn}. In this thesis, a higher ranking will always imply a higher risk of event (as in the example above).
+
+\paragraph{Time to Event}
+Predicting a time to event is the problem of predicting the deterministic survival time of a patient, i.e. the amount of time for which they are predicted to be alive after some given start time. Part of the reason this problem is less common in survival analysis is because it borders regression -- a single continuous value is predicted -- and survival -- the handling of censoring is required -- but neither is designed to solve this problem directly. Time-to-event predictions can be seen as a special-case of the ranking problem as an individual with a predicted longer survival time will have a lower overall risk, i.e. if $t_i,t_j$ and $r_i,r_j$ are survival time and ranking predictions for patients $i$ and $j$ respectively, then $t_i > t_j \rightarrow r_i < r_j$.
+
+\paragraph{Prognostic Index}
+Given covariates, $x \in \Reals^{n \times p}$, and a vector of model coefficients, $\beta \in \Reals^p$, the linear predictor is defined by $\eta := x\beta \in \Reals^n$. The `prognostic index' is a term that is often used in survival analysis papers that usually refers to some transformation (possibly identity), $\phi$, on the linear predictor, $\phi(\eta)$. Assuming a predictive function (for survival time, risk, or distribution defining function (see below)) of the form $g(\varphi)\phi(\eta)$, for some function $g$ and variables $\varphi$ where $g(\varphi)$ is constant for all observations (e.g. Cox PH \see{sec:surv_models_crank}), then predictions of $\eta$ are a special case of predicting a relative risk, as are predictions of $\phi(\eta)$ if $\phi$ is rank preserving. A higher prognostic index may imply a higher or lower risk of event, dependent on the model structure.
+
+\paragraph{Survival Distribution}
+Predicting a survival distribution refers specifically to predicting the distribution of an individual patient's survival time, i.e. modelling the distribution of the event occurring over $\NNReals$. Therefore this is seen as the probabilistic analogue to the deterministic time-to-event prediction, these definitions are motivated by similar terminology in machine learning regression problems \see{sec:surv_setml}. The above three prediction types can all be derived from a probabilistic survival distribution prediction \see{sec:car_pipelines}.
+
+A survival distribution is a mathematical object that is estimated by predicting a \emph{representation} of the distribution. Let $W$ be a continuous random variable t.v.i. $\NNReals$ with probability density function (pdf), $f_W: \NNReals \rightarrow \NNReals$, and cumulative distribution function (cdf), $F_W: \NNReals \rightarrow [0,1]; (\tau) \mapsto P(W \leq \tau)$. The pdf, $f_W(\tau)$, is the likelihood of an observation dying in a small interval around time $\tau$, and $F_W(\tau) = \int^\tau_0 f_W(\tau)$ is the probability of an observation being dead at time $\tau$ (i.e. dying at or before $\tau$). In survival analysis, it is generally more interesting to model the risk of the event taking place or the probability of the patient being alive, leading to other distribution representations of interest.
+
+The survival function is defined as
+\begin{equation}
+S_W: \NNReals \rightarrow [0,1]; \quad
+(\tau) \mapsto P(W \geq \tau) = \int^\infty_\tau f_W(u) \ du
+\end{equation}
+and so $S_W(\tau) = 1-F_W(\tau)$. This function is known as the survival function as it can be interpreted as the probability that a given individual survives until some point $\tau \geq 0$.
+
+Another common representation is the hazard function,
+\begin{equation}
+h_W: \NNReals \rightarrow \NNReals; \quad
+(\tau) \mapsto  \frac{f_W(\tau)}{S_W(\tau)}
+\end{equation}
+The hazard function is interpreted as the instantaneous risk of death given that the observation has survived up until that point; note this is not a probability as $h_W$ can be greater than one.
+
+The cumulative hazard function (chf) can be derived from the hazard function by
+\begin{equation}
+H_W: \NNReals \rightarrow \NNReals; \quad
+(\tau) \mapsto \int^\tau_0 h_W(u) \ du
+\end{equation}
+
+The cumulative hazard function relates simply to the survival function by
+\begin{equation}
+H_W(\tau) = \int^\tau_0 h_W(u) \ du = \int^\tau_0 \frac{f_W(u)}{S_W(u)} \ du = \int^\tau_0 -\frac{S'_W(u)}{S_W(u)} \ du = -\log(S_W(\tau))
+\end{equation}
+
+Any of these representations may be predicted conditionally on covariates for an individual by a probabilistic survival distribution prediction. Once a function has been estimated, predictions can be made conditional on the given data. For example if $n$ survival functions are predicted, $\hat{S}_1,...,\hat{S}_n$, then $\hat{S}_i$ is interpreted as the predicted survival function given covariates of observation $i$, and analogously for the other representation functions.

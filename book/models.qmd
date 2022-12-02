@@ -1,0 +1,26 @@
+{{< include _setup.qmd >}}
+
+# Survival models
+
+This chapter provides a brief review of classical survival models and then a critical survey of machine learning survival models. The terms `classical', `machine learning', and even `model' have hazy definitions that will be further specified to make clear how they apply in this paper.
+
+Recall \see{sec:surv_setml_meth} the separation between the following terms:
+\begin{itemize}
+\item Learning strategy  -- A method for estimating the true prediction functional, $g$
+\item Fitting algorithm, $\calA$ -- A function mapping the training data, $\dtrain$, to an estimate of the true prediction functional, $\hatg := \calA(\dtrain)$. The choice of fitting algorithm is determined by the learning strategy.
+\item (Unfitted) Model -- The complete specification of a learning strategy with hyper-parameters and any other components such as pre-processing
+\item Fitted Model/Prediction functional, $\hatg: \calX \rightarrow \calY$ -- Function, possibly with hyper-parameters, for making predictions on unseen data
+\end{itemize}
+
+\noindent `Classical' models are defined with a very narrow scope in this thesis: low-complexity models that are either non-parametric or have parameters that can be fit with maximum likelihood estimation (or an equivalent method). In contrast, `machine learning' (ML) models require more intensive model fitting procedures such as recursion or iteration. The classical models in this paper are fast to fit and highly interpretable, though can be inflexible and may make unreasonable assumptions. Whereas the ML models are more flexible with hyper-parameters however are computationally more intensive (both in terms of speed and storage), require tuning to produce `good' results, and are often a `black-box' with difficult interpretation.
+
+This chapter investigates models for predictive survival analysis with a focus on whether a model is APT \see{sec:intro_motobj_tap}. As classical survival models have been studied extensively for decades, these are separated from the ML models in this chapter and reduced to a smaller literature review in \cref{sec:surv_models}. The rest of this chapter then surveys each of the primary machine learning classes separately. The scope of the models discussed in this chapter is limited to the general thesis scope \see{sec:surv_scope}, i.e. single event with right-censoring and no competing-risks, though in some cases these are discussed.
+
+Novel adaptations for each of the ML models are suggested at the end of each section, these primarily serve as interesting avenues to explore for future research but none have been studied for theoretical properties or implemented in software packages, though most have been informally explored to demonstrate some `proof-of-concept'.
+
+\paragraph{Notation and Terminology}
+The notation introduced in \cref{chap:surv} is recapped for use in this chapter: the generative template for the survival setting is given by $(X,T,\Delta,Y,C) \ \tvi \ \calX \times \calT \times \bset \times \calT \times \calT$ where $\calX \subseteq \Reals^p$ and $\calT \subseteq \NNReals$, where $C,Y$ are unobservable, $T := \min\{Y,C\}$, and $\Delta = \II(Y = T)$. Random survival data is given by $(X_i,T_i,\Delta_i,Y_i,C_i) \iid (X,T,\Delta,Y,C)$. Usually data will instead be presented as a training dataset, $\dtrain = \{(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n)\}$ where $(X_i,T_i,\Delta_i) \iid (X,T,\Delta)$. For simplicity only a single testing observation needs to be defined to effectively write about the prediction functional, this test observation is given by $\dtest = (X^*, T^*, \Delta^*) \sim (X,T,\Delta)$.
+
+For regression models the generative template is given by $(X,Y)$ \tvi $\calX \subseteq \Reals^p$ and $Y \subseteq \Reals$. As with the survival setting, a regression training set is given by $\{(X_1,Y_1),...,(X_n,Y_n)\}$ where $(X_i,Y_i) \iid (X,Y)$ and a testing observation by $\dtest = (X^*,Y^*) \sim (X,Y)$.
+
+Finally recall: the set of unique time-points, $\calU_O := \{T_i\}_{i \in \{1,...,n\}}$, the set of unique death times, $\calU_D := \{T_i : \Delta_i = 1\}_{i \in \{1,...,n\}}$, the risk set at $\tau$ is $\calR_\tau := \{i: T_i \geq \tau\}$, the number of observations alive or at risk at $\tau$ is $n_\tau := \sum_i \II(T_i \geq \tau)$, and the number of observations that die at $\tau$ is $d_\tau := \sum_i \II(T_i = \tau, \Delta_i = 1)$.

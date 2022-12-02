@@ -1,1 +1,1171 @@
-# Evaluation
+---
+crossref:
+  cnj-prefix: Box
+  cnj-title: Box
+---
+
+{{< include _setup.qmd >}}
+
+# Evaluation {sec-eval}
+
+This chapter studies how to evaluate the predictions arising from the surveyed models in the previous chapter. 'Model evaluation' is as vague a phrase as 'human evaluation'. A human could be evaluated by a series of exams, physical or neurological tests, aesthetics, etc. Likewise a model could be evaluated according to how well it fits to training data, the quality of predictions on new data, the average prediction, and many more methods. This chapter aims to provide a nuanced approach to defining, understanding, and examining model evaluation. Evaluation is defined in further detail in @sec-eval-why and throughout this chapter the definition will continue to be refined and specialised to specific sub-types of evaluation, including discrimination (@sec-eval-crank), calibration (@sec-eval-distr-calib), and overall predictive performance (@sec-eval-distr).
+
+Evaluation is a surprising source of disagreement in the literature with some arguing that the process can often be ignored completely [@vanderLaan2007; @Wolpert1992]. There is a larger divide in survival analysis as many believe that the primary (possibly only) goal is risk prediction [@Chen2012; @Newson1983; @Pencina2012] and thus other forms of evaluation are not required. These strict views can undermine an integral part of the model building and deployment process, and create more division than necessary. This thesis advocates for strict implementation of model evaluation as a critical part of the model building process as well as in continuous monitoring of deployed models. Without rigorous evaluation, a model cannot be 'trusted' to perform well and could be as useless as making random guesses for all predictions. This is critical in survival analysis, which has important applications in healthcare and finance, in these sectors models that have not been evaluated are potentially dangerous.
+
+An infamous example of evaluation going wrong is the Google Flu Trends (GFT) model^[`r link("https://www.google.org/flutrends/about/")`], which claimed to accurately predict future flu trends but was in fact deemed by many a complete failure as it significantly overestimated all predictions, in some cases doubling the true figures [@Lazer2014].  The GFT model was never utilised (at least openly) in policy and as such no lasting harm was created. However it is not hard to imagine the problems that would be caused by such a model if it was utilised and trusted during the time of COVID-19. On a more individual level, as machine learning is increasingly deployed in public sectors, major decisions for patients could become increasingly automated (or at least machine-assisted). Patients should expect their models to be as trained and tested as their doctors.
+
+This chapter attempts to highlight the purpose and need of evaluation in survival analysis by first giving a high-level overview to evaluation as a concept, then providing a brief review of commonly-used survival measures and finally extensive treatment to scoring rules for evaluation of probabilistic predictions, including novel definitions and proofs for properness of scoring rules. The term *measure* will be used throughout this chapter to refer to functions or 'metrics' that quantify some aspect of model evaluation, this should not be confused with a mathematical measure.
+
+The APT criteria will be utilised to survey these measures. For transparency and accessibility, these are straightforward to apply to measures with the same definitions as for models. For predictive performance this is more complicated as it depends on the model class. Therefore optimal measure performance definitions will be covered within each section.
+
+#### Notation and Terminology {.unnumbered .unlisted}
+
+The notation introduced in @chap-surv is recapped for use in this chapter. The generative template is given by $(X,T,\Delta,Y,C) \ t.v.i. \ \calX \times \calT \times \bset \times \calT \times \calT$ where $\calX \subseteq \Reals^p$ and $\calT \subseteq \NNReals$, where $C,Y$ are unobservable, $T := \min\{Y,C\}$, and $\Delta = \II(Y = T)$. Specific survival data is given by training data, $\dtrain = \{(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n)\}$ where $(X_i,T_i,\Delta_i) \iid (X,T,\Delta)$, and test data, $\dtest = \{(X^*_1,T^*_1,\Delta^*_1),...,(X^*_m,T^*_m,\Delta^*_m)\}$ where $(X^*_i,T^*_i,\Delta^*_i) \iid (X,T,\Delta)$.
+
+## Evaluation Overview {#sec-eval-why}
+
+### What is Evaluation? {#sec-eval-why-what}
+
+Evaluation is the process of examining a model's relationship to data, which may refer to the model's relationship to training data, i.e. how well the model is 'fit' to this data, or the relationship to testing data, i.e. how 'good' are the predictions from the model. In this thesis, only three types of evaluation measure are considered and qualitative definitions of these are given here; more precise definitions appear later in the chapter.
+
+
+* Discrimination -- A model's discriminatory power refers to how well it separates observations that are at a higher or lower risk of event. Therefore discrimination is also sometimes referred to as *separation*. For example, a model with good discrimination will predict that (at a given time) a dead patient has a higher probability of being dead than an alive patient. These measures are the most common in survival and assess relative risk or rank predictions.
+* Calibration -- There is no single agreed upon definition of model calibration, with definitions varying from paper to paper [@Collins2014; @Harrell1996; @Rahman2017; @VanHouwelingen2000]. Generally, a model is said to be well-calibrated if the average predicted values from the model are in some 'agreement' (which is specified by the chosen measure) with the average true observed values.
+* Predictive Performance -- A model is said to have good predictive performance (or sometimes 'predictive accuracy') if its predictions for new data are 'close to' the truth.
+
+
+These are referred to as measures of predictive ability as they draw conclusions about the ability of the model to make predictions.^[Measures of predictive ability measure a model's *ability* to make any form of prediction. Measures of predictive performance measure the *performance* of the predictions. In this section a model's predictive ability refers to all three of discrimination, calibration, and predictive performance.]
+
+Using these definitions as a primary taxonomy for survival measures is problematic as without clear definitions there can be significant overlap between model 'classes'. Instead this thesis advocates for the same taxonomy as in the previous chapter and categorises measures by the return type that they evaluate: survival time, ranking, or survival distribution.
+
+Goodness-of-fit measures are very briefly discussed in @sec-eval-insample for completeness, however these are generally out of scope in this thesis as the vast majority (if any) cannot evaluate machine learning models.
+
+## Why are Models Evaluated? {#sec-eval-why-why}
+
+A key element of the scientific method is experiments and validation. In the usual workflow of the scientific method:
+
+* a hypothesis is proposed;
+* predictions are made; and
+* experiments are performed to test the hypothesis based on these predictions.
+
+For statistical models the same principles are upheld:
+
+i. a model is proposed (by manual or automated selection with possible tuning);
+ii. predictions are made either internally (cross-validation) or externally (held-out data); and
+iii. validation is performed on these predictions in order to infer something about the model's performance.
+
+The model can then be considered 'good' or 'bad' and either deployed, adjusted, or discarded. As these are models that are run on a computer (as opposed to experiments in the real-world), the process from fitting to validating is relatively quick and as such multiple proposed models can be evaluated and compared at the same time. This provides two key use-cases for evaluation:
+
+i. demonstrating model performance; and
+i. model comparison/selection.
+
+Resistance to model evaluation can be found in the machine learning community. One such example are proponents of inhomogeneous ensemble methods, which combine predictions from multiple different models into a single prediction. The arguments for these models are that:
+
+i. model evaluation can never be precise enough, or strong enough guarantees cannot be given [@Jiao2016]; and
+i. ensemble methods can guarantee a better performance than the individual component models and therefore evaluation of the components is not required.
+
+For example, 'super learners' [@vanderLaan2007] are a class of such model and claim^[Testing this claim is tangential so for now will be assumed true.] to guarantee that a super learner will always perform as well as, if not better, than its component models: ''...the super learner framework allows a researcher to try many prediction algorithms...knowing that the final combined super learner fit will either be the best fit or near the best fit" [@Polley2010]. This has three problems, it:
+
+i. assumes that researchers will only fit sensible prediction algorithms;
+i. advocates for complex ensemble models instead of transparent and parsimonious ones; and
+i. assumes that a super learner is guaranteed to be the (near) 'best fit', which actively discourages simpler models being tested separately.
+
+Each of these problems can be resolved by researchers only fitting sensible models and opting for an Occam's Razor approach where inhomogeneous ensemble methods are used only if they outperform simpler models, thus requiring validation to test this.
+
+By the parsimony principle, if two models have the same predictive performance (within some degree of confidence), then the simpler and more transparent model is preferred. Even a very slight gain in predictive performance could be outweighed by a large increase to complexity. All models, whether simple or complex, should be critically compared to many alternatives. At the very least a model should be compared to a baseline (@sec-eval-distr-score-base-base) as many performance measures are uninterpretable without a point of comparison [@Gressmann2018].
+
+### How are Models Evaluated?
+
+The process of evaluation in machine learning is briefly given as a key method in @sec-surv-setml and relevant parts are repeated here. The evaluation process itself is a simple application of a suitable mathematical function to predictions and true data. Let $L$ be some evaluation measure and for now assume $L$ is a measure evaluating deterministic predictions (the following generalises to other types trivially). A model will either be evaluated on each prediction separately, in which case $L: \Reals \times \Reals \rightarrow \ExtReals$ or the measure is calculated for all predictions simultaneously, in which case $L: \Reals^m \times \Reals^m \rightarrow \ExtReals$. Specifically the loss parameters are observed (true) outcomes, $Y$, and predictions of this outcome, $\hatY$. $L$ is usually referred to as a *loss* when $L$ should be minimised for optimal prediction, whereas a *score* is the term given when $L$ should be maximised.
+
+All evaluation measures discussed in this thesis are out-of-sample measures and therefore evaluation takes place after the model makes predictions on held-out test data.
+
+Specific choices for $L$ are now reviewed.
+
+## In-Sample Measures {#sec-eval-insample}
+
+In-sample measures are not examined in this thesis as no in-sample measures could be found that are applicable to all machine learning methods and therefore are out of scope for this thesis. Instead, the interested reader is referred to the papers and references listed below:
+
+#### Residuals {.unnumbered .unlisted}
+For discussion about model residuals, refer to texts on survival modelling fitting and goodness-of-fit such as:
+
+* @Collett2014
+* @dataapplied
+
+
+Both provide a comprehensive overview to model residuals for semi- and fully-parametric low-complexity survival models.
+
+#### $R^2$ measures {.unnumbered .unlisted}
+
+$R^2$ type measures have been the focus of several reviews and surveys, in particular the following are recommended:
+
+
+* @Choodari2012a --- For a comprehensive review and simulation study of $R^2$ type measures
+* @Kent1988 --- Defines the commonly utilised Kent and O'Quigley $R^2$ measure
+* @Royston2004 --- Defines the commonly utilised Royston and Sauerbrei $R^2$ measure
+
+
+#### Likelihood and Information Criteria {.unnumbered .unlisted}
+
+Measures of likelihood and information criteria (e.g. AIC, BIC) are commonly utilised in in-sample model comparison of low-complexity survival models though in general are harder (if not impossible) to compute on ML alternatives.
+
+These criterion are originally defined in:
+
+* @Akaike1974 --- For the introduction of the AIC
+* @Schwarz1978 --- For the introduction of the BIC
+
+
+These are discussed for survival analysis in:
+
+* @VolinskyRaftery2000 --- For discussion on the BIC for survival models.
+* @HURVICH1989 --- Definition of corrected $AIC$ for survival models, $AIC_C$
+* @Liang2008 --- 'Improved' AIC for survival models.
+
+
+## Evaluating Survival Time {#sec-eval-det}
+
+There appears to be little research into measures for evaluating survival time predictions, which is likely due to this task usually being of less interest than the others (@sec-surv-set-types). Common measures in survival analysis for survival time predictions are the same as regression measures but with an additional indicator variable to remove censoring. Three common regression measures are the mean absolute error (MAE), mean squared error (MSE), and root mean squared error (RMSE). These are respectively defined for survival analysis as
+
+::: {#def-survivaltime}
+
+## Survival time measures
+
+Let $\calT^m \subseteq \PReals^m$, $\hatt = \hatt_1,...,\hatt_m, t = t_1,...,t_m$, $\delta = \delta_1,...,\delta_m$, and $d := \sum^m_{i=1} \delta_i$, then
+
+i. The *censoring-adjusted mean absolute error*, $MAE_C$ is defined by
+
+$$
+MAE_C: \calT^m \times \calT^m \times \bset^m \rightarrow \NNReals; (\hatt, t, \delta) \mapsto \frac{1}{d} \sum^m_{i=1} \delta_i|t_i - \hat{t_i}|
+$$
+i. The *censoring-adjusted mean squared error*, $MSE_C$ is defined by
+
+$$
+MSE_C: \calT^m \times \calT^m \times \bset^m \rightarrow \NNReals; (\hatt, t, \delta) \mapsto \frac{1}{d}\sum^m_{i=1}\delta_i(t_i - \hatt_i)^2
+$$
+i. The *censoring-adjusted root mean squared error*, $RMSE_C$ is defined by
+
+$$
+RMSE_C: \calT^m \times \calT^m \times \bset^m \rightarrow \NNReals; (\hatt, t, \delta) \mapsto \sqrt{MSE_C(t, \hat{t}, \delta)}
+$$
+
+:::
+
+These are referred to as 'distance' measures as they measure the distance between the true, $(t, \delta)$, and predicted, $\hatt$, values. This approach is not ideal as the removal of censored observations results in increased bias as the proportion of censoring increases (@sec-eval-crank-disc-conc). Furthermore these measures make some assumptions that are likely not valid in a survival setting. For example these metrics assume that an over-prediction should be penalised equally as much as an under-prediction, whereas in survival data it is likely that a model should be overly-cautious and under-predict survival times, i.e. it is safer to predict a patient is more at risk and will die sooner rather than less risk and die later.
+
+These measures are clearly transparent and accessible as off-shelf implementation is straightforward, though $\proba$ [@pkgmlr3proba] was the only $\Rstats$ package found to implement these. For performance, no conclusions can be drawn as no research could be found into the theoretical properties of these losses; despite this there is evidence of them being utilised in the literature [@Wang2017].
+
+## Evaluating Continuous Rankings {#sec-eval-crank}
+
+The next category of survival measures assess predictive performance via discrimination for the evaluation of continuous ranking predictions. Assessment of continuous rankings are also possible by measures of calibration however few methods could be found that generalised to all (not just PH) model forms. Therefore this section exclusively discusses measures of discrimination. First time-independent concordance indices (@sec-eval-crank-disc-conc) are discussed and then time-dependent AUCs (@sec-eval-crank-disc-auc).
+
+Measures of discrimination identify how well a model can separate patients into different risk groups. A model has perfect discrimination if it correctly predicts that patient $i$ is at higher risk of death than patient $j$ if patient $i$ dies first. This risk of death is derived from the ranking prediction type. All discrimination measures are ranking measures, which means that the exact predicted value is irrelevant, only its relative ordering is required. For example given predictions $\{100,2,299.3\}$, only their rankings, $\{2,1,3\}$, are used by measures of discrimination.
+
+### Concordance Indices {#sec-eval-crank-disc-conc}
+
+The simplest form of discrimination measures are concordance indices, which in general measure the proportion of cases in which the model correctly separates a pair of observations into 'low' and 'high' risk.
+
+::: {#def-concordance}
+
+## Concordance
+
+Let $(i,j)$ be a pair of observations with outcomes\\ $\{(t_i,\delta_i),(t_j,\delta_j)\} \iid (T,\Delta)$ and let $y_i,y_j \in \Reals$ be their respective risk predictions. Then $(i,j)$ are called [@Harrell1984; @Harrell1982]:
+
+* *Comparable* if $t_i < t_j$ and $\delta_i = 1$;
+* *Concordant* if $y_i > y_j$.^[Recall (@sec-surv-set-types) this thesis defines the risk ranking such that a higher value implies higher risk of death and so a pair is concordant if $\II(t_i < t_j, y_i > y_j)$, whereas this would be $\II(t_i < t_j, y_i < y_j)$ if a higher value implied a lower risk of death.]
+
+:::
+
+A concordance index (C-index) is a weighted proportion of the number of concordant pairs over the number of comparable pairs. As such, a C-index value is between $[0, 1]$ with $1$ indicating perfect separation, $0.5$ indicating no separation, and $0$ being separation in the 'wrong direction', i.e. all high risk patients being ranked lower than all low risk patients. Concordance measures may either be reported as a value in $[0,1]$, a percentage, or as 'discriminatory power'. Discriminatory power refers to the percentage improvement of a model's discrimination above the baseline value of $0.5$. For example if a model has a concordance of $0.8$ then its discriminatory power is $(0.8-0.5)/0.5 = 60\%$. This representation of discrimination provides more information by encoding the model's improvement over some baseline although is often confused with reporting concordance as a percentage (e.g. reporting a concordance of 0.8 as 80\%).
+
+The most common concordance indices can be expressed as a general measure.
+
+::: {#def-cindex}
+
+## C-index
+
+Let $\calT^m \subseteq \PReals^m$, $y = y_1,...,y_m, t = t_1,...,t_m$, $\delta = \delta_1,...,\delta_m$, and let $W$ be a weighting function. Then, the *survival concordance index* is defined by,
+
+$$
+\begin{split}
+&C: \Reals^m \times \calT^m \times \bset^m \times \NNReals \rightarrow [0,1]; \\
+&(y, t, \delta|\tau) \mapsto \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, y_i > y_j, t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
+\end{split}
+$$
+for some cut-off time $\tau$.
+:::
+
+The choice of $W$ specifies a particular evaluation measure (see below). To evaluate the discrimination of a prediction functional, $\hatg$, with predicted rankings from the model, $r = r_1,...,r_m$, the concordance is calculated as \\$C(r, (T^*_1,...,T^*_m), (\Delta^*_1,...,\Delta^*_m)|\tau)$ for some choice of $\tau \in \NNReals$. The use of the cut-off $\tau$ mitigates against decreased sample size over time due to the removal of censored observations. There are multiple methods for dealing with tied times but in practice a value of $0.5$ is usually taken when $t_i = t_j$ [@Therneau2020]. The following weights have been proposed for the concordance index [@Therneau2020]:
+
+
+* $W(t_i) = 1$ -- This is Harrell's concordance index, $C_H$ [@Harrell1984; @Harrell1982], which is widely accepted to be the most common survival measure [@Collins2014; @GonenHeller2005; @Rahman2017]. There is no cut-off in the original definition of $C_H$ ($\tau = \infty$).
+* $W(t_i) = [\KMG(t_i)]^{-2}$ -- This is Uno's C, $C_U$ [@Uno2011]. $\KMG$ is the Kaplan-Meier estimate of the survival function of the censoring distribution fit on training data. This is referred to as an Inverse Probability of Censoring Weighted (IPCW) measure as the estimated censoring distribution is utilised to weight the measure in order to compensate for removed censored observations.
+* $W(t_i) = [\KMG(t_i)]^{-1}$
+* $W(t_i) = \KMS(t_i)$. $\KMS$ is the Kaplan-Meier estimator of the survival distribution.
+* $W(t_i) = \KMS(t_i)/\KMG(t_i)$
+
+
+All methods assume that censoring is conditionally-independent of the event given the features (@sec-surv-set-cens), otherwise weighting by $\KMS$ or $\KMG$ would not be applicable. It is assumed here that $\KMS$ and $\KMG$ are estimated on the training data and not the testing data (though the latter is often seen in implementation [@pkgsurvival]).
+
+With respect to being APT, all concordance indices are highly transparent and accessible, with many off-shelf implementations. With respect to performance, Choodari-Oskooei \etal (2012) [@Choodari2012a] define a measure as performant if it is:^[This paper refers specifically to measures of explained variation and therefore only the properties that generalise to all measures are included here.]
+
+i. independent of censoring;
+i. interpretable; and
+i. robust against outliers.
+
+This second property is already covered by 'transparency'. The third property is guaranteed for all measures of concordance, which are ranking measures; all outliers are removed once ranks are applied to predictions. Therefore the first property, ''a measure that is the least affected by the amount of censoring is generally preferred'' [@Choodari2012a], is now considered.
+
+Several papers have shown that $C_H$ is affected by the precense of censoring [@Koziol2009; @Pencina2012; @Royston2013; @Uno2011] as the measure ignores pairs in which the shorter survival time is censored. Despite this, $C_H$ is still the most widely utilised measure and moreover if a suitable cut-of $\tau$ is chosen, then all these weightings perform very similarly [@Rahman2017; @Schmid2012].
+
+Measures that utilise other weightings have been demonstrated to be less affected by censoring than $C_H$ [@Rahman2017]. However if a poor choice is selected for $\tau$ then IPCW measures (which include $\KMG$ in the weighting) can be highly unstable [@Rahman2017]. For example, the variance of $C_U$ has been shown to drastically increase more than other measures with increased censoring [@Schmid2012].
+
+None of these measures are perfect and all have been shown to be affected to some extent by censoring [@Schmid2012], which can lead to both under-confidence and over-confidence in the model's discriminatory ability. For example, $C_U$ has been observed to report values as low as 0.2 when the 'true estimate' was 0.6 [@Schmid2012]. Therefore interpreting a value from these measures can be very difficult, for example naively reporting a concordance of 60\% when $C_H = 0.6$ would be incorrect as this value may mean very different things for different amounts of censoring. Whilst intepreting these measures may be difficult, it is not impossible as all these estimators tend to produce values around a similar range [@Rahman2017; @Schmid2012]. Therefore this thesis advocates for multiple concordance indices being reported alongside expert interpretation that takes into account sample size and censoring proportions [@Schmid2012] as well as 'risk profiles' (how at risk patients are) [@Rahman2017].
+
+For within-study model comparison, instability from censoring is not of concern as the measure will be affected equally across all models; though interpretation remains difficult. However a concordance from one study cannot be compared to that from another if the datasets differ greatly in the proportion of censoring. Future research could consider more robust concordance indices that can provide greater ease of interpretation.
+
+As well as the concordance indices discussed here, another promiment alterntive was derived by  G\"onen and Heller (2005) [@GonenHeller2005]. However as this is only applicable to the Cox PH it is out of scope for this thesis, which is primarily concerned with generalisable measures for model comparison.
+
+In simulation experiments, the concordance indices that tended to perform 'better' were those based on AUC-type measures, these are now discussed.
+
+### AUC Measures {#sec-eval-crank-disc-auc}
+
+AUC, or AUROC, measures calculate the Area Under the Receiver Operating Characteristic (ROC) Curve, which is a plot of the *sensitivity* (or true positive rate (TPR)) against $1 - $*specificity* (or true negative rate (TNR)) at varying thresholds (described below) for the predicted probability (or risk) of event. @fig-eval-rocs visualises ROC curves for two classification models. The blue line is a featureless baseline that has no discrimination. The red line is a decision tree with better discrimination as it comes closer to the top-left corner.
+
+::: {#fig-eval-rocs}
+![](images/evaluation/rocs.png){fig-alt="Image shows graph with '1 - Specificity' on the x-axis from 0 to 1 and 'Sensitivity' on the y-axis from 0 to 1. There is a blue line from the bottom left (0,0) to the top right (1,1) of the graph and a red line that forms a curve from (0,0) to around (0.2,0.8) then (1,1)."}
+
+ROC Curves for a classification example. Red is a decision tree with good discrimination as it 'hugs' the top-left corner. Blue is a featureless baseline with no discrimination as it sits on $y = x$.
+:::
+
+In a classification setting with no censoring, the AUC has the same interpretation as Harrell's C [@Uno2011]. AUC measures for survival analysis have been developed in order to provide a time-dependent measure of discriminatory ability [@Heagerty2000]. The proposed concordance indices described above are time-independent, which is useful for producing a single statistic. However, in a survival setting it can reasonably be expected for a model to perform differently over time and therefore time-dependent measures are advantageous. First discussion around computation of TPR and TNR are provided and then how these are incorporated into the AUC equation.
+
+The AUC, TPR, and TNR are derived from the *confusion matrix* in a binary classification setting. Let $b,\hat{b} \in \{0, 1\}$ be the true and predicted binary outcomes respectively. The confusion matrix is
+
+||||
+|----|----|-----|
+| | $b = 1$ | $b = 0$ |
+| $\hat{b} = 1$ | TP | FP |
+| $\hat{b} = 0$ | FN | TN |
+
+where $TN := \sum_i \II(b = 0, \hatb = 0)$ is the number of (\#) true negatives, $TP := \sum_i \II(b = 1, \hatb = 1)$ is \# true positives, $FP := \sum_i \II(b = 0, \hatb = 1)$ is \# false positives, and $FN := \sum_i \II(b = 1, \hatb = 0)$ is \# false negatives. From these are derived
+\begin{align}
+& TPR := \frac{TP}{TP + FN} \\
+& TNR := \frac{TN}{TN + FP}
+\end{align}
+
+In classification, a probabilistic prediction of an event can simply be *thresholded* (or 'binarised') to obtain a deterministic prediction. For a predicted $\hat{p} := \hat{P}(b = 1)$, and threshold $\alpha$, the thresholded binary prediction is given by $\hat{b} := \II(\hat{p} > \alpha)$. In survival analysis, this is complicated as either models only predict a continuous ranking (and not a probability of death), or a full survival distribution, which implies that the probability of death changes over time; it is the first of these that is utilised in AUC measures. Two primary methods for doing so have emerged, the first is to use an IPCW method to weight the thresholded linear predictor by an estimated censoring distribution at a given time, the second is to first classify cases and controls then compute estimators based on these classes. All measures of TPR, TNR and AUC are in the range $[0,1]$ with larger values preferred.
+
+Weighting the linear predictor was proposed by Uno \etal (2007) [@Uno2007] and provides a method for estimating TPR and TNR via
+
+$$
+\begin{split}
+&TPR_U: \Reals^m \times \NNReals^m \times \bset^m \times \NNReals \times \Reals \rightarrow [0,1]; \\
+&(\hat{\eta}, t, \delta | \tau, \alpha) \mapsto  \frac{\sum^m_{i=1} \delta_i\mathbb{I}(k(\hat{\eta}_i) > \alpha, t_i \leq \tau)[\KMG(t_i)]^{-1}}{\sum^m_{i=1}\delta_i\II(t_i \leq \tau)[\KMG(t_i)]^{-1}}
+\end{split}
+$$
+and
+
+$$
+\begin{split}
+&TNR_U: \Reals^m \times \NNReals^m \times \NNReals \times \Reals \rightarrow [0,1]; \\
+&(\hat{\eta}, t | \tau, \alpha) \mapsto \frac{\sum^m_{i=1} \II(k(\hat{\eta}_i) \leq \alpha, t_i > \tau)}{\sum^m_{i=1}\II(t_i > \tau)}
+\end{split}
+$$
+where $\tau$ is the time at which to evaluate the measure, $\alpha$ is a cut-off for the linear predictor, and $k$ is a known, strictly increasing, differentiable function. $k$ is chosen depending on the model choice, for example if the fitted model is PH then $k(x) = 1 - \exp(-\exp(x))$ [@Uno2007]. Similarities can be drawn between these equations and Uno's concordance index, in particular the use of IPCW. Censoring is again assumed to be at least random once conditioned on features. Plotting $TPR_U$ against $1 - TNR_U$ for varying values of $\alpha$ provides the ROC.
+
+The second method, which appears to be more prominent in the literature, is derived from Heagerty and Zheng (2005) [@Heagerty2005]. They define four distinct classes, in which observations are split into controls and cases.
+
+An observation is a *case* at a given time-point if they are dead, otherwise they are a *control*. These definitions imply that all observations begin as controls and (hypothetically) become cases over time. Cases are then split into *incident* or *cumulative* and controls are split into *static* or *dynamic*. The choice between modelling static or dynamic controls is dependent on the question of interest. Modelling static controls implies that a 'subject does not change disease status' [@Heagerty2005], and few methods have been developed for this setting [@Kamarudin2017], as such the focus here is on *dynamic* controls. The incident/cumulative cases choice is discussed in more detail below.^[All measures discussed in this section evaluate model discrimination from 'markers', which may be a *predictive* marker (model predictions) or a *prognostic* marker (a single covariate). This section always defines a marker as a ranking prediction, which is valid for all measures discussed here with the exception of one given at the end.]
+
+The TNR for dynamic cases is defined as
+
+$$
+TNR_D(y, N | \alpha, \tau) = P(y_i \leq \alpha | N_i(\tau) = 0)
+$$
+where $y = (y_1,...,y_n)$ is some deterministic prediction and $N(\tau)$ is a count of the number of events in $[0,\tau)$. Heagerty and Zheng further specify $y$ to be the predicted linear predictor $\hat{\eta}$.  Cumulative/dynamic and incident/dynamic measures are available in software packages 'off-shelf', these are respectively defined by
+
+$$
+TPR_C(y, N | \alpha, \tau) = P(y_i > \alpha | N_i(\tau) = 1)
+$$
+and
+
+$$
+TPR_I(y, N | \alpha, \tau) = P(y_i > \alpha | dN_i(\tau) = 1)
+$$
+where $dN_i(\tau) = N_i(\tau) - N_i(\tau-)$. Practical estimation of these quantities is not discussed here.
+
+The choice between the incident/dynamic (I/D) and cumulative/dynamic (C/D) measures primarily relates to the use-case. The C/D measures are preferred if a specific time-point is of interest [@Heagerty2005] and is implemented in several applications for this purpose [@Kamarudin2017]. The I/D measures are preferred when the true survival time is known and discrimination is desired at the given event time [@Heagerty2005].
+
+Defining a time-specific AUC is now possible with
+
+$$
+AUC(y, N | \tau) = \int^1_0 TPR(y, N | 1 - TNR^{-1}(p|\tau), \tau) \ dp
+$$
+
+Finally, integrating over all time-points produces a time-dependent AUC and as usual a cut-off is applied for the upper limit,
+
+$$
+AUC^*(y,N|\tau^*) = \int^{\tau^*}_0 AUC(y,N|\tau)\frac{2\hatp_{KM}(\tau)\KMS(\tau)}{1 - \KMS^2(\tau^*)} \ d\tau
+$$
+where $\KMS,\hatp_{KM}$ are survival and mass functions estimated with a Kaplan-Meier model on training data.
+
+Since Heagerty and Zheng's paper, other methods for calculating the time-dependent AUC have been devised, including by Chambless and Diao [@Chambless2006], Song and Zhou [@Song2008], and Hung and Chiang [@Hung2010]. These either stem from the Heagerty and Zheng paper or ignore the case/control distinction and derive the AUC via different estimation methods of TPR and TNR. Blanche \etal (2012) [@Blanche2012] surveyed these and concluded ''regarding the choice of the retained definition for cases and controls, no clear guidance has really emerged in the literature'', but agree with Heagerty and Zeng on the use of C/D for clinical trials and I/D for 'pure' evaluation of the marker.
+Blanche \etal (2013) [@Blanche2013] published a survey of C/D AUC measures with an emphasis on non-parametric estimators with marker-dependent censoring, including their own Conditional IPCW (CIPCW) AUC,
+
+$$
+AUC_B(y, t, \delta, \hat{G}|\tau) = \frac{\sum_{i \neq j} \II(y_i > y_j)\II(t_i \leq \tau, t_j > \tau)\frac{\delta_i}{m^2\hat{G}(t_i|y_i)\hat{G}(\tau|y_j)}}{\Big(\sum^m_{i=1}\II(t_i \leq \tau)\frac{\delta_i}{m\hat{G}(t_i|y_i)}\Big)\Big(\sum^m_{j=1}\II(t_j>\tau)\frac{1}{m\hat{G}(\tau|y_j)}\Big)}
+$$
+where $t = (t_1,...,t_m)$, and $\hatG$ is the Akritas [@Akritas1994] estimator of the censoring distribution (@sec-surv-models-uncond). It can be shown that setting the $\lambda$ parameter of the Akritas estimator to $1$ results in the IPCW estimators [@Blanche2013]. However unlike the previous measures in which a deterministic prediction can be substituted for the marker, this is not valid for this estimator and as such this cannot be used for predictions. This is clear from the weights, $\hat{G}(t|y)$, in the equation which are dependent on the prediction itself. The purpose of the CIPCW method is to adapt the IPCW weights to be conditioned on the data covariates, which is not the case when $y$ is a predictive marker. Hence the following adaptation is considered instead,
+
+$$
+AUC^*_B(y, x, t, \delta, \hat{G}|\tau) = \frac{\sum_{i \neq j} \II(y_i > y_j)\II(t_i \leq \tau, t_j > \tau)\frac{\delta_i}{m^2\hat{G}(t_i|x_i)\hat{G}(\tau|x_j)}}{\Big(\sum^m_{i=1}\II(t_i \leq \tau)\frac{\delta_i}{m\hat{G}(t_i|x_i)}\Big)\Big(\sum^m_{j=1}\II(t_j>\tau)\frac{1}{m\hat{G}(\tau|x_j)}\Big)}
+$$
+where $x$ are random covariates (possibly from a separate training dataset).
+
+AUC measures are less transparent and less accessible than the simpler time-independent concordance indices, only the \pkg{survAUC} [@pkgsurvauc] package could be found that implements these measures. For performance, reviews of these measures have produced (sometimes markedly) different results [@Blanche2012; @Li2018; @Kamarudin2017] with no clear consensus on how and when these measures should be used. The primary advantage of these measures is to extend discrimination metrics to be time-dependent. However it is unclear how to interpret a threshold of a linear predictor and moreover if this is even the 'correct' quantity to threshold, especially when survival distribution predictions are the more natural object to evaluate over time. Methods for evaluating these distribution predictions are now discussed.
+
+## Evaluating Distributions by Calibration {#sec-eval-distr-calib}
+
+The final discussed measures are for evaluating survival distributions. First measures of calibration are briefly discussed in this section and then extensive treatment is given to scoring rules (@sec-eval-distr).
+
+#### Random Variable and Distribution Notation {.unnumbered .unlisted}
+
+Throughout these next two sections, two different notations are utilised for random variables and distributions. The first is the 'standard' notation, for example if $\zeta$ is a continuous probability distribution and $X \sim \zeta$ is a random variable, then $f_X$ is the probability density function of $X$. The second notation associates distribution functions directly with the distribution and not the variable. For example if $\zeta$ is a continuous probability distribution then $\zeta.f$ is the probability density function of $\zeta$. Analogously for the probability mass, cumulative distribution, hazard, cumulative hazard, and survival functions of $X \sim \zeta$, $p_X/\zeta.p, F_X/\zeta.F, h_X/\zeta.h, H_X/\zeta.H, S_X/\zeta.S$. This notation (fully described and motivated in @sec-tools-distr6-intro) provides a clearer separation of probability distributions and random variables, which in turn allows for cleaner proofs involving probability distributions.
+
+#### Measures of Calibration {.unnumbered .unlisted}
+
+Few measures of calibration exist in survival analysis [@Rahman2017] and this is likely due to the meaning of calibration being unclear in this context [@VanHouwelingen2000]. This is compounded by the fact that calibration is often evaluated graphically, which can leave room for high subjectivity and thus may be restricted to expert interpretation. For these reasons, measures of calibration are only considered in this thesis with respect to accessibility and transparency as there is no clear meaning for what makes a calibration measure performant. Many methods of calibration are restricted to calibration and re-calibration of PH models [@Demler2015; @VanHouwelingen2000], none of these are considered here as they do not generalise to all (or at least many) survival models.
+
+#### Point and Probabilistic Calibration {.unnumbered .unlisted}
+
+Andres \etal (2018) [@Andres2018] derived a taxonomy for calibration measures to separate measures that only evaluate distributions at a single time-point ('1-Calibration') and measures that evaluate distributions at all time-points ('distributional-calibration'). This section will use the same taxonomy but in keeping with machine learning terminology will refer to '1-Calibration' as 'Point Calibration' and 'distributional-calibration' as 'Probabilistic Calibration'.
+
+All measures considered previously can be viewed as 'point' measures as they evaluate predictions at a single point, specifically comparing the predicted linear predictor (more generally relative risk) or survival time to the true time of death. However calibration measures and scoring rules instead evaluate predicted distributions and specifically functions that vary over time, hence it is often of more interest to evaluate these functions at multiple (all if discrete) time-points in order to derive a metric that captures changes over time. For example one may expect probabilistic predictions to be more accurate in the near-future and to steadily worsen as uncertainty increases over time (both mathematical (censoring) and real-world uncertainty), and therefore a measure that only evaluates distributions at a single (possibly early) time-point cannot assess the true variation in the prediction.
+
+Mathematically this difference in measures may be considered as follows: Let $\calP$ be a set of distributions over $\calT \subseteq \PReals$, then a point measure for evaluating distributions is given by,
+
+$$
+L_1: \calP \times \calT \times \bset \times \calT \rightarrow \ExtReals; \quad
+(\zeta, t, \delta|\tau) \mapsto g_1(\zeta.\rho(\tau), t, \delta)
+$$
+and a probabilistic measure is given by,
+
+$$
+L_P: \calP \times \calT \times \bset \times \PReals \rightarrow \ExtReals; \quad
+(\zeta, t, \delta|\tau^*) \mapsto \int_0^{\tau^*} g_P(\zeta.\rho(\tau), t, \delta) \ d\tau
+$$
+or
+
+$$
+L_P: \calP \times \calT \times \bset \times \PReals \rightarrow \ExtReals; \quad
+(\zeta, t, \delta|\tau^*) \mapsto \sum_{\tau = 0}^{\tau^*} g_P(\zeta.\rho(\tau), t, \delta)
+$$
+where $\tau^*$ is some cut-off for the measure to control uncertainty increasing over time, $\rho$ is usually the survival function but may be any distribution-defining function, and $g_1,g_P$ are functions corresponding to specific measures (some examples in next two sections). Note that $\tau$ is an argument (not a free variable) of $L_1$ as the fixed choice of $\tau$ is measure-dependent; usually $\tau = t$.
+
+Less abstractly, a point-calibration measure will evaluate a function of the predicted distribution at a single time-point whereas a probabilistic measure evaluates the distribution over a range of time-points; in both cases the evaluated quantity is compared to the observed outcome, $(T^*, \Delta^*)$.
+
+### Point Calibration {#sec-eval-distr-calib-point}
+
+Point calibration measures can be further divided into metrics that evaluate calibration at a single time-point (by reduction) and measures that evaluate an entire distribution by only considering the event time. The subtle difference significantly affects conclusions that can be drawn. In the first case, a calibration measure can only draw conclusions at that one time-point, whereas the second case can draw conclusions about the calibration of the entire distribution.
+
+#### Calibration by Reduction
+
+Point calibration measures are implicitly reduction methods as they attempt to evaluate a full distribution based on a single point only. For example given a predicted survival function $\zeta.S$, then one could select a time-point $\tau^*$ and calculate the survival function at this time, $\zeta.S(\tau^*)$, probabilistic classification calibration measures can then be utilised. Using this approach one may employ common calibration methods such as the Hosmer–Lemeshow test [@Hosmer1980]. Calibration at a single point in this manner is not particularly useful as a model may be well-calibrated at one time-point and then poorly calibrated at all others [@Haider2020]. To overcome this one could perform the Hosmer–Lemeshow test (or any other applicable test) multiple times at different values of $\tau^* \in \NNReals$. However doing so is inefficient and can lead to problems with 'multiple testing'; hence these single-point methods are not considered further.
+
+#### Houwelingen's $\alpha$
+
+Methods that evaluate entire distributions based on a single point may be more useful as conclusions can be drawn at the distribution level. One such method is termed here 'Houwelingen's $\alpha$'. van Houwelingen proposed several measures [@VanHouwelingen2000] for calibration but only one generalises to all probabilistic survival models. This method evaluates the predicted cumulative hazard function, $\zeta_i.H$ (for some predicted distribution $\zeta_i$), by comparing $\zeta_i.H$ to the 'true' hypothetical cumulative hazard, $H$. The test statistic, $H_\alpha$, is defined by
+
+$$
+H_\alpha := \frac{\sum_i H_i(T^*_i)}{\sum_i \zeta_i.H(T^*_i)} \approx \frac{\sum_i \Delta^*_i}{\sum_i \zeta_i.H(T^*_i)}
+$$
+where $\zeta = (\zeta_1,...,\zeta_m)$ are predicted distributions and $\{(T_1^*,\Delta_1^*),...,(T_m^*,\Delta_m^*)\} \iid (T, \Delta)$ is some test data. The model is therefore well-calibrated if $H_\alpha = 1$. This has standard error $SE(H_\alpha) = \exp(1/\sqrt{(\sum_i \Delta^*_i)})$.
+
+The approximate equality is motivated by formulating survival data as a counting process and noting that in this setting the cumulative hazard function can estimate the number of events in a time-period [@dataapplied]. No study could be found that utilised $H_\alpha$ for model comparison, possibly because graphical methods are favoured. This method can infer results about the calibration of an entire model and not just at a single point because the measure is calculated at a meaningful time (the event time) and utilises known results from counting processes to verify if the expected number of deaths equals the observed number of deaths.
+
+However, as with the reduction method, the statistic is derived from a single point (the observed event time) for each individual and thus it is possible that the model is well-calibrated only for making predictions at the event time, but not over the full $\PReals$ range.
+
+### Probabilistic Calibration {#sec-eval-distr-calib-prob}
+
+Unlike other areas of evaluation, graphical methods are favoured in calibration and possibly more so than numerical ones. Graphical methods compare the average predicted distribution to the expected distribution. As the expected distribution is itself unknown, this is often estimated with the Kaplan-Meier curve.
+
+#### Kaplan-Meier Comparison
+
+The simplest graphical comparison compares the average predicted survival curve to the Kaplan-Meier curve estimated on the testing data. Formally, let \\ $\zeta_1.S,...,\zeta_m.S$ be predicted survival functions, then the average predicted survival function is a mixture of these distributions, $\mean[m]{\zeta_i.S(\tau)}$. Plotting this mixture and the Kaplan-Meier on $\tau$ vs $S(\tau)$ allows a visual comparison of how closely these curves align. An example is given in @fig-eval-calib-km, the Cox model (CPH) is well-calibrated as it almost perfectly overlaps the Kaplan-Meier estimator, whereas predictions from the poorly-calibrated support vector machine (SVM) are far from this line.
+
+::: {#fig-eval-calib-km}
+![](images/evaluation/calib_km.png)
+
+Assessing the calibration of a Cox PH (CPH) and SVM (with distribution composition by PH form and Kaplan-Meier (@sec-car-pipelines-distr)) by comparing the average survival prediction to a Kaplan-Meier (KM) estimate on the testing dataset. x-axis is time and y-axis is the predicted survival functions evaluated over time. The CPH (red line) is said to be well-calibrated as it almost perfectly overlaps the Kaplan-Meier (green line), whereas the SVM (blue line) is far from this line. Models trained and tested on randomly simulated data from the `r cran_pkg("simsurv")` [@pkgsimsurv] package in $\proba$ (@sec-tools-mlr3proba)
+:::
+
+This approach is both simple and interpretable. In the example above one can conclude: on average, the trained Cox PH predicts a distribution just as well as (or very close to) an unconditional estimator using the real test data. A major caveat is that conclusions are at an average *population* level with no individual-level measurement.
+
+In order to capture finer information on a level closer to inidivduals, calibration can be applied to the predicted relative risks or linear predictor. One such approach is to bin the predictions to create different 'risk groups' from low-to-high risk [@Royston2013]. These groups are then plotted against a stratified Kaplan-Meier estimator. This allows for a more nuanced approach to calibration and can simultaneously visualise a model's discrimination. However this method is far less transparent as it adds even more subjectivity around how many risk groups to create and how to create them [@Royston2013].
+
+#### D-Calibration
+
+D-Calibration [@Andres2018; @Haider2020] is a very recent method that aims to evaluate a model's calibration at all time-points in a predicted survival distribution. The D-calibration measure is identical to the $\chi^2$ test-statistic, which is usually written as follows
+
+$$
+\chi^2 := \sum_{i=1}^n \frac{(O_i - E_i)^2}{E_i}
+$$
+where $O_1,...,O_n$ is the observed number of events in $n$ groups and $E_1,...,E_n$ is the expected number of events. The statistic is utilised to determine if the underlying distribution of the observed events follows a theoretical/expected distribution.
+
+The D-Calibration measure tests if predictions (observations) from the  survival functions of predicted distributions, $\zeta_1.S,...,\zeta_m.S$, follow the uniform distribution as expected. The following lemma motivates this test.
+
+::: {#lem}
+\label{lem:uniform_surv}
+Let $\zeta$ be a continuous probability distribution and let $X \sim \zeta$ be a random variable. Let $S_X$ be the survival function of $X$. Then $S_X(X) \sim \Unif(0, 1)$.
+:::
+
+In order to utilise the $\chi^2$ test (for categorical variables), the $[0,1]$ codomain of $\zeta_i.S$ is cut into $B$ disjoint contiguous intervals ('bins') over the full range $[0,1]$. Let $m$ be the total number of observations in the test data. Then assuming a discrete uniform distribution as the theoretical distribution, the expected number of events is $m/B$.
+
+The observed number of events in bin $i$, $O_i$, is defined as follows: Define $b_i$ as the set of observations that die in the $i$th bin, formally defined by $b_i := \{j \in 1,...,m : \ceil{\zeta_j.S(T^*_j)B} = i\}$, where $j = 1,...,m$ are the indices of the test observations and $\zeta = (\zeta_1,...,\zeta_m)$ are predicted distributions.^[This is a slightly simplified procedure which omits handling of censoring, but this is easily extended in the full algorithm, see Algorithm 2 of Haider \etal (2020) [@Haider2020].] Then, $O_i = |b_i|, \forall i \in 1,...,B$.
+
+The D-Calibration measure, or $\chi^2$ statistic, is now defined by,
+
+
+$$
+D_{\chi^2}(\zeta, T^*) :=  \frac{\sum^B_{i = 1} (O_i - \frac{m}{B})^2}{m/B}
+$$
+
+This measure has several useful properties. Firstly, a $p$-value can be derived from $\chi^2_{B-1}$ to hypothesis test if a single model is 'D-calibrated'. Secondly, as a model is increasingly well-calibrated it holds that $D_{\chi^2} \rightarrow 0$ (as the number of observed events approach expected events), which motivates utilising the test for model comparison. Thirdly, the theory lends itself very nicely to an intuitive graphical calibration method:
+
+If a model is D-calibrated, i.e. predicted distributions from the model result in a low D-calibration, then one expects,
+
+$$
+\label{eq:eval_dcalib}
+p = \frac{\sum_i \II(T^*_i \leq \zeta_i.F^{-1}(p))}{|T^*|}
+$$
+where $p \in [0,1]$ and $\zeta_i.F^{-1}$ is the inverse cumulative distribution function of the $i$th predicted distribution. In words, if a model is D-calibrated then the number of deaths occurring at or before each quantile should be equal to the quantile itself, for example 50\% of deaths should occur before their predicted median survival time. Therefore one can graphically test for D-calibration by plotting $p$ on the x-axis and the RHS of @eq-eval-dcalib on the y-axis. A D-calibrated model should result in a straight line on $x = y$. This is visualised in @fig-eval-dcalib for the same models as in @fig-eval-calib-km. Again the SVM is terribly-calibrated but the CPH is better calibrated. In this case it is clearer that the D-calibration of the CPH is not perfect, especially at higher quantiles. Comparison to $\chi^2_9$ indicates the CPH is D-calibrated whereas the SVM is not.
+
+::: {#fig-eval-dcalib}
+![](images/evaluation/dcalib.png)
+
+Assessing the D-calibration of the Cox PH (CPH) and SVM from the same data as @fig-eval-calib-km: models trained and tested on randomly simulated data from the `r cran_pkg("simsurv")` [@pkgsimsurv] package in $\proba$ (@sec-tools-mlr3proba). x-axis are quantiles in $[0,1]$ and y-axis are predicted quantiles from the models. The dashed line is $y = x$. Again the SVM is terribly calibrated and the CPH is better calibrated as it is closer to $y = x$.
+:::
+
+#### Transparency and Accessibility
+
+It has already been stated that performance cannot be considered for calibration measures however it is unclear if any of these measures are even accessible or transparent as they often require expert interpretation to prevent erroneous conclusions. This is demonstrated by example using the same data and models as in  @fig-eval-dcalib. The predictions from these models are evaluated with Harrell's C (@sec-eval-crank-disc-conc), the Integrated Graf Score (@sec-eval-distr-commonsurv), D-Calibration, and Houwelingen's $\alpha$ (@tbl-eval-calib). All measures agree that the SVM performs poorly. In contrast, whilst the Cox PH (CPH) is well-calibrated according to both measures, its concordance is quite bad (barely above baseline). Haider \etal [@Haider2020] claimed that if a model is D-Calibrated then a 'patient should believe the prediction from the survival curve', these results clearly demonstrate otherwise. Measures of calibration alone are clearly not sufficient to determine if a survival curve prediction should be 'believed' and should therefore be computed alongside measures of discrimination or scoring rules, discussed next.
+
+| Model | KM | CPH | SVM |
+| ---- | -- | --- | -- |
+| $C_H^1$ | 0.5 | 0.52 | 0.45 |
+| $L_{IGS}^2$ | 0.18 | 0.18 | 0.52  |
+| $H_\alpha^3$ |  0.99 | 1.00 | 15.42 |
+| $D_{\chi^2}^4$ | 2.23$^*$ | 7.03$^*$ | $1.02\times10^{10}$  |
+
+: Comparison of numerical calibration metrics. Same models and data as in @fig-eval-calib-km: models trained and tested on randomly simulated data from the `r cran_pkg("simsurv")` [@pkgsimsurv] package in $\proba$. {#tbl-eval-calib}
+
+<sup>
+1. Harrell's C (@sec-eval-crank-disc-conc).
+2. Integrated Graf Score (@sec-eval-distr-commonsurv).
+3. Houwelingen's $\alpha$ (@sec-eval-distr-calib-point).
+4. D-Calibration statistic. A $'*'$ indicates the model is D-Calibrated according to a $\chi^2_9$ test.
+</sup>
+
+## Evaluating Distributions by Scoring Rules {#sec-eval-distr}
+
+Scoring rules evaluate probabilistic predictions and (attempt to) measure the overall predictive ability of a model, i.e. both calibration and discrimination [@Gneiting2007; @Murphy1973]. Scoring rules have been gaining in popularity for the past couple of decades since probabilistic forecasts were recognised to be superior than deterministic predictions for capturing uncertainity in predictions [@Dawid1984; @Dawid1986]. Formalisation and development of scoring rules has primarily been due to Dawid [@Dawid1984; @Dawid1986; @Dawid2014] and Gneiting and Raftery [@Gneiting2007]; though the earliest measures promoting ''rational'' and ''honest'' decision making date back to the 1950s [@Brier1950; @Good1952]. Whilst several scoring rules have been proposed for classification problems, fewer exist for probabilistic regression predictions [@Gneiting2007] and even fewer for survival analysis. In practice, only three continuous scoring rules for regression are employed (though the last two of these are often conflated), the integrated Brier score [@Brier1950], the log loss [@Good1952], and the integrated log loss.^[These often appear under many different names. The Brier score is often referred to as the 'squared-error loss', or 'quadratic score', and the log loss often appears as the 'log score', 'logarithmic loss', 'cross-entropy loss', or 'negative log-likelihood'.] In survival analysis only one scoring rule was found to be routinely employed. In fact, there is no recognised definition of a scoring rule in survival analysis, nor definitions for the fundamental scoring rule properties of (strict) properness. This section attempts to fill these gaps and to explore the proposed scoring rules for survival analysis.^[In this section a 'scoring rule' refers to the general class of measures that evaluate a probabilistic prediction and a 'loss' refers to the specific function to be minimised. As all scoring rules are optimally minimised in this survey, the terms are used interchangeably.]
+
+This survey of survival scoring rules covers:
+
+i. basic definitions for scoring rules and properties;
+i. proposed scoring rules for survival analysis;
+i. proofs for (strict) properness; and
+i. baselines and standard errors for scoring rules.
+
+Key contributions include demonstrating that no commonly-utilised survival scoring rule is proper and deriving a class of strictly proper outcome-independent scoring rules with strict assumptions (see @sec-eval-distr-score-surv for definitions and @sec-eval-distr-score-proper for proofs).
+
+Each of these subsections is built up in complexity, starting with binary classification, then probabilistic regression, and finally survival. This is required to demonstrate how the survival setting makes use of the other two for scoring rules.
+
+To recap the notation from @chap-surv, the three mathematical settings are defined by the generative processes:
+
+* Regression: $(X,Y) \ t.v.i. \ \calX \times \calY$ where $\calX \subseteq \Reals^p$ and $\calY \subseteq \Reals$.
+* Classification: $(X,Y) \ t.v.i. \ \calX \times \calY$ where $\calX \subseteq \Reals^p$ and $\calY = \bset$.
+* Survival: $(X,T,\Delta,Y,C) \ t.v.i. \ \calX \times \calT \times \bset \times \calT \times \calT$ where $X \subseteq \Reals^p$ and $\calT \subseteq \NNReals$, where $C,Y$ are unobservable, $T := \min\{Y,C\}$, and $\Delta = \II(Y = T)$.
+
+As the sections are clearly separated, the overloaded notation will be clear from context.
+
+### Classification and Regression Scoring Rules {#sec-eval-distr-score-reg}
+
+Definitions and losses in the classification setting are first discussed and then the same in the regression setting.
+
+#### Classification
+
+All scoring rules were initially derived from the binary classification setting, in this case scoring rules are considered to have the form in @cnj-loss-classif.
+
+:::: {.callout-note icon=false}
+
+## Binary classification loss
+
+::: {#cnj-loss-classif}
+Let $\calP$ be some family of distributions over $\calY = \bset$ containing at least two elements. Then for a predicted distribution in $\calP$, any real-valued function with the signature $L: \calP \times \calY \rightarrow \ExtReals$ will be considered as a *binary classification loss*.
+:::
+
+::::
+
+Any arbitrary function can be a binary classification loss as long as it satisfies the conditions in @cnj-loss-classif, for example $L(\zeta, y) = 0$ is a valid loss for all $\zeta \in \calP$ and all $y \in \calY$. Therefore a scoring rule is generally only considered useful if it satisfies the properties below [@Gneiting2007].
+
+::: {#def-classif-proper}
+
+## Classification loss properness
+
+A classification loss  $L: \calP \times \calY \rightarrow \ExtReals$ is called:
+
+i. *Proper* if: for any distributions $p_Y,p$ in $\calP$ and for any random variables $Y \sim p_Y$, it holds that
+
+$$
+\EE[L(p_Y, Y)] \leq \EE[L(p, Y)]
+$$
+i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, Y)] = \EE[L(p, Y)] \Leftrightarrow p = p_Y
+$$
+
+:::
+
+Proper scoring rules provide a method of model comparison as, by definition, predictions closest to the true distribution will result in lower expected losses.^[Further details for model comparison are not provided here as the topic is complex and with many open questions, see e.g. [@Demsar2006; @Dietterich1998; @Nadeau2003].] On the other hand, if a scoring rule is not proper ('improper' [@Gneiting2007]) then it has no meaningful comparison as it is unknown if the optimal model would have a lower or higher loss than any sub-optimal one. A strictly proper scoring rule has additional important uses such as in model optimisation, i.e. if a loss is strictly proper then minimisation of the loss will result in the 'optimum score estimator based on the scoring rule' [@Gneiting2007]. Whilst properness is usually a minimal acceptable property for a scoring rule, it is generally not sufficient on its own. For example, take the following classification loss,
+
+$$
+L: \calP \times \calY \rightarrow \ExtReals;
+\quad (\zeta, y) \mapsto 42
+$$
+This is proper as the loss, $L$, is always equal to $42$ and therefore is minimised by the true distribution of $Y$ but the loss is clearly useless. Properness and strict properness properties are utilised to determine if a scoring rule is performant and will be stated (if previously proved/disproved) or proved/disproved for all losses going forward.
+
+#### Losses {.unnumbered .unlisted}
+
+
+The two most widely used scoring rules for classification are the Brier score [@Brier1950] and log loss [@Good1952].^[Despite being called a 'score', the Brier score is in fact a loss to be minimised.]
+
+The (binary classification) log loss is defined by
+
+$$
+\begin{split}
+&L_{LL}:\calP \times \calY \rightarrow \NNReals; \\
+&(\zeta, y) \mapsto -\II(y = 1)\log(\zeta.p(1)) - \II(y = 0)\log(\zeta.p(0))
+\end{split}
+$$
+or more simply
+
+$$
+(\zeta, y) \mapsto -\log \zeta.p(y)
+$$
+
+The (binary classification) Brier score is defined by
+
+$$
+L_{BS}:\calP \times \calY \rightarrow [0,1]; \quad
+(\zeta, y) \mapsto (y - \zeta.p(y))^2
+$$
+
+These are both strictly proper scoring rules [@Dawid2014] and are visualised in @fig-eval-brierlog to demonstrate their properties. The figure highlights the 'honesty' property of the scoring rules (i.e. their strict properness) as both losses are shown to be minimised when the true prediction is made. The plot also demonstrates baselines for interpretability (@sec-eval-distr-score-base-base). For the Brier score and log loss, any result below 0.25 and 0.693 respectively indicates a prediction better than a constant uninformed prediction of $\zeta.p(1) = 0.5$. Therefore classification scoring rules provide a method to simultaneously encourage honest predictions and have in-built informative baselines for external reference.
+
+::: {#fig-eval-brierlog}
+![](images/evaluation/brier_logloss.png)
+
+Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in $[0,1]$, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimised with the correct prediction, i.e. if $\zeta.p(1) = 1$ when $y = 1$ and $\zeta.p(1) = 0$ when $y = 0$ for a predicted discrete distribution $\zeta$.
+:::
+
+#### Regression {#sec-eval-distr-score-reg-reg}
+
+The definition of a probabilistic regression scoring rule follows similarly to the classification setting after a re-specification of the target domain.
+
+:::: {.callout-note icon=false}
+
+## Probabilistic regression loss
+
+::: {#cnj-loss-regr}
+Let $\calP$ be some family of distributions over $\calY \subseteq \Reals$ containing at least two elements. Then for a predicted distribution in $\calP$, any real-valued function with the signature $L: \calP \times \calY \rightarrow \ExtReals$ will be considered as a *probabilistic regression loss*.
+
+:::
+
+::::
+
+::: {#def-regr-proper}
+
+## Regression loss properness
+
+A probabilistic regression loss  $L: \calP \times \calY \rightarrow \ExtReals$ is called:
+
+i. *Proper* if: for any distributions $p_Y,p$ in $\calP$ and for any random variables $Y \sim p_Y$, it holds that
+
+$$
+\EE[L(p_Y, Y)] \leq \EE[L(p, Y)]
+$$
+i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, Y)] = \EE[L(p, Y)] \Leftrightarrow p = p_Y
+$$
+
+:::
+
+#### Losses {.unnumbered .unlisted}
+
+In the regression setting, classification scoring rules are extended by instead considering distribution functions and integrating these over $\calY \subseteq \Reals$.
+
+The Integrated Brier Score (IBS) is defined by,^[also known as the Continuous Ranked Probability Score (CRPS).]
+
+$$
+L_{IBS}:\calP \times \calY \rightarrow [0,1]; \quad
+(\zeta, y) \mapsto \int_\calY (\II(y \leq \tau) - \zeta.F(\tau))^2 \ d\tau
+\label{eq:ibs}
+$$
+
+The extension from the classification Brier score is intuitive, instead of evaluating if the predicted pmf is 'correct' at a single point, the predicted cumulative distribution function is compared with the true event status over the entire distribution.
+
+The log loss has two adaptations for continuous predictions. The first is analogous to the IBS and is termed the Integrated Log Loss (ILL)
+
+$$
+\begin{split}
+&L_{ILL}:\calP \times \calY \rightarrow \NNReals; \\
+&(\zeta, y) \mapsto - \int_\calY \II(y \leq \tau)\log[\zeta.F(\tau)] + \II(y > \tau)\log[\zeta.S(\tau)] \ d\tau
+\end{split}
+$$
+
+This follows the 'longer' form of the binary classification log loss and considers the cumulative probability of events over all time-points. A second adaptation to the log loss instead considers the 'simpler' form and replaces the probability mass function with the probability density function. Again this measure is intuitive as a perfect distributional prediction will assign the highest point of density to the point at which the event occurs. This variant of the log loss does not have a specific name but it is termed here the 'density log loss', $L_{DLL}$, and is formally defined by,
+
+$$
+L_{DLL}:\calP \times \calY \rightarrow \NNReals; \quad
+(\zeta, y) \mapsto - \log[\zeta.f(y)]
+\label{eq:density_logloss}
+$$
+where $\calP$ is a family of absolutely continuous distributions over $\calY$ with defined density functions.
+
+All three of these losses are strictly proper [@Gneiting2007; @Gressmann2018].
+
+
+### Survival Scoring Rule Definitions {#sec-eval-distr-score-surv}
+
+Losses in the survival setting compare predicted survival distributions to the observed outcome tuple (time and censoring). A large class of survival losses additionally incorporate an estimator of the unknown censoring distribution, in order to attempt meaningful comparison. This second group of losses are termed here as 'approximate' losses as the true censoring distribution is never known and hence an estimate of the loss is approximate at best.
+
+:::: {.callout-note icon=false}
+
+## Survival loss
+
+::: {#cnj-loss-surv}
+Let $\calT \subseteq \NNReals$ and let $\calC, \calP$ be any two distinct families of distributions over $\calT$, containing at least two elements. Then,
+
+* Any real-valued function with the signature $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ will be considered as a *survival loss*.
+* Any real-valued function with the signature $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$ will be considered as an *approximate survival loss*.
+:::
+
+::::
+
+Two separate novel definitions for (strict) properness are provided: the first captures the general case in which no assumptions are made about the censoring distribution; the second assumes that censoring is conditionally event-independent.
+
+::: {#def-surv-proper}
+
+## Survival loss properness
+
+A survival loss $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ is called:
+
+i. *Proper* if: for any distributions $p_Y, p$ in $\calP$; and for any random variables $Y \sim p_Y$, and $C$ t.v.i. $\calT$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
+
+$$
+\EE[L(p_Y, T, \Delta)] \leq \EE[L(p, T, \Delta)]
+$$
+i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, T, \Delta)] = \EE[L(p, T, \Delta)] \Leftrightarrow p = p_Y
+$$
+i. *Outcome-independent proper* if: for any distributions $p_Y, p$ in $\calP$; and for any random variables $Y \sim p_Y$, and $C$ t.v.i. $\calT$, where $C \indep Y$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
+
+$$
+\EE[L(p_Y, T, \Delta)] \leq \EE[L(p, T, \Delta)]
+$$
+i. *Outcome-independent strictly proper* if in addition to being outcome-independent proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, T, \Delta)] = \EE[L(p, T, \Delta)] \Leftrightarrow p = p_Y
+$$
+
+:::
+
+These final two definitions are 'weaker' but provide a term for losses that are improper in general but are (strictly) proper under common (though possibly strict) assumptions about the censoring distribution. Note by definition that if a loss is:
+
+i. (strictly) proper then it is also outcome-independent (strictly) proper;
+i. (outcome-independent) strictly proper then it is also (outcome-independent) proper
+
+
+Analogous definitions are now provided for approximate survival losses.
+
+::: {#def-surv-approx-proper}
+
+## Survival approximate loss properness
+
+An approximate survival loss $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$ is called:
+
+i. *Proper* if: for any distributions $p_Y, p$ in $\calP$ and $c \in \calC$; and for any random variables $Y \sim p_Y$ and $C \sim c$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
+
+$$
+\EE[L(p_Y, T, \Delta|c)] \leq \EE[L(p, T, \Delta|c)]
+$$
+i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, T, \Delta|c)] = \EE[L(p, T, \Delta|c)] \Leftrightarrow p = p_Y
+$$
+i. *Outcome-independent proper* if: for any distributions $p_Y, p$ in $\calP$ and $c \in \calC$; and for any random variables $Y \sim p_Y$ and $C \sim c$, where $C \indep Y$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
+
+$$
+\EE[L(p_Y, T, \Delta|c)] \leq \EE[L(p, T, \Delta|c)]
+$$
+i. *Outcome-independent strictly proper* if in addition to being outcome-independent proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, T, \Delta|c)] = \EE[L(p, T, \Delta|c)] \Leftrightarrow p = p_Y
+$$
+
+:::
+
+As the true censoring distribution, $c$, can never be known exactly, this definition allows for approximate losses to be proper in the asymptotic (with infinite training data) if they include estimators of $c$ that are convergent in distribution. Proper approximate losses are therefore useful in modern predictive settings in which 'big data' is very common and thus estimators, such as the Kaplan-Meier, can converge to the true censoring distribution. However approximate losses may provide misleading results when the sample size is small; future research should ascertain what 'small' means for individual losses.
+
+### Common Survival Scoring Rules {#sec-eval-distr-commonsurv}
+
+The IBS, ILL, and DLL are now extended to the survival setting by suitably incorporating censoring and their properness properties are then discussed in @sec-eval-distr-score-proper. Measures are split into 'classes', which represent the basic form of the measure.
+
+#### Squared Survival Losses
+
+The analogue to the IBS for survival analysis is termed here as the Integrated Graf Score (IGS) as it was extensively discussed and promoted by Graf [@Graf1995; @Graf1999].
+
+::: {#def-igs}
+
+## Integrated Graf score (IGS)
+
+$$
+\begin{split}
+&L_{IGS}: \calP \times \calT \times \bset \times \calC \rightarrow [0,1]; \\
+&(\zeta, t, \delta|\KMG) \mapsto \int^{\tau^*}_0  \frac{\zeta.S^2(\tau) \II(t \leq \tau, \delta=1)}{\KMG(t)} + \frac{\zeta.F^2(\tau) \II(t > \tau)}{\KMG(\tau)} \ d\tau
+\end{split}
+\label{eq:igs}
+$$
+where  $\zeta.S^2(\tau) = (\zeta.S(\tau))^2$, analogously for $\zeta.F^2$, and $\tau^* \in \calT$ is an upper threshold to compute the loss up to.
+:::
+
+The IGS consistently estimates the mean square error $L(t, S|\tau^*) = \int^{\tau^*}_0 [\II(t > \tau) - S(\tau)]^2 d\tau$, where $S$ is the correctly specified survival function, when censoring is uninformative only [@Gerds2006]. This is intuitive as the IGS utilises the marginal Kaplan-Meier estimator to estimate the censoring distribution. Therefore CIPCW estimates such as the Cox model or Akritas estimator could instead be considered for $\KMG$ and these have been demonstrated to have less bias when censoring is informative [@Gerds2006]. However this raises concerns as now separate models have to be trained and predicted, which could need validation themselves, and therefore the final measure is even more difficult to interpret. Graf claimed that the IGS is strictly proper [@Graf1999] however as no definition of properness was provided this claim cannot be validated. With the definition of properness provided in this thesis (@def-surv-approx-proper), the IGS is not even proper (@sec-eval-distr-score-proper-nonapprox).
+
+One could instead consider extending the IBS by weighting by $\KMG(t)$ only, giving the following loss.
+
+::: {#def-rigs}
+
+## Reweighted Integrated Graf score (IGS$^*$)
+
+Let $\calP$ be a family of absolutely continuous distributions over $\calT$ with defined density functions. Then the *reweighted Integrated Graf score* (IGS$^*$) is defined by
+
+$$\label{eq:wsbs}
+\begin{split}
+&L_{IGS^*}: \calP \times \calT \times \bset \times \calC \rightarrow \NNReals; \\
+&(\zeta, t, \delta|\KMG) \mapsto \frac{\delta \int_{\calT} (\II(t \leq \tau) - \zeta.F(\tau))^2 \ d\tau}{\KMG(t)}
+\end{split}
+$$
+:::
+
+IGS$^*$ is outcome-independent strictly proper (@sec-eval-distr-score-proper-strict).
+
+#### Log Survival Losses
+
+The ILL is similarly extended to the Integrated Survival Log Loss (ISLL) [@Graf1999].
+
+::: {#def-isll}
+
+## Integrated survival log loss (ISLL)
+
+The *integrated survival log loss* (ISLL) is defined by
+\begin{align*}
+& L_{ISLL}: \calP \times \calT \times \bset \times \calC \rightarrow \NNReals; \\
+& (\zeta,t,\delta|\KMG) \mapsto -\int^{\tau^*}_0  \frac{\log[\zeta.F(\tau)] \II(t \leq \tau, \delta=1)}{\KMG(t)} + \frac{\log[\zeta.S(\tau)] \II(t > \tau)}{\KMG(\tau)} \ d\tau
+\label{eq:isll}
+\end{align*}
+
+where $\tau^* \in \calT$ is an upper threshold to compute the loss up to.
+:::
+
+The ISLL is not a proper approximate survival loss (@sec-eval-distr-score-proper-nonapprox). Again one could instead a different weighting in the denominator of the measure to give the following loss.
+
+::: {#def-risll}
+
+## Reweighted integrated survival log loss (ISLL$^*$)
+
+Let $\calP$ be a family of absolutely continuous distributions over $\calT$ with defined density functions. Then the *reweighted integrated survival log loss* (ISLL$^*$) is defined by
+
+$$\label{eq:wsill}
+\begin{split}
+&L_{ISLL^*}: \calP \times \calT \times \bset \times \calC \rightarrow \NNReals;\\
+&(\zeta, t, \delta|\KMG) \mapsto -\frac{\delta \int_{\calT} \II(t \leq \tau)\log[\zeta.F(\tau)] + \II(t > \tau)\log[\zeta.S(\tau)] \ d\tau}{\KMG(t)}
+\end{split}
+$$
+:::
+
+ISLL$^*$ is an outcome-independent strictly proper scoring rule (@sec-eval-distr-score-proper-strict).
+
+The DLL can be extended in one of two ways, the first simply removes all censored observations.
+
+::: {#def-sdll}
+
+## Survival density log loss (SDLL)
+
+Let $\calP$ be a family of absolutely continuous distributions over $\calT$ with defined density functions. Then the *survival density log loss* (SDLL) is defined by
+
+$$
+L_{SDLL}: \calP \times \calT \times \bset \rightarrow \NNReals; \quad (\zeta, t, \delta) \mapsto - \delta \log[\zeta.f(t)]
+\label{eq:sdll}
+$$
+:::
+
+The SDLL is not a proper scoring rule (@sec-eval-distr-score-proper-nostrict). The second extension to DLL adds the same IPC weighting as IGS$^*$ and ISLL$^*$.
+
+::: {#def-wsdll}
+
+## Weighted survival density log loss (SDLL$^*$)
+
+Let $\calP$ be a family of absolutely continuous distributions over $\calT$ with defined density functions. Then the *weighted survival density log loss* (SDLL$^*$) is defined by
+
+$$\label{eq:wsdll}
+L_{SDLL^*}: \calP \times \calT \times \bset \times \calC \rightarrow \NNReals; \quad (\zeta, t, \delta|\KMG) \mapsto - \frac{\delta \log[\zeta.f(t)]}{\KMG(t)}
+$$
+:::
+
+SDLL$^*$ is outcome-independent strictly proper (@sec-eval-distr-score-proper-strict).
+
+#### Absolute Survival Losses
+
+Whilst the IGS and ISLL appear to be the most common losses in the literature, there is one other class to briefly mention that is based on absolute error functions. For example, the 'absolute Brier score' proposed by Schemper and Henderson [@Schemper2000] which is based on the mean absolute error. This takes a similar approach to the IGS and weights the loss at different time-points according to whether an observation is censored. Studies of this loss have demonstrated that it depends heavily on correct model specification and is biased when this is not the case [@Choodari2012b; @Schmid2011]. To prevent this bias, Schmid \etal [@Schmid2011] proposed the following robust approximate loss, termed here the 'Schmid score',
+
+$$
+L(\zeta, t, \delta|\KMG) = \int^{\tau^*}_0 \frac{\zeta.S(\tau)\II(t \leq \tau, \delta = 1)}{\KMG(t)} + \frac{\zeta.F(\tau)\II(t > \tau)}{\KMG(\tau)} \ d\tau
+$$
+where $\KMG$ and $\tau^*$ are as defined above. Analogously to the IGS, the Schmid score consistently estimates the mean absolute error when censoring is uninformative [@Schmid2011]. Both scores tend to yield similar results [@Schmid2011].
+
+#### Comparing Weighting Methods
+
+The IGS and ISLL are well-established survival losses however no discussion about IGS$^*$ and ISLL$^*$ could be found in the literature. On the surface these measures may look very similar but there are two important differences, which are illustrated below with the ISLL and ISLL$^*$, recall these are defined as:
+
+$$
+\begin{split}
+&L_{ISLL^*}(\zeta, t, \delta|\KMG) = -\int^{\tau^*}_0  \frac{\log[\zeta.F(\tau)]\II(t \leq \tau, \delta = 1)}{\KMG(t)} + \frac{\log[\zeta.S(\tau)]\II(t > \tau, \delta = 1)}{\KMG(t)} \ d\tau \\
+&L_{ISLL}(\zeta,t,\delta|\KMG) = -\int^{\tau^*}_0  \frac{\log[\zeta.F(\tau)] \II(t \leq \tau, \delta=1)}{\KMG(t)} + \frac{\log[\zeta.S(\tau)] \II(t > \tau)}{\KMG(\tau)} \ d\tau
+\end{split}
+$$
+
+The primary differences are (RHS of equations):
+
+i. Always removing censored observations from $L_{ISLL^*}$ (even when alive) whereas $L_{ISLL}$ includes all observations when alive.
+i. $L_{ISLL^*}$ weights alive and dead observations by $\KMG(t)$ whereas $L_{ISLL}$ weights dead observations by $\KMG(t)$ and alive observations by $\KMG(\tau)$
+
+
+Analytically the difference between these weighting results has major implications as $L_{ISLL^*}$ (and $L_{IGS^*}$) is outcome-independent strictly proper (@sec-eval-distr-score-proper-strict) whereas $L_{ISLL}$ (and $L_{IGS}$) is not even proper (@sec-eval-distr-score-proper-nonapprox). However whilst it has been demonstrated that the IGS consistently estimates the mean squared error [@Gerds2006], no theory exists for IGS$^*$. Similarly no study has been made on ISLL$^*$ and SDLL$^*$.
+
+#### PECs
+
+As well as evaluating probabilistic outcomes with integrated scoring rules, non-integrated scoring rules can also be utilised for evaluating distributions at a single point. For example, instead of evaluating a probabilistic prediction with the IGS over $\NNReals$, instead one could compute the IGS at a single time-point, $\tau \in \NNReals$, only. Plotting these for varying values of $\tau$ results in 'prediction error curves' (PECs), which provide a simple visualisation for how predictions vary over the outcome. PECs are especially useful for survival predictions as they can visualise the prediction 'over time'. PECs should only be used as a graphical guide and never for model comparison as they only provide information at a limited number of points. An example is provided in @fig-eval-pecs for the IGS; the CPH is consistently better performing than the SVM.
+
+::: {#fig-eval-eval-pecs}
+![](images/evaluation/pecs.png)
+
+Prediction error curves for the CPH and SVM models from @sec-eval-distr-calib. x-axis is time and y-axis is the IGS computed at different time-points. The CPH (red) performs better than the SVM (blue) as it scores consistently lower. Trained and tested on randomly simulated data from $\proba$.
+:::
+
+### Properness of Survival Scoring Rules {#sec-eval-distr-score-proper}
+
+As the IBS, ILL, and DLL are all strictly proper regression losses, one may assume the analogous survival losses are also strictly proper. No arguments could be found proving/disproving properness of the survival losses, which may be due to researchers assuming properness followed from the regression setting. Despite these estimators being demonstrated to have useful properties and to 'perform well' in simulation experiments [@Choodari2012a; @Choodari2012b; @Gerds2006], it transpires that none are proper. Key results in this section are collected in the following summary theorem.
+
+::: {#thm}
+Let $\calT \subseteq \PReals$ and let $\calC,\calP$ be two distinct families of distributions over $\calT$  containing at least two elements and let $L_R: \calP \times \calT \rightarrow \ExtReals$ be a regression scoring rule. Then the following statements are true:
+
+i. $L_{SDLL}$ is not: a) outcome-independent proper; b) outcome-independent strictly proper; c) proper; d) strictly proper (@prop-sdll-proper).
+i. Define the approximate survival loss,
+
+$$
+L_S: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals; \quad
+(\zeta, t, \delta|\KMG) \mapsto \frac{\delta L_R(\zeta, t)}{\KMG(t)}
+$$
+Then $L_S$ is outcome-independent strictly proper if and only if $L_R$ is strictly proper (@thm-surv-regr-proper).
+i. $L_{SDLL^*}, L_{IGS^*}, L_{ISLL^*}$ are all outcome-independent strictly proper (@prop-approx-proper-losses).
+i. $L_{IGS}$ is not: a) outcome-independent proper; b) outcome-independent strictly proper; c) proper; d) strictly proper (@prop-eval-igs).
+i. $L_{ISLL}$ is not: a) outcome-independent proper; b) outcome-independent strictly proper; c) proper; d) strictly proper (@prop-eval-isll).
+
+:::
+
+The following conjectures are also made:
+
+i. No survival loss, $L: \calP \times \calT \times \bset \rightarrow \ExtReals$, is: a) outcome-independent strictly proper; b) strictly proper (@conj-no-proper-loss).
+i. No approximate survival loss, $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$, is strictly proper (@conj-approx-strictly).
+
+
+#### Definitions and Lemmas
+
+Important proofs in this subsection follow after these definitions and lemmas.
+
+::: {#lem}
+\label{lem:proper_relate}
+Let $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ be a survival loss. Let $p_Y \in \calP$, let $Y \sim p_Y$ and $C \ t.v.i. \ \calT$ be random variables where $C \indep Y$. Let $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$. Then if $\exists p \in \calP, p \neq p_Y$, such that
+
+$$
+\EE[L(p_Y, T, \Delta)] > \EE[L(p, T, \Delta)]
+$$
+Then, $L$ is not:
+
+i. outcome-independent proper;
+i. outcome-independent strictly proper;
+i. proper;
+i. strictly proper.
+:::
+
+::: {#lem}
+\label{lem:approx_proper_relate}
+Let $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$ be an approximate survival loss. Let $p_Y \in \calP$ and let $c \in \calC$. Let $Y \sim p_Y$ and $C t.v.i. \calT$ be random variables. Let $T := min\{Y,C\}$ and $\Delta := \II(T=Y)$. Then if $\exists p \in \calP, p \neq p_Y$, such that
+
+$$
+\EE[L(p_Y, T, \Delta|c)] > \EE[L(p, T, \Delta|c)]
+$$\mbox{}
+Then: $L$ is not,
+
+i. proper;
+i. strictly proper.
+:::
+
+::: {#def-proper-terms}
+
+## Properness terminology
+
+Let $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ be a proper scoring rule and let $p,p_Y$ be distributions in $\calP$. Let $Y \sim p_Y$ and $C$ t.v.i. $\calT$ be random variables and let $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$. Then, [@Gneiting2007]
+
+i. $S_L(p_Y, p) := \EE[L(p, T, \Delta)]$ is defined as the *expected penalty*.
+i. $H_L(p_Y) := S_L(p_Y, p_Y)$ is defined as the *(generalised) entropy of* $p_Y \in \calP$.
+i. $D_L(p_Y, p) := S_L(p_Y, p) - H_L(p_Y)$ is defined as the *discrepancy* or *divergence* of $p \in \calP$ from $p_Y \in \calP$.
+
+:::
+
+Similar definitions follow for the expected penalty, entropy, and divergence for an approximate survival loss $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$.
+
+::: {#lem}
+\label{lem:divergence}
+Let $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ be a survival loss and let $p_Y$ be a distribution in $\calP$. Let $Y \sim p_Y$ and $C$ t.v.i. $\calT$ be random variables and let $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$. Then,
+
+* $D_L(p_Y, p) \geq 0$ for all $p \in \calP$ if $L$ is proper
+* $D_L(p_Y, p) > 0$ iff $L$ is strictly proper and $p \neq p_Y$
+:::
+
+::: {#def-joints}
+
+## Joint density
+
+Let $X$ be an absolutely continuous random variable and let $Y$ be a discrete random variable. Then,
+
+i. The *mixed joint density* of $(X,Y)$ is defined by
+
+$$
+f_{X,Y}(x,y) = f_{X|Y}(x|y)P(Y = y)
+$$
+where $f_{X|Y}(x|y)$ is the conditional probability density function of $X$ given $Y = y$.
+i. The *mixed joint cumulative distribution function* of $(X,Y)$ is given by
+
+$$
+F_{X,Y}(x,y) =  \sum_{z \leq y} \int_{u=-\infty}^x f_{X,Y}(u, z) \ du
+$$
+
+:::
+
+::: {#lem}
+\label{lem:joints}
+Let $X,Y$ be jointly absolutely continuous random variables supported on the Reals with joint density function $f_{X,Y}(x,y)$ and let $Z = \II(X \leq Y)$, then the mixed joint density of $(X,Z)$ is given by
+
+
+$$
+f_{X,Z}(x,z) =
+\begin{cases}
+\int^\infty_x \ f_{X,Y}(x,y) \ dy, & z = 1 \\
+\int^x_{-\infty} f_{X,Y}(x,y) \ dy, & z = 0
+\end{cases} \\
+$$
+:::
+
+::: {#cor}
+\label{cor:joints}
+Let $X,Y$ be jointly absolutely continuous random variables supported on the Reals with joint density function $f_{X,Y}(x,y)$ and let $Z = \II(X \leq Y)$. As a direct corollary to @lem-joints, if $X$ and $Y$ are independent then the mixed joint density of $(X,Z)$ is given by
+
+
+$$
+f_{X,Z}(x,z) =
+\begin{cases}
+f_X(x)S_Y(x), & z = 1 \\
+f_X(x)F_Y(x), & z = 0
+\end{cases}
+$$
+:::
+
+::: {#lem}
+\label{lem:joints_rev}
+Let $X,Y$ be jointly absolutely continuous random variables supported on the Reals with joint density function $f_{X,Y}(x,y)$ and let $Z = \II(X \leq Y)$, then the mixed joint density of $(Y,Z)$ is given by
+
+
+$$
+f_{Y,Z}(y,z) =
+\begin{cases}
+\int^y_{-\infty} f_{X,Y}(x,y) \ dx, & z = 1\\
+\int^\infty_y \ f_{X,Y}(x,y) \ dx, & z = 0
+\end{cases} \\
+$$
+
+In addition if $X \indep Y$, then
+
+
+$$
+f_{Y,Z}(y,z) =
+\begin{cases}
+f_Y(y)F_X(y), & z = 1\\
+f_Y(y)S_X(y), & z = 0
+\end{cases} \\
+$$
+:::
+
+#### No Strictly Proper Survival Loss {#sec-eval-distr-score-proper-nostrict}
+
+First it is proved that the survival density log loss is not outcome-independent proper and then a conjecture is made on the strict properness of all non-approximate losses.
+
+::: {#prp}
+\label{prop:sdll_proper}
+The survival density log loss is not:
+
+i. outcome-independent proper
+i. outcome-independent strictly proper
+i. proper
+i. strictly proper
+:::
+
+Not only is the $L_{SDLL}$ not outcome-independent proper but the counter-example in the proof is not even a rare edge case. Accounting for the censoring distribution is attempted by approximate losses, which are explored after the following conjecture.
+
+::: {#cnj}
+\label{conj:no_proper_loss}
+Let $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ be a survival loss, then $L$ is not:
+
+i. outcome-independent strictly proper;
+i. strictly proper;
+
+:::
+
+This conjecture is motivated by identifying that as the true censoring distribution is always unknown, a counter-example can likely always be identified to contradict the loss being strictly proper.^[This conjecture is being explored as part of a theorem in a paper with external collaborators.]
+
+#### Strictly Proper Approximate Survival Losses {#sec-eval-distr-score-proper-strict}
+
+By making strict assumptions about the data, some survival scoring rules can still be useful, these assumptions are:
+
+i. survival times and censoring times are independent;
+i. the training dataset is large enough to approximate the censoring distribution
+
+
+With these assumptions, a large class of approximate losses can be outcome-independent strictly proper.
+
+::: {#thm}
+\label{thm:surv_regr_proper}
+Let $L_R: \calP \times \calT \rightarrow \ExtReals$ be a regression loss and define the approximate survival loss
+
+$$
+L_S: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals; \quad
+(\zeta, t, \delta|\KMG) \mapsto \frac{\delta L_R(\zeta, t)}{\KMG(t)}
+$$
+Then $L_S$ is outcome-independent strictly proper if and only if $L_R$ is strictly proper.
+:::
+
+::: {#prp}
+\label{prop:approx_proper_losses}
+The following approximate survival losses are outcome-independent strictly proper:
+
+i. $L_{SDLL^*}$ -- @eq-wsdll
+i. $L_{IGS^*}$ -- @eq-wsbs
+i. $L_{ISLL^*}$ -- @eq-wsill
+:::
+
+#### Non-Proper Approximate Survival Losses {#sec-eval-distr-score-proper-nonapprox}
+
+From the previous proofs, it would be natural to assume that $L_{IGS}$ and $L_{ISLL}$ are also outcome-independent strictly proper, however this is not the case.
+
+::: {#prp}
+\label{prop:eval_igs}
+The integrated Graf score, $L_{IGS}$, is not:
+
+i. outcome-independent proper
+i. outcome-independent strictly proper
+i. proper
+i. strictly proper
+:::
+
+Whilst in this counter-example the value of $D_{IGS}(\xi, \zeta)$ is very close to zero, there will be other counter-examples with a more pronounced difference, though this is not required for the proof. Also note that again this is not a rare edge case, practically this example is reflected in any real-world scenario in which the prediction is close to the truth and when the censoring and survival times follow the same distribution.
+
+::: {#prp}
+\label{prop:eval_isll}
+The integrated survival log-loss, $L_{ISLL}$, is not:
+
+i. outcome-independent proper
+i. outcome-independent strictly proper
+i. proper
+i. strictly proper
+
+:::
+
+Proof is not provided but follows with the same argumentation as the previous proposition and noting that a counter-example can always be found as $C$ is unknown and cannot be removed from the equation.
+
+::: {#cnj}
+\label{conj:approx_strictly}
+Let $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$ be an approximate survival loss, then $L$ is not strictly proper.
+:::
+
+This conjecture is motivated by noting that the joint distribution of $(Y,C)$ is always unknown and thus a suitable counter-example to strict-properness can likely always be derived.^[This conjecture is being explored as part of a theorem in a paper with external collaborators.]
+
+### Baselines and ERV {#sec-eval-distr-score-base}
+
+A common criticism of scoring rules is a lack of interpretability, e.g. without context an IGS of 0.5 or 0.0005 have no meaning. The final part of this section very briefly looks at two methods that help increase the interpretability of scoring rules. Scoring rules may already be considered less transparent than, say, concordance indices, as the underlying mathematics is more abstract, and therefore interpretability of the measure can play a large role in increasing transparency.
+
+#### Baselines {#sec-eval-distr-score-base-base}
+
+A baseline is either a model or a value that can be utilised to provide a reference value for a scoring rule, they provide a universal method to judge all models of the same class by [@Gressmann2018].
+
+In classification, an analytical baseline value can be derived for measures, i.e. a baseline model does not actually need to be fit to know what a 'good' value for the loss is. For example it is generally known that a Brier score is considered 'good' if it is below 0.25 or a log loss if it is below 0.693 (@sec-eval-distr-score-reg). Unfortunately simple analytical expressions are not possible in survival analysis as the losses are dependent on the distributions of both the survival and censoring time. Therefore all experiments in survival analysis must include a baseline model that can produce a reference value in order to derive meaningful results.
+
+There is a clear consensus that the Kaplan-Meier estimator is the most sensible baseline model for survival modelling [@Graf1995; @Lawless2010; @Royston2013] as it is the simplest model that can consistently estimate the true survival function. One could also consider the Akritas estimator as a tunable conditional baseline (@sec-surv-models-uncond).
+
+Baseline models are often ignored in experiments when there is overconfidence in a particular model class, this is frequently the case in survival analysis in which a novel model class may only be compared to a Cox PH. This has practical and ethical implications. The calibration example in @sec-eval-distr-calib-point demonstrates how one sophisticated model (CPH) may outperform another (SVM) and still perform worse than the Kaplan-Meier. Not including Kaplan-Meier in every experiment could lead to over-confidence in a novel model that is no better than an unconditional estimator (with no individual predictive ability).
+
+#### Explained Residual Variation {#sec-eval-distr-score-base-erv}
+
+Baseline models can also be utilised to derive a potentially more useful representation of scoring rules. Any scoring rule can be utilised to derive a measure of explained residual variation (ERV) [@Korn1990; @Korn1991] by standardising the loss with respect to a baseline, say Kaplan-Meier. For any survival loss $L$ (analogously for an approximate survival loss), the ERV is,
+
+$$
+\label{eq:eval_erv}
+\begin{split}
+&R_L: \calP \times \calP \times \NNReals^m \times \bset^m \rightarrow [0,1]; \\
+&(\zeta,\xi_0,t,\delta) \mapsto 1 - \frac{\mean[m]{L(\zeta,t_i,\delta_i)}}{\mean[m]{L(\xi_0,t_i,\delta_i)}}
+\end{split}
+$$
+where $t = t_1,...,t_m, \delta = \delta_1,...,\delta_m$ and $\zeta$ should be a predicted distribution from a sophisticated (non-baseline) model and $\xi_0$ is a prediction from the Kaplan-Meier estimator.^[@eq-eval-erv assumes the numerator is always less than the denominator or more specifically that the sophisticated model is 'better' than the baseline; if this is not the case then $R_L^2 < 0$. Therefore this representation should only be utilised when the model outperforms the baseline.]
+
+Representing a scoring rule in this manner improves interpretability by allowing for model comparison whilst simultaneously capturing the improvement from a baseline. Therefore instead of reporting some arbitrary loss value, say $L = 0.1$, one can instead report $R_L = 70\%$ which demonstrates a clear improvement (of 70\%) over the baseline.
+
+## Conclusions {#sec-eval-conc}
+
+This chapter briefly reviewed different classes of survival measures before focusing on the application of scoring rules to survival analysis.
+
+One finding of note from the review of survival measures is the possibility that research and debate has become too focused on measures of discrimination. For example, many papers state the flaws of Harrell's C index [@GonenHeller2005; @Rahman2017; @Schmid2012; @Uno2007] however few acknowledge that simulation experiments have demonstrated that common alternatives yield very similar results to Harrell's C [@Rahman2017; @Therneau2020] and moreover some promimnent alternatives, such as Uno's C [@Uno2007], are actually harder to interpret due to very high variance [@Rahman2017; @Schmid2012]. Whilst all concordance indices may be considered accessible and transparent, there is considerable doubt over their performance due to influence from censoring.
+
+Focus on discrimination could be the reason for less development in survival time and calibration measures. There is evidence [@Wang2017] of the censoring-adjusted RMSE, MAE, and MSE (@sec-eval-det) being used in evaluation but without any theoretical justification, which may lead to questionable results. Less development in calibration measures is likely due to these measures being more widely utilised for re-calibration of models and not in model comparison. The new D-Calibration measure [@Andres2018; @Haider2020] could prove useful for model comparison however independent simulation experiments and theoretical studies of the measure's properties would first be required. No calibration measures can be considered performant due to a lack of clear definition of a calibration measure for survival, moreover the reviewed measures may not even be transparent and accessible due to requiring expert interpretation.
+
+The most problematic findings in this chapter lie in the survival scoring rules. @sec-eval-distr-score-proper proved that no commonly used scoring rule is proper, which means that any results regarding model comparison based on these measures are thrown into question. It is also conjectured that no approximate survival loss can be strictly proper (in general), which is due to the joint distribution of the censoring and survival distribution always being unknown and impossible to estimate (though the marginal censoring distribution can be estimated). As demonstrated in @sec-eval-distr-score-reg, a proper scoring rule is not necessarily a useful one and therefore is not enough for robust model validation.
+
+As an important caveat to the findings in this chapter, this thesis presents one particular definition of properness for survival scoring rules. This definition is partially subjective and other definitions could instead be considered. Therefore these losses should not be immediately dismissed outright. As well as deriving new losses that are (strictly) proper with respect to the definitions provided here, research may also be directed towards finding other sensible definitions of properness, or in confirming that the definition here is the only sensible option. As these are open research questions, the scoring rules discussed in this chapter are still utilised in evaluation for the benchmark experiment in @chap-bench.
+
+This chapter demonstrates that no survival measure on its own can capture enough information to fully evaluate a survival prediction. No measure is satisfactorily APT. This is a serious problem that will either lead (or already is leading) to less interest and uptake in survival modelling, or misunderstanding and deployment of sub-optimal models. Evaluation of survival models is still possible but currently requires expert interpretation to prevent misleading results. If the aim of a study is solely in assessing a model's discriminatory power, then measures of discrimination alone are sufficient, otherwise a range of classes should be included to capture all aspects of model performance. This thesis advocates reporting *all* of the below to evaluate model performance:
+
+
+* \textbf{Calibration}: Houwelingen's $\alpha$ and [@VanHouwelingen2007] *and* D-calibration [@Haider2020].
+* \textbf{Discrimination}: Harrell's [@Harrell1984] *and* Uno's [@Uno2011] C. By including two (or even more) measures of concordance, one can determine a feasible range for the 'true' discriminatory ability of the model instead of basing results on a single measure. Time-dependent AUCs can also be considered but these may require expert-interpretation and may only be advisable for discrimination-specific studies.
+* \textbf{Scoring Rules}: When censoring is outcome-independent and a large enough training dataset is available, then the re-weighted integrated Graf score and re-weighted integrated survival log-loss (@sec-eval-distr-commonsurv). Otherwise the IGS *and* ISLL [@Graf1999] which should be interpreted together to ensure consistency in results.
+
+
+If survival time prediction is the primary goal then RMSE$_C$ and MAE$_C$ can be included in the analysis however these should not form the primary conclusions due to a lack of theoretical justification. Instead, scoring rules should be utilised as a distributional prediction can always be composed into a survival time prediction (@sec-car-pipelines-crank).
+
+All measures discussed in this chapter, with the exception of the Blanche AUC, have been implemented in  $\proba$ (@chap-tools). The listed measures above are utilised in the benchmark experiment in @chap-bench.
