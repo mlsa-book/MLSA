@@ -14,7 +14,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      R_REMOTES_NO_ERRORS_FROM_WARNINGS: true
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
@@ -26,31 +25,13 @@ jobs:
       - name: Setup Julia
         uses: julia-actions/setup-julia@v1
 
-      - uses: quarto-dev/quarto-actions/setup@v2
+      - name: Install Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
         with:
           tinytex: true
 
-      - name: Install headless chromium
-        run: quarto tools install chromium
-
-      - run: echo "LD_LIBRARY_PATH=$(R RHOME)/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-      - name: Restore cache
-        uses: actions/cache@v1
-        env:
-          cache-name: cache-artifacts
-        with:
-          path: ~/.julia/artifacts
-          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-test-${{ env.cache-name }}-
-            ${{ runner.os }}-test-
-            ${{ runner.os }}-
-
       - name: Render book
         run: quarto render book/
-
-      - name: Add .lycheeignore
-        run: cp .lycheeignore book/_book/.lycheeignore
 
       - name: Publish to Netlify (and render)
         if: ${{ github.event_name == 'pull_request' }}
