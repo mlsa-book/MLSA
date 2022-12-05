@@ -13,7 +13,7 @@ Boosting is a machine learning strategy that can be applied to any model class. 
 The best known boosting algorithm is likely AdaBoost~\cite{Freund1996}, which is more generally a Forward Stagewise Additive Model (FSAM) with an exponential loss~\cite{Hastie2001}. Today, the most widely used boosting model is the Gradient Boosting Machine (GBM)~\cite{Friedman2001}.
 
 \paragraph{Training a GBM}
-Pseudo-code for training a componentwise GBM is presented in \cref{alg:surv_gbm}. The term `componentwise' is explained fully below, only this variation of GBM is presented as it is the most common in implementation~\cite{pkggbm, pkgmboost}. Line 1: the initial function is initialized as $g_0 = 0$;\footnote{Some algorithms may instead initialize $g_0$ by finding the value that minimises the given loss function, however setting $g_0 = 0$ appears to be the most common practice for componentwise GBMs.} Line 2: iterate over boosting steps $m = 1,...,M$ and; Line 3: randomly sample the training data, $\dtrain$, to a smaller sample, $\dtrain^*$, this may be ignored if $\phi = 1$; Line 4: for all training observations in the reduced dataset, $i \in \{i:X_i \in \dtrain^*\}$, compute the negative gradient, $r_{im}$, of the differentiable loss function, $L$, with respect to predictions from the previous iteration, $g_{m-1}(X_i)$; Line 5: fit one weak learner for each feature, $j = 1,...,p$, in the training data, where the feature, $X_{;j}$, is the single covariate and $r_{im}$ are the labels; Line 6: select the optimal weak learner as the one that minimises the squared error between the prediction and the true gradient; Line 7: update the fitted model by adding the optimal weak learner with a shrinkage penalty, $\nu$; Line 9: return the model updated in the final iteration as the fitted GBM.
+Pseudo-code for training a componentwise GBM is presented in \ref{alg:surv_gbm}. The term `componentwise' is explained fully below, only this variation of GBM is presented as it is the most common in implementation~\cite{pkggbm, pkgmboost}. Line 1: the initial function is initialized as $g_0 = 0$;\footnote{Some algorithms may instead initialize $g_0$ by finding the value that minimises the given loss function, however setting $g_0 = 0$ appears to be the most common practice for componentwise GBMs.} Line 2: iterate over boosting steps $m = 1,...,M$ and; Line 3: randomly sample the training data, $\dtrain$, to a smaller sample, $\dtrain^*$, this may be ignored if $\phi = 1$; Line 4: for all training observations in the reduced dataset, $i \in \{i:X_i \in \dtrain^*\}$, compute the negative gradient, $r_{im}$, of the differentiable loss function, $L$, with respect to predictions from the previous iteration, $g_{m-1}(X_i)$; Line 5: fit one weak learner for each feature, $j = 1,...,p$, in the training data, where the feature, $X_{;j}$, is the single covariate and $r_{im}$ are the labels; Line 6: select the optimal weak learner as the one that minimises the squared error between the prediction and the true gradient; Line 7: update the fitted model by adding the optimal weak learner with a shrinkage penalty, $\nu$; Line 9: return the model updated in the final iteration as the fitted GBM.
 
 \begin{algorithm}[H]
 \caption{Training a componentwise Gradient Boosting Machine. \\
@@ -35,7 +35,7 @@ Pseudo-code for training a componentwise GBM is presented in \cref{alg:surv_gbm}
 \end{algorithm}
 
 \paragraph{Predicting with a GBM}
-In general, predictions from a trained GBM are simple to compute as the fitted model (and all individual weak learners) take the same inputs, which are passed sequentially to each of the weak learners. In \cref{alg:surv_gbm}, the fitted GBM is a single model, which is a linear combination of weak learners. Instead one could think of the returned model as a collection of the optimal weak learners, i.e. let $w_{m;j^*}$ be the optimal weak learner from iteration $m$ and let the fitted GBM (Line 9 \cref{alg:surv_gbm}) be $\hatg := \{w_{m;j^*}\}^M_{m=1}$.\footnote{This formulation is computationally and mathematically identical to the formulation in \cref{alg:surv_gbm} and is practically more convenient for implementation, indeed this is the implementation in \pkg{mboost}~\cite{pkgmboost}. Despite this, the formulation in \cref{alg:surv_gbm} is common in the literature, which often conflates model training and predicting.} With this formulation, making predictions from the GBM can be demonstrated simply in \cref{alg:surv_gbm_pred}.
+In general, predictions from a trained GBM are simple to compute as the fitted model (and all individual weak learners) take the same inputs, which are passed sequentially to each of the weak learners. In \ref{alg:surv_gbm}, the fitted GBM is a single model, which is a linear combination of weak learners. Instead one could think of the returned model as a collection of the optimal weak learners, i.e. let $w_{m;j^*}$ be the optimal weak learner from iteration $m$ and let the fitted GBM (Line 9 \ref{alg:surv_gbm}) be $\hatg := \{w_{m;j^*}\}^M_{m=1}$.\footnote{This formulation is computationally and mathematically identical to the formulation in \ref{alg:surv_gbm} and is practically more convenient for implementation, indeed this is the implementation in \pkg{mboost}~\cite{pkgmboost}. Despite this, the formulation in \ref{alg:surv_gbm} is common in the literature, which often conflates model training and predicting.} With this formulation, making predictions from the GBM can be demonstrated simply in \ref{alg:surv_gbm_pred}.
 
 \begin{algorithm}[H]
 \caption{Predicting from a Gradient Boosting Machine. \\
@@ -58,21 +58,21 @@ The biggest advantages of boosting are firstly relatively few hyper-parameters, 
 Building a GBM requires selection of the loss to minimise, $L$, selection of weak learners, $w_j$, and a method to compare the weak learners to the loss gradient. The only constraint in selecting a loss, $L$, is that it must be differentiable w.r.t. $g(X)$~\cite{Hastie2001}. Of course a sensible loss should be chosen (a classification loss should not be used for regression) and different choices of losses will optimise different tasks. $L_2$-losses have been demonstrated to be effective for regression boosting, especially with high-dimensional data~\cite{Buhlmann2003}; this is referred to as $L_2$-boosting.
 
 \paragraph{Weak Learners}
-\Cref{alg:surv_gbm} is specifically a \emph{componentwise} GBM~\cite{Buhlmann2003}, which means that each of the $p$ weak learners is fit on a single covariate from the data. This method simplifies selecting the possible choices for the weak learners to selecting the class of weak learner (below). Additionally, componentwise GBMs provide a natural and interpretable feature selection method as selecting the optimal learner (\cref{alg:surv_gbm}, line 6) corresponds to selecting the feature that minimises the chosen loss in iteration $m$.
+\ref{alg:surv_gbm} is specifically a \emph{componentwise} GBM~\cite{Buhlmann2003}, which means that each of the $p$ weak learners is fit on a single covariate from the data. This method simplifies selecting the possible choices for the weak learners to selecting the class of weak learner (below). Additionally, componentwise GBMs provide a natural and interpretable feature selection method as selecting the optimal learner (\ref{alg:surv_gbm}, line 6) corresponds to selecting the feature that minimises the chosen loss in iteration $m$.
 
 Only three weak, or `base', learner classes are commonly used in componentwise GBMs~\cite{pkgmboost, Wang2010}. These are linear least squares~\cite{Friedman2001}, smoothing splines~\cite{Buhlmann2003}, and decision stumps~\cite{Buhlmann2003, Friedman2001}. Let $L$ be a loss with negative gradient for observation $i$ in the $m$th iteration, $r_{im}$, and let $\dtrain$ be the usual training data. For linear least squares, an individual weak learner is fit by~\cite{Friedman2001,Wang2010},
-\begin{equation}
+$$
 w_j(\dtrain) = X_{;j}\frac{\sum^n_{i=1} X_{ij}r_{im}}{\sum^n_{i=1} (X_{ij})^2}
-\end{equation}
+$$
 For smoothing splines, usually cubic splines are implemented, these fit weak learners as the minimisers of the equation~\cite{Buhlmann2003},
-\begin{equation}
+$$
 w_j := \argmin_{g \in \calG} \mean{(r_{im} - g(X_{ij}))^2} + \lambda \int (g''(u))^2 du
-\end{equation}
+$$
 where $g''$ is the second derivative of $g$, $\calG$ is the set of functions, \\ $\calG := \{g: g \text{ is twice continuously differentiable and } \int (g''(x))^2 dx < \infty\}$, and $\lambda$ is a hyper-parameter usually chosen so that the number of degrees of freedom, df, is small, with df $\approx 4$ suggested~\cite{Buhlmann2003, Schmid2008a, Wang2010}.
 
-Finally for decision stumps (\cref{fig:surv_stump}), a decision tree, $w_j$, is grown (\cref{alg:dt_fit}) on $(X_{;j}, r_m)$ to depth one (equivalently to two terminal nodes) for each of the $j = 1,...,p$ covariates~\cite{Friedman2001}.
+Finally for decision stumps (\ref{fig:surv_stump}), a decision tree, $w_j$, is grown (\ref{alg:dt_fit}) on $(X_{;j}, r_m)$ to depth one (equivalently to two terminal nodes) for each of the $j = 1,...,p$ covariates~\cite{Friedman2001}.
 
-\begin{figure}[H]
+<!-- \begin{figure}[H]
 \centering
 \begin{tikzpicture}[state/.style={circle, draw, minimum size=15mm}]
 \node (t0) [state]  {Root};
@@ -94,7 +94,7 @@ Finally for decision stumps (\cref{fig:surv_stump}), a decision tree, $w_j$, is 
 \end{tikzpicture}
 \caption[A decision stump]{A decision tree of depth one, known as a decision stump. The root layer is separated at depth 0 from the terminal nodes at depth 1. A decision stump is defined by a decision tree with a single split at the root node.}
 \label{fig:surv_stump}
-\end{figure}
+\end{figure} -->
 
 \subsubsection{Hyper-Parameters}
 
@@ -104,7 +104,7 @@ The hyper-parameters in \ref{alg:surv_gbm} are the `step-size', $\nu$, the sampl
 The number of iterations is often claimed to be the most important hyper-parameter in GBMs and it has been demonstrated that as the number of iterations increases, so too does the model performance (with respect to a given loss on test data) up to a certain point of overfitting~\cite{Buhlmann2006, Hastie2001, Schmid2008a}. This is an intuitive result as the foundation of boosting rests on the idea that weak learners can slowly be combined to form a single powerful model. This is especially true in componentwise GBMs as time is required to learn which features are important. Finding the optimal value of $M$ is critical as a value too small will result in poor predictions, whilst a value too large will result in model overfitting. Two primary methods have been suggested for finding the optimal value of $M$. The first is to find the $M \in \PNaturals$ that minimises a given measure based on the AIC~\cite{Akaike1974}, the second is the `usual' empirical selection by nested cross-validation. In practice the latter method is usually employed.
 
 \paragraph{Step-size, $\nu$}
-The step-size parameter (\cref{alg:surv_gbm}, line 7), $\nu$, is a shrinkage parameter that controls the contribution of each weak learner at each iteration. Several studies have demonstrated that GBMs perform better when shrinkage is applied and a value of $\nu = 0.1$ is often suggested~\cite{Buhlmann2007, Hastie2001, Friedman2001, Lee2018, Schmid2008a}. The optimal values of $\nu$ and $M$ depend on each other, such that smaller values of $\nu$ require larger values of $M$, and vice versa. This is intuitive as smaller $\nu$ results in a slower learning algorithm and therefore more iterations are required to fit the model. Accurately selecting the $M$ parameter is generally considered to be of more importance, and therefore a value of $\nu$ is often chosen heuristically (e.g. the common value of $0.1$) and then $M$ is tuned by cross-validation and/or early-stopping.
+The step-size parameter (\ref{alg:surv_gbm}, line 7), $\nu$, is a shrinkage parameter that controls the contribution of each weak learner at each iteration. Several studies have demonstrated that GBMs perform better when shrinkage is applied and a value of $\nu = 0.1$ is often suggested~\cite{Buhlmann2007, Hastie2001, Friedman2001, Lee2018, Schmid2008a}. The optimal values of $\nu$ and $M$ depend on each other, such that smaller values of $\nu$ require larger values of $M$, and vice versa. This is intuitive as smaller $\nu$ results in a slower learning algorithm and therefore more iterations are required to fit the model. Accurately selecting the $M$ parameter is generally considered to be of more importance, and therefore a value of $\nu$ is often chosen heuristically (e.g. the common value of $0.1$) and then $M$ is tuned by cross-validation and/or early-stopping.
 
 \paragraph{Sampling Fraction, $\phi$}
 Motivated by the success of bagging in random forests, stochastic gradient boosting~\cite{Friedman1999} randomly samples the data in each iteration. It appears that subsampling performs best when also combined with shrinkage~\cite{Hastie2001} and as with the other hyper-parameters, selection of $\phi$ is usually performed by nested cross-validation.
@@ -117,60 +117,60 @@ In a componentwise GBM framework, adapting boosting to survival analysis require
 
 \subsubsection{Cox Survival Models}
 
-All survival GBMs make ranking predictions and none are able to directly predict survival distributions. However, the GBMs discussed in this section all have natural compositions to distributions as they are modelled in the semi-parametric proportional hazards framework \see{sec:car_pipelines_distr}. The models discussed in the next section can also be composed to distributions though the choice of composition is less clear and therefore they are listed as pure `ranking' models.
+All survival GBMs make ranking predictions and none are able to directly predict survival distributions. However, the GBMs discussed in this section all have natural compositions to distributions as they are modelled in the semi-parametric proportional hazards framework \ref{sec:car_pipelines_distr}. The models discussed in the next section can also be composed to distributions though the choice of composition is less clear and therefore they are listed as pure `ranking' models.
 \\\\
 \textbf{GBM-COX}\label{mod:gdcox}\label{mod:gbmcox}\\
 The `GBM-COX' aims to predict the distribution of data following the PH assumption by estimating the coefficients of a Cox model in a boosting framework~\cite{Ridgeway1999}. The model attempts to predict $\hatg(X^*) = \hat{\eta} := X^*\hat{\beta}$, by minimising a suitable loss function. As the model assumes a PH specification, the natural loss to optimise is the Cox partial likelihood~\cite{Cox1972, Cox1975}, more specifically to minimise the negative partial log-likelihood, $-l$, where
 
-\begin{equation}
+$$
 l(\beta) = \sum^n_{i=1} \Delta_i \Big[\eta_i \ - \ \log\Big(\sum^n_{j \in \calR_{t_i}} \exp(\eta_i)\Big)\Big]
 \label{eq:surv_logpartial}
-\end{equation}
+$$
 where $\calR_{t_i}$ is the set of patients at risk at time $t_i$ and $\eta_i = X_i\beta$. The gradient of $-l(\beta)$ at iteration $m$ is
-\begin{equation}
+$$
 r_{im} := \Delta_i - \sum^n_{j=1} \Delta_j \frac{\II(T_i \geq T_j) \exp(g_{m-1}(X_i))}{\sum_{k \in \calR_{t_j}} \exp(g_{m-1}(X_k))}
 \label{eq:surv_partialgrad}
-\end{equation}
+$$
 where $g_{m-1}(X_i) = X_i\beta_{m-1}$.
 
-\Cref{alg:surv_gbm} now follows with the loss $L := -l(\beta)$.\footnote{Early implementations and publications of the GBM algorithm~\cite{Friedman1999, Friedman2001} included an additional step to the algorithm in which a step size is estimated by line search. More recent research has determined that this additional step is unneccesary~\cite{Buhlmann2007} and the line search method does not appear to be used in practice.}
+\ref{alg:surv_gbm} now follows with the loss $L := -l(\beta)$.\footnote{Early implementations and publications of the GBM algorithm~\cite{Friedman1999, Friedman2001} included an additional step to the algorithm in which a step size is estimated by line search. More recent research has determined that this additional step is unneccesary~\cite{Buhlmann2007} and the line search method does not appear to be used in practice.}
 
 The GBM-COX is implemented in \pkg{mboost}~\cite{pkgmboost} and has been demonstrated to perform well even when the data violates the PH assumption~\cite{Johnson2011}. Despite being a black-box, GBMs are well-understood and individual weak learners are highly interpretable, thus making GBMs highly transparent. Several well-established software packages implement GBM-COX and those that do not tend to be very flexible with respect to custom implementations. GBM-COX is therefore considered an APT survival model.
 \\\\
 \noindent \textbf{CoxBoost}\label{mod:coxboost}\\
-The CoxBoost algorithm boosts the Cox PH by optimising the penalized partial-log likelihood; additionally the algorithm allows for mandatory (or `forced') covariates~\cite{Binder2008}. In medical domains the inclusion of mandatory covariates may be essential, either for model interpretability, or due to prior expert knowledge. This is not a feature usually supported by boosting. CoxBoost deviates from \cref{alg:surv_gbm} by instead using an offset-based approach for generalized linear models~\cite{Tutz2007}. This model has a non-componentwise and componentwise framework but only the latter is implemented by the authors~\cite{pkgcoxboost} and discussed here. Let $\calI_{mand}$ be the indices of the mandatory covariates to be included in all iterations, $m = 1,...,M$, then for an iteration $m$ the indices to consider for fitting are the set
-\begin{equation}
+The CoxBoost algorithm boosts the Cox PH by optimising the penalized partial-log likelihood; additionally the algorithm allows for mandatory (or `forced') covariates~\cite{Binder2008}. In medical domains the inclusion of mandatory covariates may be essential, either for model interpretability, or due to prior expert knowledge. This is not a feature usually supported by boosting. CoxBoost deviates from \ref{alg:surv_gbm} by instead using an offset-based approach for generalized linear models~\cite{Tutz2007}. This model has a non-componentwise and componentwise framework but only the latter is implemented by the authors~\cite{pkgcoxboost} and discussed here. Let $\calI_{mand}$ be the indices of the mandatory covariates to be included in all iterations, $m = 1,...,M$, then for an iteration $m$ the indices to consider for fitting are the set
+$$
  I_m = \{\{1\} \cup \calI_{mand},...,\{p\} \cup \calI_{mand}\} / \{\{j\} \cup \calI_{mand} : j \in \calI_{mand}\}
-\end{equation}
+$$
 i.e. in each iteration the algorithm fits a weak learner on the mandatory covariates and one additional (non-mandatory) covariate (hence still being componentwise).
 
 In addition, a penalty matrix $\mathbf{P} \in \Reals^{p \times p}$ is considered such that $P_{ii} > 0$ implies that covariate $i$ is penalized and $P_{ii} = 0$ means no penalization. In practice this is usually a diagonal matrix~\cite{Binder2008} and by setting $P_{ii} = 0, i \in I_{mand}$ and $P_{ii} > 0, i \not\in I_{mand}$, only optional (non-mandatory) covariates are penalized. The penalty matrix can be allowed to vary with each iteration, which allows for a highly flexible approach, however in implementation a simpler approach is to either select a single penalty to be applied in each iteration step or to have a single penalty matrix~\cite{pkgcoxboost}.
 
 At the $m$th iteration and the $k$th set of indices to consider ($k = 1,...,p$), the loss to optimize is the penalized partial-log likelihood given by
-\begin{equation}
+$$
 \begin{split}
 &l_{pen}(\gamma_{mk}) = \sum^n_{i=1} \Delta_i \Big[\eta_{i,m-1} + X_{i,\calI_{mk}}\gamma^T_{mk}\Big] - \\
 &\quad\Delta_i\log\Big(\sum^n_{j = 1} \II(T_j \leq T_i) \exp(\eta_{i,{m-1}} + X_{i, \calI_{mk}}\gamma^T_{mk}\Big) - \lambda\gamma_{mk}\mathbf{P}_{mk}\gamma^T_{mk}
 \end{split}
-\end{equation}
+$$
 
 where $\eta_{i,m} = X_i\beta_m$, $\gamma_{mk}$ are the coefficients corresponding to the covariates in $\calI_{mk}$ which is the possible set of candidates for a subset of total candidates $k = 1,...,p$, $\mathbf{P}_{mk}$ is the penalty matrix, and $\lambda$ is a penalty hyper-parameter to be tuned or selected.\footnote{On notation, note that $\mathbf{P}_{ij}$ refers to the penalty matrix in the $i$th iteration for the $j$th set of indices, whereas $P_{ij}$ is the $(i,j)$th element in the matrix $\mathbf{P}$.}
 \\\\
 In each iteration, all potential candidate sets (the union of mandatory covariates and one other covariate) are updated by
-\begin{equation}
+$$
 \hat{\gamma}_{mk} = \mathbf{I}^{-1}_{pen}(0)U(0)
-\end{equation}
+$$
 where $U(\gamma) = \partial l / \partial \gamma (\gamma)$ and $\mathbf{I}^{-1}_{pen} = \partial^2 l/\partial\gamma\partial\gamma^T (\gamma + \lambda\mathbf{P}_{mk})$ are the first and second derivatives of the unpenalized partial-log-likelihood. The optimal set is then found as
-\begin{equation}
+$$
 k^* := \argmax_k l_{pen}(\gamma_{mk})
-\end{equation}
+$$
 and the estimated coefficients are updated with
-\begin{equation}
+$$
 \hat{\beta}_m = \hat{\beta}_{m-1} + \gamma_{mk^*}, \quad k^* \in \calI_{mk}
-\end{equation}
+$$
 The step size, $\nu$, is then one, but this could potentially be altered.
 \\\\
-The algorithm deviates from \cref{alg:surv_gbm} as $l_{pen}$ is directly optimised and not its gradient, additionally model coefficients are iteratively updated instead of a more general model form. The algorithm is implemented in \pkg{CoxBoost}~\cite{pkgcoxboost}. Experiments suggest that including the `correct' mandatory covariates may increase predictive performance~\cite{Binder2008}. CoxBoost is less accessible than other boosting methods as it requires a unique boosting algorithm, as such only one off-shelf implementation appears to exist and even this implementation has been removed from CRAN as of 2020-11-11. CoxBoost is also less transparent as the underlying algorithm is more complex, though is well-explained by the authors~\cite{Binder2008}. There is good indication that CoxBoost is performant, which is seen in \cref{chap:bench}. In a non-medical domain, where performance may be the most important metric, then perhaps CoxBoost can be recommended as a powerful model. However, when sensitive predictions are required, CoxBoost is currently not APT. Further papers studying the model and more off-shelf implementations could change this in the future.
+The algorithm deviates from \ref{alg:surv_gbm} as $l_{pen}$ is directly optimised and not its gradient, additionally model coefficients are iteratively updated instead of a more general model form. The algorithm is implemented in \pkg{CoxBoost}~\cite{pkgcoxboost}. Experiments suggest that including the `correct' mandatory covariates may increase predictive performance~\cite{Binder2008}. CoxBoost is less accessible than other boosting methods as it requires a unique boosting algorithm, as such only one off-shelf implementation appears to exist and even this implementation has been removed from CRAN as of 2020-11-11. CoxBoost is also less transparent as the underlying algorithm is more complex, though is well-explained by the authors~\cite{Binder2008}. There is good indication that CoxBoost is performant, which is seen in \ref{chap:bench}. In a non-medical domain, where performance may be the most important metric, then perhaps CoxBoost can be recommended as a powerful model. However, when sensitive predictions are required, CoxBoost is currently not APT. Further papers studying the model and more off-shelf implementations could change this in the future.
 
 \subsubsection{Ranking Survival Models}
 
@@ -178,111 +178,111 @@ The ranking survival models in this section are all unified as they make predict
 \\\\
 \textbf{GBM-AFT}\label{mod:gbmaft}\\
 Schmid and Hothorn (2008)~\cite{Schmid2008b} published a GBM for accelerated failure time models in response to PH-boosted models that may not be suitable for non-PH data. Their model fits into the GBM framework by assuming a fully-parametric AFT and simultaneously estimating the linear predictor, $\hatg(X_i) =\hat{\eta}$, and the scale parameter, $\hat{\sigma}$, controlling the amount of noise in the distribution. The (fully-parametric) AFT is defined by
-\begin{equation}
+$$
 \log Y = \eta + \sigma W
-\end{equation}
+$$
 where $W$ is a random variable independent of the covariates that follows a given distribution and controls the noise in the model. By assuming a distribution on $W$, a distribution is assumed for the full parametric model. The full likelihood, $\calL$, is given by
-\begin{equation}
+$$
 \calL(\dtrain|\mu, \sigma, W) = \prod^n_{i=1} \Big[\frac{1}{\sigma} f_W\Big(\frac{\log(T_i) - \mu}{\sigma}\Big)\Big]^{\Delta_i}\Big[S_W\Big(\frac{\log(T_i) - \mu}{\sigma}\Big)\Big]^{(1-\Delta_i)}
 \label{eq:surv_aft_like}
-\end{equation}
+$$
 where $f_W, S_W$ is the pdf and survival function of $W$ for a given distribution. By setting $\mu := g(X_i)$, $\sigma$ is then rescaled according to known results depending on the distribution~\cite{Klein2003}. The gradient of the negative log-likelihood, $-l$, is minimised in the $m$th iteration where
-\begin{equation}
+$$
 \begin{split}
 l(\dtrain|\hat{g}, \hat{\sigma},W) = \sum^n_{i=1} \Delta_i\Big[- \log\sigma + \log f_W\Big(\frac{\log(T_i) - \hat{g}_{m-1}(X_i)}{\hat{\sigma}_{m-1}}\Big)\Big] + \\
 (1-\Delta_i)\Big[\log S_W\Big(\frac{\log(T_i) - \hat{g}_{m-1}(X_i)}{\hat{\sigma}_{m-1}}\Big)\Big]
 \end{split}
-\end{equation}
-where $\hatg_{m-1}, \hat{\sigma}_{m-1}$ are the location-scale parameters estimated in the previous iteration. Note this key difference to other GBM methods in which two estimates are made in each iteration step. In order to allow for this, \cref{alg:surv_gbm} is run as normal but in addition, after updating $\hatg_m$, one then updates $\hat{\sigma}_m$ as
-\begin{equation}
+$$
+where $\hatg_{m-1}, \hat{\sigma}_{m-1}$ are the location-scale parameters estimated in the previous iteration. Note this key difference to other GBM methods in which two estimates are made in each iteration step. In order to allow for this, \ref{alg:surv_gbm} is run as normal but in addition, after updating $\hatg_m$, one then updates $\hat{\sigma}_m$ as
+$$
 \hat{\sigma}_m := \argmin_\sigma -l(\dtrain|g_m,\sigma, W)
-\end{equation}
+$$
 $\sigma_0$ is initialized at the start of the algorithm with $\sigma_0 = 1$ suggested~\cite{Schmid2008b}.
 \\\\
 This algorithm provides a ranking prediction without enforcing an often-unrealistic PH assumption on the data. This model is implemented in \pkg{mboost} and \pkg{xgboost}. Experiments indicate that this may outperform the Cox PH~\cite{Schmid2008b}. Moreover the model has the same transparency and accessibility as the GBM-COX and is therefore also considered APT.
 \\\\
 \textbf{GBM-GEH}\label{mod:gbmgeh}\\
-The concordance index is likely the most popular measure of discrimination, this in part due to the fact that it makes little-to-no assumptions about the data \see{sec:eval_crank}. A less common measure is the Gehan loss, motivated by the semi-parametric AFT. Johnson and Long proposed the GBM with Gehan loss, here termed GBM-GEH, to optimise separation within an AFT framework~\cite{Johnson2011}.
+The concordance index is likely the most popular measure of discrimination, this in part due to the fact that it makes little-to-no assumptions about the data \ref{sec:eval_crank}. A less common measure is the Gehan loss, motivated by the semi-parametric AFT. Johnson and Long proposed the GBM with Gehan loss, here termed GBM-GEH, to optimise separation within an AFT framework~\cite{Johnson2011}.
 
 The semi-parametric AFT is defined by the linear model,
-\begin{equation}
+$$
 \log Y = \eta + \epsilon
-\end{equation}
+$$
 for some error term, $\epsilon$.
 
 The D-dimensional Gehan loss to minimise is given by,
-\begin{equation}
+$$
 G_D(\dtrain, \hatg) = -\frac{1}{n^2} \sum^n_{i=1}\sum^n_{j=1} \Delta_i (\hat{e}_i - \hat{e}_j)\II(\hat{e}_i \leq \hat{e}_j)
-\end{equation}
+$$
 where $\hat{e}_i = \log T_i - \hat{g}(X_i)$. The negative gradient of the loss is,
-\begin{equation}
+$$
 r_{im} := \frac{\sum^n_{j=1} \Delta_j \II(\hat{e}_{m-1,i} \geq \hat{e}_{m-1,j}) -\Delta_i\II(\hat{e}_{m-1,i} \leq \hat{e}_{m-1,j})}{n}
-\end{equation}
+$$
 where $\hat{e}_{m-1,i} = \log T_i - \hatg_{m-1}(X_i)$.
 \\\\
-\Cref{alg:surv_gbm} then follows naturally substituting the loss and gradient above. The algorithm is implemented in \pkg{mboost}. Simulation studies on the performance of the model are inconclusive~\cite{Johnson2011} however the results in \cref{chap:bench} indicate strong predictive performance. Therefore this can tentatively be considered APT but further benchmark experiments would be preferred.
+\ref{alg:surv_gbm} then follows naturally substituting the loss and gradient above. The algorithm is implemented in \pkg{mboost}. Simulation studies on the performance of the model are inconclusive~\cite{Johnson2011} however the results in \ref{chap:bench} indicate strong predictive performance. Therefore this can tentatively be considered APT but further benchmark experiments would be preferred.
 \\\\
 \textbf{GBM-BUJAR}\label{mod:gbmbujar}\\
 GBM-BUJAR is another boosted semi-parametric AFT. However the algorithm introduced by Wang and Wang (2010)~\cite{Wang2010} uses Buckley-James imputation and minimisation. This algorithm is almost identical to a regression GBM (i.e. using squared loss or similar for $L$), except with one additional step to iteratively impute censored survival times. Assuming a semi-parametric AFT model, the GBM-BUJAR algorithm iteratively updates imputed outcomes with the Buckley-James estimator~\cite{Buckley1979},
-\begin{equation}
+$$
 T^*_{m, i} := \hatg_{m-1}(X_i) + e_{m-1, i}\Delta_i + (1-\Delta_i)\Big[\KMS(e_{m-1, i})^{-1}\sum_{e_{m-1, j} > e_{m-1, i}} e_{m-1, j}\Delta_j \hatp_{KM}(e_{m-1, j})\Big]
-\end{equation}
-where $\hatg_{m-1}(X_i) = \hat{\eta}_{m-1}$, and $\KMS, \hatp_{KM}$ are Kaplan-Meier estimates of the survival and probability mass functions respectively fit on some training data, and $e_{m-1,i} := \log(T_i) - g_{m-1}(X_i)$. Once $T^*_{m, i}$ has been updated, \cref{alg:surv_gbm} continues from with least squares as with any regression model.
+$$
+where $\hatg_{m-1}(X_i) = \hat{\eta}_{m-1}$, and $\KMS, \hatp_{KM}$ are Kaplan-Meier estimates of the survival and probability mass functions respectively fit on some training data, and $e_{m-1,i} := \log(T_i) - g_{m-1}(X_i)$. Once $T^*_{m, i}$ has been updated, \ref{alg:surv_gbm} continues from with least squares as with any regression model.
 \\\\
 GBM-BUJAR is implemented in \pkg{bujar}~\cite{pkgbujar} though without a separated fit/predict interface, its accessibility is therefore limited. There is no evidence of wide usage of this algorithm nor simulation studies demonstrating its predictive ability. Finally, there are many known problems with semi-parametric AFT models and the Buckey-James procedure~\cite{Wei1992}, hence GBM-BUJAR is also not transparent.
 \\\\
 \textbf{GBM-UNO}\label{mod:gbmuno}\\
 Instead of optimising models based on a given model form, Chen \etal~\cite{Chen2013} studied direct optimisation of discrimination by Harrell's C whereas Mayr and Schmid~\cite{Mayr2014} focused instead on Uno's C. Only an implementation of the Uno's C method could be found, this is therefore discussed here and termed `GBM-UNO'.
 \\\\
-The GBM-UNO attempts to predict $\hatg(X^*) := \hat{\eta}$ by optimising Uno's C \see{sec:eval_crank_disc_conc},
-\begin{equation}
+The GBM-UNO attempts to predict $\hatg(X^*) := \hat{\eta}$ by optimising Uno's C \ref{sec:eval_crank_disc_conc},
+$$
 C_U(\hat{g}, \dtrain) = \frac{\sum_{i \neq j}\Delta_i\{\KMG(T_i)\}^{-2}\II(T_i < T_j)\II(\hatg(X_i) >\hatg(X_j))}{\sum_{i \neq j}\Delta_i\{\KMG(T_i)\}^{-2}\II(T_i < T_j)}
-\end{equation}
+$$
 
 The GBM algorithm requires that the chosen loss, here $C_U$, be differentiable w.r.t. $\hatg(X)$, which is not the case here due to the indicator term, $\II(\hatg(X_i) > \hatg(X_j))$. Therefore a smoothed version is instead considered where the indicator is approximated by the sigmoid function~\cite{Ma2006},
 
-\begin{equation}
+$$
 K(u|\sigma) = (1 + \exp(-u/\sigma))^{-1}
-\end{equation}
+$$
 
 where $\sigma$ is a hyper-parameter controlling the smoothness of the approximation. The measure to optimise is then,
 
-\begin{equation}
+$$
 C_{USmooth}(\dtrain|\sigma) = \sum_{i \neq j} \frac{k_{ij}}{1 + \exp\big[(\hatg(X_j) - \hatg(X_i))/\sigma)\big]}
 \label{eq:surv_gbm_cus}
-\end{equation}
+$$
 
 with
 
-\begin{equation}
+$$
 k_{ij} = \frac{\Delta_i (\KMG(T_i))^{-2}\II(T_i < T_j)}{\sum^n_{i \neq j} \Delta_i(\KMG(T_i))^{-2}\II(T_i < T_j)}
-\end{equation}
+$$
 
 The negative gradient at iteration $m$ for observation $i$ can then be found,
 
-\begin{equation}
+$$
 r_{im} := - \sum^n_{j = 1} k_{ij} \frac{-\exp(\frac{\hatg_{m-1}(X_j) - \hatg_{m-1}(X_i)}{\sigma})}{\sigma(1 + \exp(\frac{\hatg_{m-1}(X_j) - \hatg_{m-1}(X_i)}{\sigma}))}
 \label{eq:surv_gbm_cus_grad}
-\end{equation}
+$$
 
-\Cref{alg:surv_gbm} can then be followed exactly by substituting this loss and gradient; this is implemented in \pkg{mboost}. One disadvantage of GBM-UNO is that C-index boosting is more insensitive to overfitting than other methods~\cite{Mayr2016}, therefore stability selection~\cite{Meinshausen2010} can be considered for variable selection; this is possible with \pkg{mboost}. Despite directly optimising discrimination, simulation studies do not indicate that this model has better separation than other boosted or lasso models~\cite{Mayr2014}. GBM-UNO has the same accessibility, transparency, and performance \see{chap:bench} as previous APT boosting models and is therefore also considered APT.
+\ref{alg:surv_gbm} can then be followed exactly by substituting this loss and gradient; this is implemented in \pkg{mboost}. One disadvantage of GBM-UNO is that C-index boosting is more insensitive to overfitting than other methods~\cite{Mayr2016}, therefore stability selection~\cite{Meinshausen2010} can be considered for variable selection; this is possible with \pkg{mboost}. Despite directly optimising discrimination, simulation studies do not indicate that this model has better separation than other boosted or lasso models~\cite{Mayr2014}. GBM-UNO has the same accessibility, transparency, and performance \ref{chap:bench} as previous APT boosting models and is therefore also considered APT.
 
 \subsection{Novel Adaptations}
 
-A clear theme emerging throughout this survey is a historical focus on predicting survival time or ranking, with less interest in direct optimisation of distributional predictions, which may be due to less off-shelf software for the task. Optimisation of a distribution is possible by considering a scoring rule \see{sec:eval_distr} as the GBM loss. The integrated Graf score (IGS) is discussed below but others are also possible.
+A clear theme emerging throughout this survey is a historical focus on predicting survival time or ranking, with less interest in direct optimisation of distributional predictions, which may be due to less off-shelf software for the task. Optimisation of a distribution is possible by considering a scoring rule \ref{sec:eval_distr} as the GBM loss. The integrated Graf score (IGS) is discussed below but others are also possible.
 
 The Integrated Graf Score (IGS) is given by,
-\begin{equation}
+$$
 L_{IGS}(t,\delta,\hat{S}|\tau^*) = \int^{\tau^*}_0 \frac{\hat{S}(\tau)^2 \II(t \leq \tau, \delta=1)}{\KMG(t)} + \frac{\hat{F}(\tau)^2 \II(t > \tau)}{\KMG(\tau)} \ d\tau
-\end{equation}
+$$
 where $\tau^*$ is a threshold cut-off but in this case it is assumed $\tau^* = \max\{T_i: i = 1,..,n\}$. Differentiating with respect to $\hatS(\tau)$, the negative gradient in the $m$th iteration is given by
-\begin{equation}
+$$
 r_{im} := \int^{\tau^*}_0 2\hatf(\tau)\Big[\frac{\hatF(\tau)\II(t_i > \tau)}{\KMG(\tau)} - \frac{\hatS(\tau)\II(t_i \leq \tau, \delta_i = 1)}{\KMG(t_i)}\Big] \ d\tau
 \label{eq:surv_igsgrad}
-\end{equation}
+$$
 where $\hatf$ is the estimated probability density function.
 
-\Cref{alg:surv_gbm} follows with these equations. The package \pkg{mboost} can be utilised to test these equations as a `custom family'.
+\ref{alg:surv_gbm} follows with these equations. The package \pkg{mboost} can be utilised to test these equations as a `custom family'.
 
 \subsection{Conclusions}
 
