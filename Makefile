@@ -7,6 +7,7 @@ help :
 	@echo "bookinstall : Install book without dependencies."
 	@echo "serve   : Start a http server to serve the book."
 	@echo "serverefresh   : Clear cache and start a http server to serve the book."
+	@echo "render     : Render all formats."
 	@echo "pdf     : Render book as pdf."
 	@echo "html    : Render book as html."
 	@echo "clean   : Remove auto-generated files."
@@ -35,6 +36,9 @@ clean:
 	find . -name "*.dvi" -type f -delete;
 	find . -type d -name "*_files" -exec rm -rf {} \;
 	find . -type d -name "*_cache" -exec rm -rf {} \;
+
+render:
+	quarto render book/
 
 html:
 	quarto render book/ --to html
