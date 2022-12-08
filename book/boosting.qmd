@@ -2,15 +2,15 @@
 
 # Boosting Methods
 
-\section{Gradient Boosting Machines} {#sec-surv-ml-models-boost}
+## Gradient Boosting Machines {#sec-surv-ml-models-boost}
 
-\subsection{Gradient Boosting Machines for Regression} {#sec-surv-ml-models-boost-regr}
+### Gradient Boosting Machines for Regression {#sec-surv-ml-models-boost-regr}
 
 Boosting is a machine learning strategy that can be applied to any model class. Similarly to random forests, boosting is an 'ensemble' method that creates a model from a 'committee' of learners. The committee is formed of 'weak' learners that make poor predictions individually, which creates a 'slow learning' approach (as opposed to 'greedy') that requires many iterations for a model to be a good fit to the data. Boosting models are similar to random forests in that both make predictions from a large committee of learners. However the two differ in how this committee is combined to a prediction. In random forest algorithms, each decision tree is grown independently and their predictions are combined by a simple mean calculation. In contrast, weak learners in a boosting model are fit sequentially and predictions are made by a linear combination of predictions from each learner. With respect to transparency, it is simpler to inspect 100 trees in a random forest, than it is to inspect 100 weak learners in a boosted model, though both are considered black-box models.
 
 The best known boosting algorithm is likely AdaBoost  [@Freund1996], which is more generally a Forward Stagewise Additive Model (FSAM) with an exponential loss  [@Hastie2001]. Today, the most widely used boosting model is the Gradient Boosting Machine (GBM)  [@Friedman2001].
 
-\paragraph{Training a GBM}
+#### Training a GBM {.unnumbered .unlisted}
 Pseudo-code for training a componentwise GBM is presented in (@alg-surv-gbm). The term 'componentwise' is explained fully below, only this variation of GBM is presented as it is the most common in implementation  [@pkggbm; @pkgmboost]. Line 1: the initial function is initialized as $g_0 = 0$;\footnote{Some algorithms may instead initialize $g_0$ by finding the value that minimises the given loss function, however setting $g_0 = 0$ appears to be the most common practice for componentwise GBMs.} Line 2: iterate over boosting steps $m = 1,...,M$ and; Line 3: randomly sample the training data, $\dtrain$, to a smaller sample, $\dtrain^*$, this may be ignored if $\phi = 1$; Line 4: for all training observations in the reduced dataset, $i \in \{i:X_i \in \dtrain^*\}$, compute the negative gradient, $r_{im}$, of the differentiable loss function, $L$, with respect to predictions from the previous iteration, $g_{m-1}(X_i)$; Line 5: fit one weak learner for each feature, $j = 1,...,p$, in the training data, where the feature, $X_{;j}$, is the single covariate and $r_{im}$ are the labels; Line 6: select the optimal weak learner as the one that minimises the squared error between the prediction and the true gradient; Line 7: update the fitted model by adding the optimal weak learner with a shrinkage penalty, $\nu$; Line 9: return the model updated in the final iteration as the fitted GBM.
 
 \begin{algorithm}[H]
@@ -32,7 +32,7 @@ Pseudo-code for training a componentwise GBM is presented in (@alg-surv-gbm). Th
 \end{algorithmic}
 \end{algorithm}
 
-\paragraph{Predicting with a GBM}
+#### Predicting with a GBM {.unnumbered .unlisted}
 In general, predictions from a trained GBM are simple to compute as the fitted model (and all individual weak learners) take the same inputs, which are passed sequentially to each of the weak learners. In (@alg-surv-gbm), the fitted GBM is a single model, which is a linear combination of weak learners. Instead one could think of the returned model as a collection of the optimal weak learners, i.e. let $w_{m;j^*}$ be the optimal weak learner from iteration $m$ and let the fitted GBM (Line 9 (@alg-surv-gbm)) be $\hatg := \{w_{m;j^*}\}^M_{m=1}$.\footnote{This formulation is computationally and mathematically identical to the formulation in (@alg-surv-gbm) and is practically more convenient for implementation, indeed this is the implementation in \pkg{mboost}  [@pkgmboost]. Despite this, the formulation in (@alg-surv-gbm) is common in the literature, which often conflates model training and predicting.} With this formulation, making predictions from the GBM can be demonstrated simply in (@alg-surv-gbm-pred).
 
 \begin{algorithm}[H]
@@ -50,12 +50,12 @@ In general, predictions from a trained GBM are simple to compute as the fitted m
 
 The biggest advantages of boosting are firstly relatively few hyper-parameters, which all have a meaningful and intuitive interpretation, and secondly its modular nature means that, like random forests, relatively few parts need to be updated to derive a novel model. First the model components will be discussed and then the hyper-parameters. Once this has been established, deriving survival variants can be simply presented.
 
-\subsubsection{Losses and Learners}
+#### Losses and Learners
 
-\paragraph{Losses}
+#### Losses {.unnumbered .unlisted}
 Building a GBM requires selection of the loss to minimise, $L$, selection of weak learners, $w_j$, and a method to compare the weak learners to the loss gradient. The only constraint in selecting a loss, $L$, is that it must be differentiable w.r.t. $g(X)$  [@Hastie2001]. Of course a sensible loss should be chosen (a classification loss should not be used for regression) and different choices of losses will optimise different tasks. $L_2$-losses have been demonstrated to be effective for regression boosting, especially with high-dimensional data  [@Buhlmann2003]; this is referred to as $L_2$-boosting.
 
-\paragraph{Weak Learners}
+#### Weak Learners {.unnumbered .unlisted}
 (@alg-surv-gbm) is specifically a \emph{componentwise} GBM  [@Buhlmann2003], which means that each of the $p$ weak learners is fit on a single covariate from the data. This method simplifies selecting the possible choices for the weak learners to selecting the class of weak learner (below). Additionally, componentwise GBMs provide a natural and interpretable feature selection method as selecting the optimal learner ((@alg-surv-gbm), line 6) corresponds to selecting the feature that minimises the chosen loss in iteration $m$.
 
 Only three weak, or 'base', learner classes are commonly used in componentwise GBMs  [@pkgmboost; @Wang2010]. These are linear least squares  [@Friedman2001], smoothing splines  [@Buhlmann2003], and decision stumps  [@Buhlmann2003; @Friedman2001]. Let $L$ be a loss with negative gradient for observation $i$ in the $m$th iteration, $r_{im}$, and let $\dtrain$ be the usual training data. For linear least squares, an individual weak learner is fit by  [@Friedman2001; @Wang2010],
@@ -108,11 +108,11 @@ The step-size parameter ((@alg-surv-gbm), line 7), $\nu$, is a shrinkage paramet
 Motivated by the success of bagging in random forests, stochastic gradient boosting  [@Friedman1999] randomly samples the data in each iteration. It appears that subsampling performs best when also combined with shrinkage  [@Hastie2001] and as with the other hyper-parameters, selection of $\phi$ is usually performed by nested cross-validation.
 
 
-\subsection{Gradient Boosting Machines for Survival Analysis} {#sec-surv-ml-models-boost-surv}
+### Gradient Boosting Machines for Survival Analysis {#sec-surv-ml-models-boost-surv}
 
 In a componentwise GBM framework, adapting boosting to survival analysis requires only selecting a sensible choice of loss function $L$. Therefore fitting and predicting algorithms for componentwise survival GBMs are not discussed as these are fully described in algorithms (@alg-surv-gbm) and (@alg-surv-gbm-pred) respectively. However, some GBMs in this section are not componentwise and therefore require some more detailed consideration. Interestingly, unlike other machine learning algorithms that historically ignored survival analysis, early GBM papers considered boosting in a survival context  [@Ridgeway1999]; though there appears to be a decade gap before further considerations were made in the survival setting. After that period, several developments by Binder, Schmid, and Hothorn, adapted componentwise GBMs to a framework suitable for survival analysis. Their developments are covered exhaustively in the R packages \pkg{gbm}  [@pkggbm] and \pkg{mboost}  [@pkgmboost]. This survey continues with the predict type taxonomy.
 
-\subsubsection{Cox Survival Models}
+#### Cox Survival Models
 
 All survival GBMs make ranking predictions and none are able to directly predict survival distributions. However, the GBMs discussed in this section all have natural compositions to distributions as they are modelled in the semi-parametric proportional hazards framework (@sec-car-pipelines-distr). The models discussed in the next section can also be composed to distributions though the choice of composition is less clear and therefore they are listed as pure 'ranking' models.
 \\\\
@@ -167,7 +167,7 @@ The step size, $\nu$, is then one, but this could potentially be altered.
 \\\\
 The algorithm deviates from (@alg-surv-gbm) as $l_{pen}$ is directly optimised and not its gradient, additionally model coefficients are iteratively updated instead of a more general model form. The algorithm is implemented in \pkg{CoxBoost}  [@pkgcoxboost]. Experiments suggest that including the 'correct' mandatory covariates may increase predictive performance  [@Binder2008]. CoxBoost is less accessible than other boosting methods as it requires a unique boosting algorithm, as such only one off-shelf implementation appears to exist and even this implementation has been removed from CRAN as of 2020-11-11. CoxBoost is also less transparent as the underlying algorithm is more complex, though is well-explained by the authors  [@Binder2008]. There is good indication that CoxBoost is performant, which is seen in (@sec-bench). In a non-medical domain, where performance may be the most important metric, then perhaps CoxBoost can be recommended as a powerful model. However, when sensitive predictions are required, CoxBoost is currently not APT. Further papers studying the model and more off-shelf implementations could change this in the future.
 
-\subsubsection{Ranking Survival Models}
+#### Ranking Survival Models
 
 The ranking survival models in this section are all unified as they make predictions of the linear predictor, $\hat{g}(X^*) = X^*\hat{\beta}$.\footnote{This is commonly referred to as a 'linear predictor' as it directly relates to the boosted linear model (e.g. Cox PH), however it is more accurately a 'prognostic index' as the final prediction is not the true linear predictor.}
 \\\\
@@ -259,7 +259,7 @@ $$ {#eq-surv-gbm-cus-grad}
 
 (@alg-surv-gbm) can then be followed exactly by substituting this loss and gradient; this is implemented in \pkg{mboost}. One disadvantage of GBM-UNO is that C-index boosting is more insensitive to overfitting than other methods  [@Mayr2016], therefore stability selection  [@Meinshausen2010] can be considered for variable selection; this is possible with \pkg{mboost}. Despite directly optimising discrimination, simulation studies do not indicate that this model has better separation than other boosted or lasso models  [@Mayr2014]. GBM-UNO has the same accessibility, transparency, and performance (@sec-bench) as previous APT boosting models and is therefore also considered APT.
 
-\subsection{Novel Adaptations}
+### Novel Adaptations
 
 A clear theme emerging throughout this survey is a historical focus on predicting survival time or ranking, with less interest in direct optimisation of distributional predictions, which may be due to less off-shelf software for the task. Optimisation of a distribution is possible by considering a scoring rule (@sec-eval-distr) as the GBM loss. The integrated Graf score (IGS) is discussed below but others are also possible.
 
@@ -275,7 +275,7 @@ where $\hatf$ is the estimated probability density function.
 
 (@alg-surv-gbm) follows with these equations. The package \pkg{mboost} can be utilised to test these equations as a 'custom family'.
 
-\subsection{Conclusions}
+### Conclusions
 
 Componentwise gradient boosting machines are a highly flexible and powerful machine learning tool. They have proven particularly useful in survival analysis as minimal adjustments are required to make use of off-shelf software. The flexibility of the algorithm allows all the models above to be implemented in very few \Rstats (and other programming languages) packages.
 
