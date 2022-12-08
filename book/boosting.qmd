@@ -2,11 +2,9 @@
 
 # Boosting Methods
 
-\section{Gradient Boosting Machines}
- {#sec-surv-ml-models-boost}
+\section{Gradient Boosting Machines} {#sec-surv-ml-models-boost}
 
-\subsection{Gradient Boosting Machines for Regression}
- {#sec-surv-ml-models-boost-regr}
+\subsection{Gradient Boosting Machines for Regression} {#sec-surv-ml-models-boost-regr}
 
 Boosting is a machine learning strategy that can be applied to any model class. Similarly to random forests, boosting is an 'ensemble' method that creates a model from a 'committee' of learners. The committee is formed of 'weak' learners that make poor predictions individually, which creates a 'slow learning' approach (as opposed to 'greedy') that requires many iterations for a model to be a good fit to the data. Boosting models are similar to random forests in that both make predictions from a large committee of learners. However the two differ in how this committee is combined to a prediction. In random forest algorithms, each decision tree is grown independently and their predictions are combined by a simple mean calculation. In contrast, weak learners in a boosting model are fit sequentially and predictions are made by a linear combination of predictions from each learner. With respect to transparency, it is simpler to inspect 100 trees in a random forest, than it is to inspect 100 weak learners in a boosted model, though both are considered black-box models.
 
@@ -110,8 +108,7 @@ The step-size parameter ((@alg-surv-gbm), line 7), $\nu$, is a shrinkage paramet
 Motivated by the success of bagging in random forests, stochastic gradient boosting  [@Friedman1999] randomly samples the data in each iteration. It appears that subsampling performs best when also combined with shrinkage  [@Hastie2001] and as with the other hyper-parameters, selection of $\phi$ is usually performed by nested cross-validation.
 
 
-\subsection{Gradient Boosting Machines for Survival Analysis}
- {#sec-surv-ml-models-boost-surv}
+\subsection{Gradient Boosting Machines for Survival Analysis} {#sec-surv-ml-models-boost-surv}
 
 In a componentwise GBM framework, adapting boosting to survival analysis requires only selecting a sensible choice of loss function $L$. Therefore fitting and predicting algorithms for componentwise survival GBMs are not discussed as these are fully described in algorithms (@alg-surv-gbm) and (@alg-surv-gbm-pred) respectively. However, some GBMs in this section are not componentwise and therefore require some more detailed consideration. Interestingly, unlike other machine learning algorithms that historically ignored survival analysis, early GBM papers considered boosting in a survival context  [@Ridgeway1999]; though there appears to be a decade gap before further considerations were made in the survival setting. After that period, several developments by Binder, Schmid, and Hothorn, adapted componentwise GBMs to a framework suitable for survival analysis. Their developments are covered exhaustively in the R packages \pkg{gbm}  [@pkggbm] and \pkg{mboost}  [@pkgmboost]. This survey continues with the predict type taxonomy.
 
@@ -124,13 +121,11 @@ The 'GBM-COX' aims to predict the distribution of data following the PH assumpti
 
 $$
 l(\beta) = \sum^n_{i=1} \Delta_i \Big[\eta_i \ - \ \log\Big(\sum^n_{j \in \calR_{t_i}} \exp(\eta_i)\Big)\Big]
- {#eq-surv-logpartial}
-$$
+$$ {#eq-surv-logpartial}
 where $\calR_{t_i}$ is the set of patients at risk at time $t_i$ and $\eta_i = X_i\beta$. The gradient of $-l(\beta)$ at iteration $m$ is
 $$
 r_{im} := \Delta_i - \sum^n_{j=1} \Delta_j \frac{\II(T_i \geq T_j) \exp(g_{m-1}(X_i))}{\sum_{k \in \calR_{t_j}} \exp(g_{m-1}(X_k))}
- {#eq-surv-partialgrad}
-$$
+$$ {#eq-surv-partialgrad}
 where $g_{m-1}(X_i) = X_i\beta_{m-1}$.
 
 (@alg-surv-gbm) now follows with the loss $L := -l(\beta)$.\footnote{Early implementations and publications of the GBM algorithm  [@Friedman1999; @Friedman2001] included an additional step to the algorithm in which a step size is estimated by line search. More recent research has determined that this additional step is unneccesary  [@Buhlmann2007] and the line search method does not appear to be used in practice.}
@@ -184,8 +179,7 @@ $$
 where $W$ is a random variable independent of the covariates that follows a given distribution and controls the noise in the model. By assuming a distribution on $W$, a distribution is assumed for the full parametric model. The full likelihood, $\calL$, is given by
 $$
 \calL(\dtrain|\mu, \sigma, W) = \prod^n_{i=1} \Big[\frac{1}{\sigma} f_W\Big(\frac{\log(T_i) - \mu}{\sigma}\Big)\Big]^{\Delta_i}\Big[S_W\Big(\frac{\log(T_i) - \mu}{\sigma}\Big)\Big]^{(1-\Delta_i)}
- {#eq-surv-aft-like}
-$$
+$$ {#eq-surv-aft-like}
 where $f_W, S_W$ is the pdf and survival function of $W$ for a given distribution. By setting $\mu := g(X_i)$, $\sigma$ is then rescaled according to known results depending on the distribution  [@Klein2003]. The gradient of the negative log-likelihood, $-l$, is minimised in the $m$th iteration where
 $$
 \begin{split}
@@ -249,8 +243,7 @@ where $\sigma$ is a hyper-parameter controlling the smoothness of the approximat
 
 $$
 C_{USmooth}(\dtrain|\sigma) = \sum_{i \neq j} \frac{k_{ij}}{1 + \exp\big[(\hatg(X_j) - \hatg(X_i))/\sigma)\big]}
- {#eq-surv-gbm-cus}
-$$
+$$ {#eq-surv-gbm-cus}
 
 with
 
@@ -262,8 +255,7 @@ The negative gradient at iteration $m$ for observation $i$ can then be found,
 
 $$
 r_{im} := - \sum^n_{j = 1} k_{ij} \frac{-\exp(\frac{\hatg_{m-1}(X_j) - \hatg_{m-1}(X_i)}{\sigma})}{\sigma(1 + \exp(\frac{\hatg_{m-1}(X_j) - \hatg_{m-1}(X_i)}{\sigma}))}
- {#eq-surv-gbm-cus-grad}
-$$
+$$ {#eq-surv-gbm-cus-grad}
 
 (@alg-surv-gbm) can then be followed exactly by substituting this loss and gradient; this is implemented in \pkg{mboost}. One disadvantage of GBM-UNO is that C-index boosting is more insensitive to overfitting than other methods  [@Mayr2016], therefore stability selection  [@Meinshausen2010] can be considered for variable selection; this is possible with \pkg{mboost}. Despite directly optimising discrimination, simulation studies do not indicate that this model has better separation than other boosted or lasso models  [@Mayr2014]. GBM-UNO has the same accessibility, transparency, and performance (@sec-bench) as previous APT boosting models and is therefore also considered APT.
 
@@ -278,8 +270,7 @@ $$
 where $\tau^*$ is a threshold cut-off but in this case it is assumed $\tau^* = \max\{T_i: i = 1,..,n\}$. Differentiating with respect to $\hatS(\tau)$, the negative gradient in the $m$th iteration is given by
 $$
 r_{im} := \int^{\tau^*}_0 2\hatf(\tau)\Big[\frac{\hatF(\tau)\II(t_i > \tau)}{\KMG(\tau)} - \frac{\hatS(\tau)\II(t_i \leq \tau, \delta_i = 1)}{\KMG(t_i)}\Big] \ d\tau
- {#eq-surv-igsgrad}
-$$
+$$ {#eq-surv-igsgrad}
 where $\hatf$ is the estimated probability density function.
 
 (@alg-surv-gbm) follows with these equations. The package \pkg{mboost} can be utilised to test these equations as a 'custom family'.
