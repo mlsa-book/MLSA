@@ -1,0 +1,1110 @@
+{{< include _setup.qmd >}}
+
+# Pipelines - Composition and Reduction {#sec-car}
+
+In this chapter, composition and reduction are formally introduced, defined and demonstrated within survival analysis. Neither of these are novel concepts in general or in survival, with several applications already seen earlier when reviewing models (particularly in neural networks), however a lack of formalisation has led to much repeated work and at times questionable applications (@sec-surv-ml-models-nn). The primary purpose of this chapter is to formalise composition and reduction for survival and to unify references and strategies for future use. These strategies are introduced in the context of minimal 'workflows' and graphical 'pipelines' in order to maximise their generalisability. The pipelines discussed in this chapter are implemented in `r pkg("mlr3proba")`.
+<!-- %The compositions discussed in this chapter are important for understanding how classical and machine learning models are routinely discussed and implemented in survival analysis. Whereas the reductions in this chapter are more conceptual and relate specifically to solving machine learning tasks algorithmically. The frameworks discussed in this chapter are all implemented in `r pkg("mlr3proba")`. -->
+
+A *workflow* is a generic term given to a series of sequential operations. For example a standard ML workflow is fit/predict/evaluate, which means a model is fit, predictions are made, and these are evaluated. In this thesis, a *pipeline* is the name given to a concrete workflow. @sec-car-pipes demonstrates how pipelines are represented in this thesis.
+
+Composition (@sec-car-comp) is a general process in which an object is built (or composed) from other objects and parameters. Reduction (@sec-car-redux) is a closely related concept that utilises composition in order to transform one problem into another. Concrete strategies for composition and reduction are detailed in sections @sec-car-pipelines and @sec-car-reduxes.
+
+#### Notation and Terminology {.unnumbered .unlisted}
+The notation introduced in @sec-surv is recapped for use in this chapter: the generative survival template for the survival setting is given by $(X,T,\Delta,Y,C) \ t.v.i. \ \calX \times \calT \times \bset \times \calT \times \calT$ where $\calX \subseteq \Reals^p$ and $\calT \subseteq \NNReals$, where $C,Y$ are unobservable, $T := \min\{Y,C\}$, and $\Delta = \II(Y = T)$. Random survival data is given by $(X_i,T_i,\Delta_i,Y_i,C_i) \iid (X,T,\Delta,Y,C)$. Usually data will instead be presented as a training dataset, $\dtrain = \{(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n)\}$ where $(X_i,T_i,\Delta_i) \iid (X,T,\Delta)$, and some test data $\dtest = (X^*,T^*,\Delta^*) \sim (X,T,\Delta)$.
+
+For regression models the generative template is given by $(X,Y)$ t.v.i. $\calX \subseteq \Reals^p$ and $Y \subseteq \Reals$. As with the survival setting, a regression training set is given by $\{(X_1,Y_1),...,(X_n,Y_n)\}$ where $(X_i,Y_i) \iid (X,Y)$ and some test data $(X^*,Y^*) \sim (X,Y)$.
+
+## Representing Pipelines {#sec-car-pipes}
+
+Before introducing concrete composition and reduction algorithms, this section briefly demonstrates how these pipelines will be represented in this thesis.
+
+Pipelines are represented by graphs designed in the following way: all are drawn with operations progressing sequentially from left to right; graphs are comprised of nodes (or 'vertices') and arrows (or 'directed edges'); a rounded rectangular node represents a process such as a function or model fitting/predicting; a (regular) rectangular node represents objects such as data or hyper-parameters. Output from rounded nodes are sometimes explicitly drawn but when omitted the output from the node is the input to the next.
+
+These features are demonstrated in @fig-car-example. Say $y = 2$ and $a = 2$, then: data is provided ($y = 2$) and passed to the shift function ($f(x)=x + 2)$, the output of this function ($y=4$) is passed directly to the next $(h(x|a)=x^a)$, this function requires a parameter which is also input ($a = 2$), finally the resulting output is returned ($y^*=16$). Programmatically, $a = 2$ would be a hyper-parameter that is stored and passed to the required function when the function is called.
+
+This pipeline is represented as a pseudo-algorithm in @alg-car-ex, though of course is overly complicated and in practice one would just code $(y+2)^\wedge a$.
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0)[objnode] {$y$};
+\node (t1)[funnode, right=of t0]{$f(x) = x+2$};
+\node (t2)[funnode,right=of t1]{$h(x|a) = x^a$};
+\node (t3)[objnode, right=of t2]{$y^*$};
+\node (t4)[objnode, above=of t2]{$a$};
+
+\path[->]
+   (t0)  edge  (t1)
+   (t1)  edge  (t2)
+   (t2)  edge  (t3)
+   (t4)  edge  (t2);
+\end{tikzpicture}
+\caption[Example of a pipeline]{Example of a pipeline.}\label{fig:car_example}
+\end{figure} -->
+
+\begin{algorithm}[H]
+\caption{Example pipeline. \\
+\textbf{Input} Data, $y \in \Reals$. Parameter, $a \in \Reals$. \\
+\textbf{Output} Transformed data, $x \in \Reals$.}
+\begin{algorithmic}
+\State $x \gets y$
+\State $x \gets x + 2$
+\State $x \gets x^\wedge a$
+\Return $x$
+\end{algorithmic}
+\end{algorithm}
+<!-- {#alg-car-ex} -->
+
+## Introduction to Composition {#sec-car-comp}
+
+This section introduces composition, defines a taxonomy for describing compositors (@sec-car-comp-tax), and provides some motivating examples of composition in survival analysis (@sec-car-comp-mot).
+
+In the simplest definition, a model (be it mathematical, computational, machine learning, etc.) is called a \emph{composite model} if it is built of two or more constituent parts. This can be simplest defined in terms of objects. Just as objects in the real-world can be combined in some way, so can mathematical objects. The exact 'combining' process (or 'compositor') depends on the specific composition, so too do the inputs and outputs. By example, a wooden table can be thought of as a composite object (@fig-car-comp-ex). The inputs are wood and nails, the combining process is hammering (assuming the wood is pre-chopped), and the output is a surface for eating. In mathematics, this process is mirrored. Take the example of a shifted linear regression model. This is defined by a linear regression model, $f(x) = \beta_0 + x\beta_1$, a shifting parameter, $\alpha$, and a compositor $g(x|\alpha) = f(x) + \alpha$. Mathematically this example is overly trivial as this could be directly modelled with $f(x) = \alpha + \beta_0 + x\beta_1$, but algorithmically there is a difference. The composite model $g$, is defined by first fitting the linear regression model, $f$, and then applying a shift, $\alpha$; as opposed to fitting a directly shifted model.
+
+![Visualising composition in the real-world. A table is a composite object built from nails and wood, which are combined with a hammer 'compositor'. Figure not to scale.](images/car/comp.png){#fig-car-comp-ex fig-alt="TODO"}
+
+#### Why Composition? {.unnumbered .unlisted}
+Tables tend to be better surfaces for eating your dinner than bundles of wood. Or in modelling terms, it is well-known that ensemble methods (e.g. random forests) will generally outperform their components (e.g. decision trees). All ensemble methods are composite models and this demonstrates one of the key use-cases of composition: improved predictive performance. The second key use-case is reduction, which is fully discussed in @sec-car-redux. @sec-car-comp-mot motivates composition in survival analysis by demonstrating how it is already prevalent but requires formalisation to make compositions more transparent and accessible.
+
+#### Composite Model vs. Sub-models {.unnumbered .unlisted}
+A bundle of wood and nails is not a table and $1,000$ decision trees are not a random forest, both require a compositor. The compositor in a composite model combines the components into a single model. Considering a composite model as a single model enables the hyper-parameters of the compositor and the component model(s) to be efficiently tuned whilst being evaluated as a single model. This further allows the composite to be compared to other models, including its own components, which is required to justify complexity instead of parsimony in model building (@sec-eval-why-why).
+
+### Taxonomy of Compositors {#sec-car-comp-tax}
+
+Just as there are an infinite number of ways to make a table, composition can come in infinite forms. However there are relatively few categories that these can be grouped into. Two primary taxonomies are identified here. The first is the 'composition type' and relates to the number of objects composed:
+
+[i)]
+i. Single-Object Composition (SOC) -- This form of composition either makes use of parameters or a transformation to alter a single object. The shifted linear regression model above is one example of this, another is given in @sec-car-pipelines-crank.
+i. Multi-Object Composition (MOC) -- In contrast, this form of composition combines multiple objects into a single one. Both examples in @sec-car-comp-mot are multi-object compositions.
+
+
+The second grouping is the 'composition level' and determines at what 'level' the composition takes place:
+
+[i)]
+i. Prediction Composition -- This applies at the level of predictions; the component models could be forgotten at this point. Predictions may be combined from multiple models (MOC) or transformed from a single model (SOC). Both examples in @sec-car-comp-mot are prediction compositions.
+i. Task Composition -- This occurs when one task (e.g. regression) is transformed to one or more others (e.g. classification), therefore always SOC. This is seen mainly in the context of reduction (@sec-car-redux).
+i. Model Composition -- This is commonly seen in the context of wrappers (@sec-car-reduxes-r7-mlc), in which one model is contained within another.
+i. Data Composition -- This is transformation of training/testing data types, which occurs at the first stage of every pipeline.
+
+
+### Motivation for Composition {#sec-car-comp-mot}
+
+Two examples are provided below to demonstrate common uses of composition in survival analysis and to motivate the compositions introduced in @sec-car-pipelines.
+
+#### Example 1: Cox Proportional Hazards {.unnumbered .unlisted}
+
+Common implementations of well-known models can themselves be viewed as composite models, the Cox PH is the most prominent example in survival analysis. Recall the model defined by
+
+$$
+h(\tau|X_i) = h_0(\tau)\exp(\beta X_i)
+$$
+where $h_0$ is the baseline hazard and $\beta$ are the model coefficients.
+
+This can be seen as a composite model as Cox defines the model in two stages  [@Cox1972]: first fitting the $\beta$-coefficients using the partial likelihood and then by suggesting an estimate for the baseline distribution. This first stage produces a linear predictor return type (@sec-surv-set-types) and the second stage returns a survival distribution prediction. Therefore the Cox model for linear predictions is a single (non-composite) model, however when used to make distribution predictions then it is a composite. Cox implicitly describes the model as a composite by writing ''alternative simpler procedures would be worth having''  [@Cox1972], which implies a decision in fitting (a key feature of composition). This composition is formalised in @sec-car-pipelines-distr as a general pipeline \CDetI. The Cox model utilises the \CDetI pipeline with a PH form and Kaplan-Meier baseline.
+
+#### Example 2: Random Survival Forests {.unnumbered .unlisted}
+Fully discussed in @sec-surv-ml-models-ranfor, random survival forests are composed from many individual decision trees via a prediction composition algorithm (@alg-rsf-pred). In general, random forests perform better than their component decision trees, which tends to be true of all ensemble methods. Aggregation of predictions in survival analysis requires slightly more care than other fields due to the multiple prediction types, however this is still possible and is formalised in @sec-car-pipelines-avg.
+
+## Introduction to Reduction {#sec-car-redux}
+
+This section introduces reduction, motivates its use in survival analysis (@sec-car-redux-mot), details an abstract reduction pipeline and defines the difference between a complete/incomplete reduction (@sec-car-redux-task), and outlines some common mistakes that have been observed in the literature when applying reduction (@sec-car-reduxstrats-mistakes).
+
+Reduction is a concept found across disciplines with varying definitions. This report uses the Langford definition: reduction is ''a complex problem decomposed into simpler subproblems so that a solution to the subproblems gives a solution to the complex problem''  [@Langford2016]. Generalisation (or induction) is a common real-world use of reduction, for example sampling a subset of a population in order to estimate population-level results. The true answer (population-level values) may not always be found in this way but very good approximations can be made with simpler sub-problems (sub-sampling).
+
+Reductions are workflows that utilise composition. By including hyper-parameters, even complex reduction strategies can remain relatively flexible. To illustrate reduction by example, recall the table-building example (@sec-car-comp) in which the task of interest is to acquire a table. The most direct but complex solution is to fell a tree and directly saw it into a table (@fig-car-redux, top), clearly this is not a sensible process. Instead the problem can be reduced into simpler sub-problems: saw the tree into bundles of wood, acquire nails, and then use the 'hammer compositor' (@fig-car-comp-ex) to create a table (@fig-car-redux, bottom).
+
+![Visualising reduction in the real-world. The complex process (top) of directly sawing a tree into a table is inefficient and unnecessarily complex. The reduction (bottom) that involves first creating bundles of wood is simpler, more efficient, and yields the same result, though technically requiring more steps.](images/car/redux.png){#fig-car-redux fig-alt="TODO"}
+
+In a modelling example, predicting a survival distribution with the Cox model can be viewed as a reduction in which two sub-problems are solved and composed:
+
+i. predict continuous ranking;
+i. estimate baseline hazard; and
+i. compose with \CDetI (@sec-car-pipelines-distr).
+
+This is visualised as a reduction strategy in @fig-car-cargraph. The entire process from defining the original problem, to combining the simpler sub-solutions (in green), is the reduction (in red).
+
+<!-- \begin{figure}[h]
+\centering
+\begin{tikzpicture}
+\node (t0) [objnode, minimum width = 6.2cm]  {Task: Predict Distribution};
+\node (t1) [objnode, above=of t0, minimum width = 6.2cm] {Sub-Task: Predict Ranking};
+\node (t2) [objnode, below=of t0, minimum width = 6.2cm] {Sub-Task: Estimate Baseline};
+\node (t3) [objnode, right=of t1,xshift=1.5cm] {$\hat{\eta}$};
+\node (t6) [funnode, below=of t3, fill = orange!30] {$C$};
+\node (t4) [objnode, below=of t6] {$\hatS_0$};
+\node (t5) [objnode, left=of t6] {$S$};
+\node (t7) [objnode, right=of t6] {$\zeta$};
+\node (t8) [below=of t7, minimum width=10mm, minimum height = 5mm] {};
+
+\path[->]
+   (t0)  edge (t1)
+   (t0)  edge (t2)
+   (t1)  edge (t3)
+   (t2)  edge (t4)
+   (t3)  edge (t6)
+   (t4)  edge (t6)
+   (t5)  edge (t6)
+   (t6)  edge (t7);
+
+\begin{pgfonlayer}{background}
+  \draw[fill=red!30,fill opacity = 0.5,rounded corners]
+($(t1.north west)+(-0.1,0.2)$) rectangle ($(t8.south east)+(0.1,-0.4)$);
+  \draw[fill=green!30,fill opacity = 0.5,rounded corners]
+($(t3.north west)+(-2,0.1)$) rectangle ($(t4.south east) +(0.1,-0.1)$);
+ \end{pgfonlayer}
+\end{tikzpicture}
+\caption[Probabilistic survival task reduction]{Solving a survival distribution task by utilising reduction and (C1) (@sec-car-pipelines-distr). $S$, $\hat{\eta}$, $C$, $\hatS_0$ are fully described in @fig-car-comp-distr. The nodes in the green area are part of the composite model, all nodes combined form the reduction.}\label{fig:car_cargraph}
+\end{figure} -->
+
+### Reduction Motivation {#sec-car-redux-mot}
+
+Formalisation of reduction positively impacts upon accessibility, transparency, and predictive performance. Improvements to predictive performance have already been demonstrated when comparing random forests to decision trees. In addition, a reduction with multiple stages and many hyper-parameters allows for fine tuning for improved transparency and model performance (usual overfitting caveat applies, as does the trade-off described in @sec-car-pipelines-trade).
+
+The survey of ANNs (@sec-surv-ml-models-nn) demonstrated how reduction is currently utilised without transparency. Many of these ANNs are implicitly reductions to probabilistic classification (@sec-car-reduxes-r7) however none include details about how the reduction is performed. Furthermore in implementation, none provide interface points to the reduction hyper-parameters. Formalisation encourages consistent terminology, methodology and transparent implementation, which can only improve model performance by exposing further hyper-parameters.
+
+Accessibility is improved by formalising specific reduction workflows that previously demanded expert knowledge in deriving, building, and running these pipelines. All regression reductions in this chapter, are implemented in \\ `r pkg("mlr3proba")`  [@pkgmlr3proba] and can be utilised with any possible survival model.
+
+Finally there is an economic and efficiency advantage to reduction. A reduction model is relatively 'cheap' to explore as they utilise pre-established models and components to solve a new problem. Therefore if a certain degree of predictive ability can be demonstrated from reduction models, it may not be worth the expense of pursuing more novel ideas and hence reduction can help direct future research.
+
+### Task, Loss, and Data Reduction {#sec-car-redux-task}
+
+Reduction can be categorised into task, loss, and data reduction, often these must be used in conjunction with each other. The direction of the reductions may be one- or two-way; this is visualised in @fig-car-reduxdiag. This diagram should not be viewed as a strict fit/predict/evaluation workflow but instead as a guidance for which tasks, $T$, data, $D$, models, $M$, and losses, $L$, are required for each other. The subscript $O$ refers to the original object 'level' before reduction, whereas the subscript $R$ is in reference to the reduced object.
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\node (t0) {$L_O$};
+
+\node (t2)  [below=0.3cm of t0] {$D_O$};
+\node (t3)  [below=0.3cm of t2] {$D_R$};
+
+\node (t4)  [right=2cm of t0] {$M_O$};
+\node (t5)  [right=2cm of t3] {$M_R$};
+
+\node (t6)  [right=2cm of t4] {$T_O$};
+\node (t7)  [right=2cm of t5] {$T_R$};
+
+\path[->]
+   (t2) edge (t0)
+   (t2) edge (t3)
+
+   (t3) edge (t5)
+
+   (t4) edge (t0)
+   (t4) edge (t6)
+
+   (t5) edge (t4)
+
+   (t6) edge (t7)
+
+   (t7) edge (t5);
+\end{tikzpicture}
+\caption[Task, loss, and data reduction]{Task, loss, and data reduction to and from the original complex problem to sub-problems.}
+\label{fig:car_reduxdiag}
+\end{figure} -->
+
+The individual task, model, and data compositions in the diagram are listed below, the reduction from survival to classification (@sec-car-reduxes-r7r8) is utilised as a running example to help exposition.
+
+* $T_O \rightarrow T_R$: By definition of a machine learning reduction, task reduction will always be one way. A more complex task, $T_O$, is reduced to a simpler one, $T_R$, for solving. $T_R$ could also be multiple simpler tasks. For example, solving a survival task, $T_O$, by classification, $T_R$ (@sec-car-reduxes-r7r8).
+* $T_R \rightarrow M_R$:  All machine learning tasks have models that are designed to solve them. For example logistic regression, $M_R$, for classification tasks, $T_R$.
+* $M_R \rightarrow M_O$: The simpler models, $M_R$, are used for the express purpose to solve the original task, $T_O$, via solving the simpler ones. To solve $T_O$, a compositor must be applied, which may transform one (SOC) or multiple models (MOC) at a model- or prediction-level, thus creating $M_O$. For example predicting survival probabilities with logistic regression, $M_R$, at times $1,...,\tau^*$ for some $\tau^* \in \PNaturals$ (@sec-car-reduxes-r7-mlc).
+* $M_O \rightarrow T_O$: The original task should be solvable by the composite model. For example predicting a discrete survival distribution by concatenating probabilistic predictions at the times $1,...,\tau^*$ (@sec-car-reduxes-r7).
+* $D_O \rightarrow D_R$: Just as the tasks and models are reduced, the data required to fit these must likewise be reduced. Similarly to task reduction, data reduction can usually only take place in one direction, to see why this is the case take an example of data reduction by summaries. If presented with 10 data-points $\{1,1,1,5,7,3,5,4,3,3\}$ then these could be reduced to a single point by calculating the sample mean, $3.3$. Clearly given only the number $3.3$ there is no strategy to recover the original data. There are very few (if any) data reduction strategies that allow recovery of the original data. Continuing the running example, survival data, $D_O$, can be binned (@sec-car-reduxes-r7-binning) to classification data, $D_R$.
+
+There is no arrow between $D_O$ and $M_O$ as the composite model is never fit directly, only via composition from $M_R \rightarrow M_O$. However, the original data, $D_O$, is required when evaluating the composite model against the respective loss, $L_O$.\footnote{A complete diagram would indicate that $D_O$ is split into training data, which is subsequently reduced, and test data, which is passed to $L_O$. All reductions in this section can be applied to any data splitting process.} Reduction should be directly comparable to non-reduction models, hence this diagram does not include loss reduction and instead insists that all models are compared against the same loss $L_O$.
+
+A reduction is said to be *complete* if there is a full pipeline from $T_O \rightarrow M_O$ and the original task is solved, otherwise it is *incomplete*. The simplest complete reduction is comprised of the pipeline $T_O \rightarrow T_R \rightarrow M_R \rightarrow M_O$. Usually this is not sufficient on its own as the reduced models are fit on the reduced data, $D_R \rightarrow M_R$.
+
+A complete reduction can be specified by detailing:
+
+i. the original task and the sub-task(s) to be solved, $T_O \rightarrow T_R$;
+i. the original dataset and the transformation to the reduced one, $D_O \rightarrow D_R$ (if required); and
+i. the composition from the simpler model to the complex one, $M_R \rightarrow M_O$.
+
+
+### Common Mistakes in Implementation of Reduction {#sec-car-reduxstrats-mistakes}
+
+In surveying models and measures, several common mistakes in the implementation of reduction and composition were found to be particularly prevalent and problematic throughout the literature. It is assumed that these are indeed mistakes (not deliberate) and result from a lack of prior formalisation. These mistakes were even identified 20 years ago  [@Schwarzer2000] but are provided in more detail in order to highlight their current prevalence and why they cannot be ignored.
+
+RM1. Incomplete reduction. This occurs when a reduction workflow is presented as if it solves the original task but fails to do so and only the reduction strategy is solved. A common example is claiming to solve the survival task by using binary classification, e.g. erroneously claiming that a model predicts survival probabilities (which implies distribution) when it actually predicts a five year probability of death (@box-task-classif). This is a mistake as it misleads readers into believing that the model solves a survival task (@box-task-surv) when it does not. This is usually a semantic not mathematical error and results from misuse of terminology. It is important to be clear about model predict types  (@sec-surv-set-types) and general terms such as 'survival predictions' should be avoided unless they refer to one of the three prediction tasks.
+RM2. Inappropriate comparisons. This is a direct consequence of (RM1) and the two are often seen together. (RM2) occurs when an incomplete reduction is directly compared to a survival model (or complete reduction model) using a measure appropriate for the reduction. This may lead to a reduction model appearing erroneously superior. For example, comparing a logistic regression to an RSF (@sec-surv-ml-models-ranfor) for predicting survival probabilities at a single time using the accuracy measure is an unfair comparison as the RSF is optimised for distribution predictions. This would be non-problematic if a suitable composition is clearly utilised. For example a regression SSVM predicting survival time cannot be directly compared to a Cox PH. However the SSVM can be compared to a CPH composed with the probabilistic to deterministic compositor \CProb, then conclusions can be drawn about comparison to the composite survival time Cox model (and not simply a Cox PH).
+RM3. Na\"ive censoring deletion. This common mistake occurs when trying to reduce survival to regression or classification by simply deleting all censored observations, even if censoring is informative. This is a mistake as it creates bias in the dataset, which can be substantial if the proportion of censoring is high and informative. More robust deletion methods are described in @sec-car-pipelines-survreg.
+RM4. Oversampling uncensored observations. This is often seen when trying to reduce survival to regression or classification, and often alongside (RM3). Oversampling is the process of replicating observations to artificially inflate the sample size of the data. Whilst this process does not create any new information, it can help a model  detect important features in the data. However, by only oversampling uncensored observations, this creates a source of bias in the data and ignores the potentially informative information provided by the proportion of censoring.
+
+
+## Composition Strategies for Survival Analysis {#sec-car-pipelines}
+
+Though composition is common practice in survival analysis, with the Cox model being a prominent example, a lack of formalisation means a lack of consensus in simple operations. For example, it is often asked in survival analysis how a model predicting a survival distribution can be used to return a survival time prediction. A common strategy is to define the survival time prediction as the median of the predicted survival curve however there is no clear reason why this should be more sensible than returning the distribution mean, mode, or some random quantile. Formalisation allow these choices to be analytically compared both theoretically and practically as hyper-parameters in a workflow. Four prediction compositions are discussed in this section (@tab-car-taxredcar), three are utilised to convert prediction types between one another, the fourth is for aggregating multiple predictions. One data composition is discussed for converting survival to regression data. Each is first graphically represented and then the components are discussed in detail. As with losses in the previous chapter, compositions are discussed at an individual observation level but extend trivially to multiple observations.
+
+| ID$^1$ | Composition | Type$^2$ | Level$^3$ |
+| --- | --- | --- | --- |
+| C1) | Linear predictor to distribution | MOC | Prediction |
+| C2) | Survival time to distribution | MOC | Prediction |
+| C3) | Distribution to survival time | SOC | Prediction |
+| C4) | Survival model averaging | MOC | Prediction |
+| C5) | Survival to regression | SOC | Data |
+
+: Compositions formalised in @sec-car-pipelines. {tbl-car-taxredcar}
+
+<sup>
+1. ID for reference throughout this thesis.
+2. Composition type. Multi-object composition (MOC) or single-object composition (SOC).
+3. Composition level.
+</sup>
+
+### C1) Linear Predictor $\rightarrow$ Distribution {#sec-car-pipelines-distr}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0)[objnode] {$\hat{\eta}$};
+\node (t3)[funnode,right=of t0,fill=orange!30]{$C$};
+\node (t1)[objnode,above=of t3]{$M$};
+\node (t2)[objnode,below=of t3]{$\hatS_0$};
+\node (t4)[objnode, right=of t3]{$\zeta$};
+
+\path[->]
+   (t0) edge  (t3)
+   (t1) edge  (t3)
+   (t2) edge  (t3)
+   (t3) edge  (t4);
+\end{tikzpicture}
+\caption[Linear predictor to distribution composition]{Linear predictor ($\hat{\eta}$) to survival distribution ($\zeta$) composition. Parameters: $M$ -- Model form; $\hatS_0$ -- Estimated baseline survival function.}
+\label{fig:car_comp_distr}
+\end{figure} -->
+
+This is a prediction-level MOC that composes a survival distribution from a predicted linear predictor and estimated baseline survival distribution. The composition (@fig-car-comp-distr) requires:
+
+* $\hat{\eta}$: Predicted linear predictor. $\hat{\eta}$ can be tuned by including this composition multiple times in a benchmark experiment with different models predicting $\hat{\eta}$. In theory any continuous ranking could be utilised instead of a linear predictor though results may be less sensible (@sec-car-pipelines-trade).
+* $\hatS_0$: Estimated baseline survival function. This is usually estimated by the Kaplan-Meier estimator fit on training data, $\KMS$. However any model that can predict a survival distribution can estimate the baseline distribution (caveat: see @sec-car-pipelines-trade) by taking a uniform mixture of the predicted individual distributions: say $\xi_1,...,\xi_m$ are m predicted distributions, then $\hatS_0(\tau) = \mean[m]{\xi_i.S(\tau)}$. The mixture is required as the baseline must be the same for all observations. Alternatively, parametric distributions can be assumed for the baseline, e.g. $\xi = \Exp(2)$ and $\xi.S(t) = \exp(-2t)$. As with $\hat{\eta}$, this parameter is also tunable.
+* $M$: Chosen model form, which theoretically can be any non-increasing right-continuous function but is usually one of:
+
+* Proportional Hazards (PH): $S_{PH}(\tau|\eta, S_0) = S_0(\tau)^{\exp(\eta)}$
+* Accelerated Failure Time (AFT): $S_{AFT}(\tau|\eta, S_0) = S_0(\frac{\tau}{\exp(\eta)})$
+* Proportional Odds (PO): $S_{PO}(\tau|\eta, S_0) = \frac{S_0(\tau)}{\exp(-\eta) + (1-\exp(-\eta)) S_0(\tau)}$
+
+Models that predict linear predictors will make assumptions about the model form and therefore dictate sensible choices of $M$, for example the Cox model assumes a PH form. This does not mean other choices of $M$ cannot be specified but that interpretation may be more difficult (@sec-car-pipelines-trade). The model form can be treated as a hyper-parameter to tune.
+* $C$: Compositor returning the composed distribution, $\zeta := C(M, \hat{\eta}, \hatS_0)$ where $\zeta$ has survival function $\zeta.S(\tau) = M(\tau|\hat{\eta}, \hatS_0)$.
+
+
+Pseudo-code for training (@alg-car-comp-distr-fit) and predicting (@alg-car-comp-distr-pred) this composition as a model 'wrapper' with sensible parameter choices (@sec-car-pipelines-trade) is provided in appendix @app-car.
+
+### C2) Survival Time $\rightarrow$ Distribution {#sec-car-pipelines-time}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t4)[objnode]{$\hatT$};
+\node (t3)[funnode,right=of t4,fill=orange!30]{$C$};
+\node (t1)[objnode,above=of t3]{$\xi$};
+\node (t6)[objnode, below=of t3]{$\hat{\sigma}$};
+\node (t5)[objnode, right=of t3]{$\zeta$};
+
+\path[->]
+   (t1) edge  (t3)
+   (t6) edge (t3)
+   (t4) edge  (t3)
+   (t3) edge  (t5);
+\end{tikzpicture}
+\caption[Survival time to distribution composition]{Survival time ($\hatT$) to distribution ($\zeta$) composition. Parameters: $\hat{\sigma}$ -- Estimated scale parameter; $\xi$ -- Assumed survival distribution.}
+\label{fig:car_comp_response}
+\end{figure} -->
+
+This is a prediction-level MOC that composes a distribution from a predicted survival time and assumed location-scale distribution. The composition (@fig-car-comp-response) requires:
+
+
+* $\hatT$: A predicted survival time. As with the previous composition, this is tunable. In theory any continuous ranking could replace $\hatT$, though the resulting distribution may not be sensible (@sec-car-pipelines-trade).
+* $\xi$: A specified location-scale distribution, $\xi(\mu, \sigma)$, e.g. Normal distribution.
+* $\hat{\sigma}$: Estimated scale parameter for the distribution. This can be treated as a hyper-parameter or predicted by another model.
+* $C$: Compositor returning the composed distribution $\zeta := C(\xi, \hatT, \hat{\sigma}) = \xi(\hatT, \hat{\sigma})$.
+
+
+Pseudo-code for training (@alg-car-comp-response-fit) and predicting (@alg-car-comp-response-pred) this composition as a model 'wrapper' with sensible parameter choices (@sec-car-pipelines-trade) is provided in appendix @app-car.
+
+
+### C3) Distribution $\rightarrow$ Survival Time Composition {#sec-car-pipelines-crank}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t1)[funnode, right=of t0]{$\zeta$};
+\node (t2)[funnode, right=of t1, fill = orange!30]{$C$};
+\node (t4)[objnode, above=of t2]{$\phi$};
+\node (t3)[objnode, right=of t2]{$\hatT$};
+
+\path[->]
+   (t1) edge  (t2)
+   (t4) edge  (t2)
+   (t2) edge  (t3);
+\end{tikzpicture}
+\caption[Distribution to survival time composition]{Distribution ($\zeta$) to survival time ($\hatT$) composition. Parameters: $\phi$ -- Summary method.}
+\label{fig:car_comp_crank}
+\end{figure} -->
+
+This is a prediction-level SOC that composes a survival time from a predicted distribution. Any paper that evaluates a distribution on concordance is implicitly using this composition in some manner. Not acknowledging the composition leads to unfair model comparison (@sec-car-reduxstrats-mistakes). The composition (@fig-car-comp-crank) requires:
+
+
+* $\zeta$: A predicted survival distribution, which again is 'tunable'.
+* $\phi$: A distribution summary method. Common examples include the mean, median and mode. Other alternatives include distribution quantiles, $\zeta.F^{-1}(\alpha)$,\\$\alpha \in [0,1]$; $\alpha$ could be tuned as a hyper-parameter.
+* $C$: Compositor returning composed survival time predictions, $\hatT := C(\phi, \zeta) = \phi(\zeta)$.
+
+
+Pseudo-code for training (@alg-car-comp-crank-fit) and predicting (@alg-car-comp-crank-pred) this composition as a model 'wrapper' with sensible parameter choices (@sec-car-pipelines-trade) is provided in appendix @app-car.
+
+### C4) Survival Model Averaging {#sec-car-pipelines-avg}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t2)[funnode, above right=of t0,yshift=-10mm]{$\rho_2$};
+\node (t1)[funnode, above=of t2, yshift=-5mm]{$\rho_1$};
+\node (t3)[funnode, below right=of t0,yshift=10mm]{...};
+\node (t4)[funnode, below=of t3,yshift=5mm]{$\rho_B$};
+\node (t5)[funnode, right=of t0, fill=orange!30,xshift=20mm]{$C$};
+\node (t6)[objnode, right=of t5]{$\hat{\rho}$};
+\node (t7)[objnode, below=of t5, yshift = 0.2cm]{$w$};
+
+\path[->]
+   (t1) edge  (t5)
+   (t2) edge  (t5)
+   (t3) edge  (t5)
+   (t4) edge  (t5)
+   (t5) edge  (t6)
+   (t7) edge (t5);
+
+\end{tikzpicture}
+\caption[Survival model averaging composition]{Survival model averaging composition. $\rho_1,...,\rho_B$ are $B$ predictions of the same return type (time, ranking, distribution) and $\hat{\rho}$ is the averaged prediction. Parameters: $w = w_1,...,w_B$ -- Weights summing to one.}
+\label{fig:car_comp_avg}
+\end{figure} -->
+
+Ensembling is likely the most common composition in machine learning. In survival it is complicated slightly as multiple prediction types means one of two possible compositions is utilised to average predictions. The (@fig-car-comp-avg) composition requires:
+
+* $\rho = \rho_1,...,\rho_B$: $B$ predictions (not necessarily from the same model) of the same type: ranking, survival time or distribution; again 'tunable'.
+* $w = w_1,...,w_B$: Weights that sum to one.
+* $C$: Compositor returning combined predictions, $\hat{\rho} := C(\rho, w)$ where $C(\rho, w) = \mean[B]{w_i \rho_i}$, if $\rho$ are ranking of survival time predictions; or $C(\rho, w) = \zeta$ where $\zeta$ is the distribution defined by the survival function $\zeta.S(\tau) = \mean[B]{w_i \rho_i.S(\tau)}$, if $\rho$ are distribution predictions.
+
+
+Pseudo-code for training (@alg-car-comp-avg-fit) and predicting (@alg-car-comp-avg-pred) this composition as a model 'wrapper' with sensible parameter choices (@sec-car-pipelines-trade) is provided in appendix @app-car.
+
+### C5) Survival to Regression Data {#sec-car-pipelines-survreg}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node(t0)[objnode]{$\calD_S$};
+\node(t1)[funnode,right=of t0]{$I(x|\theta)$};
+\node(t2)[funnode,above=of t1]{$D(x|\phi)$};
+\node(t3)[objnode,right=of t1]{$\calD_R$};
+
+\path[->]
+   (t0) edge [dashed]  (t1)
+   (t0) edge [dashed]  (t2)
+   (t1) edge  (t3)
+   (t2) edge  (t3);
+
+\end{tikzpicture}
+\caption[Survival to regression data composition]{Survival ($\calD_S$) to regression ($\calD_R$) data composition. Dashed lines represent a choice in the workflow. Parameters: $I$ -- Imputation method (@sec-car-pipelines-survreg-imp); $\theta$ -- Hyper-parameters of $I$; $D$ -- Deletion method (@sec-car-pipelines-survreg-del); $\phi$ -- Hyper-parameters of $D$.}
+\label{fig:car_comp_survreg}
+\end{figure} -->
+
+This is a data-level SOC that transforms survival data to regression data by either removing censored observations or 'imputing' survival times. This composition is frequently incorrectly utilised (@sec-car-reduxstrats-mistakes) and therefore more detail is provided here than previous compositions. Note that the previous compositions were prediction-level transformations that occur after a survival model makes a prediction, whereas this composition is on a data-level and can take place before model training or predicting.
+
+In Statistics, there are only two methods for removing 'missing' values: deletion and imputation; both of these have been attempted for censoring.
+
+Censoring can be beneficial, harmful, or neutral; each will affect the data differently if deleted or imputed. Harmful censoring occurs if the reason for censoring is negative, for example drop-out due to disease progression. Harmful censoring indicates that the true survival time is likely soon after the censoring time. Beneficial censoring occurs if censoring is positive, for example drop-out due to recovery. This indicates that the true survival time is likely far from the censoring time. Finally neutral censoring occurs when no information can be gained about the true survival time from the censoring time. Whilst the first two of these can be considered to be dependent on the outcome, neutral censoring is often the case when censoring is independent of the outcome conditional on the data, which is a standard assumption for the majority of survival models and measures.
+
+#### Deletion #{sec-car-pipelines-survreg-del}
+
+Deletion is the process of removing observations from a dataset. This is usually seen in 'complete case analysis' in which observations with 'missingness', covariates with missing values, are removed from the dataset. In survival analysis this method is somewhat riskier as the subjects to delete depend on the outcome and not the features. Three methods are considered, the first two are a more brute-force approach whereas the third allows for some flexibility and tuning.
+
+#### Complete Deletion {.unnumbered .unlisted}
+Deleting all censored observations is simple to implement with no computational overhead. Complete deletion results in a smaller regression dataset, which may be significantly smaller if the proportion of censoring is high. If censoring is uninformative, the dataset is suitably large and the proportion of censoring suitably low, then this method can be applied without further consideration. However if censoring is informative then deletion will add bias to the dataset, although the 'direction' of bias cannot be known in advance. If censoring is harmful then censored observations will likely have a similar profile to those that died, thus removing censoring will artificially inflate the proportion of those who survive. Conversely if censoring is beneficial then censored observations may be more similar to those who survive, thus removal will artificially inflate the proportion of those who die.
+
+#### Omission {.unnumbered .unlisted}
+Omission is the process of omitting the censoring indicator from the dataset, thus resulting in a regression dataset that assumes all observations experienced the event. Complete deletion results in a smaller dataset of dead patients, omission results in no sample size reduction but the outcome may be incorrect. This reduction strategy is likely only justified for harmful censoring. In this case the true survival time is likely close to the censoring time and therefore treating censored observations as dead may be a fair assumption.
+
+#### IPCW {.unnumbered .unlisted}
+If censoring is conditionally-outcome independent then deletion of censored events is possible by using Inverse Probability of Censoring Weights (IPCW). This method has been seen several times throughout this thesis in the context of models and measures. It has been formalised as a composition technique by Vock \etal (2016)  [@Vock2016] although their method is limited to binary classification. Their method weights the survival time of uncensored observations by $w_i = 1/\KMG(T_i)$ and deletes censored observations, where $\KMG$ is the Kaplan-Meier estimate of the censoring distribution fit on training data. As previously discussed, one could instead consider the Akritas (or any other) estimator for $\KMG$.
+
+Whilst this method does provide a 'safer' way to delete censored observations, there is not a necessity to do so. Instead consider the following weights
+$$
+w_i = \frac{\Delta_i + \alpha(1 - \Delta_i)}{\KMG(T_i)}
+$$ {#eq-car-ipcw-weights}
+where $\alpha \in [0, 1]$ is a hyper-parameter to tune. Setting $\alpha = 1$ equally weights censored and uncensored observations and setting $\alpha = 0$ recovers the setting in which censored observations are deleted. It is assumed $\KMG$ is set to some very small $\epsilon$ when $\KMG(T_i) = 0$. When $\alpha \neq 0$ this becomes an imputation method, other imputation methods are now discussed.
+
+<!-- % @fig-car-ipcw-tune demonstrates the results of tuning the $\alpha$ parameter. On the y-axis is the log loss (@eq-density-logloss), the x-axis is different values of the $\alpha$ parameter. For each value of the $\alpha$ parameter, survival data is split intro training and testing, a Kaplan-Meier is fit on the censoring distributions and weights are defined as in @eq-car-ipcw-weights, a deterministic random forest model is fit to this 'probabilistic regression' data with a composition to probabilistic predictions with the Normal distribution compositor (@sec-car-reduxstrats-probregr). The results demonstrate that the logloss is minimised by values between $[0, 1]$, though results are very poor in all cases. Also note that $\alpha = 0$ -- deletion of censoring -- and $\alpha = 1$ -- equal weighting for censored and dead -- are both close to the minimal attained logloss. -->
+
+<!-- %\begin{figure}
+%\centering
+%\includegraphics[width = 14cm, height = 8cm]{c5_car/ipcw_tune}
+%\caption[Tuning the alpha parameter for IPCW survival reduction]{Tuning the alpha parameter for IPCW survival reduction.}\label{fig:car_ipcw_tune}
+%\end{figure} -->
+
+#### Imputation {#sec-car-pipelines-survreg-imp}
+
+Imputation methods estimate the values of missing data conditional on non-missing data and other covariates. Whilst the true value of the missing data can never be known, by carefully conditioning on the 'correct' covariates, good estimates for the missing value can be obtained to help prevent a loss of data. Imputing outcome data is more difficult than imputing covariate data as models are then trained on 'fake' data. However a poor imputation should still be clear when evaluating a model as testing data remains un-imputed. By imputing censoring times with estimated survival times, the censoring indicator can be removed and the dataset becomes a regression dataset.
+
+#### Gamma Imputation {.unnumbered .unlisted}
+Gamma imputation  [@Jackson2014] incorporates information about whether censoring is harmful, beneficial, or neutral. The method imputes survival times by generating times from a shifted proportional hazards model
+
+$$
+h(\tau) = h_0(\tau)\exp(\eta + \gamma)
+$$
+
+where $\eta$ is the usual linear predictor and $\gamma \in \Reals$ is a hyper-parameter determining the 'type' of censoring such that $\gamma > 0$ indicates harmful censoring, $\gamma < 0$ indicates beneficial censoring, and $\gamma = 0$ is neutral censoring. This imputation method has the benefit of being tunable as $\gamma$ is a hyper-parameter and there is a choice of variables to condition the imputation. No independent experiments exist studying how well this method performs, nor discussing the theoretical properties of the method.
+
+#### MRL {.unnumbered .unlisted}
+The Mean Residual Lifetime (MRL) estimator has been previously discussed in the context of SVMs (@sec-surv-ml-models-svm-surv). Here the estimator is extended to serve as an imputation method. Recall the MRL function, $MRL(\tau|\hatS) = \int^\infty_\tau \hat{S}(u) \ du/\hat{S}(\tau)$, where $\hatS$ is an estimate of the survival function of the underlying survival distribution (e.g. $\KMS$). The MRL is interpreted as the expected remaining survival time after the time-point $\tau$. This serves as a natural imputation strategy where given the survival outcome $(T_i, \Delta_i)$, the new imputed time $T'_i$ is given by
+$$
+T'_i = T_i + (1 - \Delta_i)MRL(T_i|\hatS)
+$$
+where $\hatS$ would be fit on the training data and could be an unconditional estimator, such as Kaplan-Meier, or conditional, such as Akritas. The resulting survival times are interpreted as the true times for those who died and the expected survival times for those who were censored.
+
+#### Buckley-James {.unnumbered .unlisted}
+Buckley-James  [@Buckley1979] is another imputation method discussed earlier (@sec-surv-ml-models-boost). The Buckley-James method uses an iterative procedure to impute censored survival times by the conditional expectation given censoring times and covariates  [@Wang2010]. Given the survival tuple for an outcome $(T_i, \Delta_i)$, the new imputed time $T'_i$ is
+$$
+T'_i =
+\begin{cases}
+T_i, & \Delta_i = 1 \\
+X_i\hat{\beta} + \frac{1}{\KMS(e_i)} \sum_{e_i < e_k} \hat{p}_{KM}(e_k) e_k & \Delta_i = 0
+\end{cases}
+$$
+where $\KMS$ is the Kaplan-Meier estimator of the survival distribution estimated on training data and with associated pmf $\hat{p}_{KM}$ and $e_i = T_i - X_i\hat{\beta}$ where $\hat{\beta}$ are estimated coefficients of a linear regression model fit on $(X_i, T_i)$. Given the least squares approach, more parametric assumptions are made than other imputation methods and it is more complex to separate model fitting from imputation. Hence, this imputation may only be appropriate on a limited number of data types.
+
+#### Alternative Methods {.unnumbered .unlisted}
+Other methods have been proposed for 'imputing' censored survival times though with either less clear discussion or to no benefit. Multiple imputation by chained equations (MICE) has been demonstrated to perform well with covariate data and even outcome data (in a non-survival setting). However no adaptations have been developed to incorporate censoring times into the imputation and therefore is less informative than Gamma imputation.
+
+Re-calibration of censored survival times  [@Vinzamuri2017] uses an iterative update procedure to 're-calibrate' censoring times however the motivation behind the method is not sufficiently clear to be of interest in general survival modelling tasks outside of the authors' specific pipelines.
+
+Finally parametric imputation is defined by making random draws from truncated probability distributions and adding these to the censoring time [@Royston2001; @Royston2008]. Whilst this method is arguably the simplest method and will lead to a sufficiently random sample, i.e. not one skewed by the imputation process, in practice the randomness leads to unrealistic results, with some imputed times being very far from the original censoring times and some being very close.
+
+#### The Decision to Impute or Delete {#sec-car-pipelines-survreg-dec}
+
+Deletion methods are simple to implement and fast to compute however they can lead to biasing the data or a significant sample reduction if used incorrectly. Imputation methods can incorporate tuning and have more relaxed assumptions about the censoring mechanism, though they may lead to over-confidence in the resulting outcome and therefore add bias into the dataset. In some cases, the decision to impute or delete is straightforward, for example if censoring is uninformative and only few observations are censored then complete deletion is appropriate. If it is unknown if censoring is informative then this can crudely be estimated by a benchmark experiment. Classification models can be fit on $\{(X_1, \Delta_1),...,(X_n,\Delta_n)\}$ where $(X_i, \Delta_i) \in \dtrain$. Whilst not an exact test, if any model significantly outperforms a baseline, then this may indicate censoring is informative. This is demonstrated in @tab-car-predcens, in which a logistic regression outperforms a featureless baseline in correctly predicting if an observation is censored when censoring is informative, but is no better than the baseline when censoring is uninformative.
+
+| Data | Baseline | Logistic Regression |
+| --- | ------- | ---- |
+| `Sim1` | 0.20 (0.14, 0.26) | 0.02 (0.01, 0.03) |
+| `Sim7` | 0.19 (0.14, 0.24) | 0.16 (0.13, 0.19) |
+
+: Estimating censoring dependence by prediction. `Sim1` is informative censoring and `Sim7` is uninformative. Logistic regression is compared to a featureless baseline with the Brier score with standard errors. Censoring can be significantly predicted to 95% confidence when informative (`Sim1`) but not when uninformative (`Sim7`). {#tbl-car-predcens}
+
+## Novel Survival Reductions {#sec-car-reduxes}
+This section collects the various strategies and settings discussed previously into complete reduction workflows. @tab-car-reduxes lists the reductions discussed in this section with IDs for future reference. All strategies are described by visualising a graphical pipeline and then listing the composition steps required in fitting and predicting.
+
+This section only includes novel reduction strategies and does not provide a survey of pre-existing strategies. This limitation is primarily due to time (and page) constraints as every method has very distinct workflows that require complex exposition. Well-established strategies are briefly mentioned below and future research is planned to survey and compare all strategies with respect to empirical performance (i.e. in benchmark experiments).
+
+Two prominent reductions are 'landmarking'  [@VanHouwelingen2007] and piecewise exponential models  [@Friedman1982]. Both are reductions for time-varying covariates and hence outside the scope of this thesis. Relevant to this thesis scope is a large class of strategies that utilise 'discrete time survival analysis'  [@Tutz2016]; these strategies include reductions (R7) and (R8). Methodology for discrete time survival analysis has been seen in the literature for the past three decades  [@Liestol1994]. The primary reduction strategy for discrete time survival analysis is implemented in the \Rstats package `r pkg("discSurv")`  [@pkgdiscsurv]; this is very similar to (R7) except that it enforces stricter constraints in the composition procedures and forces a 'discrete-hazard' instead of 'discrete-survival' representation (@sec-car-reduxes-r7-out).
+
+| ID | Original Survival Task | Reduced Task |
+| --- | --- | --- |
+| R1) | Probabilistic | Probabilistic Regression |
+| R2) | Probabilistic | Deterministic Regression |
+| R3) | Deterministic | Deterministic Regression |
+| R4) | Deterministic | Probabilistic Distribution |
+| R5) | Probabilistic | Deterministic Regression |
+| R6) | Ranking | Deterministic Regression |
+| R7) | Probabilistic | Probabilistic Classification |
+| R8) | Deterministic | Probabilistic Classification |
+
+: Survival reductions in @sec-car-reduxes. First column is a unique identifier for the strategy, second column is the original suvival task of interest, third column is the reduced task that will be solved as a surrogate in the workflow. {#tbl:car-reduxes}
+
+### R1) Probabilistic Survival $\rightarrow$ Probabilistic Regression {#sec-car-reduxes-r1}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0) [objnode]  {$\dtrain$};
+\node (t1) [funnode,right=of t0]  {\CSR};
+\node (t3) [objnode,right=of t1] {$D_R$};
+\node (t4) [funnode,right=of t3] {$g(D_R | \phi)$};
+\node (t5) [objnode,right=of t4] {$\hat{g}$};
+
+\node (t6) [objnode, below=of t0] {$\dtest$};
+\node (t7) [funnode,right=of t6] {$\hat{g}(\dtest | \phi)$};
+\node (t8) [objnode,right=of t7] {$\zeta$};
+
+
+\path[->]
+   (t0) edge (t1)
+   (t1) edge (t3)
+   (t3) edge (t4)
+   (t4) edge (t5)
+
+   (t6) edge (t7)
+   (t7) edge (t8);
+
+\draw[dashed, line width=0.1mm] (-1,-1) -- (11,-1);
+\end{tikzpicture}
+\caption[Probabilistic survival to probabilistic regression reduction]{Probabilistic survival to probabilistic regression reduction. Top row is fitting step and bottom is predicting. Key: training data, $\dtrain$; survival to regression data composition (@sec-car-pipelines-survreg), \CSR; transformed data, $D_R$; probabilistic regression model, $g$; model hyper-parameters, $\phi$; fitted model, $\hatg$; testing data, $\dtest$; distribution predictions, $\zeta$.}
+\label{fig:car_R1}
+\end{figure} -->
+
+This is perhaps the most natural reduction strategy as the survival task can be thought of as probabilistic regression with censoring. Steps and compositions of the reduction (@fig-car-R1):
+
+
+  \textbf{Fit}
+F1) A survival dataset, $\dtrain$, is composed with \CSR to a regression dataset, $\calD_R$.
+F2) A *probabilistic* regression model, $g$, with hyper-parameters, $\phi$, is fit on the composed regression data. It is important to select a model that will only predict distributions supported over $\NNReals$ in order to reflect the survival setting.
+  \textbf{Predict}
+P1) Testing survival data, $\dtest$, is passed to the trained regression model, $\hatg$, without further data composition, and distributions are predicted, $\zeta = \zeta_1,...,\zeta_m$.
+
+
+### R2) Probabilistic Survival $\rightarrow$ Deterministic Regression {#sec-car-reduxes-r2}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0) [objnode]  {$\dtrain$};
+\node (t1) [funnode,right=of t0]  {\CSR};
+\node (t3) [objnode,right=of t1] {$D_R$};
+\node (t4) [funnode,right=of t3] {$g(D_R | \phi)$};
+\node (t5) [objnode,right=of t4] {$\hat{g}$};
+
+\node (t6) [objnode, below=of t0] {$\dtest$};
+\node (t7) [funnode,right=of t6] {$\hat{g}(\dtest | \phi)$};
+\node (t8) [objnode,right=of t7] {$\hatT$};
+\node (t9) [funnode,right=of t8] {\CDetII};
+\node (t10) [objnode,right=of t9] {$\zeta$};
+
+
+\path[->]
+   (t0) edge (t1)
+   (t1) edge (t3)
+   (t3) edge (t4)
+   (t4) edge (t5)
+
+   (t6) edge (t7)
+   (t7) edge (t8)
+   (t8) edge (t9)
+   (t9) edge (t10);
+
+\draw[dashed, line width=0.1mm] (-1,-1) -- (11,-1);
+\end{tikzpicture}
+\caption[Probabilistic survival to deterministic regression reduction]{Probabilistic survival to deterministic regression reduction. Top row is fitting step and bottom row is predicting. Key: training data, $\dtrain$; survival to regression data composition (@sec-car-pipelines-survreg), \CSR; transformed data, $D_R$; deterministic regression model, $g$; model hyper-parameters, $\phi$; fitted model, $\hatg$; testing data, $\dtest$; survival time predictions, $\hatT$; time to distribution composition (@sec-car-pipelines-time), \CDetII; distribution predictions, $\zeta$.}
+\label{fig:car_R2}
+\end{figure} -->
+
+This is almost identical to the previous reduction but utilises deterministic regression models and composition to distribution predictions. Steps and compositions of the reduction (@fig-car-R2):
+
+
+  \textbf{Fit}
+F1) A survival dataset, $\dtrain$, is composed with \CSR to a regression dataset, $\calD_R$.
+F2) A *deterministic* regression model, $g$, with hyper-parameters, $\phi$, is fit on the composed regression data. It is important to select a model that will only predict positive values in order to reflect the survival setting.
+  \textbf{Predict}
+P1)  Testing survival data, $\dtest$, is passed to the trained regression model, $\hatg$, without further data composition, and survival times are predicted, $\hatT = \hatT_1,...,\hatT_m$.
+P2)  Survival times are composed with \CDetII to distribution predictions $\zeta = \zeta_1,...,\zeta_m$.
+
+
+### R3) Deterministic Survival $\rightarrow$ Deterministic Regression {#sec-car-reduxes-r3}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0) [objnode]  {$\dtrain$};
+\node (t1) [funnode,right=of t0]  {\CSR};
+\node (t3) [objnode,right=of t1] {$D_R$};
+\node (t4) [funnode,right=of t3] {$g(D_R | \phi)$};
+\node (t5) [objnode,right=of t4] {$\hat{g}$};
+
+\node (t6) [objnode, below=of t0] {$\dtest$};
+\node (t7) [funnode,right=of t6] {$\hat{g}(\dtest | \phi)$};
+\node (t8) [objnode,right=of t7] {$\hatT$};
+
+
+\path[->]
+   (t0) edge (t1)
+   (t1) edge (t3)
+   (t3) edge (t4)
+   (t4) edge (t5)
+
+   (t6) edge (t7)
+   (t7) edge (t8);
+
+\draw[dashed, line width=0.1mm] (-1,-1) -- (11,-1);
+\end{tikzpicture}
+\caption[Deterministic survival to deterministic regression reduction]{Deterministic survival to deterministic regression reduction. Top row is fitting step and bottom row is predicting. Key: training data, $\dtrain$; survival to regression data composition (@sec-car-pipelines-survreg), \CSR; transformed data, $D_R$; deterministic regression model, $g$; model hyper-parameters, $\phi$; fitted model, $\hatg$; testing data, $\dtest$; survival time predictions, $\hatT$.}
+\label{fig:car_R3}
+\end{figure} -->
+
+This reduction is identical to (R2) except (P2) is omitted.
+
+### R4) Deterministic Survival $\rightarrow$ Probabilistic Regression {#sec-car-reduxes-r4}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0) [objnode]  {$\dtrain$};
+\node (t1) [funnode,right=of t0]  {\CSR};
+\node (t3) [objnode,right=of t1] {$D_R$};
+\node (t4) [funnode,right=of t3] {$g(D_R | \phi)$};
+\node (t5) [objnode,right=of t4] {$\hat{g}$};
+
+\node (t6) [objnode, below=of t0] {$\dtest$};
+\node (t7) [funnode,right=of t6] {$\hat{g}(\dtest | \phi)$};
+\node (t8) [objnode,right=of t7] {$\zeta$};
+\node (t9) [funnode,right=of t8] {\CProb};
+\node (t10) [objnode,right=of t9] {$\hatT$};
+
+
+\path[->]
+   (t0) edge (t1)
+   (t1) edge (t3)
+   (t3) edge (t4)
+   (t4) edge (t5)
+
+   (t6) edge (t7)
+   (t7) edge (t8)
+   (t8) edge (t9)
+   (t9) edge (t10);
+
+\draw[dashed, line width=0.1mm] (-1,-1) -- (11,-1);
+\end{tikzpicture}
+\caption[Deterministic survival to probabilistic regression reduction]{Deterministic survival to probabilistic regression reduction. Top row is fitting step and bottom row is predicting. Key: training data, $\dtrain$; survival to regression data composition (@sec-car-pipelines-survreg), \CSR; transformed data, $D_R$; probabilistic regression model, $g$; model parameters, $\phi$; fitted model, $\hatg$; testing data, $\dtest$; distribution predictions, $\zeta$; distribution to survival time composition (@sec-car-pipelines-crank), \CProb; survival time predictions, $\hatT$}
+\label{fig:car_R4}
+\end{figure} -->
+
+This is identical to (R1) with an additional composition to survival time. Steps and compositions of the reduction (@fig-car-R4):
+
+
+  \textbf{Fit}
+F) Same as (R1).
+  \textbf{Predict}
+P1)  Testing survival data, $\dtest$, is passed to the trained regression model, $\hatg$, without further data composition, and distributions are predicted, $\zeta = \zeta_1,...,\zeta_m$.
+P2)  Distributions are composed with \CProb to survival times $\hatT = \hatT_1,...,\hatT_m$.
+
+
+### R5) Probabilistic Survival $\rightarrow$ Deterministic Regression (II) {#sec-car-reduxes-r5}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0) [objnode]  {$\dtrain$};
+\node (t1) [funnode,right=of t0] {$g_0(\dtrain|\theta)$};
+\node (t2) [objnode,right=of t1] {$\eta$};
+\node (t3) [funnode,right=of t2] {$g_1(\dtrain|\phi)$};
+\node (t4) [objnode,right=of t3] {$\hat{g}_1$};
+
+\node (t5) [objnode,below=of t0,yshift = -2mm] {$\dtest$};
+\node (t6) [funnode,right=of t5] {$\hat{g}_1(\dtest | \phi)$};
+\node (t7) [objnode,right=of t6] {$\hat{\eta}$};
+\node (t8) [funnode,right=of t7] {\CDetI};
+\node (t9) [objnode,right=of t8] {$\zeta$};
+
+\path[->]
+   (t0) edge (t1)
+   (t1) edge (t2)
+   (t2) edge (t3)
+   (t3) edge (t4)
+
+   (t5) edge (t6)
+   (t6) edge (t7)
+   (t7) edge (t8)
+   (t8) edge (t9);
+
+\draw[dashed, line width=0.1mm] (-1,-1) -- (11,-1);
+\end{tikzpicture}
+\caption[Probabilistic survival to deterministic regression reduction (II)]{Probabilistic survival to deterministic regression reduction (II). Top row is fitting step and bottom row is predicting. Key: training data, $\dtrain$; linear survival model $g_0$ with parameters $\theta$; fitted linear predictor from $g_0$, $\eta$; deterministic regression model, $g_1$, with parameters, $\phi$; fitted model, $\hatg_1$; testing data, $\dtest$; linear predictor predictions, $\hat{\eta}$; linear predictor to distribution composition (@sec-car-pipelines-distr), \CDetI; distribution prediction, $\zeta$.}
+\label{fig:car_R5}
+\end{figure} -->
+
+These next two reductions utilise deterministic regression to predict linear predictors. This first reduction additionally composes the linear predictor to a distribution prediction. Steps and compositions of the reduction (@fig-car-R5):
+
+
+ \textbf{Fit}
+F1) A survival model, $g_0$, with a linear predictor prediction type is fit on a survival dataset, $\dtrain$.
+F2)  The model is inspected and the fitted linear predictors, $\eta$, are returned.
+F3)  A deterministic regression model, $g$, is fit on $(X_i, \eta_i)$ with $\eta_i$ as the target.
+  \textbf{Predict}
+P1)  Testing survival data, $\dtest$, is passed to the trained regression model, $\hatg$, and linear predictors are predicted, $\hat{\eta} = \hat{\eta}_1,...,\hat{\eta}_m$.
+P2)  Linear predictors are composed with \CDetI to survival distributions $\zeta = \zeta_1,...,\zeta_m$. The most sensible choice of model form for the \CDetI composition will be dictated by $g_0$, e.g. does it have an underlying PH form?
+
+
+R6) Ranking Survival $\rightarrow$ Deterministic Regression {#sec-car-reduxes-r6}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0) [objnode]  {$\dtrain$};
+\node (t1) [funnode,right=of t0] {$g_0(\dtrain|\theta)$};
+\node (t2) [objnode,right=of t1] {$\eta$};
+\node (t3) [funnode,right=of t2] {$g_1(\dtrain|\phi)$};
+\node (t4) [objnode,right=of t3] {$\hat{g}_1$};
+
+\node (t5) [objnode,below=of t0,yshift = -2mm] {$\dtest$};
+\node (t6) [funnode,right=of t5] {$\hat{g}_1(\dtest | \phi)$};
+\node (t7) [objnode,right=of t6] {$\hat{\eta}$};
+
+\path[->]
+   (t0) edge (t1)
+   (t1) edge (t2)
+   (t2) edge (t3)
+   (t3) edge (t4)
+
+   (t5) edge (t6)
+   (t6) edge (t7);
+
+\draw[dashed, line width=0.1mm] (-1,-1) -- (11,-1);
+\end{tikzpicture}
+\caption[Ranking survival to deterministic regression reduction]{Ranking survival to deterministic regression reduction. Top row is fitting step and bottom row is predicting. Key: training data, $\dtrain$; linear survival model $g_0$ with parameters $\theta$; fitted linear predictor from $g_0$, $\eta$; deterministic regression model, $g_1$, with parameters, $\phi$; testing data, $\dtest$; linear predictor predictions, $\hat{\eta}$.}
+\label{fig:car_R6}
+\end{figure} -->
+
+This reduction is identical to (R5) except (P2) is omitted. Whilst this is categorised as solving a ranking task, the predicted quantities can be interpreted as linear predictors (given the model form specified by $g_0$).
+
+### R7-R8) Survival $\rightarrow$ Probabilistic Classification {#sec-car-reduxes-r7r8}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0) [objnode]  {$\dtrain$};
+\node (t1) [funnode,right=of t0] {$B(\dtrain|w)$};
+\node (t2) [objnode,right=of t1] {$D_B$};
+\node (t3) [funnode, below=of t2] {$C_C$};
+\node (t4) [funnode, right=of t3] {$g_C(D_B|\phi)$};
+\node (t5) [funnode, above=of t2] {$C_B$};
+\node (t6) [funnode, right=of t5] {$g_B(D_B|\varphi)$};
+\node (t7) [funnode,right=of t2] {$g_L(D_B|\theta)$};
+\node (t8) [objnode,right=of t7] {$\hatg$};
+
+\node (t9) [objnode, below=of t0, yshift = -15mm] {$\dtest$};
+\node (t10) [funnode, right=of t9] {$\hat{g}(\dtest|\Theta)$};
+\node (t11) [objnode, right=of t10] {$\tilde{S}$};
+\node (t12) [funnode, right=of t11] {$T_1(\tilde{S})$};
+\node (t13) [funnode, below=of t12] {$T_2(\tilde{S})$};
+\node (t14) [objnode, right=of t12] {$\zeta$};
+\node (t15) [objnode, right=of t13] {$\hatT$};
+
+\path[->]
+   (t0)  edge (t1)
+   (t1)  edge (t2)
+   (t2)  edge[dashed] (t3)
+   (t2)  edge[dashed] (t5)
+   (t2)  edge[dashed] (t7)
+   (t3)  edge (t4)
+   (t4)  edge (t8)
+   (t6)  edge (t8)
+   (t7)  edge (t8)
+   (t5)  edge (t6)
+
+   (t9) edge (t10)
+   (t10) edge (t11)
+   (t11) edge[dotted,color=red] (t12)
+   (t11) edge[dash dot,color=blue] (t13)
+   (t12) edge[dotted,color=red] (t14)
+   (t13) edge[dash dot,color=blue] (t15);
+
+\draw[dashed, line width=0.1mm] (-1,-2.5) -- (11,-2.5);
+\end{tikzpicture}
+\caption[Survival to classification reduction]{Survival to classification reduction. Top row is fitting and bottom row is predicting. Dashed lines represent a choice in the reduction (alternative compositions). Red dotted lines complete the probabilistic survival reduction (R7) and the blue dash-dotted lines complete the deterministic survival reduction (R8). Key: training data, $\dtrain$; binning function, $B$, with weights, $w$; binned data, $D_B$; composition to binary-class classification, $C_B$; composition to multi-class classification, $C_C$; binary-class classifier, $g_B$, with parameters, $\varphi$; multi-label classifier, $g_L$, with parameters, $\theta$; multi-class classifier, $g_C$, with parameters $\phi$; trained classifier, $\hat{g}$ with parameters $\Theta$; testing data, $\dtest$; pseudo-survival probabilities, $\tilde{S}$; composition, $T_1$, to distribution, $\zeta$; composition, $T_2$, to survival time, $\hatT$.}
+\label{fig:car_R7R8}
+\end{figure} -->
+
+Two separate reductions are presented in @fig-car-R7R8 however as both are reductions to probabilistic classification and are only different in the very last step, both are presented in this section. Steps and compositions of the reduction (@fig-car-R7R8):
+
+
+  \textbf{Fit}
+F1) A survival dataset, $\dtrain$, is binned, $B$, with a continuous to discrete data composition (@sec-car-reduxes-r7-binning).
+F2)  A multi-label classification model, with adaptations for censoring, $g_L(D_B|\theta)$, is fit on the transformed dataset, $D_B$. Optionally, $g_L$ could be further reduced to binary, $g_B$, or multi-class classification, $g_c$, (@sec-car-reduxes-r7-mlc).
+  \textbf{Predict}
+P1)  Testing survival data, $\dtest$, is passed to the trained classification model, $\hatg$, to predict pseudo-survival probabilities $\tilde{S}$ (or optionally hazards (@sec-car-reduxes-r7-out)).
+P2a) Predictions can be composed, $T_1$, into a survival distribution prediction, $\zeta = \zeta_1,...,\zeta_m$ (@sec-car-reduxes-r7); or,
+P2b) Predictions can be composed, $T_2$, to survival time predictions, $\hatT = \hatT_1,...,\hatT_m$ (@sec-car-reduxes-r8).
+
+
+Further details for binning, multi-label classification, and transformation of pseudo-survival probabilities are now provided.
+
+#### Composition: Binning Survival Times {#sec-car-reduxes-r7-binning}
+
+An essential part of the reduction is the transformation from a survival dataset to a classification dataset, which requires two separate compositions. The first (discussed here) is to discretise the survival times ($B(\dtrain|w)$ in @fig-car-R7R8)  and the second is to merge the survival time and censoring indicator into a single outcome (@sec-car-reduxes-r7-out).
+
+Discretising survival times is achieved by the common 'binning' composition, in which a continuous outcome is discretised into 'bins' according to specified thresholds. These thresholds are usually determined by specifying the width of the bins as a hyper-parameter $w$.\footnote{Binning is described here with equal widths but generalises to unequal widths trivially.} This is a common transformation and therefore further discussion is not provided here. An example is given below with the original survival data on the left and the binned data on the right ($w = 1$).
+
+| X | Time (Cont.) | Died |
+| --- | --- | --- |
+| 1 | 1.56 | 0|
+| 2 | 2 | 1|
+| 3 | 3.3 | 1 |
+| 4 | 3.6 | 0|
+| 5 | 4 | 0 |
+
+| X | Time (Disc.) | Died |
+| --- | --- | --- |
+| 1 | [1, 2) | 0|
+| 2 | [2, 3) | 1|
+| 3 | [3, 4) | 1 |
+| 4 | [3, 4) | 0|
+| 5 | [4, 5) | 0 |
+
+
+#### Composition: Survival to Classification Outcome {#sec-car-reduxes-r7-out}
+
+The binned dataset still has the unique survival data format of utilising two outcomes for training (time and status) but only making a prediction for one outcome (distribution). In order for this to be compatible with classification, the two outcome variables are composed into a single variable.\footnote{This is the first key divergence from other discrete-time classification strategies, which use the censoring indicator as the outcome and the time outcome as a feature.} This is achieved by casting the survival times into a 'wide' format and creating a new outcome indicator.\footnote{This is the second key divergence from other discrete-time classification strategies, which keep the data in a 'long' format.} Two outcome transformations are possible, the first represents a discrete survival function and the second represents a discrete hazard function.\footnote{This is the final key divergence from other discrete-time classification strategies, which enforce the discrete hazard representation.}
+
+#### Discrete Survival Function Composition {.unnumbered .unlisted}
+In this composition, the data in the transformed dataset represents the discrete survival function. The new indicator is defined as follows,
+$$
+Y_{i;\tau} :=
+\begin{cases}
+1, & T_i > \tau \\
+0, & T_i \leq \tau \cap \Delta_i = 1 \\
+-1, & T_i \leq \tau \cap \Delta_i = 0
+\end{cases}
+$$
+At a given discrete time $\tau$, an observation, $i$, is either alive ($Y_{i;\tau} = 1$), dead ($Y_{i;\tau} = 0$), or censored ($Y_{i;\tau} = -1$). Therefore $\hat{P}(Y_{i;\tau} = 1) = \hatS_i(\tau)$, motivating this particular choice of representation.
+
+This composition is demonstrated below with the binned data (left) and the composed classification data (right).
+
+| X | Time (Disc.) | Died |
+| --- | --- | --- |
+| 1 | [1, 2) | 0|
+| 2 | [2, 3) | 1|
+| 3 | [3, 4) | 1 |
+| 4 | [3, 4) | 0|
+| 5 | [4, 5) | 0 |
+
+| X | [1,2) | [2,3) | [3,4) | [4,5) |
+| --- | --- | --- | --- | --- |
+| 1 | -1 | -1 | -1 | -1 |
+| 2 | 1 | 0 | 0 | 0 |
+| 3 | 1 | 1 | 0 | 0 |
+| 4 | 1 | 1 | -1 | -1 |
+| 5 | 1 | 1 | -1 | -1 |
+
+#### Discrete Hazard Function Composition {.unnumbered .unlisted}
+In this composition, the data in the transformed dataset represents the discrete hazard function. The new indicator is defined as follows,
+$$
+Y^*_{i;\tau} :=
+\begin{cases}
+1, & T_i = \tau \cap \Delta_i = 1 \\
+-1, & T_i = \tau \cap \Delta_i = 0 \\
+0, & \otherw
+\end{cases}
+$$
+At a given discrete time $\tau$, an observation, $i$, either experiences the event ($Y^*_{i;\tau} = 1$), experiences censoring ($Y_{i;\tau} = -1$), or neither ($Y_{i;\tau} = 0$). Utilising sequential multi-label classification problem transformation methods (@sec-car-reduxes-r7-mlc) results in $\hat{P}(Y^*_{i;\tau} = 1) = \hat{h}_i(\tau)$. If methods are utilised that do not 'look back' at predictions then $\hat{P}(Y^*_{i;\tau} = 1) = \hat{p}_i(\tau)$ (@sec-car-reduxes-r7-mlc).\footnote{This important distinction is not required in other discrete-time reduction strategies that automatically condition the prediction by including time as a feature.}
+
+This composition is demonstrated below with the binned data (left) and the composed classification data (right).
+
+| X | Time (Disc.) | Died |
+| --- | --- | --- |
+| 1 | [1, 2) | 0|
+| 2 | [2, 3) | 1|
+| 3 | [3, 4) | 1 |
+| 4 | [3, 4) | 0|
+| 5 | [4, 5) | 0 |
+
+| X | [1,2) | [2,3) | [3,4) | [4,5) |
+| --- | --- | --- | --- | --- |
+| 1 | -1 | 0 | 0 | 0 |
+| 2 | 0 | 1 | 0 | 0 |
+| 3 | 0 | 0 | 1 | 0 |
+| 4 | 0 | 0 | -1 | 0 |
+| 5 | 0 | 0 | 0 | -1 |
+
+
+#### Multi-Label Classification Data {.unnumbered .unlisted}
+
+In both compositions, survival data t.v.i. $\Reals^p \times \NNReals \times \bset$ is transformed to multi-label classification data t.v.i. $\Reals^p \times \{-1,0,1\}^K$ for $K$ binned time-intervals. The multi-label classification task is defined in @sec-car-reduxes-r7-mlc with possible algorithms.
+
+The discrete survival representation has a slightly more natural interpretation and is 'easier' for classifiers to use for training as there are more positive events (i.e. more observations alive) to train on, whereas the discrete hazard representation will have relatively few events in each time-point. However the hazard representation leads to more natural predictions (@sec-car-reduxes-r7).
+
+A particular bias that may easily result from the composition of survival to classification data is now discussed.
+
+#### Reduction to Classification Bias
+The reduction to classification bias is commonly known  [@Zhou2005] but is reiterated briefly here as it must be accounted for in any automated reduction to classification workflow. This bias occurs when making classification predictions about survival at a given time and incorrectly censoring patients who have not been observed long enough, instead of removing them.
+
+By example, say the prediction of interest is five-year survival probabilities after a particular diagnosis, clearly a patient who has only been diagnosed for three years cannot inform this prediction. The bias is introduced if this patient is censored at five-years instead of being removed from the dataset. The result of this bias is to artificially inflate the probability of survival at each time-point as an unknown outcome is treated as censored and therefore alive.
+
+This bias is simply dealt with by removing patients who have not been alive 'long enough'.\footnote{Accounting for this bias is only possible if the study start and end dates are known, as well as the date the patient entered the study.} Paradoxically, even if a patient is observed to die before the time-point of interest, they should still be removed if they have not been in the dataset 'long enough' as failing to do so will result in a bias in the opposite direction, thus over-inflating the proportion of dead observations.
+
+Accounting for this bias is particularly important in the multi-label reduction as the number of observable patients will decrease over time due to censoring.
+
+#### Multi-Label Classification Algorithms {#sec-car-reduxes-r7-mlc}
+
+As the work in this section is completely out of the thesis scope, the full text is in appendix @app-mlc. The most important contributions from this section are:
+
+
+* Reviewing problem transformation methods  [@Tsoumakas2007] for multi-label classification;
+* Identifying that only binary relevance, nested stacking, and classifier chains are appropriate in this reduction; and
+* Generalising these methods into a single wrapper for any binary classifier, the 'LWrapper'.
+
+
+#### Censoring in Classification
+
+Classification algorithms cannot natively handle the censoring that is included in the survival reduction, but this can be incorporated using one of two approaches.
+
+#### Multi-Class Classification {.unnumbered .unlisted}
+
+All multi-label datasets can also handle multi-class data, hence the simplest way in which to handle censoring is to make multi-class predictions in each label for the outcome $Y_\tau \ t.v.i. \{-1, 0, 1\}$. Many off-shelf classification learners can make multi-class predictions natively and simple reductions exist for those that cannot. As a disadvantage to this method, classifiers would then predict if an individual is dead or alive or censored (each mutually exclusive), and not simply alive or dead. Though this could be perceived as an advantage when censoring is informative as this will accurately reflect a real-world competing-risks set-up.
+
+#### Subsetting/Hurdle Models {.unnumbered .unlisted}
+
+For this approach, the multi-class task is reduced to two binary class tasks: first predict if a subject is censored or not (dead or alive) and only if the prediction for censoring is below some threshold, $\alpha \in [0, 1]$, then predict if the subject is alive or not (dead or censored). If the probability of censoring is high in the first task then the probability of being alive is automatically set to zero in the final prediction, otherwise the prediction from the second task is used. Any classifier can utilise this approach and it has a meaningful interpretation, additionally $\alpha$ is a tunable hyper-parameter. The main disadvantage is increases to storage and run-time requirements as double the number of models may be fit.
+
+Once the datasets have been composed to classification datasets and censoring is suitably incorporated by either approach, then any probabilistic classification model can be fit on the data. Predictions from these models can either be composed to a distribution prediction (R7) or a survival time prediction (R8).
+
+#### R7) Probabilistic Survival $\rightarrow$ Probabilistic Classification {#sec-car-reduxes-r7}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0) [objnode]  {$\dtrain$};
+\node (t1) [funnode,right=of t0] {$B(\dtrain|w)$};
+\node (t2) [objnode,right=of t1] {$D_B$};
+\node (t3) [funnode, below=of t2] {$C_C$};
+\node (t4) [funnode, right=of t3] {$g_C(D_B|\phi)$};
+\node (t5) [funnode, above=of t2] {$C_B$};
+\node (t6) [funnode, right=of t5] {$g_B(D_B|\varphi)$};
+\node (t7) [funnode,right=of t2] {$g_L(D_B|\theta)$};
+\node (t8) [objnode,right=of t7] {$\hatg$};
+
+\node (t9) [objnode, below=of t0, yshift = -15mm] {$\dtest$};
+\node (t10) [funnode, right=of t9] {$\hat{g}(\dtest|\Theta)$};
+\node (t11) [objnode, right=of t10] {$\tilde{S}$};
+\node (t12) [funnode, right=of t11] {$T_1(\tilde{S})$};
+\node (t14) [objnode, right=of t12] {$\zeta$};
+
+\path[->]
+   (t0)  edge (t1)
+   (t1)  edge (t2)
+   (t2)  edge[dashed] (t3)
+   (t2)  edge[dashed] (t5)
+   (t2)  edge[dashed] (t7)
+   (t3)  edge (t4)
+   (t4)  edge (t8)
+   (t6)  edge (t8)
+   (t7)  edge (t8)
+   (t5)  edge (t6)
+
+   (t9) edge (t10)
+   (t10) edge (t11)
+   (t11) edge (t12)
+   (t12) edge (t14);
+
+\draw[dashed, line width=0.1mm] (-1,-2.5) -- (11,-2.5);
+\end{tikzpicture}
+\caption[Probabilistic survival to probabilistic classification reduction]{Probabilistic survival to probabilistic reduction. See @fig-car-R7R8 for key.}
+\label{fig:car_R7}
+\end{figure} -->
+
+This final part of the (R7) reduction is described separately for discrete hazard and survival representations of the data (@sec-car-reduxes-r7-out).
+
+#### Discrete Hazard Representation {.unnumbered .unlisted}
+In this representation recall that predictions of the positive class, $P(Y_\tau = 1)$, are estimating the quantity $h(\tau)$. These predictions provide a natural and efficient transformation from predicted hazards to survival probabilities. Let $\hat{h}_i$ be a predicted hazard function for some observation $i$, then the survival function for that observation can be found with a Kaplan-Meier type estimator,
+$$
+\tilde{S}_i(\tau^*) = \prod_\tau 1 - \hat{h}_i(\tau)
+$$
+Now predictions are for a pseudo-survival function, which is 'pseudo' as it is not right-continuous. Resolving this is discussed below.
+
+#### Discrete Survival Representation {.unnumbered .unlisted}
+In this representation, $P(Y_\tau = 1)$ is estimating $S(\tau)$, which means that predictions from a classification model result in discrete point predictions and not a right-continuous function. More importantly, there is no guarantee that a non-increasing function will be predicted, i.e. there is no guarantee that $P(Y_j = 1) < P(Y_i = 1)$, for time-points $j > i$.
+
+Unfortunately there is no optimal way of dealing with predictions of this sort and 'mistakes' of this kind have been observed in some software implementation. One point to note is that in practice these are quite rare as the probability of survival will always decrease over time. Therefore the 'usual' approach is quite 'hacky' and involves imputing increasing predictions with the previous prediction, formally,
+$$
+\tilde{S}({i+1}) := \min\{P(Y_{i+1} = 1), P(Y_i = 1)\}, \forall i = \NNReals
+$$
+assuming $\tilde{S}(0) = 1$.
+Future research should seek more robust alternatives.
+
+#### Right-Continuous Survival Function {.unnumbered .unlisted}
+From either representation, a \\ non-increasing but non-continuous pseudo-survival function, $\tilde{S}$, is now predicted. Creating a right-continuous function ('$T_1(\tilde{S})$' in @fig-car-R7) from these point predictions  (@fig-car-survclass (a)) is relatively simple and well-known with accessible off-shelf software. At the very least, one can assume a constant hazard rate between predictions and cast them into a step function (@fig-car-survclass (b)). This is a fairly common assumption and is usually valid as bin-width decreases. Alternatively, the point predictions can be smoothed into a continuous function with off-shelf software, for example with polynomial local regression smoothing (@fig-car-survclass (c)) or generalised linear smoothing (@fig-car-survclass (d)). Whichever method is chosen, the survival function is now non-increasing right-continuous and the (R7) reduction is complete.
+
+::: {#fig-car-survclass layout-ncol=2}
+
+![Point Predictions](images/car/surv_points.png){#fig-car-survclass-a}
+
+![Survival Step Function](images/car/surv_step.png){#fig-car-survclass-b}
+
+![Local polynomial regression smoothing](images/car/surv_loess.png){#fig-car-survclass-c}
+
+![Generalised linear smoothing](images/car/surv_glm.png){#fig-car-survclass-d}
+
+Survival function as a: point prediction (a), step function assuming constant risk (b), local polynomial regression smoothing (c), and generalised linear smoothing (d). (c) and (d) computed with `r pkg("ggplot2")`  [@pkgggplot2].
+:::
+
+#### R8) Deterministic Survival $\rightarrow$ Probabilistic Classification {#sec-car-reduxes-r8}
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node (t0) [objnode]  {$\dtrain$};
+\node (t1) [funnode,right=of t0] {$B(\dtrain|w)$};
+\node (t2) [objnode,right=of t1] {$D_B$};
+\node (t3) [funnode, below=of t2] {$C_C$};
+\node (t4) [funnode, right=of t3] {$g_C(D_B|\phi)$};
+\node (t5) [funnode, above=of t2] {$C_B$};
+\node (t6) [funnode, right=of t5] {$g_B(D_B|\varphi)$};
+\node (t7) [funnode,right=of t2] {$g_L(D_B|\theta)$};
+\node (t8) [objnode,right=of t7] {$\hatg$};
+
+\node (t9) [objnode, below=of t0, yshift = -15mm] {$\dtest$};
+\node (t10) [funnode, right=of t9] {$\hat{g}(\dtest|\Theta)$};
+\node (t11) [objnode, right=of t10] {$\tilde{S}$};
+\node (t13) [funnode, right=of t11] {$T_2(\tilde{S})$};
+\node (t15) [objnode, right=of t13] {$\hatT$};
+
+\path[->]
+   (t0)  edge (t1)
+   (t1)  edge (t2)
+   (t2)  edge[dashed] (t3)
+   (t2)  edge[dashed] (t5)
+   (t2)  edge[dashed] (t7)
+   (t3)  edge (t4)
+   (t4)  edge (t8)
+   (t6)  edge (t8)
+   (t7)  edge (t8)
+   (t5)  edge (t6)
+
+   (t9) edge (t10)
+   (t10) edge (t11)
+   (t11) edge (t13)
+   (t13) edge (t15);
+
+\draw[dashed, line width=0.1mm] (-1,-2.5) -- (11,-2.5);
+\end{tikzpicture}
+\caption[Deterministic survival to probabilistic classification reduction]{Deterministic survival to probabilistic reduction. See @fig-car-R7R8 for key.}
+\label{fig:car_R8}
+\end{figure} -->
+
+Predicting a deterministic survival time from the multi-label classification predictions is relatively straightforward and can be viewed as a discrete analogue to (C3) (@sec-car-pipelines-crank). For the discrete hazard representation, one can simply take the predicted time-point for an individual to be time at which the predicted hazard probability is highest however this could easily be problematic as there may be multiple time-points at which the predicted hazard equals $1$. Instead it is cleaner to first cast the hazard to a pseudo-survival probability (@sec-car-reduxes-r7) and then treat both representations the same.
+
+Let $\tilde{S}_i$ be the predicted multi-label survival probabilities for an observation $i$ s.t. $\tilde{S}_i(\tau)$ corresponds with $\hat{P}(Y_{i;\tau} = 1)$ for label $\tau \in \mathcal{K}$ where $Y_{i;\tau}$ is defined in @sec-car-reduxes-r7-out and $\mathcal{K} = \{1,...,K\}$ is the set of labels for which to make predictions. Then the survival time transformation is defined by
+$$
+T_2(\tilde{S}_i) = \inf \{\tau \in \mathcal{K} : \tilde{S}_i(\tau) \leq \beta\}
+$$
+for some $\beta \in [0, 1]$.
+
+This is interpreted as defining the predicted survival time as the first time-point in which the predicted probability of being alive drops below a certain threshold $\beta$. Usually $\beta = 0.5$, though this can be treated as a hyper-parameter for tuning. This composition can be utilised even if predictions are not non-increasing, as only the first time the predicted survival probability drops below the threshold is considered. With this composition the (R8) reduction is now complete.
+
+## Choices and Defaults {#sec-car-pipelines-trade}
+
+Before concluding the chapter, this brief section describes a common problem that occurs when programming pipelines and how this thesis (and implementation in `r pkg("mlr3proba")`) addresses this.
+
+#### Many Choices {.unnumbered .unlisted}
+Implementation of any of these pipelines leads to an important trade-off between user-choice and sensible decisions. When programming any software, the more choice that is given to the user, the higher the potential to make less sensible decisions; in the extreme as the number of user possibilities tends to infinity, the probability of a user selecting a sensible decision will tend to zero. On the other hand, if decisions are fully-restricted to sensible decisions then the user's choice is also fully-restricted by the subjective concept of 'sensible'.
+
+To illustrate the problem, below are three possible choices that could be made with the compositors in @sec-car-pipelines:
+
+* A linear predictor predicted by a CPH could be composed with a PH-ANN-predicted baseline and AFT model form to a full distribution.
+* A survival time predicted by a regression SSVM could be composed with a Gompertz baseline and PO model form to a full distribution.
+* A survival time could be composed by taking the 42nd quantile from a survival distribution predicted by a random survival forest.
+
+
+Each choice lacks a meaningful interpretation however there is no apriori reason why they should yield 'bad' predictions and all could be considered in a benchmark experiment. Dismissing these examples as 'not sensible' may lead to dismissing the optimal model with respect to predictive performance.
+
+#### Sensible Defaults {.unnumbered .unlisted}
+It has been demonstrated that the choice of defaults vastly influences human decision making  [@Johnson2003], which is known as the '(endogenous) default effect'. This effect extends to computer science and parameter defaults. Setting sensible defaults for parameters encourages users towards using these defaults in their code and this 'sensible defaults' design principle is routinely used in programming software.\footnote{No specific reference for the 'sensible defaults' principle could be found, though it is often seen as a direct consequence of the 'convention over configuration' principle.}
+
+This thesis advocates for a slight adaptation to the 'sensible defaults' design principle: non-proprietary open-source software should apply the sensible defaults principle whilst allowing users to make any choice that is possible (even if not sensible); whereas proprietary software should only allow sensible choices. This distinction is important from an ethical standpoint: in the latter case users may not be domain-experts and therefore the developer could be considered liable for negative consequences of building models from non-sensible choices.
+
+## Conclusions {#sec-car-conc}
+
+This chapter introduced composition and reduction to survival analysis and formalised specific strategies. Formalising these concepts allows for better quality of research and most importantly improved transparency. Clear interface points for hyper-parameters and compositions allow for reproducibility that was previously obfuscated by unclear workflows and imprecise documentation for pipelines.
+
+Additionally, composition and reduction improves accessibility. Reduction workflows vastly increase the number of machine learning models that can be utilised in survival analysis, thus opening the field to those whose experience is limited to regression or classification. Formalisation of workflows allows for precise implementation of model-agnostic pipelines as computational objects, as opposed to functions that are built directly into an algorithm without external interface points.
+
+Finally, predictive performance is also increased by these methods, which is most prominently the case for the survival model averaging compositor \CAvg (as demonstrated by RSFs).
+
+All compositions in this chapter, as well as (R1)-(R6), have been implemented in `r pkg("mlr3proba")` with the `r pkg("mlr3pipelines")`  [@pkgmlr3pipelines] interface. The reductions to classification will be implemented in a near-future update. Additionally the `r pkg("discSurv")` package  [@pkgdiscsurv] will be interfaced as a `r pkg("mlr3proba")` pipeline to incorporate further discrete-time strategies.
+
+The compositions \CDetI and \CProb are included in the benchmark experiment in @Sonabend2021b so that every tested model can make probabilistic survival distribution predictions as well as deterministic survival time predictions. Future research will benchmark all the pipelines in this chapter and will cover algorithm and model selection, tuning, and comparison of performance. Strategies from other papers will also be explored.
