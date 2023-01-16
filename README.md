@@ -5,7 +5,7 @@ This electronic version (including pdf download) will always be free and open ac
 
 We will continue to update this version after publication to correct mistakes (big and small), as well as making minor and major additions.
 
-## Citing this book {.unnumbered}
+## Citing this book
 
 Whilst this book remains a work in progress you can cite as
 
