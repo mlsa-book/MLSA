@@ -1,6 +1,6 @@
 # MLSA
 
-<img src="book/Figures/coverbg.svg" align="right" width = "150" />
+<img src="book/Figures/coverbg.svg" align="right" width = "200" />
 
 This book is a work in progress, the final work will be published by Chapman and Hall/Crc.
 This electronic version (including pdf download) will always be free and open access ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
