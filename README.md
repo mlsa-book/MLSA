@@ -1,4 +1,4 @@
-# MLSA
+# Machine Learning in Survival Analysis
 
 <img src="book/Figures/coverbg.svg" align="right" width = "200" />
 
