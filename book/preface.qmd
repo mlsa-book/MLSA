@@ -1,105 +1,35 @@
 {{< include _setup.qmd >}}
+# Preface {.unnumbered}
 
 > "Everything happens to everybody sooner or later if there is time enough" - George Bernard Shaw
 
-# Preface {.unnumbered}
+> "...but in this world nothing can be said to be certain, except death and taxes." - Benjamin Franklin
 
-## Symbols and Notation
+Together, the epigraphs for this book perfectly and succinctly sets up the 'survival problem'.
+In maths perhaps we could be even more succinct: $\forall X (P(X) \rightarrow 1\text{ as t }\rightarrow \infty)$.
+Of course, nothing is immortal and therefore there is never 'time enough'.
+Thus creating the predictive 'survival problem': given an individual (object), predict when this individual will experience an event of interest.
+The 'problem' in survival analysis is that we implicitly assume the individual *will* experience the event, which is of course not guaranteed (with the exception of death or taxes).
+To make matters worse, the vast majority of accessible models to make survival predictions, encode an even stricter assumption, that either the event of interest will occur, or, for some completely unrelated reason, it will not.
+For example, a model assumes either a marathon runner will finish a race, or they won't due to some arbitrary reason, e.g., someone else pushing them over.
+This assumption does not reflect the real-world, in practice the runner may not finish the marathon due to some related reasons, such as extreme exhaustion.
 
-The most common symbols and notation used throughout this book are presented below; in rare cases where different meanings are intended within the book, this will be made clear.
+When I (RS) began writing my PhD thesis I was motivated by two questions: given the enormous power of survival analysis (who doesn't want to be able to predict the future?), and given the rapid rise in interest in machine learning, i) why are more data scientists not using machine learning? ii) and why do machine learning models fail to outperform simple, classical models that have been around for decades?
+The answer it transpired was fairly simple, and largely ignored by researchers (including myself), for decades.
+The survival analysis problem is simply impossible.
+In 1975, Anastasios Tsiatis published a paper as part of their PhD submission [@Tsiatis1975] demonstrating the 'non-identifiability problem' in survival analysis.
+In the abstract of this paper, Tsiatis sums up the problem we face today: "based on the assumption that [competing events] are independent, may have no resemblance to reality".
+In simpler terms, the majority of survival models encode an assumption that is very hard (/impossible) to justify in reality and in doing so, predictions made by these models "may have no resemblance to reality".
+Despite this, the majority of this book is going to focus on these models, and we will come back to why after a brief detour to the alternative treatment of events.
 
-### Cases, Fonts, and Symbols
+[FIXME: Would be nice to have something from Andi here about CR]
 
-Lower-case letters, $x$, refer to fixed ('realised', 'observed') values and upper-case letters, $X$, refer to random variables. For example $X$ is a random variable (r.v.) taking values in (t.v.i.) the set $\calX$ if, $X: \Omega \rightarrow \calX$ where $\Omega$ is the sample space of all possible outcomes; then $x \in \calX$ is a possible realised value from $X$. A lower-case (Greek or Latin) letter, $x$, refers to either a single element or a vector, which will be clear from context. Calligraphic letters, $\calX$, are used to refer to sets. A lower-case bold-face letter, $\xx$, refers to a matrix. If $x$ is a vector then $x_i$ refers to the $i$th element in this vector. If $\xx$ is a matrix then $x_i$ refers to the $i$th row of the matrix, $x_{;j}$ refers to the $j$th column of the matrix, and $x_{ij}$ refers to the $i$th row of the $j$th column of matrix $\xx$. Unless otherwise stated, a 'vector' is used to refer to a column vector. An element with a 'hat', $\hat{x}$, refers to the prediction or estimation of the variable without the hat, $x$. Inline code and datasets will use `this font` and package names will look like this `r pkg("survival")`. Finally, any dates will be presented in the ISO format: YYYY-MM-DD.
+So in this book, we will consider both the 'standard framework' and the competing risks framework.
+Instead of treating these as two distinct parts to the book, we will interweave methods throughout the narrative, to highlight our belief that all practitioners should have an equally firm grasp on both settings.
+Where competing risk alternatives do not yet exist, readers are directed to @sec-car which includes a section on extending *any* survival model, to the competing risks setting.
+Some readers may be questioning why we event both including the non-competing framework at all, which is a reasonable question.
+The answer is threefold, firstly there are times when this setting is appropriate, if you can reasonably justify that the sole reason for an event not occurring is independent of the event itself (we will see examples of this later in the book), then this framework is valid and is the simpler setting; secondly, as mentioned above, any model in this framework can be extended to competing risks, and therefore knowing about these models is still important; thirdly, so that readers who may be reviewing other academic texts, can spot errors and help correct them when found in the wild.
 
-*Italicised text* emphasises a word or phrase that is the focus of the sentence or definition. 'Single quotation marks' are most often utilised to signify that the word or phase will either be defined later in the book, or to identify when a word should be taken in an English and not mathematical sense, for example 'a good model' would signify that the phrase does not refer to a particular mathematical definition of a model being good. ''Double quotation marks'' are reserved for direct quotes and are always followed by the associated citation.
+### How to use this book
 
-### Distributions and Random Variables
-
-Random variables are denoted as follows: let $X$ be a random variable following some distribution $\zeta$, then $f_X$ is the probability density function of $X$.
-
-### Variables
-
-The majority of variables will be defined when required however below are some that are commonly used throughout this book.
-
-| Variable | Definition |
-|--------- | ---------- |
-| $\Reals$|Set of Reals. |
-| $\PReals$|Set of Positive Reals (excluding zero). |
-| $\NNReals$|Set of Non-Negative Reals (including zero). |
-| $\ExtReals$|Set of Extended Reals, equal to $\Reals \cup \{-\infty, +\infty\}$. |
-| $\Naturals$|Set of Naturals (including zero). |
-| $\PNaturals$|Set of Positive Naturals (excluding zero). |
-| $\calN$|Normal distribution. |
-| $\calU$|Uniform distribution. |
-| $x, \xx, X, \calX$|Vector, matrix, random variable, and set of features. |
-| $y, \mathbf{y}, Y, \calY$|Vector, matrix, random variable, and set of true outcomes. |
-| $t, \mathbf{t}, T, \calT$|Vector, matrix, random variable, and set of observed time outcomes. |
-| $\delta, \Delta$|Vector and random variable of survival/censoring indicators. |
-| $\beta$|Vector of model coefficients, or weights. |
-| $\eta$|Linear predictor, $X\beta$. |
-| $\zeta.f$|Probability density function of distribution $\zeta$. |
-| $\zeta.F$|Cumulative distribution function of distribution $\zeta$. |
-| $\zeta.h$|Hazard function of distribution $\zeta$. |
-| $\zeta.H$|Cumulative hazard function of distribution $\zeta$. |
-| $\zeta.S$|Survival function of distribution $\zeta$. |
-| $\calL$|Likelihood function. |
-
-The indicator function, $\II(\cdot)$, expects a well-defined logical statement $(\cdot)$ and equals $1$ when this statement is true, and $0$ otherwise.
-Any distribution function with a '$0$' in the subscript refers to the 'baseline' function, e.g. $h_0, S_0$ are the baseline hazard and baseline survival functions respectively.
-
-| Function | Definition |
-|--------- | ---------- |
-| $\Distr(\calD)$ | Space of distributions over the set $\calD$. |
-| $|x|$ | Absolute value of $x$. |
-| $\|x\|$ | Euclidean norm of vector $x$, $\sqrt{|x_1|^2 + ... + |x_n|^2}$. |
-| $\bar{x}$ | Sample mean of vector $x$, $\mean{x_i}$. |
-| $\EE(X)$ | Expectation of random variable $X$. |
-| $\Var(X)$ | Variance of random variable $X$. |
-
-
-Let $f: \calX \rightarrow \calY$ be any function with domain $\calX$ and codomain $\calY$. Then the \emph{function signature} of $f$ is $\calX \rightarrow \calY$. Arguments and parameters are separated in function signatures by a pipe, '$|$', where variables to the left are parameters (free variables) and those to the right are arguments (fixed). For example let $f$ be an indicator function that 'checks' if the parameter, $\phi$, is below the fixed argument, $\theta$, then $f$ is fully defined by
-
-$$
-f: \Reals \times \Reals \rightarrow \bset; \quad (\phi|\theta) \mapsto \II(\phi < \theta)
-$$
-
-Traditionally arguments are not included in the formal signature and the above could be expressed as: Let $\theta \in \Reals$ then $f: \Reals \rightarrow \bset; \ (\phi) \mapsto \II(\phi < \theta)$. The first notation is preferred as it clearly specifies all variables included in the function with their domains, whether they are free or fixed, and cleanly extends to multiple parameters and arguments.
-
-**Acronyms**
-
-Below is a table of acronyms used throughout this book (styled as they appear in the text), these are all fully defined the first time they are used.
-
-| Acronym | Definition |
-|--------- | ---------- |
-| AFT | Accelerated Failure Time |
-| APT | Accessible, Performant, Transparent |
-| ANN | Artificial Neural Network |
-| AUC | Area Under the Curve |
-| cdf | Cumulative Distribution Function |
-| chf | Cumulative Hazard Function |
-| CPH | Cox Proportional Hazards |
-| GBM | Gradient Boosting Machine |
-| GLM | Generalised Linear Model |
-| IGS | Integrated Graf Score |
-| IPC(W) | Inverse Probability of Censoring (Weighted) |
-| I(S)LL | Integrated (Survival) Log Loss |
-| KM | Kaplan-Meier |
-| LHS | Left Hand Side |
-| MAE | Mean Absolute Error |
-| ML | Machine Learning |
-| pdf | Probability Density Function |
-| PH | Proportional Hazards |
-| PO | Proportional Odds |
-| RHS | Right Hand Side |
-| (R)MSE | (Root) Mean Squared Error |
-| ROC | Receiver Operating Characteristic |
-| R(S)F | Random (Survival) Forest |
-| r.v. | Random Variable |
-| (S)SVM | (Survival) Support Vector Machine |
-| s.t. | Such That |
-| TNR | True Negative Rate |
-| TPR | True Positive Rate |
-| t.v.i. | Taking Values In |
-| w.r.t. | With Respect To |
-| (W)(S)DLL | (Weighted) (Survival) Density Log Loss |
+[FIX ME]
