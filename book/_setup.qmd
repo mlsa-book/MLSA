@@ -4,49 +4,101 @@ $$
 $$
 :::
 
-```{r,echo=FALSE}
+```{r utils,echo=FALSE}
 toproper = function(str) {
   str = strsplit(str, " ", TRUE)[[1]]
   paste0(toupper(substr(str, 1, 1)), tolower(substr(str, 2, 100)), collapse = " ")
 }
+```
 
+```{r index_functions, include = FALSE, cache = FALSE}
 define = function(main, margin = toproper(main)) {
   sprintf("\\index{%s}%s[%s]{.aside}", toproper(main), main, margin)
 }
 
-index = function(main) {
-  sprintf("\\index{%s}%s", toproper(main), main)
+index = function(main, code = FALSE, lower = TRUE) {
+  entry = if (code || !lower) main else tolower(main)
+  text = if (code) sprintf("`%s`", main) else main
+  sprintf("\\index{%s}%s", entry, main)
 }
+```
 
-link = function(url, text = url) {
-  sprintf("[%s](%s)^[[%s](%s)]", text, url, url, url)
+```{r link_functions, include = FALSE, cache = FALSE}
+link = function(url) {
+  sprintf("[%s](%s)", url, url)
 }
+```
 
-pkg = function(pkg, github = TRUE) {
+```{r reference_functions, include = FALSE, cache = FALSE}
+ref = function(topic, index = FALSE, aside = FALSE) {
+
+  topic = trimws(topic)
+
+  stopifnot(grepl(pattern = "^[[:alnum:]]::[[:alnum:]]$"), topic)
+
+  if (grepl("::", topic, fixed = TRUE)) {
+    parts = strsplit(topic, "::", fixed = TRUE)[[1L]]
+    topic = parts[2L]
+    name = sub("\\(\\)$", "", parts[2L])
+    pkg = parts[1L]
+  }
+
+  url = sprintf("https://www.rdocumentation.org/packages/%s/topics/%s", pkg, name)
+
+  out = sprintf("[`%s`](%s)", topic, url)
+
+  if (index || aside) {
+    out = paste0(out, index(main = NULL, index = topic, aside = aside, code = TRUE))
+  }
+
+  out
+}
+```
+
+```{r reference_packages, include = FALSE, cache = FALSE}
+pkg = function(pkg, github = TRUE, index = TRUE, aside = TRUE) {
   pkg = trimws(pkg)
 
   if (grepl("/", pkg, fixed = TRUE)) {
     if (github) {
-      gh_pkg(pkg)
+      out = .gh_pkg(pkg)
     } else {
-      ru_pkg(pkg)
+      out = .ru_pkg(pkg)
     }
   } else {
-    cran_pkg(pkg)
+    out = .cran_pkg(pkg)
+  }
+
+  if (index || aside) {
+    out = paste0(out, index(main = NULL, index = pkg, aside = aside))
+  }
+
+  out
+}
+
+.cran_pkg = function(pkg) {
+  if (pkg %in% c("stats", "graphics", "datasets")) {
+    sprintf("`%s`", pkg)
+  } else {
+    url = sprintf("https://cran.r-project.org/package=%s", pkg)
+    sprintf("[`%s`](%s)", pkg, url)
   }
 }
 
-cran_pkg = function(pkg) {
-  sprintf("[`%s`](https://cran.r-project.org/package=%s)", pkg, pkg)
-}
-
-gh_pkg = function(pkg) {
+.gh_pkg = function(pkg) {
   sprintf("[`%s`](https://github.com/%s)", pkg, pkg)
 }
 
-ru_pkg = function(pkg) {
+.ru_pkg = function(pkg) {
   parts = strsplit(pkg, "/", fixed = TRUE)[[1L]]
   url = sprintf("https://%s.r-universe.dev/ui#package:%s", parts[1L], parts[2L])
   sprintf("[`%s`](%s)", pkg, url)
+}
+```
+
+```{r include_multi_graphics, include = FALSE, cache = FALSE}
+include_multi_graphics = function(fig_name) {
+  fmt = if (knitr::is_latex_output()) "png" else "svg"
+  knitr::include_graphics(sprintf("Figures/%s.%s", fig_name, fmt), dpi = 600)
 }
 ```
