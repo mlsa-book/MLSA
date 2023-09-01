@@ -25,11 +25,11 @@ bookinstall:
 			-e 'devtools::install()'
 
 serve:
-	Rscript -e 'renv::restore("book/", prompt = FALSE)'
+	Rscript -e 'renv::restore("book/", prompt = FALSE, repos = getOption("repos"))'
 	quarto preview book/
 
 serveref:
-	Rscript -e 'renv::restore("book/", prompt = FALSE)'
+	Rscript -e 'renv::restore("book/", prompt = FALSE, repos = getOption("repos"))'
 	quarto preview book/ --cache-refresh
 
 clean:
@@ -46,11 +46,11 @@ html:
 	quarto render book/ --to html
 
 pdf:
-	Rscript -e 'renv::restore("book/", prompt = FALSE)'
+	Rscript -e 'renv::restore("book/", prompt = FALSE, repos = getOption("repos"))'
 	quarto render book/ --to pdf
 
 pdfref:
-	Rscript -e 'renv::restore("book/", prompt = FALSE)'
+	Rscript -e 'renv::restore("book/", prompt = FALSE, repos = getOption("repos"))'
 	quarto render book/ --to pdf --cache-refresh
 
 
