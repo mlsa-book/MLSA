@@ -25,9 +25,11 @@ bookinstall:
 			-e 'devtools::install()'
 
 serve:
+	Rscript -e 'renv::restore("book/", prompt = FALSE)'
 	quarto preview book/
 
-serverefresh:
+serveref:
+	Rscript -e 'renv::restore("book/", prompt = FALSE)'
 	quarto preview book/ --cache-refresh
 
 clean:
@@ -44,7 +46,13 @@ html:
 	quarto render book/ --to html
 
 pdf:
+	Rscript -e 'renv::restore("book/", prompt = FALSE)'
 	quarto render book/ --to pdf
+
+pdfref:
+	Rscript -e 'renv::restore("book/", prompt = FALSE)'
+	quarto render book/ --to pdf --cache-refresh
+
 
 bibtex:
 	biber --tool --output-align --output-indent=2 --output-fieldcase=lower book/book.bib -O book/book.bib
