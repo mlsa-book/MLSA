@@ -6,6 +6,8 @@ abstract: TODO (150-200 WORDS)
 
 # Evaluation {#sec-eval}
 
+{{< include _wip.qmd >}}
+
 This chapter studies how to evaluate the predictions arising from the surveyed models in the previous chapter. 'Model evaluation' is as vague a phrase as 'human evaluation'. A human could be evaluated by a series of exams, physical or neurological tests, aesthetics, etc. Likewise a model could be evaluated according to how well it fits to training data, the quality of predictions on new data, the average prediction, and many more methods. This chapter aims to provide a nuanced approach to defining, understanding, and examining model evaluation. Evaluation is defined in further detail in @sec-eval-why and throughout this chapter the definition will continue to be refined and specialised to specific sub-types of evaluation, including discrimination (@sec-eval-crank), calibration (@sec-eval-distr-calib), and overall predictive performance (@sec-eval-distr).
 
 Evaluation is a surprising source of disagreement in the literature with some arguing that the process can often be ignored completely [@vanderLaan2007; @Wolpert1992]. There is a larger divide in survival analysis as many believe that the primary (possibly only) goal is risk prediction [@Chen2012; @Newson1983; @Pencina2012] and thus other forms of evaluation are not required. These strict views can undermine an integral part of the model building and deployment process, and create more division than necessary. This book advocates for strict implementation of model evaluation as a critical part of the model building process as well as in continuous monitoring of deployed models. Without rigorous evaluation, a model cannot be 'trusted' to perform well and could be as useless as making random guesses for all predictions. This is critical in survival analysis, which has important applications in healthcare and finance, in these sectors models that have not been evaluated are potentially dangerous.
@@ -13,8 +15,6 @@ Evaluation is a surprising source of disagreement in the literature with some ar
 An infamous example of evaluation going wrong is the Google Flu Trends (GFT) model, which claimed to accurately predict future flu trends but was in fact deemed by many a complete failure as it significantly overestimated all predictions, in some cases doubling the true figures [@Lazer2014].  The GFT model was never utilised (at least openly) in policy and as such no lasting harm was created. However it is not hard to imagine the problems that would be caused by such a model if it was utilised and trusted during the time of COVID-19. On a more individual level, as machine learning is increasingly deployed in public sectors, major decisions for patients could become increasingly automated (or at least machine-assisted). Patients should expect their models to be as trained and tested as their doctors.
 
 This chapter attempts to highlight the purpose and need of evaluation in survival analysis by first giving a high-level overview to evaluation as a concept, then providing a brief review of commonly-used survival measures and finally extensive treatment to scoring rules for evaluation of probabilistic predictions, including novel definitions and proofs for properness of scoring rules. The term *measure* will be used throughout this chapter to refer to functions or 'metrics' that quantify some aspect of model evaluation, this should not be confused with a mathematical measure.
-
-The APT criteria will be utilised to survey these measures. For transparency and accessibility, these are straightforward to apply to measures with the same definitions as for models. For predictive performance this is more complicated as it depends on the model class. Therefore optimal measure performance definitions will be covered within each section.
 
 
 #### Notation and Terminology {.unnumbered .unlisted}
@@ -200,7 +200,7 @@ The choice of $W$ specifies a particular evaluation measure (see below). To eval
 
 All methods assume that censoring is conditionally-independent of the event given the features (@sec-surv-set-cens), otherwise weighting by $\KMS$ or $\KMG$ would not be applicable. It is assumed here that $\KMS$ and $\KMG$ are estimated on the training data and not the testing data (though the latter is often seen in implementation [@pkgsurvival]).
 
-With respect to being APT, all concordance indices are highly transparent and accessible, with many off-shelf implementations. With respect to performance, Choodari-Oskooei $\etal$ (2012) [@Choodari2012a] define a measure as performant if it is:^[This paper refers specifically to measures of explained variation and therefore only the properties that generalise to all measures are included here.]
+All concordance indices are highly transparent and accessible, with many off-shelf implementations. With respect to performance, Choodari-Oskooei $\etal$ (2012) [@Choodari2012a] define a measure as performant if it is:^[This paper refers specifically to measures of explained variation and therefore only the properties that generalise to all measures are included here.]
 
 i. independent of censoring;
 i. interpretable; and
@@ -421,7 +421,7 @@ If a model is D-calibrated, i.e. predicted distributions from the model result i
 $$
 p = \frac{\sum_i \II(T^*_i \leq \zeta_i.F^{-1}(p))}{|T^*|}
 $$ {#eq-eval-dcalib}
-where $p \in [0,1]$ and $\zeta_i.F^{-1}$ is the inverse cumulative distribution function of the $i$th predicted distribution. In words, if a model is D-calibrated then the number of deaths occurring at or before each quantile should be equal to the quantile itself, for example 50% of deaths should occur before their predicted median survival time. Therefore one can graphically test for D-calibration by plotting $p$ on the x-axis and the RHS of @eq-eval-dcalib on the y-axis. A D-calibrated model should result in a straight line on $x = y$. This is visualised in @fig-eval-dcalib for the same models as in @fig-eval-calib-km. Again the SVM is terribly-calibrated but the CPH is better calibrated. In this case it is clearer that the D-calibration of the CPH is not perfect, especially at higher quantiles. Comparison to $\chi^2_9$ indicates the CPH is D-calibrated whereas the SVM is not.
+where $p \in [0,1]$ and $\zeta_i.F^{-1}$ is the inverse cumulative distribution function of the $i$th predicted distribution. In words, if a model is D-calibrated then the number of deaths occurring at or before each quantile should be equal to the quantile itself, for example 50% of deaths should occur before their predicted median survival time. Therefore one can graphically test for D-calibration by plotting $p$ on the x-axis and the right hand side of @eq-eval-dcalib on the y-axis. A D-calibrated model should result in a straight line on $x = y$. This is visualised in @fig-eval-dcalib for the same models as in @fig-eval-calib-km. Again the SVM is terribly-calibrated but the CPH is better calibrated. In this case it is clearer that the D-calibration of the CPH is not perfect, especially at higher quantiles. Comparison to $\chi^2_9$ indicates the CPH is D-calibrated whereas the SVM is not.
 
 ![Assessing the D-calibration of the Cox PH (CPH) and SVM from the same data as @fig-eval-calib-km: models trained and tested on randomly simulated data from the `r pkg("simsurv")` [@pkgsimsurv] package in $\proba$ [@pkgmlr3proba]. x-axis are quantiles in $[0,1]$ and y-axis are predicted quantiles from the models. The dashed line is $y = x$. Again the SVM is terribly calibrated and the CPH is better calibrated as it is closer to $y = x$.](Figures/evaluation/dcalib.png){#fig-eval-dcalib fig-alt="TODO"}
 
@@ -825,7 +825,7 @@ $$
 \end{split}
 $$
 
-The primary differences are (RHS of equations):
+The primary differences are (right hand side of equations):
 
 i. Always removing censored observations from $L_{ISLL^*}$ (even when alive) whereas $L_{ISLL}$ includes all observations when alive.
 i. $L_{ISLL^*}$ weights alive and dead observations by $\KMG(t)$ whereas $L_{ISLL}$ weights dead observations by $\KMG(t)$ and alive observations by $\KMG(\tau)$
@@ -1114,7 +1114,8 @@ The most problematic findings in this chapter lie in the survival scoring rules.
 
 As an important caveat to the findings in this chapter, this book presents one particular definition of properness for survival scoring rules. This definition is partially subjective and other definitions could instead be considered. Therefore these losses should not be immediately dismissed outright. As well as deriving new losses that are (strictly) proper with respect to the definitions provided here, research may also be directed towards finding other sensible definitions of properness, or in confirming that the definition here is the only sensible option.<!-- As these are open research questions, the scoring rules discussed in this chapter are still utilised in evaluation for the benchmark experiment in -->
 
-This chapter demonstrates that no survival measure on its own can capture enough information to fully evaluate a survival prediction. No measure is satisfactorily APT. This is a serious problem that will either lead (or already is leading) to less interest and uptake in survival modelling, or misunderstanding and deployment of sub-optimal models. Evaluation of survival models is still possible but currently requires expert interpretation to prevent misleading results. If the aim of a study is solely in assessing a model's discriminatory power, then measures of discrimination alone are sufficient, otherwise a range of classes should be included to capture all aspects of model performance. This book advocates reporting *all* of the below to evaluate model performance:
+This chapter demonstrates that no survival measure on its own can capture enough information to fully evaluate a survival prediction.
+This is a serious problem that will either lead (or already is leading) to less interest and uptake in survival modelling, or misunderstanding and deployment of sub-optimal models. Evaluation of survival models is still possible but currently requires expert interpretation to prevent misleading results. If the aim of a study is solely in assessing a model's discriminatory power, then measures of discrimination alone are sufficient, otherwise a range of classes should be included to capture all aspects of model performance. This book advocates reporting *all* of the below to evaluate model performance:
 
 
 * **Calibration**: Houwelingen's $\alpha$ and [@VanHouwelingen2007] *and* D-calibration [@Haider2020].
