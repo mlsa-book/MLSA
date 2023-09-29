@@ -21,6 +21,21 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
+      - name: Check TODO/FIXMEs
+        run: |
+          #!/bin/bash
+  
+          # Search TODO/FIXME and strip whitespace
+          count=$(grep -Rniwo --include="*.qmd" -e 'TODO\|FIXME' book/ | wc -l)
+          count=$(echo "$count" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+  
+          # Warn if count>0
+          if [ "$count" -gt 0 ]; then
+              echo "There are $count FIXMEs/TODOs."
+              exit 1 # Exit with a non-zero status code to indicate a warning
+          fi
+        shell: bash
+
       - name: Install Quarto
         uses: quarto-dev/quarto-actions/setup@v2
         with:
@@ -36,21 +51,6 @@ jobs:
 
       - name: Install dependencies
         uses: r-lib/actions/setup-r-dependencies@v2
-        
-      - name: Run the script
-        run: |
-          #!/bin/bash
-  
-          # Search TODO/FIXME and strip whitespace
-          count=$(grep -Rniwo --include="*.qmd" -e 'TODO\|FIXME' book/ | wc -l)
-          count=$(echo "$count" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-  
-          # Warn if count>0
-          if [ "$count" -gt 0 ]; then
-              echo "There are $count FIXMEs/TODOs."
-              exit 1 # Exit with a non-zero status code to indicate a warning
-          fi
-        shell: bash
 
       - name: Render book
         run: make render
