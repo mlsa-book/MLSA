@@ -8,32 +8,53 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _wip.qmd >}}
 
-There appears to be little research into measures for evaluating survival time predictions, which is likely due to this task usually being of less interest than the others (@sec-surv-set-types). Common measures in survival analysis for survival time predictions are the same as regression measures but with an additional indicator variable to remove censoring. Three common regression measures are the mean absolute error (MAE), mean squared error (MSE), and root mean squared error (RMSE). These are respectively defined for survival analysis as
+When it comes to evaluating survival time predictions, there are few measures available at our disposal.
+It makes sense this is an under-researched area, as survival time predictions are very uncommon when compared to other prediction types (@sec-surv-set-types).
+In fact, to our knowledge, there are no specialised 'survival time measures', instead regression measures are used once censored observations have been removed.
 
-::: {#def-survivaltime}
+Before presenting these measures, we will consider what happens by discarding censored observations.
+If censoring is truly independent and occurs randomly, then there is no harm in discarding observations and treating this as a regression problem.
+The advantage of using survival models in this case (and not also removing censored observations from the training data) is that we are still maximising all available training data and helping models learn as much as possible before censoring.
+However, if censoring is not independent, then the removal of censored observations results in increased bias as the proportion of censoring increases (@sec-eval-crank-disc-conc).
+Moreover, by discarding censored observations, we could miss very valuable insights about the model.
+In the real-world, we do not know the ground truth for observations in our test data, we simply make predictions and wait for the truth to be observed (which could be years depending on our time scale).
+Therefore, we need to be sure that predictions for people who end up being censored, are as good as those who are not, simply because we do not know which group people will fall into!
+In this context, it is worth considering if discarding censoring times, and providing no weighting to compensate (for example, IPCW), is truly the best strategy?
+There has been limited (if any) research into IPCW adjusted survival time measures, so below we just present the simplest case of regression measures for independent censoring that at least has some grounding in literature [@Wang2017].
 
-## Survival time measures
+## Metrics
 
-Let $\calT^m \subseteq \PReals^m$, $\hatt = \hatt_1,...,\hatt_m, t = t_1,...,t_m$, $\delta = \delta_1,...,\delta_m$, and $d := \sum^m_{i=1} \delta_i$, then
+**Censoring-adjusted mean absolute error, $MAE_C$**
 
-i. The *censoring-adjusted mean absolute error*, $MAE_C$ is defined by
+In regression, the mean absolute error (MAE) is a popular measure because it is intuitive to understand as it measures the absolute difference between true and predicted outcomes; hence intuitively one can understand that a model predicting a height of 175cm is clearly better than one predicting a height of 180cm, for a person with true height of 174cm.
 
 $$
-MAE_C: \calT^m \times \calT^m \times \bset^m \rightarrow \NNReals; (\hatt, t, \delta) \mapsto \frac{1}{d} \sum^m_{i=1} \delta_i|t_i - \hat{t_i}|
-$$
-i. The *censoring-adjusted mean squared error*, $MSE_C$ is defined by
-
-$$
-MSE_C: \calT^m \times \calT^m \times \bset^m \rightarrow \NNReals; (\hatt, t, \delta) \mapsto \frac{1}{d}\sum^m_{i=1}\delta_i(t_i - \hatt_i)^2
-$$
-i. The *censoring-adjusted root mean squared error*, $RMSE_C$ is defined by
-
-$$
-RMSE_C: \calT^m \times \calT^m \times \bset^m \rightarrow \NNReals; (\hatt, t, \delta) \mapsto \sqrt{MSE_C(t, \hat{t}, \delta)}
+MAE_C(\hatt, t, \delta) = \frac{1}{d} \sum^m_{i=1} \delta_i|t_i - \hat{t_i}|
 $$
 
-:::
+**Censoring-adjusted mean squared error**
 
-These are referred to as 'distance' measures as they measure the distance between the true, $(t, \delta)$, and predicted, $\hatt$, values. This approach is not ideal as the removal of censored observations results in increased bias as the proportion of censoring increases (@sec-eval-crank-disc-conc). Furthermore these measures make some assumptions that are likely not valid in a survival setting. For example these metrics assume that an over-prediction should be penalised equally as much as an under-prediction, whereas in survival data it is likely that a model should be overly-cautious and under-predict survival times, i.e. it is safer to predict a patient is more at risk and will die sooner rather than less risk and die later.
+In comparison to MAE, the mean squared error (MSE), computes the squared differences between true and predicted values.
+While the MAE provides a smooth, linear, 'penalty' for increasingly poor predictions (i.e., the difference between an error of predicting 2 vs. 5 is still 3), but the square in the MSE means that larger errors are quickly magnified (so the difference in the above example is 9).
+By taking the mean over all predictions, the effect of this inflation is to increase the MSE value as larger mistakes are made.
 
-These measures are clearly transparent and accessible as off-shelf implementation is straightforward, though $\proba$ [@pkgmlr3proba] was the only $\Rstats$ package found to implement these. For performance, no conclusions can be drawn as no research could be found into the theoretical properties of these losses; despite this there is evidence of them being utilised in the literature [@Wang2017].
+$$
+MSE_C(\hatt, t, \delta) = \frac{1}{d}\sum^m_{i=1}\delta_i(t_i - \hatt_i)^2
+$$
+
+**Censoring-adjusted root mean squared error**
+
+Finally, the root mean squared error (RMSE), is simply the square root of the MSE.
+This allows interpretation on the original scale (as opposed to the squared scale produced by the MSE).
+Given the inflation effect for the MSE, the RMSE will be larger than the MAE as increasingly poor predictions are made; it is common practice for the MAE and RMSE to be reported together.
+
+$$
+RMSE_C(\hatt, t, \delta) = \sqrt{MSE_C(t, \hat{t}, \delta)}
+$$
+
+## Over- and under-predictions
+
+These measures are often referred to as 'distance' measures as they measure the distance between the true, $(t, \delta=1)$, and predicted, $\hatt$, values.
+Note that all of these, assume that the error for an over-prediction ($\hatt > t$) should be equal to an under-prediction ($\hatt < t$).
+In the survival setting, this assumption is unlikely to be valid as we would generally prefer models to be overly cautious and therefore predict higher risk and lower survival times, as the converse could lead to observations not being responded to quick enough.
+For example, if a model were to predict a life-support machine will fail after 5 years but in fact it fails after 3, this could have disastrous consequences.
