@@ -3,7 +3,7 @@
 <img src="book/Figures/cover_inverse.svg" align="right" width = "200" />
 
 This book is a work in progress, the final work will be published by Chapman and Hall/Crc.
-This electronic version (including pdf download) will always be free and open access ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)).
+This electronic version (including pdf download) will always be free and open access ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)).
 
 We will continue to update this version after publication to correct mistakes (big and small), as well as making minor and major additions.
 
