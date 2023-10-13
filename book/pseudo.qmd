@@ -4,7 +4,7 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _setup.qmd >}}
 
-# Connections to Regression and Imputation {#sec-car-pipelines-survreg}
+# Connections to Regression and Imputation {#sec-redux-regr}
 
 {{< include _wip.qmd >}}
 
@@ -34,7 +34,7 @@ ___
    (t2) edge  (t3);
 
 \end{tikzpicture}
-\caption[Survival to regression data composition]{Survival ($\calD_S$) to regression ($\calD_R$) data composition. Dashed lines represent a choice in the workflow. Parameters: $I$ -- Imputation method (@sec-car-pipelines-survreg-imp); $\theta$ -- Hyper-parameters of $I$; $D$ -- Deletion method (@sec-car-pipelines-survreg-del); $\phi$ -- Hyper-parameters of $D$.}
+\caption[Survival to regression data composition]{Survival ($\calD_S$) to regression ($\calD_R$) data composition. Dashed lines represent a choice in the workflow. Parameters: $I$ -- Imputation method (@sec-redux-regr-imp); $\theta$ -- Hyper-parameters of $I$; $D$ -- Deletion method (@sec-redux-regr-del); $\phi$ -- Hyper-parameters of $D$.}
 \label{fig:car_comp_survreg}
 \end{figure} -->
 
@@ -44,7 +44,7 @@ In Statistics, there are only two methods for removing 'missing' values: deletio
 
 Censoring can be beneficial, harmful, or neutral; each will affect the data differently if deleted or imputed. Harmful censoring occurs if the reason for censoring is negative, for example drop-out due to disease progression. Harmful censoring indicates that the true survival time is likely soon after the censoring time. Beneficial censoring occurs if censoring is positive, for example drop-out due to recovery. This indicates that the true survival time is likely far from the censoring time. Finally neutral censoring occurs when no information can be gained about the true survival time from the censoring time. Whilst the first two of these can be considered to be dependent on the outcome, neutral censoring is often the case when censoring is independent of the outcome conditional on the data, which is a standard assumption for the majority of survival models and measures.
 
-#### Deletion #{sec-car-pipelines-survreg-del}
+#### Deletion #{sec-redux-regr-del}
 
 Deletion is the process of removing observations from a dataset. This is usually seen in 'complete case analysis' in which observations with 'missingness', covariates with missing values, are removed from the dataset. In survival analysis this method is somewhat riskier as the subjects to delete depend on the outcome and not the features. Three methods are considered, the first two are a more brute-force approach whereas the third allows for some flexibility and tuning.
 
@@ -71,7 +71,7 @@ where $\alpha \in [0, 1]$ is a hyper-parameter to tune. Setting $\alpha = 1$ equ
 %\caption[Tuning the alpha parameter for IPCW survival reduction]{Tuning the alpha parameter for IPCW survival reduction.}\label{fig:car_ipcw_tune}
 %\end{figure} -->
 
-#### Imputation {#sec-car-pipelines-survreg-imp}
+#### Imputation {#sec-redux-regr-imp}
 
 Imputation methods estimate the values of missing data conditional on non-missing data and other covariates. Whilst the true value of the missing data can never be known, by carefully conditioning on the 'correct' covariates, good estimates for the missing value can be obtained to help prevent a loss of data. Imputing outcome data is more difficult than imputing covariate data as models are then trained on 'fake' data. However a poor imputation should still be clear when evaluating a model as testing data remains un-imputed. By imputing censoring times with estimated survival times, the censoring indicator can be removed and the dataset becomes a regression dataset.
 
@@ -109,7 +109,7 @@ Re-calibration of censored survival times  [@Vinzamuri2017] uses an iterative up
 
 Finally parametric imputation is defined by making random draws from truncated probability distributions and adding these to the censoring time [@Royston2001; @Royston2008]. Whilst this method is arguably the simplest method and will lead to a sufficiently random sample, i.e. not one skewed by the imputation process, in practice the randomness leads to unrealistic results, with some imputed times being very far from the original censoring times and some being very close.
 
-#### The Decision to Impute or Delete {#sec-car-pipelines-survreg-dec}
+#### The Decision to Impute or Delete {#sec-redux-regr-dec}
 
 Deletion methods are simple to implement and fast to compute however they can lead to biasing the data or a significant sample reduction if used incorrectly. Imputation methods can incorporate tuning and have more relaxed assumptions about the censoring mechanism, though they may lead to over-confidence in the resulting outcome and therefore add bias into the dataset. In some cases, the decision to impute or delete is straightforward, for example if censoring is uninformative and only few observations are censored then complete deletion is appropriate. If it is unknown if censoring is informative then this can crudely be estimated by a benchmark experiment. Classification models can be fit on $\{(X_1, \Delta_1),...,(X_n,\Delta_n)\}$ where $(X_i, \Delta_i) \in \dtrain$. Whilst not an exact test, if any model significantly outperforms a baseline, then this may indicate censoring is informative. This is demonstrated in @tab-car-predcens, in which a logistic regression outperforms a featureless baseline in correctly predicting if an observation is censored when censoring is informative, but is no better than the baseline when censoring is uninformative.
 
