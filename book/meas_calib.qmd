@@ -4,74 +4,83 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _setup.qmd >}}
 
-# Evaluating Distributions by Calibration Measures {#sec-eval-distr-calib}
+# Calibration Measures {#sec-eval-distr-calib}
 
 {{< include _wip.qmd >}}
 
-The final discussed measures are for evaluating survival distributions. First measures of calibration are briefly discussed in this section and then extensive treatment is given to scoring rules (@sec-eval-distr).
+Calibration measures evaluate the 'average' quality of survival distribution predictions.
+This chapter is kept relatively short as the literature in this area is scarce [@Rahman2017], this is likely due to the meaning of calibration being unclear in a survival context [@VanHouwelingen2000].
+However the meaning of calibration is better specified once specific metrics are introduced.
+As with other measure classes, only measures that can generalise beyond Cox PH models are included here but note that several calibration measures for re-calibrating PH models have been discussed in the literature [@Demler2015; @VanHouwelingen2000].
 
-#### Random Variable and Distribution Notation {.unnumbered .unlisted}
+Calibration measures can be grouped [@Andres2018] into those that evaluate distributions at a single time-point, '1-Calibration' or 'Point Calibration' measures, and those that evaluate distributions at all time-points 'distributional-calibration' or 'probabilistic calibration' measures.
+A point-calibration measure will evaluate a function of the predicted distribution at a single time-point whereas a probabilistic measure evaluates the distribution over a range of time-points; in both cases the evaluated quantity is compared to the observed outcome, $(T^*, \Delta^*)$.
 
-Throughout these next two sections, two different notations are utilised for random variables and distributions. The first is the 'standard' notation, for example if $\zeta$ is a continuous probability distribution and $X \sim \zeta$ is a random variable, then $f_X$ is the probability density function of $X$. The second notation associates distribution functions directly with the distribution and not the variable. For example if $\zeta$ is a continuous probability distribution then $\zeta.f$ is the probability density function of $\zeta$. Analogously for the probability mass, cumulative distribution, hazard, cumulative hazard, and survival functions of $X \sim \zeta$, $p_X/\zeta.p, F_X/\zeta.F, h_X/\zeta.h, H_X/\zeta.H, S_X/\zeta.S$. This notation provides a clearer separation of probability distributions and random variables, which in turn allows for cleaner proofs involving probability distributions.
+## Point Calibration {#sec-eval-distr-calib-point}
 
-#### Measures of Calibration {.unnumbered .unlisted}
+Point calibration measures can be further divided into metrics that evaluate calibration at a single time-point (by reduction) and measures that evaluate an entire distribution by only considering the event time.
+The difference may sound subtle but it affects conclusions that can be drawn.
+In the first case, a calibration measure can only draw conclusions at that one time-point, whereas the second case can draw conclusions about the calibration of the entire distribution.
+This is the same caveat as using prediction error curves for scoring rules.
 
-Few measures of calibration exist in survival analysis [@Rahman2017] and this is likely due to the meaning of calibration being unclear in this context [@VanHouwelingen2000]. This is compounded by the fact that calibration is often evaluated graphically, which can leave room for high subjectivity and thus may be restricted to expert interpretation. For these reasons, measures of calibration are only considered in this book with respect to accessibility and transparency as there is no clear meaning for what makes a calibration measure performant. Many methods of calibration are restricted to calibration and re-calibration of PH models [@Demler2015; @VanHouwelingen2000], none of these are considered here as they do not generalise to all (or at least many) survival models.
+```{r echo=FALSE}
+learn("sec-pecs", "prediction error curves")
+```
 
-#### Point and Probabilistic Calibration {.unnumbered .unlisted}
+### Calibration by Reduction
 
-Andres $\etal$ (2018) [@Andres2018] derived a taxonomy for calibration measures to separate measures that only evaluate distributions at a single time-point ('1-Calibration') and measures that evaluate distributions at all time-points ('distributional-calibration'). This section will use the same taxonomy but in keeping with machine learning terminology will refer to '1-Calibration' as 'Point Calibration' and 'distributional-calibration' as 'Probabilistic Calibration'.
+Point calibration measures are implicitly reduction methods as they use classification methods to evaluate a full distribution based on a single point only.
+For example, given a predicted survival function $\hatS$, one could calculate the survival function at a single time point, $\hatS{\tau^*}$ and then use probabilistic classification calibration measures.
+Using this approach one may employ common calibration methods such as the Hosmer–Lemeshow test [@Hosmer1980].
+Measuring calibration in this way can have significant drawbacks as a model may be well-calibrated at one time-point but poorly calibrated at all others [@Haider2020].
+To mitigate this, one could perform the Hosmer–Lemeshow test (or other applicable tests) multiple times with multiple testing correction at many (or all possible) time points, however this would be less efficient and more difficult to interpret than other measures discussed in this chapter.
 
-All measures considered previously can be viewed as 'point' measures as they evaluate predictions at a single point, specifically comparing the predicted linear predictor (more generally relative risk) or survival time to the true time of death. However calibration measures and scoring rules instead evaluate predicted distributions and specifically functions that vary over time, hence it is often of more interest to evaluate these functions at multiple (all if discrete) time-points in order to derive a metric that captures changes over time. For example one may expect probabilistic predictions to be more accurate in the near-future and to steadily worsen as uncertainty increases over time (both mathematical (censoring) and real-world uncertainty), and therefore a measure that only evaluates distributions at a single (possibly early) time-point cannot assess the true variation in the prediction.
+```{r echo=FALSE}
+learn("sec-car", "reduction")
+```
 
-Mathematically this difference in measures may be considered as follows: Let $\calP$ be a set of distributions over $\calT \subseteq \PReals$, then a point measure for evaluating distributions is given by,
+### Houwelingen's $\alpha$
 
-$$
-L_1: \calP \times \calT \times \bset \times \calT \rightarrow \ExtReals; \quad
-(\zeta, t, \delta|\tau) \mapsto g_1(\zeta.\rho(\tau), t, \delta)
-$$
-and a probabilistic measure is given by,
-
-$$
-L_P: \calP \times \calT \times \bset \times \PReals \rightarrow \ExtReals; \quad
-(\zeta, t, \delta|\tau^*) \mapsto \int_0^{\tau^*} g_P(\zeta.\rho(\tau), t, \delta) \ d\tau
-$$
-or
-
-$$
-L_P: \calP \times \calT \times \bset \times \PReals \rightarrow \ExtReals; \quad
-(\zeta, t, \delta|\tau^*) \mapsto \sum_{\tau = 0}^{\tau^*} g_P(\zeta.\rho(\tau), t, \delta)
-$$
-where $\tau^*$ is some cut-off for the measure to control uncertainty increasing over time, $\rho$ is usually the survival function but may be any distribution-defining function, and $g_1,g_P$ are functions corresponding to specific measures (some examples in next two sections). Note that $\tau$ is an argument (not a free variable) of $L_1$ as the fixed choice of $\tau$ is measure-dependent; usually $\tau = t$.
-
-Less abstractly, a point-calibration measure will evaluate a function of the predicted distribution at a single time-point whereas a probabilistic measure evaluates the distribution over a range of time-points; in both cases the evaluated quantity is compared to the observed outcome, $(T^*, \Delta^*)$.
-
-### Point Calibration {#sec-eval-distr-calib-point}
-
-Point calibration measures can be further divided into metrics that evaluate calibration at a single time-point (by reduction) and measures that evaluate an entire distribution by only considering the event time. The subtle difference significantly affects conclusions that can be drawn. In the first case, a calibration measure can only draw conclusions at that one time-point, whereas the second case can draw conclusions about the calibration of the entire distribution.
-
-#### Calibration by Reduction
-
-Point calibration measures are implicitly reduction methods as they attempt to evaluate a full distribution based on a single point only. For example given a predicted survival function $\zeta.S$, then one could select a time-point $\tau^*$ and calculate the survival function at this time, $\zeta.S(\tau^*)$, probabilistic classification calibration measures can then be utilised. Using this approach one may employ common calibration methods such as the Hosmer–Lemeshow test [@Hosmer1980]. Calibration at a single point in this manner is not particularly useful as a model may be well-calibrated at one time-point and then poorly calibrated at all others [@Haider2020]. To overcome this one could perform the Hosmer–Lemeshow test (or any other applicable test) multiple times at different values of $\tau^* \in \NNReals$. However doing so is inefficient and can lead to problems with 'multiple testing'; hence these single-point methods are not considered further.
-
-#### Houwelingen's $\alpha$
-
-Methods that evaluate entire distributions based on a single point may be more useful as conclusions can be drawn at the distribution level. One such method is termed here 'Houwelingen's $\alpha$'. van Houwelingen proposed several measures [@VanHouwelingen2000] for calibration but only one generalises to all probabilistic survival models. This method evaluates the predicted cumulative hazard function, $\zeta_i.H$ (for some predicted distribution $\zeta_i$), by comparing $\zeta_i.H$ to the 'true' hypothetical cumulative hazard, $H$. The test statistic, $H_\alpha$, is defined by
+As opposed to evaluating distributions at one or more arbitrary time points, one could instead evaluate distribution predictions at meaningful times.
+van Houwelingen proposed several measures [@VanHouwelingen2000] for calibration but only one generalises to all probabilistic survival models, termed here 'Houwelingen's $\alpha$'.
+The statistic measures calibration by assessing if the model correctly predicts the true number of total events in the test data.
 
 $$
-H_\alpha := \frac{\sum_i H_i(T^*_i)}{\sum_i \zeta_i.H(T^*_i)} \approx \frac{\sum_i \Delta^*_i}{\sum_i \zeta_i.H(T^*_i)}
+\frac{\sum_i H_i(T)}{\sum_i \hatH_i(T)}
 $$
-where $\zeta = (\zeta_1,...,\zeta_m)$ are predicted distributions and $\{(T_1^*,\Delta_1^*),...,(T_m^*,\Delta_m^*)\} \iid (T, \Delta)$ is some test data. The model is therefore well-calibrated if $H_\alpha = 1$. This has standard error $SE(H_\alpha) = \exp(1/\sqrt{(\sum_i \Delta^*_i)})$.
 
-The approximate equality is motivated by formulating survival data as a counting process and noting that in this setting the cumulative hazard function can estimate the number of events in a time-period [@dataapplied]. No study could be found that utilised $H_\alpha$ for model comparison, possibly because graphical methods are favoured. This method can infer results about the calibration of an entire model and not just at a single point because the measure is calculated at a meaningful time (the event time) and utilises known results from counting processes to verify if the expected number of deaths equals the observed number of deaths.
+This follows by noting the closely related nature of survival analysis and counting processes, and exploiting the fact that the sum of the cumulative hazard function is an estimate for the number of events in a given time-period [@dataapplied].
+As this result is often surprising result to readers, below is a short experiment using R that demonstrates how the sum of the cumulative hazard estimated by a Kaplan-Meier estimator is identical to the number of randomly simulated deaths in a dataset:
+```{r}
+#| echo: true
+set.seed(42)
+library(survival)
+
+event = rbinom(100, 1, 0.7)
+times = runif(100)
+H = survfit(Surv(times, event) ~ 1)$cumhaz
+sum(event) / sum(H)
+```
+
+Houwelingen's $\alpha$ is therefore defined by substituting $\sum_i H_i(T)$ for $\sum_i \Delta_i$:
+
+$$
+H_\alpha(\Delta, \hatH, T) = \frac{\sum_i \Delta}{\sum_i \hatH(T_i)}
+$$
+
+with standard error $SE(H_\alpha) = \exp(1/\sqrt{(\sum_i \Delta)})$.
+A model is well-calibrated with respect to $H_\alpha$ if $H_\alpha = 1$.
+
+
+This method can infer results about the calibration of an entire model and not just at a single point because the measure is calculated at a meaningful time (the event time) and utilises known results from counting processes to verify if the expected number of deaths equals the observed number of deaths.
 
 However, as with the reduction method, the statistic is derived from a single point (the observed event time) for each individual and thus it is possible that the model is well-calibrated only for making predictions at the event time, but not over the full $\PReals$ range.
 
-### Probabilistic Calibration {#sec-eval-distr-calib-prob}
+## Probabilistic Calibration {#sec-eval-distr-calib-prob}
 
 Unlike other areas of evaluation, graphical methods are favoured in calibration and possibly more so than numerical ones. Graphical methods compare the average predicted distribution to the expected distribution. As the expected distribution is itself unknown, this is often estimated with the Kaplan-Meier curve.
 
-#### Kaplan-Meier Comparison
+### Kaplan-Meier Comparison
 
 The simplest graphical comparison compares the average predicted survival curve to the Kaplan-Meier curve estimated on the testing data. Formally, let \\ $\zeta_1.S,...,\zeta_m.S$ be predicted survival functions, then the average predicted survival function is a mixture of these distributions, $\mean[m]{\zeta_i.S(\tau)}$. Plotting this mixture and the Kaplan-Meier on $\tau$ vs $S(\tau)$ allows a visual comparison of how closely these curves align. An example is given in @fig-eval-calib-km, the Cox model (CPH) is well-calibrated as it almost perfectly overlaps the Kaplan-Meier estimator, whereas predictions from the poorly-calibrated support vector machine (SVM) are far from this line.
 
@@ -81,7 +90,7 @@ This approach is both simple and interpretable. In the example above one can con
 
 In order to capture finer information on a level closer to inidivduals, calibration can be applied to the predicted relative risks or linear predictor. One such approach is to bin the predictions to create different 'risk groups' from low-to-high risk [@Royston2013]. These groups are then plotted against a stratified Kaplan-Meier estimator. This allows for a more nuanced approach to calibration and can simultaneously visualise a model's discrimination. However this method is far less transparent as it adds even more subjectivity around how many risk groups to create and how to create them [@Royston2013].
 
-#### D-Calibration
+### D-Calibration
 
 D-Calibration [@Andres2018; @Haider2020] is a very recent method that aims to evaluate a model's calibration at all time-points in a predicted survival distribution. The D-calibration measure is identical to the $\chi^2$ test-statistic, which is usually written as follows
 
@@ -118,7 +127,7 @@ where $p \in [0,1]$ and $\zeta_i.F^{-1}$ is the inverse cumulative distribution 
 
 ![Assessing the D-calibration of the Cox PH (CPH) and SVM from the same data as @fig-eval-calib-km: models trained and tested on randomly simulated data from the `r pkg("simsurv")` [@pkgsimsurv] package in $\proba$ [@pkgmlr3proba]. x-axis are quantiles in $[0,1]$ and y-axis are predicted quantiles from the models. The dashed line is $y = x$. Again the SVM is terribly calibrated and the CPH is better calibrated as it is closer to $y = x$.](Figures/evaluation/dcalib.png){#fig-eval-dcalib fig-alt="TODO"}
 
-#### Transparency and Accessibility
+### Transparency and Accessibility
 
 It has already been stated that performance cannot be considered for calibration measures however it is unclear if any of these measures are even accessible or transparent as they often require expert interpretation to prevent erroneous conclusions. This is demonstrated by example using the same data and models as in  @fig-eval-dcalib. The predictions from these models are evaluated with Harrell's C (@sec-eval-crank-disc-conc), the Integrated Graf Score (@sec-eval-distr-commonsurv), D-Calibration, and Houwelingen's $\alpha$ (@tbl-eval-calib). All measures agree that the SVM performs poorly. In contrast, whilst the Cox PH (CPH) is well-calibrated according to both measures, its concordance is quite bad (barely above baseline). Haider $\etal$ [@Haider2020] claimed that if a model is D-Calibrated then a 'patient should believe the prediction from the survival curve', these results clearly demonstrate otherwise. Measures of calibration alone are clearly not sufficient to determine if a survival curve prediction should be 'believed' and should therefore be computed alongside measures of discrimination or scoring rules, discussed next.
 
