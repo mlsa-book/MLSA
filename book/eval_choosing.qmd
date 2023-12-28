@@ -16,20 +16,8 @@ Therefore, this final chapter aims to provide some simple to follow guidelines f
 
 ## Defining the experiment
 
-Experiments may be performed to investigate patterns in observed data, to make predictions for new data, to compare the performance of multiple models ('benchmark experiments'), or some combination of these.
+Experiments may be performed to make predictions for new data, compare the performance of multiple models ('benchmark experiments'), investigate patterns in observed data, or some combination of these.
 Each experiment requires different choices of measures, with different levels of strictness applied to measure assumptions.
-
-### Investigation
-
-Investigating patterns in observed data is increasingly common as model interpretability methods have become more accessible [@Molnar2019].
-Before data can be investigated, any model that is trained on the data must first be demonstrated to be a good fit to the data.
-A model's fit to data can also be evaluated by resampling the data (@sec-ml) and evaluating the predictions.
-In this case, it is important to choose measures that are interpretable and have justified assumptions.
-Calibration measures are particularly useful for evaluating if a model is well fit to data, and any of the methods described in @sec-eval-distr-calib are recommended for this purpose.
-Discrimination measures *may* be useful, however, given how susceptible they are to censoring, they can be difficult to interpret on their own, and the same is true for scoring rules.
-One method to resolve ambiguity is to perform a benchmark experiment of multiple models on the same data (ideally with some automated tuning) and then select the best model from this experiment and refit it on the full data [@Becker2024] -- this is a robust, empirical method that demonstrates a clear trail to selecting a model that outperforms other potential candidates.
-When investigating a dataset, one may also consider using different measures to assess algorithmic fairness [@Sonabend2022a], any measure that can be optimised (i.e., where the lowest or highest value is the best) may be used in this case.
-Finally, there are survival adaptations to the well-known AIC [@Liang2008] and BIC [@VolinskyRaftery2000] however as these are generally only applicable to low-complexity models, they are out of scope for this book and hence have not been discussed.
 
 ### Predictive experiments
 
@@ -41,10 +29,9 @@ Common survival problems to solve include: identifying low and high risk groups 
 The first of these is a discrimination problem and it is therefore most important that the model optimises corresponding measures and that measure assumptions are justified.
 However, even this task may be more complex than it initially seems.
 For example, while some papers have shown flaws in Harrell's C [@Gonen2005; @Rahman2017; @Schmid2012; @Uno2007], others have demonstrated that common alternatives yield very similar results [@Rahman2017; @Therneau2020] and moreover some prominent alternatives may be harder to interpret due to high variance [@Rahman2017; @Schmid2012].
-There is also the risk of C-hacking [@Sonabend2022] when the ranking prediction is composed from a distribution prediction (@sec-car) or when multiple C-indices are reported.
-To reduce this risk, this book recommends always reporting both Harrell's C and Uno's C when evaluating discrimination from ranking predictions as doing so will increase confidence in drawing general conclusions about a model's overall discriminatory ability.
-When evaluating discrimination from distribution predictions, Antolini's C can be used.
-Before these metrics are computed, a pre-defined threshold should be established to determine if the deployed model is optimal, a natural threshold would be 0.5 as anything above this is better than a baseline model.
+In predictive experiment that may require more level of automation, it is important to be careful of C-hacking (@sec-eval-crank-choose) and to avoid overoptimistic results.
+Hence one should not compute a range of concordance indices and report the maximum but instead calculate a single discrimination measure and then establish a pre-defined threshold to determine if the deployed model is optimal, a natural threshold would be 0.5 as anything above this is better than a baseline model.
+Given Harrell's C to be increasingly over-optimistic with additional censoring [@Rahman2017], it is advisable to use Uno's C instead.
 
 If the task of interest is to predict survival distributions *over time*, then the choice of measure is more limited and only the RCLL and the proper Graf score are recommended.
 Both these measures can only be interpreted with respect to a baseline so use of the ERV representation is strongly recommended.
@@ -68,6 +55,18 @@ This book recommends using Harrell's C and Uno's C for concordance as these are 
 For calibration, D-calibration is recommended as it can be meaningfully compared between models, and the RCLL is recommended for a scoring rule (which is proper for outcome-independent censoring).
 No distance measure is recommended as these do not apply to the vast majority of models.
 All these measures can be used for automated tuning, in the case of discrimination tuning to Harrell's C alone should suffice (without also tuning to Uno's C).
+
+### Investigation
+
+Investigating patterns in observed data is increasingly common as model interpretability methods have become more accessible [@Molnar2019].
+Before data can be investigated, any model that is trained on the data must first be demonstrated to be a good fit to the data.
+A model's fit to data can also be evaluated by resampling the data (@sec-ml) and evaluating the predictions.
+In this case, it is important to choose measures that are interpretable and have justified assumptions.
+Calibration measures are particularly useful for evaluating if a model is well fit to data, and any of the methods described in @sec-eval-distr-calib are recommended for this purpose.
+Discrimination measures *may* be useful, however, given how susceptible they are to censoring, they can be difficult to interpret on their own, and the same is true for scoring rules.
+One method to resolve ambiguity is to perform a benchmark experiment of multiple models on the same data (ideally with some automated tuning) and then select the best model from this experiment and refit it on the full data [@Becker2024] -- this is a robust, empirical method that demonstrates a clear trail to selecting a model that outperforms other potential candidates.
+When investigating a dataset, one may also consider using different measures to assess algorithmic fairness [@Sonabend2022a], any measure that can be optimised (i.e., where the lowest or highest value is the best) may be used in this case.
+Finally, there are survival adaptations to the well-known AIC [@Liang2008] and BIC [@VolinskyRaftery2000] however as these are generally only applicable to low-complexity models, they are out of scope for this book and hence have not been discussed.
 
 ## Conclusions
 
