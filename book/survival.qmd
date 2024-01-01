@@ -21,43 +21,56 @@ TODO
 ___
 
 <!-- In their broadest and most basic definitions, survival analysis is the study of temporal data from a given origin until the occurrence of one or more events or 'end-points'  [@Collett2014], and machine learning is the study of models and algorithms that learn from data in order to make predictions or find patterns  [@Hastie2001]. Reducing either field to these definitions is ill-advised. -->
+<!--
+Survival analysis is concerned with time-to-event data, i.e. data where the outcome is a duration from some origin until the occurrence of one or multiple events of interest.
+In many medical settings, this duration will often be literal survival time, i.e. time until death after some procedure or treatment.
+When collecting such data, however, the outcome of interest can often be not observed (fully), e.g. because subjects drop out of the study, haven't experienced the event of interest until end of study period or due to the occurence of another, competing event.
 
-Survival analysis is concerned with time-to-event data, i.e. data where we are interested in the duration from some origin until the occurrence of one or multiple events of interest. The fact that observation of a time-to-event takes place in the temporal domain can lead to incomplete information about the outcome of interest (censoring and truncation, occurrence of competing events), or, similar to longitudinal or time-series data, lead to changes of feature values and change in feature effects between origin and end point of the observation period.
+Often analysis of time-to-event data targets the estimation of the (improper) distribution of the event times or, equivalently, modelling the transitions between different states (e.g. alive -> dead) while taking into account censoring and truncation as well as other peculiarities of time-to-event data. However, the target of estimation can also be a relative risk score or the expected time-to-event (cf. @sec-surv-set-types for details).
+ -->
 
-Often analysis of such data targets the estimation of the (improper) distribution of the event times or, equivalently, modelling the transitions between different states (e.g. alive -> dead) while taking into account censoring and truncation as well as other peculiarities of time-to-event data. However, the target of estimation can also be a relative risk score or the expected time-to-event (cf. @sec-surv-set-types for details).
+
+ As discussed in the introduction (@sec-intro), *Survival Analysis* is concerned with data where the outcome is a time-to-event.
+ Because the collection of such data takes place in the temporal domain (it takes time to observe a duration), the event of interest is often unobservable, e.g. because it didn't occur by the end of the data collection period or because of the occurrence of another, competing event.
+ In survival analysis terminolgy these are refered to as *censoring* and *competing risks*.
+
+In this chapter we define these and related terms, introduce some basic terminology and mathematical definitions in @sec-surv-set-math, starting of with the common single-event, right-censored data setting and then extend to further types of censoring as well as truncation.
+In Section @sec-eha we will discuss settings with multiple, potentially competing or recurrent events.
+Section @sec-surv-set-types defines common prediction types of survival models, which is particularly important for machine learning based survival analysis and a common source of confusion.
+Finally, in order to cleanly discuss 'machine learning survival analysis', we will introduce the 'Survival Task' [@Kiraly2021] in Section @sec-surv-setmltask as an addition to the more common 'Regression' and 'Classification' tasks.
+While the exposition in this book will mostly focus on the survival task with single-event, right-censored data, it is important to be aware of the other settings.
+
+It is of utmost importance to identify and specify the survival task correctly, as misspecification cannot be detected by comparing the predictive performance of alternate models via evaluation measures.
+Evaluation measure can only detect if one model is better suited to minimize the obejective function, but not whether or not the obejective function is correct.
+The latter depends on the (assumptions about the) data generating process and has to be also reflected in the definition of the evaluation measure.
 
 
-This chapter collects terminology utilised in survival analysis (@sec-surv-set) and machine learning (@sec-surv-setml) in order that this book can cleanly discuss 'machine learning survival analysis' (@sec-surv-setmltask). Once the mathematical setting is set up, the book scope is fully presented in (@sec-surv-scope). Whilst the content of this chapter is not novel with respect to either survival analysis or machine learning separately, this does appear to be the first formulation of the survival analysis machine learning 'task'  [@Kiraly2021].
+## Survival Data and Definitions {#sec-surv-set-math}
 
-## Survival Analysis {#sec-surv-set}
 
-Survival analysis is the field of Statistics concerned with the analysis of time-to-event data, which consists of covariates, a categorical (often binary) outcome, and the time until this outcome takes place (the 'survival time'). As a motivating example of time-to-event data, say 100 patients are admitted to a COVID-19 ward and for each patient the following covariate data are collected: age, weight and sex; additionally for each patient the time until death or discharge is recorded. In the time-to-event dataset, which takes a standard tabular form, each of the 100 patients is a row, with columns consisting of age, weight, and sex measurements, as well as the outcome (death or discharge) and the time to outcome.
 
-Survival analysis is distinct from other areas of Statistics due to the incorporation of 'censoring', a mechanism for capturing uncertainty around when an event occurs in the real-world. Continuing the above example, if a patient dies of COVID-19 five dies after admittance, then their outcome is exactly known: they *died* after five days. Consider now a patient who is discharged after ten days. As death is a guaranteed event they have a true survival time but this may be decades later, therefore they are said to be *censored* at ten days. This is a convenient method to express that the patient survives up to ten days and their survival status at any time after this point is unknown. Censoring is a unique challenge to survival analysis that attempts to incorporate as much information as possible without knowing the true outcome. This is a 'challenge' as statistical models usually rely on learning from observed, i.e. known, outcome data; therefore censoring requires special treatment.
 
-Whilst survival analysis occurs in many fields, for example as 'reliability analysis' in engineering and 'duration analysis' in economics, in this book the term 'survival' will always be used. Moreover the following terminology, analogous to a healthcare setting, are employed: survival analysis (or 'survival' for short) refers to the field of study; the event of interest is the 'event', or 'death'; an observation that has not experienced an event is 'censored' or 'alive'; and observations are referred to as 'observations', 'subjects', or 'patients'.
+### Single-event, right-censored data {#sec-data-rc}
 
-Some of the biggest challenges in survival analysis stem from an unclear definition of a 'survival analysis prediction' and different (sometimes conflicting) common notations. This book attempts to make discussions around survival analysis clearer and more precise by first describing the mathematical setting for survival analysis in (@sec-surv-set-math) and only then defining the prediction types to consider in (@sec-surv-set-types).
-
-### Survival Data and Definitions {#sec-surv-set-math}
-
-Survival analysis has a more complicated data setting than other fields as the 'true' data generating process is not directly modelled but instead engineered variables are defined to capture observed information. Let,
+Survival analysis has a more complicated data setting than other fields as the 'true' data generating process is not directly observable but instead engineered variables are defined to capture observed information. Let,
 
 * $X \ t.v.i. \ \calX \subseteq \Reals^p, p \in \PNaturals$ be the generative random variable  representing the data *features*/*covariates*/*independent variables*.
-* $Y \ t.v.i. \ \calT \subseteq \NNReals$ be the (unobservable) *true survival time*.
-* $C \ t.v.i. \ \calT \subseteq \NNReals$ be the (unobservable) *true censoring time*.
+* $Y \ t.v.i. \ \calY \subseteq \NNReals$ be the (unobservable) *true survival time*.
+* $C \ t.v.i. \ \calC \subseteq \NNReals$ be the (unobservable) *true censoring time*.
 
 
-It is impossible to fully observe both $Y$ and $C$. This is clear by example: if an observation drops out of a study then their censoring time is observed but their event time is not, whereas if an observation dies then their true censoring time is unknown. Hence, two engineered variables are defined to represent observable outcomes. Let,
-
+Note that we are interested in the properties of $Y$. However, in the presence of censoring $C$, it is impossible to fully observe both $Y$.
+Instead, the observable variables are given by
 
 * $T := \min\{Y,C\}$ be the *observed outcome time*.
-* $\Delta := \II(Y = T) = \II(Y \leq C)$ be the *survival indicator* (also known as the *censoring* or *event* indicator).\footnote{Indicators are usually named to reflect a positive condition in the function (in this case the event when $Y = T$), but counter to this convention the 'censoring indicator' is possibly the most common term.}
+* $\Delta := \II(Y = T) = \II(Y \leq C)$ be the *survival indicator* (also known as the *censoring* or *event* indicator).\footnote{Indicators are usually named to reflect a positive condition in the function (in this case the event when $Y = T$), but counter to this convention the 'censoring indicator' is possibly the more common term.}
 
 
-Together $(T,\Delta)$ is referred to as the *survival outcome* or *survival tuple* and they form the dependent variables. The survival outcome provides a concise mechanism for representing the time of the *observed* outcome and indicating which outcome (death or censoring) took place.
+Together $(T,\Delta)$ is referred to as the *survival outcome* or *survival tuple* and they form the dependent variables.
+The survival outcome provides a concise mechanism for representing the time of the *observed* outcome and indicating which outcome (event or censoring) took place.
 
-Now the full generative template for survival analysis is given by \\ $(X, \Delta, C, Y, T) \ t.v.i. \ \calX \times \bset \times \calT \times \calT \times \calT$ and with $(X_i, \Delta_i, C_i, Y_i, T_i)$ jointly i.i.d. A *survival dataset* is defined by $\calD = \{(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n)\}$ where $(X_i,T_i,\Delta_i) \iid (X,T,\Delta)$ and $X_i$ is a $p$-vector, $X_i = (X_{i;1},...,X_{i;p})$. Though unobservable, the true outcome times are defined by $(Y_1,C_1),...,(Y_n,C_n)$ where $(Y_i,C_i) \iid (Y,C)$.
+<!-- Now the full generative template for survival analysis is given by \\ $(X, C, Y) \ t.v.i. \ \calX \times \calC \times \calY$ and with $(X_i, C_i, Y_i)$ jointly i.i.d. -->
+A *survival dataset* is defined by $\calD = \{(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n)\}$ where $(X_i,T_i,\Delta_i) \iid (X,T,\Delta)$ and $X_i$ is a $p$-vector, $X_i = (X_{i;1},...,X_{i;p})$. Though unobservable, the true outcome times are defined by $(Y_1,C_1),...,(Y_n,C_n)$ where $(Y_i,C_i) \iid (Y,C)$.
 
 (@tab-surv-data-abs) exemplifies a random survival dataset with $n$ observations (rows) and $p$ features.
 
@@ -97,25 +110,65 @@ Finally the following terms are used frequently throughout this report. Let $(T_
 
 Notation and definitions will be recapped at the start of each chapter for convenience.
 
-### Censoring {#sec-surv-set-cens}
+### Types of Censoring
 
-Censoring is now discussed in more detail and important concepts introduced. Given the survival generating process $(X,T,\Delta)$ with unobservable $(Y,C)$, the event is experienced if $Y \leq C$ and $\Delta = 1$ or censored if $\Delta = 0$.
+In *Survival Analysis* three types of censoring are commonly defined
 
-#### Censoring 'Location' {.unnumbered .unlisted}
+* right-censoring,
+* left-censoring, and
+* interval-censoring
 
-Right-censoring is the most common form of censoring in survival models and it occurs either when a patient drops out (but doesn't experience the event) of the study before the end and thus their outcome is unknown, or if they experience the event at some unknown point after the study end. Formally let $[\tau_l, \tau_u]$ be the study period for some, $\tau_l,\tau_u \in \NNReals$. Then right-censoring occurs when either $Y > \tau_u$ or when $Y \in [\tau_l,\tau_u]$ and $C \leq Y$. In the first case $T = C = \tau_u$ and censoring is due to the true time of death being unknown as the observation period has finished. In the latter case, a separate censoring event, such as drop-out or another competing risk, is observed.
+The latter can be viewed as the most general case with the other types being special cases.
+Notably, multiple types of censoring (or truncation, cf. (@sec-truncation)) can occur in any given data set.
+It is therefore important to identify which types are present, in order to select a method that can deal with the respective data, as most methods (and particularly the available implementations) are limited with respect to which type of survival task they can handle.
 
-Left-censoring is a rarer form of censoring and occurs when the event happens at some unknown time before the study start, $Y < \tau_l$. Interval-censoring occurs when the event takes place in some interval within the study period, but the exact time of event is unknown. (@fig-survset-censor) shows a graphical representation of right-censoring.
+
+#### Right-censoring Types {.unnumbered .unlisted}
+
+Right-censoring is the most common form of censoring in survival models and it occurs either when a patient drops out (but doesn't experience the event) of the study before the end and thus their outcome is unknown, or if they experience the event at some unknown point after the study end. Formally let $[\tau_l, \tau_u]$ be the study period for some, $\tau_l,\tau_u \in \NNReals$. Then right-censoring occurs when either $Y > \tau_u$ or when $Y \in [\tau_l,\tau_u]$ and $C \leq Y$. In the first case $T = C = \tau_u$ and censoring is due to the true time-to-event being unknown as the observation period has finished. In the latter case, a separate censoring event, such as drop-out or another competing risk, is observed.
 
 ![Dead and censored subjects (y-axis) over time (x-axis). Black diamonds indicate true death times and white circles indicate censoring times. Vertical line is the study end time. Subjects 1 and 2 die in the study time. Subject 3 is censored in the study and (unknown) dies within the study time. Subject 4 is censored in the study and (unknown) dies after the study. Subject 5 dies after the end of the study.](Figures/survival/censoring.png){#fig-survset-censor fig-alt="TODO"}
 
-#### Censoring 'Dependence' {.unnumbered .unlisted}
+Sometimes, right-censoring is also subdivided into Type-I, Type-II and Type-III censoring.
+In Type-I, censoring occurs at the fixed, pre-difined end of the study $\tau_u$, in which case we observe $(T_i = \min(Y_i, \tau_u), \II(Y_i \leq \tau_u))$.
+Sometimes this is also refered to as *administrative* censoring, .
+Type-II censoring is similar, however, the study ends when a pre-defined number of subjects experienced the event of interest, in which case $\tau_u$ is random.
+Type-III censoring refers to random censoring, i.e. we assume the censoring times follow some unknown distribution and we observe $(T_i=\min(Y_i,C_i), \II(Y_i\leq C_i))$.
+Often, the different types of right-censorig can co-occur in any given data set.
 
-Censoring is often defined as *uninformative* if $Y \indep C$ and *informative* otherwise however these definitions can be misleading as the term 'uninformative' appears to be imply that censoring is independent of both $X$ and $Y$, and not just $Y$. Instead the following more precise definitions are used in this report.
+For the purposes of this book, however, the difference will be largely irrelevant, as the different types are treated the same at the modeling/estimation stage.
+
+
+#### Left-censoring {.unnumbered .unlisted}
+Left-censoring is a rarer form of censoring and occurs when the event happens at some unknown time before the study start. While quiet rare in medical settings, this type of data often occurs in sociology studies when retrospective interviews are conducted.
+
+For illustration, consider an interview whith questions alas "At what age did you ... for the first/last time?", where you can fill in the blank with "use a smartphone", "drink alcohol" or similar.
+Let $A_i$ denote the age of the participants during the interview.
+If they remember the age exactly\footnote{If one assumes that the subjects remember correctly, otherwise one would need to account for potential measuresment error}, then $T_i = Y_i \leq A_i$.
+If the event didn't occur yet, then the subject is right-censored at $A_i$, i.e., $Y_i > T_i = C_i = A_i$.
+However, if the event occured, but the subjects don't remember when, the subject is left-censored at $A_i$, i.e. we know that $T_i = Y_i < A_i$, but not the exact time.
+
+<Note: maybe things like this should be put in a "practical tips" box>
+Note that for this type of data you need an additional variable in order to differentiate between left- and right-censoring as well as exact event times. In practice this is often solved by including two columns that store time, such that left-censored data is given by $(-\infty, A_i)$, while right-censored data is denoted by $(A_i, \infty)$. In this convention, actual event times are denoted by $(T_i, T_i)$.
+
+
+#### Interval-censoring {.unnumbered .unlisted}
+
+Interval-censoring occurs when the event takes place in some interval within the study period, but the exact time of event is unknown. This often occurs in data resulting from regular or irregular check-ups, as it often occurs in electronic health record data. For example, patients might get periodic tests for skin cancer. Some patients might check once a year, for others the intervals between checks might be longer. If skin cancer is detected, one only knows that it occured between the last and current check up, but not the exact time.
+
+Formally, consider $L_i$ the subject-specific check-up time and $R_i$ the current check-up time.
+Then we know that if an event occured $T_i = Y_i \in (L_i, R_i]$.
+If no event occured then $Y_i > T_i = C_i = R_i$.
+
+
+
+### Censoring 'Dependence' {.unnumbered .unlisted}
+
+Censoring is often defined as *uninformative* if $Y \indep C$ and *informative* otherwise however these definitions can be misleading as the term 'uninformative' appears to imply that censoring is independent of both $X$ and $Y$, and not just $Y$. Instead the following more precise definitions are used in this book.
 
 ::: {#def-cens}
 
-## Censoring
+## Independent Censoring
 
 Let $(X,T,\Delta,Y,C)$ be defined as above, then
 
@@ -128,28 +181,58 @@ Let $(X,T,\Delta,Y,C)$ be defined as above, then
 
 Non-informative censoring can generally be well-handled by models as true underlying patterns can still be detected and the reason for censoring does not affect model inference or predictions. However in the real-world, censoring is rarely non-informative as reasons for drop-out or missingness in outcomes tend to be related to the study of interest. Event-dependent censoring is a tricky case that, if not handled appropriately (by a competing-risks framework), can easily lead to poor model development; the reason for this can be made clear by example: Say a study is interested in predicting the time between relapses of stroke but a patient suffers a brain aneurysm due to some separate neurological condition, then there is a high possibility that a stroke may have occurred if the aneurysm had not. Therefore a survival model is unlikely to distinguish the censoring event (aneurysm) from the event of interest (stroke) and will confuse predictions. In practice, the majority of models and measures assume that censoring is conditionally event-independent and hence censoring can be predicted by the covariates whilst not directly depending on the event. For example if studying the survival time of ill pregnant patients in hospital, then dropping out of the study due to pregnancy is clearly dependent on how many weeks pregnant the patient is when the study starts (for the sake of argument assume no early/late pregnancy due to illness).
 
-#### Type I Censoring {.unnumbered .unlisted}
-Type I and Type II censoring are special-cases of right-censoring, only Type I is discussed in this book as it is more common in simulation experiments. Type I censoring occurs if a study has a set end-date, or maximum survival time, and a patient survives until the end of the study. If survival times are dependent on covariates (i.e. not random) and the study start date is known (or survival times are shifted to the same origin) then Type I censoring will usually be informative as censored patients will be those who survived the longest.
 
-## Book Scope {#sec-surv-scope}
+### Censoring vs. Truncation {#sec-truncation}
+While sometimes confused or missnamed, it is very important to differentiate
+between censoring and truncation, as the way the are handled and the methods suitable to handle respective survival tasks differs substantially.
+While truncation also occurs in non time-to-event settings, it is quit common in survival analysis, especially left-truncation.
 
-Now that the mathematical setting has been defined, the book scope is provided. For time and relevance the scope of this book is narrowed to the most parsimonious setting that is genuinely useful in modelling real-world scenarios. This is the setting that captures all assumptions made by the majority of proposed survival models and therefore is practical both theoretically and in application. This setting is defined by the following assumptions (with justifications):
+In general, while censored observations have incomplete information about the time-to-event, they are still part of the data set.
+Truncation on the other hand often leads to observations not entering the data set (at least not at time 0).
+This will usually introduce bias that needs to be accounted for.
 
-
-* Let $p$ be the proportion of censored observations in the data, then $p \in [0,1)$. This open interval prevents the case when $p = 0$, which is simply a regression problem (@sec-surv-ml-regr), or the case when $p = 1$, in which no useful models exist (as the event never occurs).
-* Only right-censoring is observed in the data, no left- or interval-censoring. This accurately reflects most real-world data in which observations that have experienced the event before the study start (left-censoring) are usually not of interest, and close monitoring of patients means that interval-censoring is unlikely in practice. It is acknowledged that left-truncation is a common problem in medical datasets though this is often handled not by models but by data pre-processing, which is not part of the workflow discussed in this book.
-* There is only one event of interest, an observation that does not experience this event is censored. This eliminates the 'competing risk' setting in which multiple events of interest can be modelled.
-* The event can happen at most once. For example the event could be death or initial diagnosis of a disease however cannot be recurrent such as seizure. In the case where the event could theoretically happen multiple times, only the time to one (usually the first) occurrence of the event is modelled.
-* The event is guaranteed to happen at least once. This is an assumption implicitly made by all survival models as predictions are for the time until the true event, $Y$, and not the observed outcome, $T$.
+#### Left-truncation {.unnumbered .unlisted}
 
 
-For both the multi-event and recurrent-event cases, simple reductions exist such that these settings can be handled by the models discussed in this paper however this is not discussed further here.
+Left-truncation often occurs when study participation is conditional of the occurence of another event. This is easiest explained through some examples:
 
-No assumptions are made about whether censoring is dependent on the data but when models and measures make these assumptions, they will be explicitly discussed.
+In one famous study (reference), the interest was in infant survival during the first 365 days after birth based on whether the mother was alive.
+The study is from the 18the century, when childhood and maternal mortality were compartively high.
+Infants entered the study when the mother died, and two other infants with same age and other features were matched into the study, except that their mothers were still alive.
+The age of the infant at entrance into the study therefore signifies a so-called *left-truncation event*, as infants who die before their mothers never enter the data and the *left-truncation time* is given by the infants' age at which the mother died.
 
-The purpose of any statistical analysis is dependent on the research question. For example techniques are available for data analysis, imputation, exploration, prediction, and more. This book focuses on the predictive setting; other objectives, such as model inspection and data exploration can be achieved post-hoc via interpretable machine learning techniques  [@Molnar2019].
+More formally, let $T^l_i$ the subject-specific left truncation time.
+Then we only observe subjects with $Y_i > T^l_i$ or $C_i > T^l_i$. Subjects with $Y_i < T^l_i$ never enter the data.
 
-Finally, the methods in this book are restricted to frequentist statistics. Bayesian methods are not discussed as the frequentist setting is usually more parsimonious and additionally there are comparatively very few off-shelf implementations of Bayesian survival methods. Despite this, it is noted that Bayesian methods are particularly relevant to the research in this book, which is primarily concerned with uncertainty estimates and predictions of distributions. Therefore, a natural extension to the work in this book would be to fully explore the Bayesian setting.
+Notably, left-truncation also plays an important role when modeling recurrent events or multi-state data, as the data generating process induces left-truncation (more on this in Section @sec-eha).
+
+
+#### Right-truncation {.unnumbered .unlisted}
+
+
+
+
+### Setting up the objective function
+
+Here we summarise how the likelihood is constructed for observations subject to different types of censoring and truncation. For machine learning survival analysis this can be used to construct the objective (or loss) function for any survival task.
+
+
+## Event-history Analysis {#sec-eha}
+
+- Here standard illustration of single-event, competing risks, multi-state models.
+- Also talk about recurrent events setting, that can be viewd as multi-state, but also single-event with further dependencies.
+- Make sure to refer back to left-truncation
+
+
+### Competing Risks {#sec-competing-risks}
+
+
+### Multi-state Models {#sec-multi-state}
+
+
+### Recurrent Events {#sec-recurrent-events}
+
+
 
 ## Survival Prediction Problems {#sec-surv-set-types}
 
@@ -244,7 +327,7 @@ The estimated prediction functional $\hatg$ is fit on training data \\$(X_1,T_1,
 :::
 ::::
 
-Any other survival prediction type falls within one of these tasks above, for example predicting log-survival time is the deterministic task and predicting prognostic index or linear predictor is the ranking task. Removing the separation between the prognostic index and ranking prediction types is due to them both making predictions over the Reals; their mathematical difference lies in interpretation only. In general, the survival task will assume that $\calT \subseteq \NNReals$, and the terms 'discrete' or 'reduced survival task' will refer to the case when $\calT \subseteq \PNaturals$. Unless otherwise specified, the 'survival task', will be used to refer to the probabilistic survival task.\footnote{These definitions are given in the most general case where the time variable is over $\NNReals$. In practice, all models instead assume time is over $\PReals$ and any death at $T_i = 0$ is set to $T_i = \epsilon$ for some very small $\epsilon \in \PReals$. Analogously for the discrete survival task. This assumption may not reflect reality as a patient could die at the study start however models cannot typically include this information in training.}
+Any other survival prediction type falls within one of these tasks above, for example predicting log-survival time is the deterministic task and predicting prognostic index or linear predictor is the ranking task. Removing the separation between the prognostic index and ranking prediction types is due to them both making predictions over the Reals; their mathematical difference lies in interpretation only. In general, the survival task will assume that $\calT \subseteq \NNReals$, and the terms 'discrete' or 'reduced survival task' will refer to the case when $\calT \subseteq \PNaturals$. Unless otherwise specified, the term 'survival task', will be used to refer to the probabilistic survival task.\footnote{These definitions are given in the most general case where the time variable is over $\NNReals$. In practice, all models instead assume time is over $\PReals$ and any death at $T_i = 0$ is set to $T_i = \epsilon$ for some very small $\epsilon \in \PReals$. Analogously for the discrete survival task. This assumption may not reflect reality as a patient could die at the study start however models cannot typically include this information in training.}
 
 #### Survival Analysis and Regression {.unnumbered .unlisted}
 
