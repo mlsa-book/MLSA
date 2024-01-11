@@ -4,89 +4,207 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _setup.qmd >}}
 
-# Evaluating Continuous Rankings {#sec-eval-crank}
+# Discrimination Measures {#sec-eval-crank}
 
 {{< include _wip.qmd >}}
 
-The next category of survival measures assess predictive performance via discrimination for the evaluation of continuous ranking predictions. Assessment of continuous rankings are also possible by measures of calibration however few methods could be found that generalised to all (not just PH) model forms. Therefore this section exclusively discusses measures of discrimination. First time-independent concordance indices (@sec-eval-crank-disc-conc) are discussed and then time-dependent AUCs (@sec-eval-crank-disc-auc).
+The next category of measures, 'discrimination measures', evaluate how well models separate observations into different risk groups.
+A model is said to have good discrimination if it correctly predicts that one observation is at higher risk of the event of interest than another, where the prediction is 'correct' if the observation predicted to be at higher risk does indeed experience the event sooner.
+In the survival setting, the 'risk' is taken to be the continuous ranking prediction.
+All discrimination measures are ranking measures, which means that the exact predicted value is irrelevant, only its relative ordering is required.
+For example given predictions $\{100,2,299.3\}$, only their rankings, $\{2,1,3\}$, are used by measures of discrimination.
+This chapter begins with time-independent measures, which measure concordance between pairs of observations at a single observed time point.
+The next section focuses on time-dependent measures, which are primarily AUC-type measures that evaluate discrimination over all possible unique time-points and integrate the results for a single metric.
 
-Measures of discrimination identify how well a model can separate patients into different risk groups. A model has perfect discrimination if it correctly predicts that patient $i$ is at higher risk of death than patient $j$ if patient $i$ dies first. This risk of death is derived from the ranking prediction type. All discrimination measures are ranking measures, which means that the exact predicted value is irrelevant, only its relative ordering is required. For example given predictions $\{100,2,299.3\}$, only their rankings, $\{2,1,3\}$, are used by measures of discrimination.
+## Time-Independent Measures {#sec-eval-crank-disc-conc}
 
-### Concordance Indices {#sec-eval-crank-disc-conc}
-
-The simplest form of discrimination measures are concordance indices, which in general measure the proportion of cases in which the model correctly separates a pair of observations into 'low' and 'high' risk.
+The simplest form of discrimination measures are concordance indices, which, in general, measure the proportion of cases in which the model correctly ranks a pair of observations according to their risk.
+These measures may be best understood in terms of two key definitions: 'comparable', and 'concordant'.
 
 ::: {#def-concordance}
 
 ## Concordance
 
-Let $(i,j)$ be a pair of observations with outcomes\\ $\{(t_i,\delta_i),(t_j,\delta_j)\} \iid (T,\Delta)$ and let $y_i,y_j \in \Reals$ be their respective risk predictions. Then $(i,j)$ are called [@Harrell1984; @Harrell1982]:
+Let $(i,j)$ be a pair of observations with outcomes $\{(t_i,\delta_i),(t_j,\delta_j)\} \iid (T,\Delta)$ and let $y_i,y_j \in \Reals$ be their respective risk predictions. Then $(i,j)$ are called [@Harrell1984; @Harrell1982]:
 
 * *Comparable* if $t_i < t_j$ and $\delta_i = 1$;
-* *Concordant* if $y_i > y_j$.^[Recall (@sec-surv-set-types) this book defines the risk ranking such that a higher value implies higher risk of death and so a pair is concordant if $\II(t_i < t_j, y_i > y_j)$, whereas this would be $\II(t_i < t_j, y_i < y_j)$ if a higher value implied a lower risk of death.]
+* *Concordant* if $y_i > y_j$.
 
 :::
 
-A concordance index (C-index) is a weighted proportion of the number of concordant pairs over the number of comparable pairs. As such, a C-index value is between $[0, 1]$ with $1$ indicating perfect separation, $0.5$ indicating no separation, and $0$ being separation in the 'wrong direction', i.e. all high risk patients being ranked lower than all low risk patients. Concordance measures may either be reported as a value in $[0,1]$, a percentage, or as 'discriminatory power'. Discriminatory power refers to the percentage improvement of a model's discrimination above the baseline value of $0.5$. For example if a model has a concordance of $0.8$ then its discriminatory power is $(0.8-0.5)/0.5 = 60%$. This representation of discrimination provides more information by encoding the model's improvement over some baseline although is often confused with reporting concordance as a percentage (e.g. reporting a concordance of 0.8 as 80%).
+Note that this book defines risk rankings such that a higher value implies higher risk of event and thus lower expected survival time (@sec-surv-set-types), hence a pair is concordant if $\II(t_i < t_j, y_i > y_j)$.
+Other sources may instead assume that higher values imply lower risk of event and hence a pair would be concordant if $\II(t_i < t_j, y_i < y_j)$.
 
-The most common concordance indices can be expressed as a general measure.
+Concordance measures then estimate the probability of a pair being concordant, given that they are comparable:
 
-::: {#def-cindex}
+$$P(y_i > y_j | t_i < t_j \cap \delta_i)$$
 
-## C-index
+From this formula it may be seen why these measures are referred to as time *independent*, once observations are organised into comparable pairs, the observed survival times can be ignored.
 
-Let $\calT^m \subseteq \PReals^m$, $y = y_1,...,y_m, t = t_1,...,t_m$, $\delta = \delta_1,...,\delta_m$, and let $W$ be a weighting function. Then, the *survival concordance index* is defined by,
+
+
+While various definitions of a 'Concordance index' (C-index) exist (discussed in the next section), they all represent a weighted proportion of the number of concordant pairs over the number of comparable pairs.
+As such, a C-index value will always be between $[0, 1]$ with $1$ indicating perfect separation, $0.5$ indicating no separation, and $0$ being separation in the 'wrong direction', i.e. all high risk observations being ranked lower than all low risk observations.
+Concordance measures may either be reported as a value in $[0,1]$, a percentage, or as 'discriminatory power', which refers to the percentage improvement of a model's discrimination above the baseline value of $0.5$.
+For example, if a model has a concordance of $0.8$ then its discriminatory power is $(0.8-0.5)/0.5 = 60\%$.
+This representation of discrimination provides more information by encoding the model's improvement over some baseline although is often confused with reporting concordance as a percentage (e.g. reporting a concordance of 0.8 as 80%).
+Representing measures as a percentage over a baseline is a common method to improve measure interpretability and closely relates to the ERV representation of scoring rules.
+
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
+learn("sec-eval-distr-score-base", "calculating measures with respect to an arbitrary baseline", ttl_fmt = "Learn more about baseline comparison")
+```
+
+### Concordance Indices
+
+Common concordance indices in survival analysis can be expressed as a general measure:
+
+Let $y = y_1,...,y_m$ be predicted risks, $(t, \delta) = (t_1, \delta_1),...,(t_m, \delta_m)$ be observed outcomes, let $W$ be some weighting function, and let $\tau$ be a cut-off time.
+Then, the time-independent ('ind') *survival concordance index* is defined by,
 
 $$
-\begin{split}
-&C: \Reals^m \times \calT^m \times \bset^m \times \NNReals \rightarrow [0,1]; \\
-&(y, t, \delta|\tau) \mapsto \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, y_i > y_j, t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
-\end{split}
+C_{ind}(y, t, \delta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, y_i > y_j, t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
 $$
-for some cut-off time $\tau$.
-:::
 
-The choice of $W$ specifies a particular evaluation measure (see below). To evaluate the discrimination of a prediction functional, $\hatg$, with predicted rankings from the model, $r = r_1,...,r_m$, the concordance is calculated as \\$C(r, (T^*_1,...,T^*_m), (\Delta^*_1,...,\Delta^*_m)|\tau)$ for some choice of $\tau \in \NNReals$. The use of the cut-off $\tau$ mitigates against decreased sample size over time due to the removal of censored observations. There are multiple methods for dealing with tied times but in practice a value of $0.5$ is usually taken when $t_i = t_j$ [@Therneau2020]. The following weights have been proposed for the concordance index [@Therneau2020]:
+The choice of $W$ specifies a particular variation of the c-index (see below).
+The use of the cut-off $\tau$ mitigates against decreased sample size (and therefore high variance) over time due to the removal of censored observations.
+For $\tau$ to be comparable across datasets, a common choice would be to set $\tau$ as the time at which 80\%, or perhaps 90\% of the data have been censored or experienced the event.
 
+There are multiple methods for dealing with tied predictions and times.
+Strictly, tied times are incomparable given the definition of 'comparable' given above and hence are usually ignored in the numerator.
+On the other hand, ties in the prediction are more problematic but a common method is to set a value of $0.5$ for observations when $y_i = y_j$ [@Therneau2020].
+Specific concordance indices can be constructed by assigning a weighting scheme for $W$ which generally depends on the Kaplan-Meier estimate of the survival function of the censoring distribution fit on training data, $\KMG$, or the Kaplan-Meier estimate for the survival function of the survival distribution fit on training data, $\KMS$, or both.
+Measures that use $\KMG$ are referred to as Inverse Probability of Censoring Weighted (IPCW) measures as the estimated censoring distribution is utilised to weight the measure in order to compensate for removed censored observations.
+This is visualised in @fig-ipcw where $\KMS$, $\KMG$, and $\KMG^{-2}$ are computed based on the `whas` dataset [@dataapplied].
 
-* $W(t_i) = 1$ -- This is Harrell's concordance index, $C_H$ [@Harrell1984; @Harrell1982], which is widely accepted to be the most common survival measure [@Collins2014; @Gonen2005; @Rahman2017]. There is no cut-off in the original definition of $C_H$ ($\tau = \infty$).
-* $W(t_i) = [\KMG(t_i)]^{-2}$ -- This is Uno's C, $C_U$ [@Uno2011]. $\KMG$ is the Kaplan-Meier estimate of the survival function of the censoring distribution fit on training data. This is referred to as an Inverse Probability of Censoring Weighted (IPCW) measure as the estimated censoring distribution is utilised to weight the measure in order to compensate for removed censored observations.
+```{r, echo=FALSE,messages=FALSE,warnings=FALSE}
+#| fig-cap: "Kaplan-Meier estimates trained on the `whas` dataset. x-axis is time variable. y-axis is outputs from one of three functions: S(t), survival function based on original `whas` dataset (blue), G(t), survival function based on the censoring distribution of the `whas` dataset (red), and 1/G(t)^2 (green). The vertical gray line at t=1267 represents the point at which G(t)<0.6."
+#| fig-alt: "Line graph with three lines in green, red, and blue. x-axis is labelled 't' and ranges from 0 to 6000. y-axis is labelled 'W(t)' and ranges from 0 to 5. Legend for lines is titled 'W' with entries 'KMG' for the red line, 'KMG^-2' for the green line, and 'KMS' for the blue line. The blue line starts at (0,1), moves to around (1000, 0.5) then is relatively flat. The red line roughly linearly decreases from (0,1) to (6000,0). The green line sharply increases between (1, 1000) to (5, 3500). A vertical gray line passes through (0, 1267)."
+#| label: fig-ipcw
+library(dplyr)
+library(ggplot2)
+library(mlr3)
+library(mlr3proba)
+
+s_t = tsk("whas")
+time = s_t$unique_times()
+c_t = s_t$data() %>% mutate(status = 1 - status) %>% as_task_surv(event = "status")
+
+s_d = data.frame(t = time, surv = s_t$kaplan()$surv, W = "KMS")
+c_d = data.frame(t = time, surv = c_t$kaplan()$surv, W = "KMG")
+w_d = data.frame(t = time, surv = 1 / (c_t$kaplan()$surv^2), W = "KMG^-2")
+
+cutoff = time[which(s_t$kaplan()$surv < 0.6)[1]]
+
+d = rbind(s_d, c_d, w_d) %>% as.data.frame()
+ggplot(d, aes(x = t, y = surv, color = W)) +
+  geom_line() +
+  ylim(0, 5) +
+  theme_bw() +
+  labs(y = "W(t)", title = "Kaplan-Meier estimates and weighting on `whas` data") +
+  geom_vline(xintercept = cutoff, lty = 2, color = "gray")
+```
+```{r, echo=FALSE, include=FALSE}
+ids = c("W=1", "W=G^-1", "W=G^-2")
+m_inf = c(msr("surv.cindex"),
+msr("surv.cindex", weight_meth = "G"),
+msr("surv.cindex", weight_meth = "G2"))
+
+m_80 = c(msr("surv.cindex", id = "W=1", cutoff = cutoff),
+msr("surv.cindex", weight_meth = "G", id = "W=G^-1", cutoff = cutoff),
+msr("surv.cindex", weight_meth = "G2", id = "W=G^-2", cutoff = cutoff))
+
+m = c(m_inf, m_80)
+
+set.seed(20231207)
+res = round(resample(s_t, lrn("surv.coxph"), rsmp("cv", folds = 3))$aggregate(m), 2)
+```
+
+The following weights have been proposed for the concordance index:
+
+* $W(t_i) = 1$ -- Harrell's concordance index, $C_H$ [@Harrell1984; @Harrell1982], which is widely accepted to be the most common survival measure and imposes no weighting on the definition of concordance. The original measure given by Harrell has no cut-off, $\tau = \infty$, however applying a cut-off is now more widely accepted in practice.
+* $W(t_i) = [\KMG(t_i)]^{-2}$ -- Uno's C, $C_U$ [@Uno2011].
 * $W(t_i) = [\KMG(t_i)]^{-1}$
-* $W(t_i) = \KMS(t_i)$. $\KMS$ is the Kaplan-Meier estimator of the survival distribution.
+* $W(t_i) = \KMS(t_i)$
 * $W(t_i) = \KMS(t_i)/\KMG(t_i)$
 
+All methods assume that censoring is conditionally-independent of the event given the features (@sec-surv-set-cens), otherwise weighting by $\KMS$ or $\KMG$ would not be applicable. It is assumed here that $\KMS$ and $\KMG$ are estimated on the training data and not the testing data (though the latter may be seen in some implementations, e.g. @pkgsurvival).
 
-All methods assume that censoring is conditionally-independent of the event given the features (@sec-surv-set-cens), otherwise weighting by $\KMS$ or $\KMG$ would not be applicable. It is assumed here that $\KMS$ and $\KMG$ are estimated on the training data and not the testing data (though the latter is often seen in implementation [@pkgsurvival]).
+### Choosing a C-index {#sec-eval-crank-choose}
 
-All concordance indices are highly transparent and accessible, with many off-shelf implementations. With respect to performance, Choodari-Oskooei $\etal$ (2012) [@Choodari2012a] define a measure as performant if it is:^[This paper refers specifically to measures of explained variation and therefore only the properties that generalise to all measures are included here.]
+With multiple choices of weighting available, choosing a specific measure might seem daunting.
+Matters are only made worse by debate in the literature, reflecting uncertainty in measure choice and interpretation.
+In practice, when a suitable cut-of $\tau$ is chosen, all these weightings perform very similarly [@Rahman2017; @Schmid2012].
+For example, @tbl-ipcw uses the `whas` data again to compare Harrell's C with measures that include IPCW weighting, when no cutoff is applied (top row) and when a cutoff is applied when G(t)=0.6 (grey line in @fig-ipcw).
+The results are almost identical when the cutoff is applied but still not massively different without the cutoff.
 
-i. independent of censoring;
-i. interpretable; and
-i. robust against outliers.
+```{r, echo=FALSE, results='asis'}
+#| label: tbl-ipcw
+#| tbl-cap: Comparing c-index measures (calculated on the `whas` dataset using a Cox model with three-fold cross-validation) with no cut-off (top) and a cut-off when G(t)=0.6 (bottom). First column is Harrell's C, second is the weighting 1/G(t), third is Uno's C.
+knitr::kable(matrix(res, 2, 3, TRUE, dimnames = list(c("tau=Inf", paste0("tau=", cutoff)), ids)))
+```
 
-This second property is already covered by 'transparency'. The third property is guaranteed for all measures of concordance, which are ranking measures; all outliers are removed once ranks are applied to predictions. Therefore the first property, ''a measure that is the least affected by the amount of censoring is generally preferred'' [@Choodari2012a], is now considered.
+On the other hand, if a poor choice is selected for $\tau$ (cutting off too late) then IPCW measures can be highly unstable [@Rahman2017], for example the variance of Uno's C drastically increases with increased censoring [@Schmid2012].
 
-Several papers have shown that $C_H$ is affected by the precense of censoring [@Koziol2009; @Pencina2012; @Royston2013; @Uno2011] as the measure ignores pairs in which the shorter survival time is censored. Despite this, $C_H$ is still the most widely utilised measure and moreover if a suitable cut-of $\tau$ is chosen, then all these weightings perform very similarly [@Rahman2017; @Schmid2012].
+In practice, all C-index metrics provide an intuitive measure of discrimination and as such the choice of C-index is less important than the transparency in reporting.
+'C-hacking' [@Sonabend2022] is the deliberate, unethical procedure of calculating multiple C-indices and to selectively report one or more results to promote a particular model or result, whilst ignoring any negative findings.
+For example, calculating Harrell's C and Uno's C but only reporting the measure that shows a particular model of interest is better than another (even if the other metric shows the reverse effect).
+To avoid 'C-hacking':
 
-Measures that utilise other weightings have been demonstrated to be less affected by censoring than $C_H$ [@Rahman2017]. However if a poor choice is selected for $\tau$ then IPCW measures (which include $\KMG$ in the weighting) can be highly unstable [@Rahman2017]. For example, the variance of $C_U$ has been shown to drastically increase more than other measures with increased censoring [@Schmid2012].
+i) the choice of C-index should be made before experiments have begun and the choice of C-index should be clearly reported;
+ii) when ranking predictions are composed from distribution predictions, the composition method should be chosen and clearly described before experiments have begun.
 
-None of these measures are perfect and all have been shown to be affected to some extent by censoring [@Schmid2012], which can lead to both under-confidence and over-confidence in the model's discriminatory ability. For example, $C_U$ has been observed to report values as low as 0.2 when the 'true estimate' was 0.6 [@Schmid2012]. Therefore interpreting a value from these measures can be very difficult, for example naively reporting a concordance of 60% when $C_H = 0.6$ would be incorrect as this value may mean very different things for different amounts of censoring. Whilst intepreting these measures may be difficult, it is not impossible as all these estimators tend to produce values around a similar range [@Rahman2017; @Schmid2012]. Therefore this book advocates for multiple concordance indices being reported alongside expert interpretation that takes into account sample size and censoring proportions [@Schmid2012] as well as 'risk profiles' (how at risk patients are) [@Rahman2017].
+As the C-index is highly dependent on censoring within a dataset, C-index values between experiments are not directly comparable, instead comparisons are limited to comparing model rankings, for example conclusions such as "model A outperformed model B with respect to Harrell's C in this experiment".
 
-For within-study model comparison, instability from censoring is not of concern as the measure will be affected equally across all models; though interpretation remains difficult. However a concordance from one study cannot be compared to that from another if the datasets differ greatly in the proportion of censoring. Future research could consider more robust concordance indices that can provide greater ease of interpretation.
+```{r, echo=FALSE, warning=FALSE}
+learn("sec-car-pipelines", "creating ranking predictions from distribution predictions using composition", ttl_fmt = "Learn about distribution to ranking compositions.")
+```
 
-As well as the concordance indices discussed here, another promiment alterntive was derived by  G\"onen and Heller (2005) [@Gonen2005]. However as this is only applicable to the Cox PH it is out of scope for this book, which is primarily concerned with generalisable measures for model comparison.
+## Time-Dependent Measures {#sec-eval-crank-disc-auc}
 
-In simulation experiments, the concordance indices that tended to perform 'better' were those based on AUC-type measures, these are now discussed.
+In the time-dependent case, where the metrics are computed based on specific survival times, the majority of measures are based on the Area Under the Curve, with one exception which is a simpler concordance index.
 
-### AUC Measures {#sec-eval-crank-disc-auc}
+### Concordance Indices
 
-AUC, or AUROC, measures calculate the Area Under the Receiver Operating Characteristic (ROC) Curve, which is a plot of the *sensitivity* (or true positive rate (TPR)) against $1 - $*specificity* (or true negative rate (TNR)) at varying thresholds (described below) for the predicted probability (or risk) of event. @fig-eval-rocs visualises ROC curves for two classification models. The blue line is a featureless baseline that has no discrimination. The red line is a decision tree with better discrimination as it comes closer to the top-left corner.
+In contrast to the measures described above, Antolini's C [@Antolini2005] provides a time-dependent ('dep') formula for the concordance index.
+The definition of 'comparable' is the same for Antolini's C, however, concordance is now determined using the individual predicted survival probabilities calculated at the smaller event time in the pair:
+
+$$P(S_i(t_i) < S_j(t_i) | t_i < t_j \cap \delta_i)$$
+
+Note that observations are concordant when $S_i(t_i) < S_j(t_i)$ as at the time $t_i$, observation $i$ has experienced the event and observation $j$ has not, hence the expected survival probability for $S_i(t_i)$ would be as close to 0 as possible (noting inherent randomness may prevent the perfect $S_i(t_i)=0$ prediction) but otherwise should be less than $S_j(t_i)$ as $j$ is still 'alive'.
+Once again this probability is estimated with a metric that could include a cut-off and different weighting schemes (though this is not included in Antolini's original definition):
+
+$$
+C_{dep}(y, t, \delta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, S_i(t_i) < S_j(t_i), t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
+$$
+
+Antolini's C provides an intuitive method to evaluate the discrimination of a model based on distribution predictions without depending on compositions to ranking predictions.
+
+### Area Under the Curve
+
+:::{.callout-warning}
+
+We are still discussing how to structure and write this section so the contents are all subject to change.
+The text below is 'correct' but we want to add more detail about estimation of AUC so the book can be more practical, otherwise we may remove the section completely, let us know your thoughts about what you'd like to see here!
+
+:::
+
+
+AUC, or AUROC, measures calculate the Area Under the Receiver Operating Characteristic (ROC) Curve, which is a plot of the *sensitivity* (or true positive rate (TPR)) against $1 - \textit{specificity}$ (or true negative rate (TNR)) at varying thresholds (described below) for the predicted probability (or risk) of event.
+@fig-eval-rocs visualises ROC curves for two classification models.
+The blue line is a featureless baseline that has no discrimination.
+The red line is a decision tree with better discrimination as it comes closer to the top-left corner.
 
 ![ROC Curves for a classification example. Red is a decision tree with good discrimination as it 'hugs' the top-left corner. Blue is a featureless baseline with no discrimination as it sits on $y = x$.](Figures/evaluation/rocs.png){#fig-eval-rocs fig-alt="Image shows graph with '1 - Specificity' on the x-axis from 0 to 1 and 'Sensitivity' on the y-axis from 0 to 1. There is a blue line from the bottom left (0,0) to the top right (1,1) of the graph and a red line that forms a curve from (0,0) to around (0.2,0.8) then (1,1)."}
 
-In a classification setting with no censoring, the AUC has the same interpretation as Harrell's C [@Uno2011]. AUC measures for survival analysis have been developed in order to provide a time-dependent measure of discriminatory ability [@Heagerty2000]. The proposed concordance indices described above are time-independent, which is useful for producing a single statistic. However, in a survival setting it can reasonably be expected for a model to perform differently over time and therefore time-dependent measures are advantageous. First discussion around computation of TPR and TNR are provided and then how these are incorporated into the AUC equation.
+In a classification setting with no censoring, the AUC has the same interpretation as Harrell's C [@Uno2011].
+AUC measures for survival analysis were developed to provide a time-dependent measure of discriminatory ability [@Heagerty2000].
+In a survival setting it can reasonably be expected for a model to perform differently over time and therefore time-dependent measures are advantageous.
+Computation of AUC estimators is complex and as such there are limited accessible metrics available off-shelf.
+There is limited evidence of these estimators used in the literature, hence discussion of these measures is kept brief.
 
-The AUC, TPR, and TNR are derived from the *confusion matrix* in a binary classification setting. Let $b,\hat{b} \in \{0, 1\}$ be the true and predicted binary outcomes respectively. The confusion matrix is
+The AUC, TPR, and TNR are derived from the *confusion matrix* in a binary classification setting.
+Let $b,\hat{b} \in \{0, 1\}$ be the true and predicted binary outcomes respectively.
+The confusion matrix is then given by:
 
 ||||
 |----|----|-----|
@@ -94,13 +212,18 @@ The AUC, TPR, and TNR are derived from the *confusion matrix* in a binary classi
 | $\hat{b} = 1$ | TP | FP |
 | $\hat{b} = 0$ | FN | TN |
 
-where $TN := \sum_i \II(b = 0, \hatb = 0)$ is the number of (\#) true negatives, $TP := \sum_i \II(b = 1, \hatb = 1)$ is \# true positives, $FP := \sum_i \II(b = 0, \hatb = 1)$ is \# false positives, and $FN := \sum_i \II(b = 1, \hatb = 0)$ is \# false negatives. From these are derived
+where $TN := \sum_i \II(b = 0, \hatb = 0)$ is the number of true negatives, $TP := \sum_i \II(b = 1, \hatb = 1)$ is the number true positives, $FP := \sum_i \II(b = 0, \hatb = 1)$ is the number of false positives, and $FN := \sum_i \II(b = 1, \hatb = 0)$ is the number of false negatives.
+From these are derived
+
 \begin{align}
 & TPR := \frac{TP}{TP + FN} \\
 & TNR := \frac{TN}{TN + FP}
 \end{align}
 
-In classification, a probabilistic prediction of an event can simply be *thresholded* (or 'binarised') to obtain a deterministic prediction. For a predicted $\hat{p} := \hat{P}(b = 1)$, and threshold $\alpha$, the thresholded binary prediction is given by $\hat{b} := \II(\hat{p} > \alpha)$. In survival analysis, this is complicated as either models only predict a continuous ranking (and not a probability of death), or a full survival distribution, which implies that the probability of death changes over time; it is the first of these that is utilised in AUC measures. Two primary methods for doing so have emerged, the first is to use an IPCW method to weight the thresholded linear predictor by an estimated censoring distribution at a given time, the second is to first classify cases and controls then compute estimators based on these classes. All measures of TPR, TNR and AUC are in the range $[0,1]$ with larger values preferred.
+In classification, a probabilistic prediction of an event can be *thresholded* to obtain a deterministic prediction.
+For a predicted $\hat{p} := \hat{P}(b = 1)$, and threshold $\alpha$, the thresholded binary prediction is $\hat{b} := \II(\hat{p} > \alpha)$.
+This is achieved in survival analysis by thresholding the linear predictor at a given time for different values of the threshold and different values of the time.
+All measures of TPR, TNR and AUC are in the range $[0,1]$ with larger values preferred.
 
 Weighting the linear predictor was proposed by Uno $\etal$ (2007) [@Uno2007] and provides a method for estimating TPR and TNR via
 
@@ -169,4 +292,6 @@ AUC^*_B(y, x, t, \delta, \hat{G}|\tau) = \frac{\sum_{i \neq j} \II(y_i > y_j)\II
 $$
 where $x$ are random covariates (possibly from a separate training dataset).
 
-AUC measures are less transparent and less accessible than the simpler time-independent concordance indices, only the $\pkg{survAUC}$ [@pkgsurvauc] package could be found that implements these measures. For performance, reviews of these measures have produced (sometimes markedly) different results [@Blanche2012; @Li2018; @Kamarudin2017] with no clear consensus on how and when these measures should be used. The primary advantage of these measures is to extend discrimination metrics to be time-dependent. However it is unclear how to interpret a threshold of a linear predictor and moreover if this is even the 'correct' quantity to threshold, especially when survival distribution predictions are the more natural object to evaluate over time. Methods for evaluating these distribution predictions are now discussed.
+Reviews of AUC measures have produced (sometimes markedly) different results [@Blanche2012; @Li2018; @Kamarudin2017] with no clear consensus on how and when these measures should be used.
+The primary advantage of these measures is to extend discrimination metrics to be time-dependent.
+However, it is unclear how to interpret a threshold of a linear predictor and moreover if this is even the 'correct' quantity to threshold, especially when survival distribution predictions are the more natural object to evaluate over time.
