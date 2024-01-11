@@ -8,8 +8,9 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _wip.qmd >}}
 
-The next category of measures, 'discrimination measures', evaluate hwo well models separate observations into different risk groups.
-A model has perfect discrimination if it correctly predicts that observation $i$ is at higher risk of the event of interest than observation $j$ if observation $i$ experiences the event first, where 'risk' is taken to be the continuous ranking prediction.
+The next category of measures, 'discrimination measures', evaluate how well models separate observations into different risk groups.
+A model is said to have good discrimination if it correctly predicts that one observation is at higher risk of the event of interest than another, where the prediction is 'correct' if the observation predicted to be at higher risk does indeed experience the event sooner.
+In the survival setting, the 'risk' is taken to be the continuous ranking prediction.
 All discrimination measures are ranking measures, which means that the exact predicted value is irrelevant, only its relative ordering is required.
 For example given predictions $\{100,2,299.3\}$, only their rankings, $\{2,1,3\}$, are used by measures of discrimination.
 This chapter begins with time-independent measures, which measure concordance between pairs of observations at a single observed time point.
@@ -17,13 +18,7 @@ The next section focuses on time-dependent measures, which are primarily AUC-typ
 
 ## Time-Independent Measures {#sec-eval-crank-disc-conc}
 
-The simplest form of discrimination measures are concordance indices, which, in general, measure the proportion of cases in which the model correctly separates a pair of observations into 'low' and 'high' risk.
-Concordance measures generally estimate the probability of the predicted risk for one observation being lower than another if the former experience the event first *and* is not censored:
-
-$$P(y_i > y_j | t_i < t_j \cap \delta_i)$$
-
-From this formula it can be seen why these measures are referred to as time *independent*, once observations are paired up according to observed survival times, their discrimination is calculated according to risk aggregated over all time-points.
-
+The simplest form of discrimination measures are concordance indices, which, in general, measure the proportion of cases in which the model correctly ranks a pair of observations according to their risk.
 These measures may be best understood in terms of two key definitions: 'comparable', and 'concordant'.
 
 ::: {#def-concordance}
@@ -40,13 +35,22 @@ Let $(i,j)$ be a pair of observations with outcomes $\{(t_i,\delta_i),(t_j,\delt
 Note that this book defines risk rankings such that a higher value implies higher risk of event and thus lower expected survival time (@sec-surv-set-types), hence a pair is concordant if $\II(t_i < t_j, y_i > y_j)$.
 Other sources may instead assume that higher values imply lower risk of event and hence a pair would be concordant if $\II(t_i < t_j, y_i < y_j)$.
 
-A concordance index (C-index) is a weighted proportion of the number of concordant pairs over the number of comparable pairs.
+Concordance measures then estimate the probability of a pair being concordant, given that they are comparable:
+
+$$P(y_i > y_j | t_i < t_j \cap \delta_i)$$
+
+From this formula it may be seen why these measures are referred to as time *independent*, once observations are organised into comparable pairs, the observed survival times can be ignored.
+
+
+
+While various definitions of a 'Concordance index' (C-index) exist (discussed in the next section), they all represent a weighted proportion of the number of concordant pairs over the number of comparable pairs.
 As such, a C-index value will always be between $[0, 1]$ with $1$ indicating perfect separation, $0.5$ indicating no separation, and $0$ being separation in the 'wrong direction', i.e. all high risk observations being ranked lower than all low risk observations.
 Concordance measures may either be reported as a value in $[0,1]$, a percentage, or as 'discriminatory power', which refers to the percentage improvement of a model's discrimination above the baseline value of $0.5$.
-For example, if a model has a concordance of $0.8$ then its discriminatory power is $(0.8-0.5)/0.5 = 60%$.
-This representation of discrimination provides more information by encoding the model's improvement over some baseline although is often confused with reporting concordance as a percentage (e.g. reporting a concordance of 0.8 as 80%), this representation closely relates to the ERV representation scoring rules.
+For example, if a model has a concordance of $0.8$ then its discriminatory power is $(0.8-0.5)/0.5 = 60\%$.
+This representation of discrimination provides more information by encoding the model's improvement over some baseline although is often confused with reporting concordance as a percentage (e.g. reporting a concordance of 0.8 as 80%).
+Representing measures as a percentage over a baseline is a common method to improve measure interpretability and closely relates to the ERV representation of scoring rules.
 
-```{r, echo=FALSE,warning=FALSE}
+```{r, echo=FALSE,warning=FALSE,message=FALSE}
 learn("sec-eval-distr-score-base", "calculating measures with respect to an arbitrary baseline", ttl_fmt = "Learn more about baseline comparison")
 ```
 
@@ -55,13 +59,13 @@ learn("sec-eval-distr-score-base", "calculating measures with respect to an arbi
 Common concordance indices in survival analysis can be expressed as a general measure:
 
 Let $y = y_1,...,y_m$ be predicted risks, $(t, \delta) = (t_1, \delta_1),...,(t_m, \delta_m)$ be observed outcomes, let $W$ be some weighting function, and let $\tau$ be a cut-off time.
-Then, the *survival concordance index* is defined by,
+Then, the time-independent ('ind') *survival concordance index* is defined by,
 
 $$
-C_{ti}(y, t, \delta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, y_i > y_j, t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
+C_{ind}(y, t, \delta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, y_i > y_j, t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
 $$
 
-The choice of $W$ specifies a particular evaluation measure (see below).
+The choice of $W$ specifies a particular variation of the c-index (see below).
 The use of the cut-off $\tau$ mitigates against decreased sample size (and therefore high variance) over time due to the removal of censored observations.
 For $\tau$ to be comparable across datasets, a common choice would be to set $\tau$ as the time at which 80\%, or perhaps 90\% of the data have been censored or experienced the event.
 
@@ -125,14 +129,10 @@ The following weights have been proposed for the concordance index:
 
 All methods assume that censoring is conditionally-independent of the event given the features (@sec-surv-set-cens), otherwise weighting by $\KMS$ or $\KMG$ would not be applicable. It is assumed here that $\KMS$ and $\KMG$ are estimated on the training data and not the testing data (though the latter may be seen in some implementations, e.g. @pkgsurvival).
 
-As well as these methods, another alternative C-index has been proposed by G\"onen and Heller (2005) [@Gonen2005] also proposed a C-index measure.
-However, the metric is only applicable to the Cox PH model, and is therefore outside the scope of this book which focuses on generalisable measures for widespread model comparison.
-
 ### Choosing a C-index {#sec-eval-crank-choose}
 
 With multiple choices of weighting available, choosing a specific measure might seem daunting.
 Matters are only made worse by debate in the literature, reflecting uncertainty in measure choice and interpretation.
-Harrell's C is the most common C-index [@Collins2014; @Gonen2005; @Rahman2017] but several papers have shown it to be greatly affected by censoring [@Koziol2009; @Pencina2012; @Royston2013; @Uno2011].
 In practice, when a suitable cut-of $\tau$ is chosen, all these weightings perform very similarly [@Rahman2017; @Schmid2012].
 For example, @tbl-ipcw uses the `whas` data again to compare Harrell's C with measures that include IPCW weighting, when no cutoff is applied (top row) and when a cutoff is applied when G(t)=0.6 (grey line in @fig-ipcw).
 The results are almost identical when the cutoff is applied but still not massively different without the cutoff.
@@ -148,8 +148,12 @@ On the other hand, if a poor choice is selected for $\tau$ (cutting off too late
 In practice, all C-index metrics provide an intuitive measure of discrimination and as such the choice of C-index is less important than the transparency in reporting.
 'C-hacking' [@Sonabend2022] is the deliberate, unethical procedure of calculating multiple C-indices and to selectively report one or more results to promote a particular model or result, whilst ignoring any negative findings.
 For example, calculating Harrell's C and Uno's C but only reporting the measure that shows a particular model of interest is better than another (even if the other metric shows the reverse effect).
-To avoid 'C-hacking': i) the choice of C-index should be made before experiments have begun and the choice of C-index should be clearly reported; ii) when ranking predictions are composed from distribution predictions, the composition method should be chosen and clearly described before experiments have begun.
-As the C-index is highly dependent on censoring within a dataset, C-index values between experiments are not directly comparable, instead comparisons are limited to comparing model rankings, for example conclusions such as "model A performed significantly better than model B with respect to Harrell's C in this experiment".
+To avoid 'C-hacking':
+
+i) the choice of C-index should be made before experiments have begun and the choice of C-index should be clearly reported;
+ii) when ranking predictions are composed from distribution predictions, the composition method should be chosen and clearly described before experiments have begun.
+
+As the C-index is highly dependent on censoring within a dataset, C-index values between experiments are not directly comparable, instead comparisons are limited to comparing model rankings, for example conclusions such as "model A outperformed model B with respect to Harrell's C in this experiment".
 
 ```{r, echo=FALSE, warning=FALSE}
 learn("sec-car-pipelines", "creating ranking predictions from distribution predictions using composition", ttl_fmt = "Learn about distribution to ranking compositions.")
@@ -161,15 +165,16 @@ In the time-dependent case, where the metrics are computed based on specific sur
 
 ### Concordance Indices
 
-In contrast to the measures described above, Antolini's C [@Antolini2005] provides a time-dependent formula by estimating the survival probability of both observations at the event time for the observation with the smaller outcome time:
+In contrast to the measures described above, Antolini's C [@Antolini2005] provides a time-dependent ('dep') formula for the concordance index.
+The definition of 'comparable' is the same for Antolini's C, however, concordance is now determined using the individual predicted survival probabilities calculated at the smaller event time in the pair:
 
 $$P(S_i(t_i) < S_j(t_i) | t_i < t_j \cap \delta_i)$$
 
-Note that observations are concordant when $S_i(t_i) < S_j(t_i)$ as at the time $t_i$, observation $i$ has experienced the event and observation $j$ has not, hence the expected survival probability for $S_i(t_i)$ would ideally be 0 but otherwise should be less than $S_j(t_i)$ as $j$ is still 'alive'.
+Note that observations are concordant when $S_i(t_i) < S_j(t_i)$ as at the time $t_i$, observation $i$ has experienced the event and observation $j$ has not, hence the expected survival probability for $S_i(t_i)$ would be as close to 0 as possible (noting inherent randomness may prevent the perfect $S_i(t_i)=0$ prediction) but otherwise should be less than $S_j(t_i)$ as $j$ is still 'alive'.
 Once again this probability is estimated with a metric that could include a cut-off and different weighting schemes (though this is not included in Antolini's original definition):
 
 $$
-C_{td}(y, t, \delta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, S_i(t_i) < S_j(t_i), t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
+C_{dep}(y, t, \delta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, S_i(t_i) < S_j(t_i), t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
 $$
 
 Antolini's C provides an intuitive method to evaluate the discrimination of a model based on distribution predictions without depending on compositions to ranking predictions.
