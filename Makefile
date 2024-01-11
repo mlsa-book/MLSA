@@ -40,9 +40,11 @@ clean:
 	find . -type d -name "*_cache" -exec rm -rf {} \;
 
 render:
+	Rscript -e 'renv::restore("book/", prompt = FALSE, repos = getOption("repos"))'
 	quarto render book/
 
 html:
+	Rscript -e 'renv::restore("book/", prompt = FALSE, repos = getOption("repos"))'
 	quarto render book/ --to html
 
 pdf:
