@@ -14,7 +14,7 @@ However the meaning of calibration is better specified once specific metrics are
 As with other measure classes, only measures that can generalise beyond Cox PH models are included here but note that several calibration measures for re-calibrating PH models have been discussed in the literature [@Demler2015; @VanHouwelingen2000].
 
 Calibration measures can be grouped [@Andres2018] into those that evaluate distributions at a single time-point, '1-Calibration' or 'Point Calibration' measures, and those that evaluate distributions at all time-points 'distributional-calibration' or 'probabilistic calibration' measures.
-A point-calibration measure will evaluate a function of the predicted distribution at a single time-point whereas a probabilistic measure evaluates the distribution over a range of time-points; in both cases the evaluated quantity is compared to the observed outcome, $(T, \Delta)$.
+A point-calibration measure will evaluate a function of the predicted distribution at a single time-point whereas a probabilistic measure evaluates the distribution over a range of time-points; in both cases the evaluated quantity is compared to the observed outcome, $(t, \delta)$.
 
 ## Point Calibration {#sec-eval-distr-calib-point}
 
@@ -43,14 +43,10 @@ learn("sec-car", "reduction")
 
 As opposed to evaluating distributions at one or more arbitrary time points, one could instead evaluate distribution predictions at meaningful times.
 van Houwelingen proposed several measures [@VanHouwelingen2000] for calibration but only one generalises to all probabilistic survival models, termed here 'Houwelingen's $\alpha$'.
-The statistic measures calibration by assessing if the model correctly predicts the true number of total events in the test data.
+The measure assesses if the model correctly estimates the theoretical 'true' cumulative hazard function of the underlying data generating process, $H = \hatH$.
 
-$$
-\frac{\sum_i H_i(T)}{\sum_i \hatH_i(T)}
-$$
-
-This follows by noting the closely related nature of survival analysis and counting processes, and exploiting the fact that the sum of the cumulative hazard function is an estimate for the number of events in a given time-period [@dataapplied].
-As this result is often surprising result to readers, below is a short experiment using R that demonstrates how the sum of the cumulative hazard estimated by a Kaplan-Meier estimator is identical to the number of randomly simulated deaths in a dataset:
+The statistic is derived by noting the closely related nature of survival analysis and counting processes, and exploiting the fact that the sum of the cumulative hazard function is an estimate for the number of events in a given time-period [@dataapplied].
+As this result is often surprising result to readers, below is a short experiment using $\Rstats$ that demonstrates how the sum of the cumulative hazard estimated by a Kaplan-Meier estimator is identical to the number of randomly simulated deaths in a dataset:
 ```{r}
 #| collapse: true
 #| results: 'markup'
@@ -64,13 +60,13 @@ H = survfit(Surv(times, event) ~ 1)$cumhaz
 sum(event) / sum(H)
 ```
 
-Houwelingen's $\alpha$ is therefore defined by substituting $\sum_i H_i(T)$ for $\sum_i \Delta_i$:
+Houwelingen's $\alpha$ is then defined by substituting $H$ for the observed total number of deaths and summing over all predictions:
 
 $$
-H_\alpha(\Delta, \hatH, T) = \frac{\sum_i \Delta}{\sum_i \hatH(T_i)}
+H_\alpha(\dd, \hatHH, \tt) = \frac{\sum_i \delta_i}{\sum_i \hatHH_i(t_i)}
 $$
 
-with standard error $SE(H_\alpha) = \exp(1/\sqrt{(\sum_i \Delta)})$.
+with standard error $SE(H_\alpha) = \exp(1/\sqrt{\sum_i \delta_i})$.
 A model is well-calibrated with respect to $H_\alpha$ if $H_\alpha = 1$.
 
 The next metrics we look at evaluate models across a spectrum of points to assess calibration over time.
@@ -141,16 +137,18 @@ Let $m$ be the total number of observations, then assuming a discrete uniform di
 
 The observations in the $i$th bin, $b_i$, are defined by the set:
 
-$$b_i := \{j \in 1,...,m : \lceil \hatS(T_j)B \rceil = i\}$$
+$$b_i := \{j \in 1,...,m : \lceil \hatS_i(t_j)B \rceil = i\}$$
 
-where $j = 1,...,m$ are the indices of the observations, $\hatS = (\hatS_1,...,\hatS_m)$ are observed (i.e., predicted) survival functions, $T = (T_1,...,T_m)$ are observed (i.e., the ground truth) outcome times, and $\lceil \cdot \rceil$ is the ceiling function.
+where $j = 1,...,m$ are the indices of the observations, $\hatS_i$ are observed (i.e., predicted) survival functions, $t_i$ are observed (i.e., the ground truth) outcome times, and $\lceil \cdot \rceil$ is the ceiling function.
 The observed number of events in $b_i$ is then the number of observations in that set: $O_i = |b_i|$.
 
 The D-Calibration measure, or $\chi^2$ statistic, is now defined by,
 
 $$
-D_{\chi^2}(\hatS, T) :=  \frac{\sum^B_{i = 1} (O_i - \frac{m}{B})^2}{m/B}
+D_{\chi^2}(\hatSS, \tt) :=  \frac{\sum^B_{i = 1} (O_i - \frac{m}{B})^2}{m/B}
 $$
+
+where $\hatSS = (S_1 \ S_2 \cdots S_m)^\trans$ and $\tt = (t_1 \ t_2 \cdots t_m)^\trans$.
 
 This measure has several useful properties.
 Firstly, one can test the null hypothesis that a model is 'D-calibrated' by deriving a $p$-value from comparison to $\chi^2_{B-1}$.
