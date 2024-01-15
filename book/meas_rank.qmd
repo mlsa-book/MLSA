@@ -25,23 +25,21 @@ These measures may be best understood in terms of two key definitions: 'comparab
 
 ## Concordance
 
-Let $(i,j)$ be a pair of observations with outcomes $\{(t_i,\delta_i),(t_j,\delta_j)\} \iid (T,\Delta)$ and let $y_i,y_j \in \Reals$ be their respective risk predictions. Then $(i,j)$ are called [@Harrell1984; @Harrell1982]:
+Let $(i,j)$ be a pair of observations with outcomes $\{(t_i,\delta_i),(t_j,\delta_j)\}$ and let $r_i,r_j \in \Reals$ be their respective risk predictions. Then $(i,j)$ are called [@Harrell1984; @Harrell1982]:
 
 * *Comparable* if $t_i < t_j$ and $\delta_i = 1$;
-* *Concordant* if $y_i > y_j$.
+* *Concordant* if $r_i > r_j$.
 
 :::
 
-Note that this book defines risk rankings such that a higher value implies higher risk of event and thus lower expected survival time (@sec-surv-set-types), hence a pair is concordant if $\II(t_i < t_j, y_i > y_j)$.
-Other sources may instead assume that higher values imply lower risk of event and hence a pair would be concordant if $\II(t_i < t_j, y_i < y_j)$.
+Note that this book defines risk rankings such that a higher value implies higher risk of event and thus lower expected survival time (@sec-surv-set-types), hence a pair is concordant if $\II(t_i < t_j, r_i > r_j)$.
+Other sources may instead assume that higher values imply lower risk of event and hence a pair would be concordant if $\II(t_i < t_j, r_i < r_j)$.
 
 Concordance measures then estimate the probability of a pair being concordant, given that they are comparable:
 
-$$P(y_i > y_j | t_i < t_j \cap \delta_i)$$
+$$P(r_i > r_j | t_i < t_j \cap \delta_i)$$
 
 From this formula it may be seen why these measures are referred to as time *independent*, once observations are organised into comparable pairs, the observed survival times can be ignored.
-
-
 
 While various definitions of a 'Concordance index' (C-index) exist (discussed in the next section), they all represent a weighted proportion of the number of concordant pairs over the number of comparable pairs.
 As such, a C-index value will always be between $[0, 1]$ with $1$ indicating perfect separation, $0.5$ indicating no separation, and $0$ being separation in the 'wrong direction', i.e. all high risk observations being ranked lower than all low risk observations.
@@ -58,11 +56,11 @@ learn("sec-eval-distr-score-base", "calculating measures with respect to an arbi
 
 Common concordance indices in survival analysis can be expressed as a general measure:
 
-Let $y = y_1,...,y_m$ be predicted risks, $(t, \delta) = (t_1, \delta_1),...,(t_m, \delta_m)$ be observed outcomes, let $W$ be some weighting function, and let $\tau$ be a cut-off time.
+Let $\dvec{\hatr}{m}$ be predicted risks, $(\tt, \dd) = ((t_1, \delta_1) \ (t_2, \delta_2) \cdots (t_m, \delta_m))^\trans$ be observed outcomes, let $W$ be some weighting function, and let $\tau$ be a cut-off time.
 Then, the time-independent ('ind') *survival concordance index* is defined by,
 
 $$
-C_{ind}(y, t, \delta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, y_i > y_j, t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
+C_{ind}(\hatrr, \tt, \dd|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, \hatr_i > \hatr_j, t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
 $$
 
 The choice of $W$ specifies a particular variation of the c-index (see below).
@@ -71,7 +69,7 @@ For $\tau$ to be comparable across datasets, a common choice would be to set $\t
 
 There are multiple methods for dealing with tied predictions and times.
 Strictly, tied times are incomparable given the definition of 'comparable' given above and hence are usually ignored in the numerator.
-On the other hand, ties in the prediction are more problematic but a common method is to set a value of $0.5$ for observations when $y_i = y_j$ [@Therneau2020].
+On the other hand, ties in the prediction are more problematic but a common method is to set a value of $0.5$ for observations when $r_i = r_j$ [@Therneau2020].
 Specific concordance indices can be constructed by assigning a weighting scheme for $W$ which generally depends on the Kaplan-Meier estimate of the survival function of the censoring distribution fit on training data, $\KMG$, or the Kaplan-Meier estimate for the survival function of the survival distribution fit on training data, $\KMS$, or both.
 Measures that use $\KMG$ are referred to as Inverse Probability of Censoring Weighted (IPCW) measures as the estimated censoring distribution is utilised to weight the measure in order to compensate for removed censored observations.
 This is visualised in @fig-ipcw where $\KMS$, $\KMG$, and $\KMG^{-2}$ are computed based on the `whas` dataset [@dataapplied].
@@ -168,14 +166,16 @@ In the time-dependent case, where the metrics are computed based on specific sur
 In contrast to the measures described above, Antolini's C [@Antolini2005] provides a time-dependent ('dep') formula for the concordance index.
 The definition of 'comparable' is the same for Antolini's C, however, concordance is now determined using the individual predicted survival probabilities calculated at the smaller event time in the pair:
 
-$$P(S_i(t_i) < S_j(t_i) | t_i < t_j \cap \delta_i)$$
+$$P(\hatS_i(t_i) < \hatS_j(t_i) | t_i < t_j \cap \delta_i)$$
 
-Note that observations are concordant when $S_i(t_i) < S_j(t_i)$ as at the time $t_i$, observation $i$ has experienced the event and observation $j$ has not, hence the expected survival probability for $S_i(t_i)$ would be as close to 0 as possible (noting inherent randomness may prevent the perfect $S_i(t_i)=0$ prediction) but otherwise should be less than $S_j(t_i)$ as $j$ is still 'alive'.
+Note that observations are concordant when $\hatS_i(t_i) < \hatS_j(t_i)$ as at the time $t_i$, observation $i$ has experienced the event and observation $j$ has not, hence the expected survival probability for $\hatS_i(t_i)$ would be as close to 0 as possible (noting inherent randomness may prevent the perfect $\hatS_i(t_i)=0$ prediction) but otherwise should be less than $\hatS_j(t_i)$ as $j$ is still 'alive'.
 Once again this probability is estimated with a metric that could include a cut-off and different weighting schemes (though this is not included in Antolini's original definition):
 
 $$
-C_{dep}(y, t, \delta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, S_i(t_i) < S_j(t_i), t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
+C_{dep}(\hatSS, \tt, \dd|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, \hatS_i(t_i) < \hatS_j(t_i), t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
 $$
+
+where $\dvec{\hatS}{m}$.
 
 Antolini's C provides an intuitive method to evaluate the discrimination of a model based on distribution predictions without depending on compositions to ranking predictions.
 
@@ -203,16 +203,16 @@ Computation of AUC estimators is complex and as such there are limited accessibl
 There is limited evidence of these estimators used in the literature, hence discussion of these measures is kept brief.
 
 The AUC, TPR, and TNR are derived from the *confusion matrix* in a binary classification setting.
-Let $b,\hat{b} \in \{0, 1\}$ be the true and predicted binary outcomes respectively.
+Let $b_i,\hatb_i \in \{0, 1\}$ be the true and predicted binary outcomes respectively for some observation $i$.
 The confusion matrix is then given by:
 
 ||||
 |----|----|-----|
-| | $b = 1$ | $b = 0$ |
-| $\hat{b} = 1$ | TP | FP |
-| $\hat{b} = 0$ | FN | TN |
+| | $b_i = 1$ | $b_i = 0$ |
+| $\hatb_i = 1$ | TP | FP |
+| $\hatb_i = 0$ | FN | TN |
 
-where $TN := \sum_i \II(b = 0, \hatb = 0)$ is the number of true negatives, $TP := \sum_i \II(b = 1, \hatb = 1)$ is the number true positives, $FP := \sum_i \II(b = 0, \hatb = 1)$ is the number of false positives, and $FN := \sum_i \II(b = 1, \hatb = 0)$ is the number of false negatives.
+where $TN := \sum_i \II(b_i = 0, \hatb_i = 0)$ is the number of true negatives, $TP := \sum_i \II(b_i = 1, \hatb_i = 1)$ is the number true positives, $FP := \sum_i \II(b_i = 0, \hatb_i = 1)$ is the number of false positives, and $FN := \sum_i \II(b_i = 1, \hatb_i = 0)$ is the number of false negatives.
 From these are derived
 
 \begin{align}
@@ -229,19 +229,18 @@ Weighting the linear predictor was proposed by Uno $\etal$ (2007) [@Uno2007] and
 
 $$
 \begin{split}
-&TPR_U: \Reals^m \times \NNReals^m \times \bset^m \times \NNReals \times \Reals \rightarrow [0,1]; \\
-&(\hat{\eta}, t, \delta | \tau, \alpha) \mapsto  \frac{\sum^m_{i=1} \delta_i \II(k(\hat{\eta}_i) > \alpha, t_i \leq \tau)[\KMG(t_i)]^{-1}}{\sum^m_{i=1}\delta_i\II(t_i \leq \tau)[\KMG(t_i)]^{-1}}
+&TPR_U(\hatee, \tt, \dd | \tau, \alpha) =  \frac{\sum^m_{i=1} \delta_i \II(k(\hat{\eta}_i) > \alpha, t_i \leq \tau)[\KMG(t_i)]^{-1}}{\sum^m_{i=1}\delta_i\II(t_i \leq \tau)[\KMG(t_i)]^{-1}}
 \end{split}
 $$
+
 and
 
 $$
 \begin{split}
-&TNR_U: \Reals^m \times \NNReals^m \times \NNReals \times \Reals \rightarrow [0,1]; \\
-&(\hat{\eta}, t | \tau, \alpha) \mapsto \frac{\sum^m_{i=1} \II(k(\hat{\eta}_i) \leq \alpha, t_i > \tau)}{\sum^m_{i=1}\II(t_i > \tau)}
+&TNR_U(\hatee, \tt | \tau, \alpha) \mapsto \frac{\sum^m_{i=1} \II(k(\hat{\eta}_i) \leq \alpha, t_i > \tau)}{\sum^m_{i=1}\II(t_i > \tau)}
 \end{split}
 $$
-where $\tau$ is the time at which to evaluate the measure, $\alpha$ is a cut-off for the linear predictor, and $k$ is a known, strictly increasing, differentiable function. $k$ is chosen depending on the model choice, for example if the fitted model is PH then $k(x) = 1 - \exp(-\exp(x))$ [@Uno2007]. Similarities can be drawn between these equations and Uno's concordance index, in particular the use of IPCW. Censoring is again assumed to be at least random once conditioned on features. Plotting $TPR_U$ against $1 - TNR_U$ for varying values of $\alpha$ provides the ROC.
+where $\dvec{\hateta}{m}$ is a vector of predicted linear predictors, $\tau$ is the time at which to evaluate the measure, $\alpha$ is a cut-off for the linear predictor, and $k$ is a known, strictly increasing, differentiable function. $k$ is chosen depending on the model choice, for example if the fitted model is PH then $k(x) = 1 - \exp(-\exp(x))$ [@Uno2007]. Similarities can be drawn between these equations and Uno's concordance index, in particular the use of IPCW. Censoring is again assumed to be at least random once conditioned on features. Plotting $TPR_U$ against $1 - TNR_U$ for varying values of $\alpha$ provides the ROC.
 
 The second method, which appears to be more prominent in the literature, is derived from Heagerty and Zheng (2005) [@Heagerty2005]. They define four distinct classes, in which observations are split into controls and cases.
 
@@ -250,17 +249,17 @@ An observation is a *case* at a given time-point if they are dead, otherwise the
 The TNR for dynamic cases is defined as
 
 $$
-TNR_D(y, N | \alpha, \tau) = P(y_i \leq \alpha | N_i(\tau) = 0)
+TNR_D(\hatrr, N | \alpha, \tau) = P(\hatr_i \leq \alpha | N_i(\tau) = 0)
 $$
-where $y = (y_1,...,y_n)$ is some deterministic prediction and $N(\tau)$ is a count of the number of events in $[0,\tau)$. Heagerty and Zheng further specify $y$ to be the predicted linear predictor $\hat{\eta}$.  Cumulative/dynamic and incident/dynamic measures are available in software packages 'off-shelf', these are respectively defined by
+where $\dvec{\hatr}{n}$ is some deterministic prediction and $N(\tau)$ is a count of the number of events in $[0,\tau)$. Heagerty and Zheng further specify $y$ to be the predicted linear predictor $\hat{\eta}$.  Cumulative/dynamic and incident/dynamic measures are available in software packages 'off-shelf', these are respectively defined by
 
 $$
-TPR_C(y, N | \alpha, \tau) = P(y_i > \alpha | N_i(\tau) = 1)
+TPR_C(\hatrr, N | \alpha, \tau) = P(\hatr_i > \alpha | N_i(\tau) = 1)
 $$
 and
 
 $$
-TPR_I(y, N | \alpha, \tau) = P(y_i > \alpha | dN_i(\tau) = 1)
+TPR_I(\hatrr, N | \alpha, \tau) = P(\hatr_i > \alpha | dN_i(\tau) = 1)
 $$
 where $dN_i(\tau) = N_i(\tau) - N_i(\tau-)$. Practical estimation of these quantities is not discussed here.
 
@@ -269,28 +268,18 @@ The choice between the incident/dynamic (I/D) and cumulative/dynamic (C/D) measu
 Defining a time-specific AUC is now possible with
 
 $$
-AUC(y, N | \tau) = \int^1_0 TPR(y, N | 1 - TNR^{-1}(p|\tau), \tau) \ dp
+AUC(\hatrr, N | \tau) = \int^1_0 TPR(\hatrr, N | 1 - TNR^{-1}(p|\tau), \tau) \ dp
 $$
 
 Finally, integrating over all time-points produces a time-dependent AUC and as usual a cut-off is applied for the upper limit,
 
 $$
-AUC^*(y,N|\tau^*) = \int^{\tau^*}_0 AUC(y,N|\tau)\frac{2\hatp_{KM}(\tau)\KMS(\tau)}{1 - \KMS^2(\tau^*)} \ d\tau
+AUC^*(\hatrr,N|\tau^*) = \int^{\tau^*}_0 AUC(\hatrr,N|\tau)\frac{2\hatp_{KM}(\tau)\KMS(\tau)}{1 - \KMS^2(\tau^*)} \ d\tau
 $$
 where $\KMS,\hatp_{KM}$ are survival and mass functions estimated with a Kaplan-Meier model on training data.
 
 Since Heagerty and Zheng's paper, other methods for calculating the time-dependent AUC have been devised, including by Chambless and Diao [@Chambless2006], Song and Zhou [@Song2008], and Hung and Chiang [@Hung2010]. These either stem from the Heagerty and Zheng paper or ignore the case/control distinction and derive the AUC via different estimation methods of TPR and TNR. Blanche $\etal$ (2012) [@Blanche2012] surveyed these and concluded ''regarding the choice of the retained definition for cases and controls, no clear guidance has really emerged in the literature'', but agree with Heagerty and Zeng on the use of C/D for clinical trials and I/D for 'pure' evaluation of the marker.
-Blanche $\etal$ (2013) [@Blanche2013] published a survey of C/D AUC measures with an emphasis on non-parametric estimators with marker-dependent censoring, including their own Conditional IPCW (CIPCW) AUC,
-
-$$
-AUC_B(y, t, \delta, \hat{G}|\tau) = \frac{\sum_{i \neq j} \II(y_i > y_j)\II(t_i \leq \tau, t_j > \tau)\frac{\delta_i}{m^2\hat{G}(t_i|y_i)\hat{G}(\tau|y_j)}}{\Big(\sum^m_{i=1}\II(t_i \leq \tau)\frac{\delta_i}{m\hat{G}(t_i|y_i)}\Big)\Big(\sum^m_{j=1}\II(t_j>\tau)\frac{1}{m\hat{G}(\tau|y_j)}\Big)}
-$$
-where $t = (t_1,...,t_m)$, and $\hatG$ is the Akritas [@Akritas1994] estimator of the censoring distribution (@sec-surv-models-uncond). It can be shown that setting the $\lambda$ parameter of the Akritas estimator to $1$ results in the IPCW estimators [@Blanche2013]. However unlike the previous measures in which a deterministic prediction can be substituted for the marker, this is not valid for this estimator and as such this cannot be used for predictions. This is clear from the weights, $\hat{G}(t|y)$, in the equation which are dependent on the prediction itself. The purpose of the CIPCW method is to adapt the IPCW weights to be conditioned on the data covariates, which is not the case when $y$ is a predictive marker. Hence the following adaptation is considered instead,
-
-$$
-AUC^*_B(y, x, t, \delta, \hat{G}|\tau) = \frac{\sum_{i \neq j} \II(y_i > y_j)\II(t_i \leq \tau, t_j > \tau)\frac{\delta_i}{m^2\hat{G}(t_i|x_i)\hat{G}(\tau|x_j)}}{\Big(\sum^m_{i=1}\II(t_i \leq \tau)\frac{\delta_i}{m\hat{G}(t_i|x_i)}\Big)\Big(\sum^m_{j=1}\II(t_j>\tau)\frac{1}{m\hat{G}(\tau|x_j)}\Big)}
-$$
-where $x$ are random covariates (possibly from a separate training dataset).
+Blanche $\etal$ (2013) [@Blanche2013] published a survey of C/D AUC measures with an emphasis on non-parametric estimators with marker-dependent censoring, including their own Conditional IPCW (CIPCW) AUC, which is not discussed further here as it cannot be used for evaluating predictions [@Sonabend2021b].
 
 Reviews of AUC measures have produced (sometimes markedly) different results [@Blanche2012; @Li2018; @Kamarudin2017] with no clear consensus on how and when these measures should be used.
 The primary advantage of these measures is to extend discrimination metrics to be time-dependent.
