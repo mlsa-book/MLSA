@@ -38,7 +38,6 @@ In this chapter we define these and related terms, introduce some basic terminol
 In Section @sec-eha we will discuss settings with multiple, potentially competing or recurrent events.
 Section @sec-surv-set-types defines common prediction types of survival models, which is particularly important for machine learning based survival analysis and a common source of confusion.
 Finally, in order to cleanly discuss 'machine learning survival analysis', we will introduce the 'Survival Task' [@Kiraly2021] in Section @sec-surv-setmltask as an addition to the more common 'Regression' and 'Classification' tasks.
-While the exposition in this book will mostly focus on the survival task with single-event, right-censored data, it is important to be aware of the other settings.
 
 It is of utmost importance to identify and specify the survival task correctly, as misspecification cannot be detected by comparing the predictive performance of alternate models via evaluation measures.
 Evaluation measure can only detect if one model is better suited to minimize the obejective function, but not whether or not the obejective function is correct.
@@ -47,7 +46,48 @@ The latter depends on the (assumptions about the) data generating process and ha
 
 ## Survival Data and Definitions {#sec-surv-set-math}
 
+### Quantifying the Distribution of Event Times {#sec-distributions}
 
+In this section, we introduce different functions that represent a distribution of a random variable and particularly the ones that are particularly important in survival analysis.
+
+For now, assume a continuous, positive, random variable $Y$ t.v.i. $\NNReals$. A standard representation of the distribution of $Y$ is given by the probability density function (pdf), $f_Y: \NNReals \rightarrow \NNReals$, and cumulative distribution function (cdf), $F_Y: \NNReals \rightarrow [0,1]; (\tau) \mapsto P(Y \leq \tau)$.
+
+For reasons that will become apparent later and partly for historical reasons, in survival analysis, it is more common to describe the distribution of event times $Y$ via the so called *survival function* and *hazard rate* (or *hazard function*).
+
+The survival function is defined as
+$$
+S_Y: \NNReals \rightarrow [0,1]; \quad
+(\tau) \mapsto P(Y \geq \tau) = \int^\infty_\tau f_Y(u) \ du
+$$
+and so $S_Y(\tau) = 1-F_Y(\tau)$.
+This function is known as the survival function as it can be interpreted as the probability that a given individual survives until some point $\tau \geq 0$.
+
+Another common representation is the hazard function,
+$$
+h_Y: \NNReals \rightarrow \NNReals; \quad
+(\tau) \mapsto  \frac{f_Y(\tau)}{S_Y(\tau)}
+$$
+The hazard function is interpreted as the instantaneous risk of death given that the observation has survived up until that point; note this is not a probability as $h_Y$ can be greater than one.
+
+The cumulative hazard function (chf) can be derived from the hazard function by
+$$
+H_Y: \NNReals \rightarrow \NNReals; \quad
+(\tau) \mapsto \int^\tau_0 h_Y(u) \ du
+$$
+
+The cumulative hazard function relates simply to the survival function by
+$$
+H_Y(\tau) = \int^\tau_0 h_Y(u) \ du = \int^\tau_0 \frac{f_Y(u)}{S_Y(u)} \ du = \int^\tau_0 -\frac{S'_Y(u)}{S_Y(u)} \ du = -\log(S_Y(\tau))
+$$
+
+These last relationships are particularly important, as many methods estimate the hazard rate, which is then used to calculate the cumulative hazard and survival probability
+$$S_Y(\tau) = \exp(-H_Y(\tau)) = \exp\left(-\int_0^\tau h_Y(u)\ du\right).$${#eq-surv-haz}
+
+
+From now on we will often refer to these quantities as $S$, $h$, etc. rather than $S_Y$, $h_Y$ for convenience, unless it's necessary to use the subscript to avoid confusion.
+
+Normally, these quantities could be estimated using standard techniques like regression modeling (estimation of parameters of an assumed distribution).
+However, in contrast to standard settings, $Y$ is only observed partially, due to different types of censoring and truncation describeb below.
 
 
 ### Single-event, right-censored data {#sec-data-rc}
@@ -59,7 +99,8 @@ Survival analysis has a more complicated data setting than other fields as the '
 * $C \ t.v.i. \ \calC \subseteq \NNReals$ be the (unobservable) *true censoring time*.
 
 
-Note that we are interested in the properties of $Y$. However, in the presence of censoring $C$, it is impossible to fully observe both $Y$.
+Note that we are interested in the properties of $Y$.
+However, in the presence of censoring $C$, it is impossible to fully observe both $Y$.
 Instead, the observable variables are given by
 
 * $T := \min\{Y,C\}$ be the *observed outcome time*.
@@ -70,7 +111,8 @@ Together $(T,\Delta)$ is referred to as the *survival outcome* or *survival tupl
 The survival outcome provides a concise mechanism for representing the time of the *observed* outcome and indicating which outcome (event or censoring) took place.
 
 <!-- Now the full generative template for survival analysis is given by \\ $(X, C, Y) \ t.v.i. \ \calX \times \calC \times \calY$ and with $(X_i, C_i, Y_i)$ jointly i.i.d. -->
-A *survival dataset* is defined by $\calD = \{(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n)\}$ where $(X_i,T_i,\Delta_i) \iid (X,T,\Delta)$ and $X_i$ is a $p$-vector, $X_i = (X_{i;1},...,X_{i;p})$. Though unobservable, the true outcome times are defined by $(Y_1,C_1),...,(Y_n,C_n)$ where $(Y_i,C_i) \iid (Y,C)$.
+A *survival dataset* is defined by $\calD = \{(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n)\}$ where $(X_i,T_i,\Delta_i) \iid (X,T,\Delta)$ and $X_i$ is a $p$-vector, $X_i = (X_{i;1},...,X_{i;p})$.
+Though unobservable, the true outcome times are defined by $(Y_1,C_1),...,(Y_n,C_n)$ where $(Y_i,C_i) \iid (Y,C)$.
 
 (@tab-surv-data-abs) exemplifies a random survival dataset with $n$ observations (rows) and $p$ features.
 
@@ -93,11 +135,13 @@ A *survival dataset* is defined by $\calD = \{(X_1,T_1,\Delta_1),...,(X_n,T_n,\D
 | 2 | 0 | 0 | 104 | 1 | 104 | 104 |
 | 2 | 0 | 0 | 102 | 1 | 102 | 120 |
 
-: `rats`  [@pkgsurvival] time-to-event dataset with added hypothetical columns ($Y,C$). Rows are individual observations, $X$ columns are features, $T$ is observed time-to-event, $\Delta$ is the censoring indicator, and $(Y,C)$ are hypothetical (here arbitrary values dependent on $(T,\Delta)$) true survival and censoring times. {#tbl-surv-data-rats}
+: `rats`  [@pkgsurvival] time-to-event dataset with added hypothetical columns ($Y,C$).
+Rows are individual observations, $X$ columns are features, $T$ is observed time-to-event, $\Delta$ is the censoring indicator, and $(Y,C)$ are hypothetical (here arbitrary values dependent on $(T,\Delta)$) true survival and censoring times. {#tbl-surv-data-rats}
 
 Both datasets includes two extra columns, on the right of the triple vertical line, which imagine hypothetical data for the unobserved true survival and censoring times.
 
-Finally the following terms are used frequently throughout this report. Let $(T_i, \Delta_i) \iid (T,\Delta), i = 1,...,n$, be random survival outcomes. Then,
+Finally the following terms are used frequently throughout this report. Let $(T_i, \Delta_i) \iid (T,\Delta), i = 1,...,n$, be random survival outcomes.
+Then,
 
 * The *set of unique* or *distinct time-points* refers to the set of time-points in which at least one observation dies or is censored, $\calU_O := \{T_i\}_{i \in \{1,...,n\}}$.
 * The *set of unique death times* refers to the set of unique time-points in which death (and not censoring) occurred, $\calU_D := \{T_i : \Delta_i = 1\}_{i \in \{1,...,n\}}$.
@@ -125,7 +169,11 @@ It is therefore important to identify which types are present, in order to selec
 
 #### Right-censoring Types {.unnumbered .unlisted}
 
-Right-censoring is the most common form of censoring in survival models and it occurs either when a patient drops out (but doesn't experience the event) of the study before the end and thus their outcome is unknown, or if they experience the event at some unknown point after the study end. Formally let $[\tau_l, \tau_u]$ be the study period for some, $\tau_l,\tau_u \in \NNReals$. Then right-censoring occurs when either $Y > \tau_u$ or when $Y \in [\tau_l,\tau_u]$ and $C \leq Y$. In the first case $T = C = \tau_u$ and censoring is due to the true time-to-event being unknown as the observation period has finished. In the latter case, a separate censoring event, such as drop-out or another competing risk, is observed.
+Right-censoring is the most common form of censoring in survival models and it occurs either when a patient drops out (but doesn't experience the event) of the study before the end and thus their outcome is unknown, or if they experience the event at some unknown point after the study end.
+Formally let $[\tau_l, \tau_u]$ be the study period for some, $\tau_l,\tau_u \in \NNReals$.
+Then right-censoring occurs when either $Y > \tau_u$ or when $Y \in [\tau_l,\tau_u]$ and $C \leq Y$.
+In the first case $T = C = \tau_u$ and censoring is due to the true time-to-event being unknown as the observation period has finished.
+In the latter case, a separate censoring event, such as drop-out or another competing risk, is observed.
 
 ![Dead and censored subjects (y-axis) over time (x-axis). Black diamonds indicate true death times and white circles indicate censoring times. Vertical line is the study end time. Subjects 1 and 2 die in the study time. Subject 3 is censored in the study and (unknown) dies within the study time. Subject 4 is censored in the study and (unknown) dies after the study. Subject 5 dies after the end of the study.](Figures/survival/censoring.png){#fig-survset-censor fig-alt="TODO"}
 
@@ -140,7 +188,8 @@ For the purposes of this book, however, the difference will be largely irrelevan
 
 
 #### Left-censoring {.unnumbered .unlisted}
-Left-censoring is a rarer form of censoring and occurs when the event happens at some unknown time before the study start. While quiet rare in medical settings, this type of data often occurs in sociology studies when retrospective interviews are conducted.
+Left-censoring is a rarer form of censoring and occurs when the event happens at some unknown time before the study start.
+While quiet rare in medical settings, this type of data often occurs in sociology studies when retrospective interviews are conducted.
 
 For illustration, consider an interview whith questions alas "At what age did you ... for the first/last time?", where you can fill in the blank with "use a smartphone", "drink alcohol" or similar.
 Let $A_i$ denote the age of the participants during the interview.
@@ -148,13 +197,18 @@ If they remember the age exactly\footnote{If one assumes that the subjects remem
 If the event didn't occur yet, then the subject is right-censored at $A_i$, i.e., $Y_i > T_i = C_i = A_i$.
 However, if the event occured, but the subjects don't remember when, the subject is left-censored at $A_i$, i.e. we know that $T_i = Y_i < A_i$, but not the exact time.
 
-<Note: maybe things like this should be put in a "practical tips" box>
-Note that for this type of data you need an additional variable in order to differentiate between left- and right-censoring as well as exact event times. In practice this is often solved by including two columns that store time, such that left-censored data is given by $(-\infty, A_i)$, while right-censored data is denoted by $(A_i, \infty)$. In this convention, actual event times are denoted by $(T_i, T_i)$.
+Note that for this type of data you need an additional variable in order to differentiate between left- and right-censoring as well as exact event times.
+In practice this is often solved by including two columns that store time, such that left-censored data is given by $(-\infty, A_i)$, while right-censored data is denoted by $(A_i, \infty)$.
+In this convention, actual event times are denoted by $(T_i, T_i)$.
 
 
 #### Interval-censoring {.unnumbered .unlisted}
 
-Interval-censoring occurs when the event takes place in some interval within the study period, but the exact time of event is unknown. This often occurs in data resulting from regular or irregular check-ups, as it often occurs in electronic health record data. For example, patients might get periodic tests for skin cancer. Some patients might check once a year, for others the intervals between checks might be longer. If skin cancer is detected, one only knows that it occured between the last and current check up, but not the exact time.
+Interval-censoring occurs when the event takes place in some interval within the study period, but the exact time of event is unknown.
+This often occurs in data resulting from regular or irregular check-ups, as it often occurs in electronic health record data.
+For example, patients might get periodic tests for skin cancer.
+Some patients might check once a year, for others the intervals between checks might be longer.
+If skin cancer is detected, one only knows that it occured between the last and current check up, but not the exact time.
 
 Formally, consider $L_i$ the subject-specific check-up time and $R_i$ the current check-up time.
 Then we know that if an event occured $T_i = Y_i \in (L_i, R_i]$.
@@ -164,7 +218,8 @@ If no event occured then $Y_i > T_i = C_i = R_i$.
 
 ### Censoring 'Dependence' {.unnumbered .unlisted}
 
-Censoring is often defined as *uninformative* if $Y \indep C$ and *informative* otherwise however these definitions can be misleading as the term 'uninformative' appears to imply that censoring is independent of both $X$ and $Y$, and not just $Y$. Instead the following more precise definitions are used in this book.
+Censoring is often defined as *uninformative* if $Y \indep C$ and *informative* otherwise however these definitions can be misleading as the term 'uninformative' appears to imply that censoring is independent of both $X$ and $Y$, and not just $Y$.
+Instead the following more precise definitions are used in this book.
 
 ::: {#def-cens}
 
@@ -179,7 +234,12 @@ Let $(X,T,\Delta,Y,C)$ be defined as above, then
 
 :::
 
-Non-informative censoring can generally be well-handled by models as true underlying patterns can still be detected and the reason for censoring does not affect model inference or predictions. However in the real-world, censoring is rarely non-informative as reasons for drop-out or missingness in outcomes tend to be related to the study of interest. Event-dependent censoring is a tricky case that, if not handled appropriately (by a competing-risks framework), can easily lead to poor model development; the reason for this can be made clear by example: Say a study is interested in predicting the time between relapses of stroke but a patient suffers a brain aneurysm due to some separate neurological condition, then there is a high possibility that a stroke may have occurred if the aneurysm had not. Therefore a survival model is unlikely to distinguish the censoring event (aneurysm) from the event of interest (stroke) and will confuse predictions. In practice, the majority of models and measures assume that censoring is conditionally event-independent and hence censoring can be predicted by the covariates whilst not directly depending on the event. For example if studying the survival time of ill pregnant patients in hospital, then dropping out of the study due to pregnancy is clearly dependent on how many weeks pregnant the patient is when the study starts (for the sake of argument assume no early/late pregnancy due to illness).
+Non-informative censoring can generally be well-handled by models as true underlying patterns can still be detected and the reason for censoring does not affect model inference or predictions.
+However in the real-world, censoring is rarely non-informative as reasons for drop-out or missingness in outcomes tend to be related to the study of interest.
+Event-dependent censoring is a tricky case that, if not handled appropriately (by a competing-risks framework), can easily lead to poor model development; the reason for this can be made clear by example: Say a study is interested in predicting the time between relapses of stroke but a patient suffers a brain aneurysm due to some separate neurological condition, then there is a high possibility that a stroke may have occurred if the aneurysm had not.
+Therefore a survival model is unlikely to distinguish the censoring event (aneurysm) from the event of interest (stroke) and will confuse predictions.
+In practice, the majority of models and measures assume that censoring is conditionally event-independent and hence censoring can be predicted by the covariates whilst not directly depending on the event.
+For example if studying the survival time of ill pregnant patients in hospital, then dropping out of the study due to pregnancy is clearly dependent on how many weeks pregnant the patient is when the study starts (for the sake of argument assume no early/late pregnancy due to illness).
 
 
 ### Censoring vs. Truncation {#sec-truncation}
@@ -209,7 +269,10 @@ Notably, left-truncation also plays an important role when modeling recurrent ev
 
 #### Right-truncation {.unnumbered .unlisted}
 
+Right-truncation mostly occurs in analyses based on registry data.
+When sampling the registry for events, some subjects might already have experienced the event, but the registry data at a given time-point does not reflect this yet.
 
+Formally, let $T_i^r$ the right-truncation time, then subjects only enter the data set when $T_i < T_i^r$.
 
 
 ### Setting up the objective function
@@ -240,12 +303,60 @@ The *recurrent events setting* (not pictured, @sec-recurrent-events) can be view
 
 ### Competing Risks {#sec-competing-risks}
 
+In constrast to single-event survival analysis, competing risks are concerned with time-to first of many, mutually exclusive events $E \in {1,\ldots, K}$.
+Mutually exclusive means that once one of the events occurs, we can not observe the other events any more.
+That doesn't mean, that the events have to be terminal (e.g. death), however, the observation of the process ends at the occurence of one of the events.
+
+Formally, let $Y$ the time-to-event as before.
+In CR we now have an additional random variable $E_Y\in \{1,\ldots,K\}$ which denotes one of $K$ competing events that can occur at event time $Y$.
+Absent of censoring, the data would be given as$(Y, E)$.
+However, in the presence of right-censoring we have $T = \min(Y, C), \Delta = I(Y\leq C) \cdot E$.
+Note that the status indicator can now take values $\Delta \in \{0, 1,\ldots, k\}$, compared to \Delta\in\{0,1\} in the single-event setting.
+
+The predominating approach to competing-risks analysis is the so called *cause-specific hazards* approach, where we define $h_{0e}$ the hazard for the transition from initial state 0 to state $e =1,\ldots,K$:
+
+$$
+h_{0e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}, \; e = 1, \dots, K.
+$$
+
+As at any time $\tau$ the competing events are mutually exclusive, we can also define the
+
+- *all-cause hazard*: $h(\tau) = \sum_{e = 1}^{K}h_{0e}(\tau)$,
+- *all-cause cumulative hazard*: $H(\tau) = \int_{0}^\tau h(u)\ du = \sum_{e=1}^{K}\int_{0}^\tau h_{0e}(u)\ du = \sum_{e=1}^K H_{0e}(\tau)$, and
+- *all-cause survival probability*: $S(\tau) = P(Y \geq \tau) = \exp(-H(\tau))$
+
+Note that now the survival probability has the interpretation of non of the events occuring until time $\tau$ and can be calculated from the cause specific hazards.
+
+Another important quantity often of interest in competing risks analysis is the *Cumulative Incidence Function* (CIF) which denote the probability of experiencing an event $E$ before time $\tau$
+
+$$
+F_{e}(\tau) = P(Y \leq \tau, E = e) = \int_{0}^\tau h_{0e}(u)S(u)\ du,
+$$
+intuitively the integrants are given as the probability of not experiencing *any* event at time $u$ ($S(u)$) multiplied with the instantaneous risk of experiencing an event of type $e$ ($h_{oe}(u)$).
+
+Calculating the CIF (in addition to the cause-specific hazards) is particularly important when making statements about the absolute risk (probability) for an event of type $e$, as it depends on all cause-specific hazards via $S(\tau)$.
+
+This will be particularly relevant when assesing how features affect the probability for observing a specific event.
+While some feautures might strongly affect some of the cause-specific hazards, events of type $e$ might have overall low prevalence and occur rarely (because competing events occur earlier on average), thus the absolut probability of observing an event of type $e$ might still be low.
+
+In order to estimate the cause-specific hazards, one creates a new event indicator for each event type, such that all events of a different type are considered censoring:
+$$\delta_{ie} = I(Y_i \leq C_i \wedge E_i = e) \in \{0, 1\},\ e=1,\ldots,K$$
+
+Using this definition, we can construct a data set $(t_i, \delta_{ie}, \bx_i)$ and fit a separate model to each of the $K$ data sets in order to obtain cause-specific hazards using standard methods for the single-event case.
+Once we have the hazards, we can calculate the all-cause survival probability and the CIFs.
+
+Note that in this book we follow the exposition of competing risks offered in @beyersmann.competing.2012, particularly w.r.t. to the view that the cause-specific hazards model fully describes the data generating processes and doesn't require an independence assumption for the competing events.
+
+
 
 ### Multi-state Models {#sec-multi-state}
+
+{{< include _wip.qmd >}}
 
 
 ### Recurrent Events {#sec-recurrent-events}
 
+{{< include _wip.qmd >}}
 
 
 ## Survival Prediction Problems {#sec-surv-set-types}
@@ -298,7 +409,7 @@ $$
 S_W: \NNReals \rightarrow [0,1]; \quad
 (\tau) \mapsto P(W \geq \tau) = \int^\infty_\tau f_W(u) \ du
 $$
-and so $S_W(\tau) = 1-F_W(\tau)$. This function is known as the survival function as it can be interpreted as the probability that a given individual survives until some point $\tau \geq 0$.
+and so $S_W(\tau) = 1-F_W(\tau)$. This function is known as the survival function as it can be interpreted as the probability that a given individual survives beyond some time point $\tau \geq 0$.
 
 Another common representation is the hazard function,
 $$
