@@ -8,32 +8,66 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _wip.qmd >}}
 
-There appears to be little research into measures for evaluating survival time predictions, which is likely due to this task usually being of less interest than the others (@sec-surv-set-types). Common measures in survival analysis for survival time predictions are the same as regression measures but with an additional indicator variable to remove censoring. Three common regression measures are the mean absolute error (MAE), mean squared error (MSE), and root mean squared error (RMSE). These are respectively defined for survival analysis as
+When it comes to evaluating survival time predictions, there are few measures available at our disposal.
+As a result of survival time predictions being uncommon compared to other prediction types (@sec-surv-set-types), there are limited survival time evaluation measures in the literature.
+To our knowledge, there are no specialised 'survival time measures', instead regression measures are used by ignoring censored observations.
 
-::: {#def-survivaltime}
+Before presenting these measures, consider what happens when censored observations are discarded.
+If censoring is truly independent, occurs randomly, and is *very* limited in the data, then there is little harm in discarding observations and treating this as a regression problem.
+However, if censoring is not independent, then discarding censored observations will lead to missing valuable insights about the model.
+For example, say the task of interest is to predict the probability of death due to kidney failure and patients are censored if they receive a transplant - this is clearly a competing risk as receiving a transplant greatly reduces the probability of death.
+If one were to predict the time to death for all patients and to not evaluate the quality of prediction for censored patients, then it would only be possible to conclude about the model's performance for those who do not receive a transplant.
+On the surface this may appear to be of value, however, if at the time of prediction it is impossible to know who will receive a transplant (perhaps because the dataset omits relevant information such as time of hospital admission, wait on register, etc.), then for a given prediction for an observation, it would be impossible to know if the prediction is trustworthy - it would be if that patient does not receive a transplant, but would not be if they do not.
+In short, it is essential that predictions for individuals who end up being censored, are as good as those who are not, simply because there is no method to know which group observations will eventually fall into.
 
-## Survival time measures
+It is interesting to consider if IPCW strategies would compensate for this deficiency, however as we were unable to find research into this method, we have only included measures that we term 'censoring-ignored regression measures', which are presented in [@Wang2017].
 
-Let $\calT^m \subseteq \PReals^m$, $\hatt = \hatt_1,...,\hatt_m, t = t_1,...,t_m$, $\delta = \delta_1,...,\delta_m$, and $d := \sum^m_{i=1} \delta_i$, then
+## Distance measures
 
-i. The *censoring-adjusted mean absolute error*, $MAE_C$ is defined by
+Survival time measures are often referred to as 'distance' measures as they measure the distance between the true, $(t, \delta=1)$, and predicted, $\hatt$, values.
+These are presented in turn with brief descriptions of their interpretation.
+
+**Censoring-ignored mean absolute error, $MAE_C$**
+
+In regression, the mean absolute error (MAE) is a popular measure because it is intuitive to understand as it measures the absolute difference between true and predicted outcomes; hence intuitively one can understand that a model predicting a height of 175cm is clearly better than one predicting a height of 180cm, for a person with true height of 174cm.
 
 $$
-MAE_C: \calT^m \times \calT^m \times \bset^m \rightarrow \NNReals; (\hatt, t, \delta) \mapsto \frac{1}{d} \sum^m_{i=1} \delta_i|t_i - \hat{t_i}|
-$$
-i. The *censoring-adjusted mean squared error*, $MSE_C$ is defined by
-
-$$
-MSE_C: \calT^m \times \calT^m \times \bset^m \rightarrow \NNReals; (\hatt, t, \delta) \mapsto \frac{1}{d}\sum^m_{i=1}\delta_i(t_i - \hatt_i)^2
-$$
-i. The *censoring-adjusted root mean squared error*, $RMSE_C$ is defined by
-
-$$
-RMSE_C: \calT^m \times \calT^m \times \bset^m \rightarrow \NNReals; (\hatt, t, \delta) \mapsto \sqrt{MSE_C(t, \hat{t}, \delta)}
+MAE_C(\hattt, \tt, \dd) = \frac{1}{d} \sum^m_{i=1} \delta_i|t_i - \hatt_i|
 $$
 
-:::
+Where $d$ is the number of uncensored observations in the dataset, $d = \sum_i \delta_i$.
 
-These are referred to as 'distance' measures as they measure the distance between the true, $(t, \delta)$, and predicted, $\hatt$, values. This approach is not ideal as the removal of censored observations results in increased bias as the proportion of censoring increases (@sec-eval-crank-disc-conc). Furthermore these measures make some assumptions that are likely not valid in a survival setting. For example these metrics assume that an over-prediction should be penalised equally as much as an under-prediction, whereas in survival data it is likely that a model should be overly-cautious and under-predict survival times, i.e. it is safer to predict a patient is more at risk and will die sooner rather than less risk and die later.
+**Censoring-ignored mean squared error**
 
-These measures are clearly transparent and accessible as off-shelf implementation is straightforward, though $\proba$ [@pkgmlr3proba] was the only $\Rstats$ package found to implement these. For performance, no conclusions can be drawn as no research could be found into the theoretical properties of these losses; despite this there is evidence of them being utilised in the literature [@Wang2017].
+In comparison to MAE, the mean squared error (MSE), computes the squared differences between true and predicted values.
+While the MAE provides a smooth, linear, 'penalty' for increasingly poor predictions (i.e., the difference between an error of predicting 2 vs. 5 is still 3), but the square in the MSE means that larger errors are quickly magnified (so the difference in the above example is 9).
+By taking the mean over all predictions, the effect of this inflation is to increase the MSE value as larger mistakes are made.
+
+$$
+MSE_C(\hattt, \tt, \dd) = \frac{1}{d}\sum^m_{i=1}\delta_i(t_i - \hatt_i)^2
+$$
+
+Where $d$ is again the number of uncensored observations in the dataset, $d = \sum_i \delta_i$.
+
+**Censoring-adjusted root mean squared error**
+
+Finally, the root mean squared error (RMSE), is simply the square root of the MSE.
+This allows interpretation on the original scale (as opposed to the squared scale produced by the MSE).
+Given the inflation effect for the MSE, the RMSE will be larger than the MAE as increasingly poor predictions are made; it is common practice for the MAE and RMSE to be reported together.
+
+$$
+RMSE_C(\hattt, \tt, \dd) = \sqrt{MSE_C(\hattt, \tt, \dd)}
+$$
+
+## Over- and under-predictions
+
+All of these distance measures assume that the error for an over-prediction ($\hatt > t$) should be equal to an under-prediction ($\hatt < t$), i.e., that it is 'as bad' if a model predicts an outcome time being 10 years longer than the truth compared to being 10 years shorter.
+In the survival setting, this assumption is often invalid as it is generally preferred for models to be overly cautious, hence to predict negative events to happen sooner (e.g., predict a life-support machine fails after three years not five if the truth is actually four) and to predict positive events to happen later (e.g., predict a patient recovers after four years not two if the truth is actually three).
+A simple method to incorporate this imbalance between over- and under-predictions is to add a weighting factor to any of the above measures, for example the $MAE_C$ might become
+
+$$
+MAE_C(\hattt, \tt, \dd, \lambda, \mu, \phi) = \frac{1}{d} \sum^m_{i=1} \delta_i|(t_i - \hatt_i) [\lambda\II(t_i>\hatt_i) + \mu\II(t_i<\hatt_i) + \phi\II(t_i=\hatt_i)]|
+$$
+
+where $\lambda, \mu, \phi$ are any Real number to be used to weight over-, under-, and exact-predictions, and $d$ is as above.
+The choice of these are highly context dependent and could even be tuned.
