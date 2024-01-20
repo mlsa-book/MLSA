@@ -21,6 +21,7 @@ In the simplest terms, a scoring rule compares two values and assigns them a sco
 In machine learning, this usually means comparing a prediction for an observation to the ground truth, so $L: \Reals \times \calP \mapsto \ExtReals$ where $\calP$ is a set of distributions.
 Crucially, scoring rules usually refer to comparisons of true and predicted *distributions*.
 For example, let's construct a scoring rule as follows:
+
 1. Let $y \in \{0,1\}$ be the ground truth and let $\hat{p}$ be the predicted probability mass function such that $\hat{p}(y)$ is the probability of the observed event occurring;
 2. Define $\hat{y} := \II(\hat{p}(y) \geq 0.5)$, i.e., $\hat{y}$ is $1$ if the predicted probability of event $1$ is greater or equal than 0.5;
 3. Then define our scoring rule such that we score $1$ if $\hat{y}$ equals $y$ or 0 otherwise: $SR :=\II(\hat{y} = y)$.
@@ -264,7 +265,7 @@ $$
 L_{IGS}(\hat{S}, t, \delta|\KMG) = \int^{\tau^*}_0  \frac{\hat{S}^2(\tau) \II(t \leq \tau, \delta=1)}{\KMG(t)} + \frac{\hat{F}^2(\tau) \II(t > \tau)}{\KMG(\tau)} \ d\tau
 \end{split}
 $$ {#eq-igs}
-where  $\hatS^2(\tau) = (\hatS(\tau))^2$ and $\hatF^2(\tau) = (1 - \hatS(\tau)^2$, and $\tau^* \in \NNReals$ is an upper threshold to compute the loss up to, and $\KMG$ is the Kaplan-Meier trained on the censoring distribution for IPCW.
+where  $\hatS^2(\tau) = (\hatS(\tau))^2$ and $\hatF^2(\tau) = (1 - \hatS(\tau))^2$, and $\tau^* \in \NNReals$ is an upper threshold to compute the loss up to, and $\KMG$ is the Kaplan-Meier trained on the censoring distribution for IPCW.
 
 ```{r echo = FALSE}
 learn("sec-eval-crank-disc-conc", "IPCW")
@@ -273,13 +274,13 @@ learn("sec-eval-crank-disc-conc", "IPCW")
 To understand this loss, let's break it down and look at the computations at a single time-point, $\tau$.
 At $\tau$ the loss will either be:
 
-1. $\frac{\hat{S}^2(\tau)}{\KMG(t)}$ - If the observation experiences the event before $\tau$
-2. 0 - If the observation is censored before $\tau$
-3. $\frac{\hat{F}^2(\tau)}{\KMG(\tau)}$ - If the observation's outcome is after $\tau$
+1. $\frac{\hat{S}^2(\tau)}{\KMG(t)}$ -- If the observation experiences the event before $\tau$
+2. 0 -- If the observation is censored before $\tau$
+3. $\frac{\hat{F}^2(\tau)}{\KMG(\tau)}$ -- If the observation's outcome (censoring or event) is after $\tau$
 
 <!-- FIXME: BELOW IS TERRIBLY WRITTEN! -->
-As we have no information about the true survival time of censored observations, it is sensible to not attempt to provide a meaningful score once censored, so their contribution is $0$.
-For observations that are known to have experience the event at $\tau$, then we would expect their survival probability to be zero as the event has occurred (and they cannot continue to survive) hence contributing $\hatS^2$ -- the addition of $\KMG(t)$ has the effect of placing more weight on the score at the observed event time if the proportion of censoring is lower at this time, the reason being that when the observations are alive ($t > \tau$) then their contributing the rest of the weighting after this time.
+As we have no information about the true survival status of censored observations beyond their censoring times, it is sensible to not attempt to provide a meaningful score once censored, so their contribution is $0$.
+For observations that are known to have experienced the event at $\tau$, we would expect their survival probability to be zero as the event has occurred (and they cannot continue to survive) hence contributing $\hatS^2$ -- the addition of $\KMG(t)$ has the effect of placing more weight on the score at the observed event time if the proportion of censoring is lower at this time, the reason being that when the observations are alive ($t > \tau$) then their contributing the rest of the weighting after this time.
 Finally, for observations who are still alive, then we'd expect their survival probability to be as close to 1 as possible with inverse weighting at the current timepoint.
 As $\tau \rightarrow \infty$, then $\KMG(\tau) \rightarrow 0$ as the number of observations in the dataset decreases, hence this weighting ensures that observations that are still in the data can contribute as if all observations were still in the data.
 
@@ -332,7 +333,7 @@ L_{SDLL}(\hatf, t, \delta|\KMG) = - \frac{\delta \log[\hatf(t)]}{\KMG(t)}
 $$
 
 where $\hatf$ is the predicted probability density function.
-This loss is essentially the classification log loss ($-log(\hatp(t))$) with added IPCW.
+This loss is essentially the classification log loss ($-\log(\hatp(t))$) with added IPCW.
 Whilst the classification log loss has beneficial properties such as being differentiable, this is more complex for the SDLL, which is also only an approximate loss.
 A useful alternative to the SDLL which can be readily used in automated procedures is the right-censored log loss.
 
