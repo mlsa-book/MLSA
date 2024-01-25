@@ -4,136 +4,200 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _setup.qmd >}}
 
-# Evaluating Distributions by Calibration Measures {#sec-eval-distr-calib}
+# Calibration Measures {#sec-eval-distr-calib}
 
 {{< include _wip.qmd >}}
 
-The final discussed measures are for evaluating survival distributions. First measures of calibration are briefly discussed in this section and then extensive treatment is given to scoring rules (@sec-eval-distr).
+Calibration measures evaluate the 'average' quality of survival distribution predictions.
+This chapter is kept relatively short as the literature in this area is scarce [@Rahman2017], this is likely due to the meaning of calibration being unclear in a survival context [@VanHouwelingen2000].
+However the meaning of calibration is better specified once specific metrics are introduced.
+As with other measure classes, only measures that can generalise beyond Cox PH models are included here but note that several calibration measures for re-calibrating PH models have been discussed in the literature [@Demler2015; @VanHouwelingen2000].
 
-#### Random Variable and Distribution Notation {.unnumbered .unlisted}
+Calibration measures can be grouped [@Andres2018] into those that evaluate distributions at a single time-point, '1-Calibration' or 'Point Calibration' measures, and those that evaluate distributions at all time-points 'distributional-calibration' or 'probabilistic calibration' measures.
+A point-calibration measure will evaluate a function of the predicted distribution at a single time-point whereas a probabilistic measure evaluates the distribution over a range of time-points; in both cases the evaluated quantity is compared to the observed outcome, $(t, \delta)$.
 
-Throughout these next two sections, two different notations are utilised for random variables and distributions. The first is the 'standard' notation, for example if $\zeta$ is a continuous probability distribution and $X \sim \zeta$ is a random variable, then $f_X$ is the probability density function of $X$. The second notation associates distribution functions directly with the distribution and not the variable. For example if $\zeta$ is a continuous probability distribution then $\zeta.f$ is the probability density function of $\zeta$. Analogously for the probability mass, cumulative distribution, hazard, cumulative hazard, and survival functions of $X \sim \zeta$, $p_X/\zeta.p, F_X/\zeta.F, h_X/\zeta.h, H_X/\zeta.H, S_X/\zeta.S$. This notation provides a clearer separation of probability distributions and random variables, which in turn allows for cleaner proofs involving probability distributions.
+## Point Calibration {#sec-eval-distr-calib-point}
 
-#### Measures of Calibration {.unnumbered .unlisted}
+Point calibration measures can be further divided into metrics that evaluate calibration at a single time-point (by reduction) and measures that evaluate an entire distribution by only considering the event time.
+The difference may sound subtle but it affects conclusions that can be drawn.
+In the first case, a calibration measure can only draw conclusions at that one time-point, whereas the second case can draw conclusions about the calibration of the entire distribution.
+This is the same caveat as using prediction error curves for scoring rules.
 
-Few measures of calibration exist in survival analysis [@Rahman2017] and this is likely due to the meaning of calibration being unclear in this context [@VanHouwelingen2000]. This is compounded by the fact that calibration is often evaluated graphically, which can leave room for high subjectivity and thus may be restricted to expert interpretation. For these reasons, measures of calibration are only considered in this book with respect to accessibility and transparency as there is no clear meaning for what makes a calibration measure performant. Many methods of calibration are restricted to calibration and re-calibration of PH models [@Demler2015; @VanHouwelingen2000], none of these are considered here as they do not generalise to all (or at least many) survival models.
+```{r echo=FALSE}
+learn("sec-pecs", "prediction error curves")
+```
 
-#### Point and Probabilistic Calibration {.unnumbered .unlisted}
+### Calibration by Reduction
 
-Andres $\etal$ (2018) [@Andres2018] derived a taxonomy for calibration measures to separate measures that only evaluate distributions at a single time-point ('1-Calibration') and measures that evaluate distributions at all time-points ('distributional-calibration'). This section will use the same taxonomy but in keeping with machine learning terminology will refer to '1-Calibration' as 'Point Calibration' and 'distributional-calibration' as 'Probabilistic Calibration'.
+Point calibration measures are implicitly reduction methods as they use classification methods to evaluate a full distribution based on a single point only.
+For example, given a predicted survival function $\hatS$, one could calculate the survival function at a single time point, $\hatS{\tau}$ and then use probabilistic classification calibration measures.
+Using this approach one may employ common calibration methods such as the Hosmer–Lemeshow test [@Hosmer1980].
+Measuring calibration in this way can have significant drawbacks as a model may be well-calibrated at one time-point but poorly calibrated at all others [@Haider2020].
+To mitigate this, one could perform the Hosmer–Lemeshow test (or other applicable tests) multiple times with multiple testing correction at many (or all possible) time points, however this would be less efficient and more difficult to interpret than other measures discussed in this chapter.
 
-All measures considered previously can be viewed as 'point' measures as they evaluate predictions at a single point, specifically comparing the predicted linear predictor (more generally relative risk) or survival time to the true time of death. However calibration measures and scoring rules instead evaluate predicted distributions and specifically functions that vary over time, hence it is often of more interest to evaluate these functions at multiple (all if discrete) time-points in order to derive a metric that captures changes over time. For example one may expect probabilistic predictions to be more accurate in the near-future and to steadily worsen as uncertainty increases over time (both mathematical (censoring) and real-world uncertainty), and therefore a measure that only evaluates distributions at a single (possibly early) time-point cannot assess the true variation in the prediction.
+```{r echo=FALSE}
+learn("sec-car", "reduction")
+```
 
-Mathematically this difference in measures may be considered as follows: Let $\calP$ be a set of distributions over $\calT \subseteq \PReals$, then a point measure for evaluating distributions is given by,
+### Houwelingen's $\alpha$
+
+As opposed to evaluating distributions at one or more arbitrary time points, one could instead evaluate distribution predictions at meaningful times.
+van Houwelingen proposed several measures [@VanHouwelingen2000] for calibration but only one generalises to all probabilistic survival models, termed here 'Houwelingen's $\alpha$'.
+The measure assesses if the model correctly estimates the theoretical 'true' cumulative hazard function of the underlying data generating process, $H = \hatH$.
+
+The statistic is derived by noting the closely related nature of survival analysis and counting processes, and exploiting the fact that the sum of the cumulative hazard function is an estimate for the number of events in a given time-period [@dataapplied].
+As this result is often surprising result to readers, below is a short experiment using $\Rstats$ that demonstrates how the sum of the cumulative hazard estimated by a Kaplan-Meier estimator is identical to the number of randomly simulated deaths in a dataset:
+```{r}
+#| collapse: true
+#| results: 'markup'
+#| comment: '#>'
+set.seed(42)
+library(survival)
+
+event = rbinom(100, 1, 0.7)
+times = runif(100)
+H = survfit(Surv(times, event) ~ 1)$cumhaz
+sum(event) / sum(H)
+```
+
+Houwelingen's $\alpha$ is then defined by substituting $H$ for the observed total number of deaths and summing over all predictions:
 
 $$
-L_1: \calP \times \calT \times \bset \times \calT \rightarrow \ExtReals; \quad
-(\zeta, t, \delta|\tau) \mapsto g_1(\zeta.\rho(\tau), t, \delta)
+H_\alpha(\dd, \hatHH, \tt) = \frac{\sum_i \delta_i}{\sum_i \hatHH_i(t_i)}
 $$
-and a probabilistic measure is given by,
 
-$$
-L_P: \calP \times \calT \times \bset \times \PReals \rightarrow \ExtReals; \quad
-(\zeta, t, \delta|\tau^*) \mapsto \int_0^{\tau^*} g_P(\zeta.\rho(\tau), t, \delta) \ d\tau
-$$
-or
+with standard error $SE(H_\alpha) = \exp(1/\sqrt{\sum_i \delta_i})$.
+A model is well-calibrated with respect to $H_\alpha$ if $H_\alpha = 1$.
 
-$$
-L_P: \calP \times \calT \times \bset \times \PReals \rightarrow \ExtReals; \quad
-(\zeta, t, \delta|\tau^*) \mapsto \sum_{\tau = 0}^{\tau^*} g_P(\zeta.\rho(\tau), t, \delta)
-$$
-where $\tau^*$ is some cut-off for the measure to control uncertainty increasing over time, $\rho$ is usually the survival function but may be any distribution-defining function, and $g_1,g_P$ are functions corresponding to specific measures (some examples in next two sections). Note that $\tau$ is an argument (not a free variable) of $L_1$ as the fixed choice of $\tau$ is measure-dependent; usually $\tau = t$.
+The next metrics we look at evaluate models across a spectrum of points to assess calibration over time.
 
-Less abstractly, a point-calibration measure will evaluate a function of the predicted distribution at a single time-point whereas a probabilistic measure evaluates the distribution over a range of time-points; in both cases the evaluated quantity is compared to the observed outcome, $(T^*, \Delta^*)$.
+## Probabilistic Calibration {#sec-eval-distr-calib-prob}
 
-### Point Calibration {#sec-eval-distr-calib-point}
+Calibration over a range of time points may be assessed quantitatively or qualitatively, with graphical methods often favoured.
+Graphical methods compare the average predicted distribution to the expected distribution, which can be estimated with the Kaplan-Meier curve, discussed next.
 
-Point calibration measures can be further divided into metrics that evaluate calibration at a single time-point (by reduction) and measures that evaluate an entire distribution by only considering the event time. The subtle difference significantly affects conclusions that can be drawn. In the first case, a calibration measure can only draw conclusions at that one time-point, whereas the second case can draw conclusions about the calibration of the entire distribution.
+### Kaplan-Meier Comparison
 
-#### Calibration by Reduction
+The simplest graphical comparison compares the average predicted survival curve to the Kaplan-Meier curve estimated on the testing data.
+Let $\hatS_1,...,\hatS_m$ be predicted survival functions, then the average predicted survival function is the mixture: $\bar{\hatS} = \mean[m]{\hatS_i(\tau)}$.
+This estimate can be plotted next to the Kaplan-Meier estimate of the survival distribution in a test dataset (i.e., the true data for model evaluation), allowing for visual comparison of how closely these curves align.
+An example is given in @fig-eval-calib, a Cox model (CPH), random survival forest, and relative risk tree with distribution composition, are all compared to the Kaplan-Meier estimator.
+This figure highlights the advantages and disadvantages of this method.
+The relative risk tree is clearly poorly calibrated as it increasingly diverges from the Kaplan-Meier.
+In contrast, the Cox model and random forest cannot be directly compared to one another, as both models frequently overlap with each other and the Kaplan-Meier estimator.
+Hence it is possible to say that the Cox and forests models are better calibrated than the risk tree, however it is not possible to say which of those two is better calibrated and whether their distance from the Kaplan-Meier is significant or not at a given time (when not clearly overlapping).
 
-Point calibration measures are implicitly reduction methods as they attempt to evaluate a full distribution based on a single point only. For example given a predicted survival function $\zeta.S$, then one could select a time-point $\tau^*$ and calculate the survival function at this time, $\zeta.S(\tau^*)$, probabilistic classification calibration measures can then be utilised. Using this approach one may employ common calibration methods such as the Hosmer–Lemeshow test [@Hosmer1980]. Calibration at a single point in this manner is not particularly useful as a model may be well-calibrated at one time-point and then poorly calibrated at all others [@Haider2020]. To overcome this one could perform the Hosmer–Lemeshow test (or any other applicable test) multiple times at different values of $\tau^* \in \NNReals$. However doing so is inefficient and can lead to problems with 'multiple testing'; hence these single-point methods are not considered further.
+```{r, message=FALSE,warning=FALSE,echo=FALSE}
+#| label: fig-eval-calib
+#| fig-cap: Comparing the calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the Kaplan-Meier estimate of the survival function calculated on a test set. The calibration of RRT notably decreases over time whereas RF and CPH are closer to the Kaplan-Meier curve.
+#| fig-alt: "x-axis is labelled 'T' and ranges from 20 to 100. y-axis is labelled 'S(T)' and rages from 0.8 to 1. Four lines are plotted: CPH (red), KM (green), RF (blue), RRT (purple). The RRT line is quite flat across y=1. The other lines overlap multiple times from (20, 1) to (100, 0.8)."
+library(mlr3proba)
+library(mlr3pipelines)
+library(mlr3extralearners)
+library(ggplot2)
+library(dplyr)
+set.seed(20231211)
+t = tgen("simsurv")$generate(400)
+s = partition(t)
 
-#### Houwelingen's $\alpha$
+prrt = as_learner(ppl("distrcompositor", lrn("surv.rpart")))$
+  train(t, s$train)$predict(t, s$test)
+pcox = lrn("surv.coxph")$train(t, s$train)$predict(t, s$test)
+pran = lrn("surv.ranger")$train(t, s$train)$predict(t, s$test)
 
-Methods that evaluate entire distributions based on a single point may be more useful as conclusions can be drawn at the distribution level. One such method is termed here 'Houwelingen's $\alpha$'. van Houwelingen proposed several measures [@VanHouwelingen2000] for calibration but only one generalises to all probabilistic survival models. This method evaluates the predicted cumulative hazard function, $\zeta_i.H$ (for some predicted distribution $\zeta_i$), by comparing $\zeta_i.H$ to the 'true' hypothetical cumulative hazard, $H$. The test statistic, $H_\alpha$, is defined by
+drrt = autoplot(prrt, "calib", t, s$test)$data
+drrt = drrt %>% filter(Group == "Pred") %>% mutate(Group = "RRT")
+dcox = autoplot(pcox, "calib", t, s$test)$data
+dcox = dcox %>% mutate(Group = if_else(Group == "KM", "KM", "CPH"))
+dran = autoplot(pran, "calib", t, s$test)$data
+dran = dran %>% filter(Group == "Pred") %>% mutate(Group = "RF")
 
-$$
-H_\alpha := \frac{\sum_i H_i(T^*_i)}{\sum_i \zeta_i.H(T^*_i)} \approx \frac{\sum_i \Delta^*_i}{\sum_i \zeta_i.H(T^*_i)}
-$$
-where $\zeta = (\zeta_1,...,\zeta_m)$ are predicted distributions and $\{(T_1^*,\Delta_1^*),...,(T_m^*,\Delta_m^*)\} \iid (T, \Delta)$ is some test data. The model is therefore well-calibrated if $H_\alpha = 1$. This has standard error $SE(H_\alpha) = \exp(1/\sqrt{(\sum_i \Delta^*_i)})$.
+ggplot(rbind(dcox, dran, drrt), aes(x = x, y = y, color = Group)) +
+  geom_line() + theme_bw() + ylim(0, 1) +
+  labs(x = "T", y = "S(T)", color = "Model")
+```
 
-The approximate equality is motivated by formulating survival data as a counting process and noting that in this setting the cumulative hazard function can estimate the number of events in a time-period [@dataapplied]. No study could be found that utilised $H_\alpha$ for model comparison, possibly because graphical methods are favoured. This method can infer results about the calibration of an entire model and not just at a single point because the measure is calculated at a meaningful time (the event time) and utilises known results from counting processes to verify if the expected number of deaths equals the observed number of deaths.
+This method is useful for making broad statements such as "model X is clearly better calibrated than model Y" or "model X appears to make average predictions close to the Kaplan-Meier estimate", but that is the limit in terms of useful conclusions.
+One could refine this method for more fine-grained information by instead using relative risk predictions to create 'risk groups' that can be plotted against a stratified Kaplan-Meier, however this method is harder to interpret and adds even more subjectivity around how many risk groups to create and how to create them [@Royston2013].
+The next measure we consider includes a graphical method as well as a quantitative interpretation.
 
-However, as with the reduction method, the statistic is derived from a single point (the observed event time) for each individual and thus it is possible that the model is well-calibrated only for making predictions at the event time, but not over the full $\PReals$ range.
+### D-Calibration
 
-### Probabilistic Calibration {#sec-eval-distr-calib-prob}
-
-Unlike other areas of evaluation, graphical methods are favoured in calibration and possibly more so than numerical ones. Graphical methods compare the average predicted distribution to the expected distribution. As the expected distribution is itself unknown, this is often estimated with the Kaplan-Meier curve.
-
-#### Kaplan-Meier Comparison
-
-The simplest graphical comparison compares the average predicted survival curve to the Kaplan-Meier curve estimated on the testing data. Formally, let \\ $\zeta_1.S,...,\zeta_m.S$ be predicted survival functions, then the average predicted survival function is a mixture of these distributions, $\mean[m]{\zeta_i.S(\tau)}$. Plotting this mixture and the Kaplan-Meier on $\tau$ vs $S(\tau)$ allows a visual comparison of how closely these curves align. An example is given in @fig-eval-calib-km, the Cox model (CPH) is well-calibrated as it almost perfectly overlaps the Kaplan-Meier estimator, whereas predictions from the poorly-calibrated support vector machine (SVM) are far from this line.
-
-![Assessing the calibration of a Cox PH (CPH) and SVM (with distribution composition by PH form and Kaplan-Meier (@sec-car)) by comparing the average survival prediction to a Kaplan-Meier (KM) estimate on the testing dataset. x-axis is time and y-axis is the predicted survival functions evaluated over time. The CPH (red line) is said to be well-calibrated as it almost perfectly overlaps the Kaplan-Meier (green line), whereas the SVM (blue line) is far from this line. Models trained and tested on randomly simulated data from the `r pkg("simsurv")` [@pkgsimsurv] package in $\proba$ [@pkgmlr3proba].](Figures/evaluation/calib_km.png){#fig-eval-calib-km fig-alt="TODO"}
-
-This approach is both simple and interpretable. In the example above one can conclude: on average, the trained Cox PH predicts a distribution just as well as (or very close to) an unconditional estimator using the real test data. A major caveat is that conclusions are at an average *population* level with no individual-level measurement.
-
-In order to capture finer information on a level closer to inidivduals, calibration can be applied to the predicted relative risks or linear predictor. One such approach is to bin the predictions to create different 'risk groups' from low-to-high risk [@Royston2013]. These groups are then plotted against a stratified Kaplan-Meier estimator. This allows for a more nuanced approach to calibration and can simultaneously visualise a model's discrimination. However this method is far less transparent as it adds even more subjectivity around how many risk groups to create and how to create them [@Royston2013].
-
-#### D-Calibration
-
-D-Calibration [@Andres2018; @Haider2020] is a very recent method that aims to evaluate a model's calibration at all time-points in a predicted survival distribution. The D-calibration measure is identical to the $\chi^2$ test-statistic, which is usually written as follows
+D-Calibration [@Andres2018; @Haider2020] evaluates a model's calibration by assessing if the predicted survival distributions follow the Uniform distribution as expected, which is motivated by the result that for any random variable $X$ it follows $S_X(x) \sim \calU(0,1)$.
+This can be tested using a $\chi^2$ test-statistic:
 
 $$
 \chi^2 := \sum_{i=1}^n \frac{(O_i - E_i)^2}{E_i}
 $$
-where $O_1,...,O_n$ is the observed number of events in $n$ groups and $E_1,...,E_n$ is the expected number of events. The statistic is utilised to determine if the underlying distribution of the observed events follows a theoretical/expected distribution.
 
-The D-Calibration measure tests if predictions (observations) from the  survival functions of predicted distributions, $\zeta_1.S,...,\zeta_m.S$, follow the uniform distribution as expected. The following lemma motivates this test.
+where $O_1,...,O_n$ is the observed number of events  in $n$ groups and $E_1,...,E_n$ is the expected number of events.
 
-::: {#lem-uniform-surv}
-Let $\zeta$ be a continuous probability distribution and let $X \sim \zeta$ be a random variable. Let $S_X$ be the survival function of $X$. Then $S_X(X)$ follows the standard Uniform distribution: $S_X(X) \sim \calU(0, 1)$.
-:::
+To utilise this test, the $[0,1]$ codomain of $S_i$ is cut into $B$ disjoint contiguous intervals ('bins') over the full range $[0,1]$.
+Let $m$ be the total number of observations, then assuming a discrete uniform distribution as the theoretical distribution, the expected number of events in each bin is $E_i = m/B$ (as the probability of an observation falling into each bin is equal).
 
-In order to utilise the $\chi^2$ test (for categorical variables), the $[0,1]$ codomain of $\zeta_i.S$ is cut into $B$ disjoint contiguous intervals ('bins') over the full range $[0,1]$. Let $m$ be the total number of observations in the test data. Then assuming a discrete uniform distribution as the theoretical distribution, the expected number of events is $m/B$.
+The observations in the $i$th bin, $b_i$, are defined by the set:
 
-The observed number of events in bin $i$, $O_i$, is defined as follows: Define $b_i$ as the set of observations that die in the $i$th bin, formally defined by $b_i := \{j \in 1,...,m : \lceil \zeta_j.S(T^*_j)B \rceil = i\}$, where $j = 1,...,m$ are the indices of the test observations and $\zeta = (\zeta_1,...,\zeta_m)$ are predicted distributions.^[This is a slightly simplified procedure which omits handling of censoring, but this is easily extended in the full algorithm, see Algorithm 2 of Haider $\etal$ (2020) [@Haider2020].] Then, $O_i = |b_i|, \forall i \in 1,...,B$.
+$$b_i := \{j \in 1,...,m : \lceil \hatS_i(t_j)B \rceil = i\}$$
+
+where $j = 1,...,m$ are the indices of the observations, $\hatS_i$ are observed (i.e., predicted) survival functions, $t_i$ are observed (i.e., the ground truth) outcome times, and $\lceil \cdot \rceil$ is the ceiling function.
+The observed number of events in $b_i$ is then the number of observations in that set: $O_i = |b_i|$.
 
 The D-Calibration measure, or $\chi^2$ statistic, is now defined by,
 
+$$
+D_{\chi^2}(\hatSS, \tt) :=  \frac{\sum^B_{i = 1} (O_i - \frac{m}{B})^2}{m/B}
+$$
+
+where $\hatSS = (S_1 \ S_2 \cdots S_m)^\trans$ and $\tt = (t_1 \ t_2 \cdots t_m)^\trans$.
+
+This measure has several useful properties.
+Firstly, one can test the null hypothesis that a model is 'D-calibrated' by deriving a $p$-value from comparison to $\chi^2_{B-1}$.
+Secondly, $D_{\chi^2}$ tends to zero as a model is increasingly well-calibrated, hence the measure can be used for model comparison.
+Finally, the theory lends itself to an intuitive graphical calibration method as a D-calibrated model implies:
 
 $$
-D_{\chi^2}(\zeta, T^*) :=  \frac{\sum^B_{i = 1} (O_i - \frac{m}{B})^2}{m/B}
+p = \frac{\sum_i \II(T_i \leq \hatF_i^{-1}(p))}{m}
 $$
 
-This measure has several useful properties. Firstly, a $p$-value can be derived from $\chi^2_{B-1}$ to hypothesis test if a single model is 'D-calibrated'. Secondly, as a model is increasingly well-calibrated it holds that $D_{\chi^2} \rightarrow 0$ (as the number of observed events approach expected events), which motivates utilising the test for model comparison. Thirdly, the theory lends itself very nicely to an intuitive graphical calibration method:
+where $p$ is some value in $[0,1]$, $\hatF_i^{-1}$ is the $i$th predicted inverse cumulative distribution function, and $m$ is again the number of observations.
+In words, the number of events occurring at or before each quantile should be equal to the quantile itself, for example 50% of events should occur before their predicted median survival time.
+Therefore, one can plot $p$ on the x-axis and the right hand side of the above equation on the y-axis.
+A D-calibrated model should result in a straight line on $x = y$.
+This is visualised in @fig-eval-dcalib for the same models as in @fig-eval-calib.
+This figure supports the previous findings that the relative risk tree is poorly calibrated in contrast to the Cox model and random forest but again no direct comparison between the latter models is possible.
 
-If a model is D-calibrated, i.e. predicted distributions from the model result in a low D-calibration, then one expects,
+```{r, message=FALSE,warning=FALSE,echo=FALSE}
+#| label: fig-eval-dcalib
+#| fig-cap: Comparing the D-calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the expected distribution on y=x. As with @fig-eval-calib, the relative risk tree is clearly not D-calibrated (as supported by the figures in the bottom-right). The CPH and RF are closer to the y=x however neither follow it perfectly.
+#| fig-alt: "x-axis is labelled 'True (p)' and the y-axis is labelled 'Predicted', both range from 0 to 1. A box in the bottom right says 'DCal (p-values): CPH = 8.2 (0.51); RF = 10 (0.33); RRT = 170 (7e-32). There are four lines on the plot: a blue line (RRT) quickly ascends from (0,0) to (0.1,1) and then is flat; the red (CPH) and green (RF) lines are overlapping and run parallel but not on y=x. Finally a gray dashed line marks the y=x line."
+drrt = autoplot(prrt, "dcalib", t, s$test, extend_quantile = TRUE)$data
+drrt = drrt %>% mutate(Group = "RRT")
+dcox = autoplot(pcox, "dcalib", t, s$test, extend_quantile = TRUE)$data
+dcox = dcox %>% mutate(Group = "CPH")
+dran = autoplot(pran, "dcalib", t, s$test, extend_quantile = TRUE)$data
+dran = dran %>% mutate(Group = "RF")
 
-$$
-p = \frac{\sum_i \II(T^*_i \leq \zeta_i.F^{-1}(p))}{|T^*|}
-$$ {#eq-eval-dcalib}
-where $p \in [0,1]$ and $\zeta_i.F^{-1}$ is the inverse cumulative distribution function of the $i$th predicted distribution. In words, if a model is D-calibrated then the number of deaths occurring at or before each quantile should be equal to the quantile itself, for example 50% of deaths should occur before their predicted median survival time. Therefore one can graphically test for D-calibration by plotting $p$ on the x-axis and the right hand side of @eq-eval-dcalib on the y-axis. A D-calibrated model should result in a straight line on $x = y$. This is visualised in @fig-eval-dcalib for the same models as in @fig-eval-calib-km. Again the SVM is terribly-calibrated but the CPH is better calibrated. In this case it is clearer that the D-calibration of the CPH is not perfect, especially at higher quantiles. Comparison to $\chi^2_9$ indicates the CPH is D-calibrated whereas the SVM is not.
+dcal_coxp = as.numeric(pcox$score(msr("surv.dcalib", truncate = Inf, chisq = TRUE)))
+dcal_cox = as.numeric(pcox$score(msr("surv.dcalib", truncate = Inf, chisq = FALSE)))
 
-![Assessing the D-calibration of the Cox PH (CPH) and SVM from the same data as @fig-eval-calib-km: models trained and tested on randomly simulated data from the `r pkg("simsurv")` [@pkgsimsurv] package in $\proba$ [@pkgmlr3proba]. x-axis are quantiles in $[0,1]$ and y-axis are predicted quantiles from the models. The dashed line is $y = x$. Again the SVM is terribly calibrated and the CPH is better calibrated as it is closer to $y = x$.](Figures/evaluation/dcalib.png){#fig-eval-dcalib fig-alt="TODO"}
+dcal_ranp = as.numeric(pran$score(msr("surv.dcalib", truncate = Inf, chisq = TRUE)))
+dcal_ran = as.numeric(pran$score(msr("surv.dcalib", truncate = Inf, chisq = FALSE)))
 
-#### Transparency and Accessibility
+dcal_rrtp = as.numeric(prrt$score(msr("surv.dcalib", truncate = Inf, chisq = TRUE)))
+dcal_rrt = as.numeric(prrt$score(msr("surv.dcalib", truncate = Inf, chisq = FALSE)))
 
-It has already been stated that performance cannot be considered for calibration measures however it is unclear if any of these measures are even accessible or transparent as they often require expert interpretation to prevent erroneous conclusions. This is demonstrated by example using the same data and models as in  @fig-eval-dcalib. The predictions from these models are evaluated with Harrell's C (@sec-eval-crank-disc-conc), the Integrated Graf Score (@sec-eval-distr-commonsurv), D-Calibration, and Houwelingen's $\alpha$ (@tbl-eval-calib). All measures agree that the SVM performs poorly. In contrast, whilst the Cox PH (CPH) is well-calibrated according to both measures, its concordance is quite bad (barely above baseline). Haider $\etal$ [@Haider2020] claimed that if a model is D-Calibrated then a 'patient should believe the prediction from the survival curve', these results clearly demonstrate otherwise. Measures of calibration alone are clearly not sufficient to determine if a survival curve prediction should be 'believed' and should therefore be computed alongside measures of discrimination or scoring rules, discussed next.
+scores = paste0(sprintf("   %s = %s (%s)", c("CPH", "RF", "RRT"), signif(c(dcal_cox, dcal_ran, dcal_rrt), 2), signif(c(dcal_coxp, dcal_ranp, dcal_rrtp), 2)), collapse = "\n")
+scores = paste0("DCal (p-values):\n", scores)
 
-| Model | KM | CPH | SVM |
-| ---- | -- | --- | -- |
-| $C_H^1$ | 0.5 | 0.52 | 0.45 |
-| $L_{IGS}^2$ | 0.18 | 0.18 | 0.52  |
-| $H_\alpha^3$ |  0.99 | 1.00 | 15.42 |
-| $D_{\chi^2}^4$ | 2.23$^*$ | 7.03$^*$ | $1.02\times10^{10}$  |
+ggplot(rbind(dcox, dran, drrt), aes(x = p, y = q, color = Group)) +
+  geom_line() + theme_bw() + ylim(0, 1) + xlim(0, 1) +
+  geom_abline(slope = 1, intercept = 0, color = "lightgray", lty = "dashed") +
+  labs(x = "True (p)", y = "Predicted", color = "Model") +
+  geom_label(aes(x = x, y = y), data.frame(x = 0.75, y = 0.1), label = scores, inherit.aes = FALSE, hjust = "left", size = 2.5)
+```
 
-: Comparison of numerical calibration metrics. Same models and data as in @fig-eval-calib-km: models trained and tested on randomly simulated data from the `r pkg("simsurv")` [@pkgsimsurv] package in $\proba$. {#tbl-eval-calib}
+Whilst D-calibration has the same problems as the Kaplan-Meier method with respect to visual comparison, at least in this case there are quantities to help draw more concrete solutions.
+For the models in @fig-eval-dcalib, it is clear that the relative risk tree is not D-calibrated with $p<0.01$ indicating the null hypothesis of D-calibration, i.e., the predicted quantiles not following a Discrete Uniform distribution, can be comfortably rejected.
+Whilst the D-calibration for the Cox model is smaller than that of the random forest, the difference is unlikely to be significant, as is seen in the overlapping curves in the figure.
 
-<sup>
-1. Harrell's C (@sec-eval-crank-disc-conc).
-2. Integrated Graf Score (@sec-eval-distr-commonsurv).
-3. Houwelingen's $\alpha$ (@sec-eval-distr-calib-point).
-4. D-Calibration statistic. A $'*'$ indicates the model is D-Calibrated according to a $\chi^2_9$ test.
-</sup>
+The next chapter will look at scoring rules, which provides a more concrete method to analytically compare the predicted distributions from survival models.
