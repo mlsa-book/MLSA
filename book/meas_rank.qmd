@@ -16,7 +16,7 @@ All discrimination measures are ranking measures, which means that the exact pre
 For example given predictions $\{100,2,299.3\}$, only their rankings, $\{2,1,3\}$, are used by measures of discrimination.
 
 This chapter begins with time-independent measures (@sec-eval-crank-disc-conc), which measure concordance between pairs of observations at a single observed time point.
-The next section focuses on time-dependent measures (@sec-eval-crank-disc-auc), which are primarily AUC-type measures that evaluate discrimination over all possible unique time-points and integrate the results for a single metric.
+The next section focuses on time-dependent measures (@sec-eval-crank-timedep), which are primarily AUC-type measures that evaluate discrimination over all possible unique time-points and integrate the results for a single metric.
 
 ## Time-Independent Measures {#sec-eval-crank-disc-conc}
 
@@ -41,7 +41,8 @@ Concordance measures then estimate the probability of a pair being concordant, g
 
 $$P(r_i > r_j | t_i < t_j \cap \delta_i)$$
 
-From this formula it may be seen why these measures are referred to as time *independent*, once observations are organised into comparable pairs, the observed survival times can be ignored.
+These measures are referred to as time *independent* when $r_i,r_j$ is not a function of time as once the observations are organised into comparable pairs, the observed survival times can be ignored.
+The time-dependent case is covered in @sec-eval-antolini.
 
 While various definitions of a 'Concordance index' (C-index) exist (discussed in the next section), they all represent a weighted proportion of the number of concordant pairs over the number of comparable pairs.
 As such, a C-index value will always be between $[0, 1]$ with $1$ indicating perfect separation, $0.5$ indicating no separation, and $0$ being separation in the 'wrong direction', i.e. all high risk observations being ranked lower than all low risk observations.
@@ -49,6 +50,7 @@ As such, a C-index value will always be between $[0, 1]$ with $1$ indicating per
 Concordance measures may either be reported as a value in $[0,1]$, a percentage, or as 'discriminatory power', which refers to the percentage improvement of a model's discrimination above the baseline value of $0.5$.
 For example, if a model has a concordance of $0.8$ then its discriminatory power is $(0.8-0.5)/0.5 = 60\%$.
 This representation of discrimination provides more information by encoding the model's improvement over some baseline although is often confused with reporting concordance as a percentage (e.g. reporting a concordance of 0.8 as 80%).
+In theory this representation could result in a negative value, however this would indicate that $C<0.5$, which would indicate serious problems with the model that should be addressed before proceeding with further analysis.
 Representing measures as a percentage over a baseline is a common method to improve measure interpretability and closely relates to the ERV representation of scoring rules.
 
 ```{r, echo=FALSE,warning=FALSE,message=FALSE}
@@ -75,10 +77,10 @@ Strictly, tied times are incomparable given the definition of 'comparable' given
 On the other hand, ties in the prediction are more problematic but a common method is to set a value of $0.5$ for observations when $r_i = r_j$ [@Therneau2020].
 Specific concordance indices can be constructed by assigning a weighting scheme for $W$ which generally depends on the Kaplan-Meier estimate of the survival function of the censoring distribution fit on training data, $\KMG$, or the Kaplan-Meier estimate for the survival function of the survival distribution fit on training data, $\KMS$, or both.
 Measures that use $\KMG$ are referred to as Inverse Probability of Censoring Weighted (IPCW) measures as the estimated censoring distribution is utilised to weight the measure in order to compensate for removed censored observations.
-This is visualised in @fig-ipcw where $\KMS$, $\KMG$, and $\KMG^{-2}$ are computed based on the `whas` dataset [@dataapplied].
+This is visualised in @fig-ipcw where $\KMG$, $\KMG^{-2}$, and $\KMS$ are computed based on the `whas` dataset [@dataapplied].
 
 ```{r, echo=FALSE,message=FALSE,warnings=FALSE}
-#| fig-cap: "Weighting functions obtained on the `whas` dataset. x-axis is follow-up time. y-axis is outputs from one of three weighting functions: S(t), marginal survival function based on original `whas` dataset (blue), G(t), survival function based on the censoring distribution of the `whas` dataset (red), and 1/G(t)^2 (green). The vertical gray line at t=1267 represents the point at which G(t)<0.6."
+#| fig-cap: "Weighting functions obtained on the `whas` dataset. x-axis is follow-up time. y-axis is outputs from one of three weighting functions: $\\KMG$, survival function based on the censoring distribution of the `whas` dataset (red), and $\\KMG^{-2}$ (green), $\\KMS$, marginal survival function based on original `whas` dataset (blue), . The vertical gray line at $t = \\tau=1267$ represents the point at which $\\hatG(t)<0.6$."
 #| fig-alt: "Line graph with three lines in green, red, and blue. x-axis is labelled 't' and ranges from 0 to 6000. y-axis is labelled 'W(t)' and ranges from 0 to 5. Legend for lines is titled 'W' with entries 'KMG' for the red line, 'KMG^-2' for the green line, and 'KMS' for the blue line. The blue line starts at (0,1), moves to around (1000, 0.5) then is relatively flat. The red line roughly linearly decreases from (0,1) to (6000,0). The green line sharply increases between (1, 1000) to (5, 3500). A vertical gray line passes through (0, 1267)."
 #| label: fig-ipcw
 library(dplyr)
@@ -164,11 +166,11 @@ As the C-index is highly dependent on censoring within a dataset, C-index values
 learn("sec-car-pipelines", "creating ranking predictions from distribution predictions using composition", ttl_fmt = "Learn about distribution to ranking compositions.")
 ```
 
-## Time-Dependent Measures {#sec-eval-crank-disc-auc}
+## Time-Dependent Measures {#sec-eval-crank-timedep}
 
 In the time-dependent case, where the metrics are computed based on specific survival times, the majority of measures are based on the Area Under the Curve, with one exception which is a simpler concordance index.
 
-### Concordance Indices
+### Concordance Indices {#sec-eval-antolini}
 
 In contrast to the measures described above, Antolini's C [@Antolini2005] provides a time-dependent ('dep') formula for the concordance index.
 The definition of 'comparable' is the same for Antolini's C, however, concordance is now determined using the individual predicted survival probabilities calculated at the smaller event time in the pair:
