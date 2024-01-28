@@ -37,7 +37,7 @@ Often analysis of time-to-event data targets the estimation of the (improper) di
 In this chapter we define these and related terms, introduce some basic terminology and mathematical definitions in @sec-surv-set-math, starting of with the common single-event, right-censored data setting and then extend to further types of censoring as well as truncation.
 In Section @sec-eha we will discuss settings with multiple, potentially competing or recurrent events.
 Section @sec-surv-set-types defines common prediction types of survival models, which is particularly important for machine learning based survival analysis and a common source of confusion.
-Finally, in order to cleanly discuss 'machine learning survival analysis', we will introduce the 'Survival Task' [@Kiraly2021] in Section @sec-surv-setmltask as an addition to the more common 'Regression' and 'Classification' tasks.
+Finally, in order to cleanly discuss 'machine learning survival analysis', we will introduce the *Survival Task* in Section @sec-surv-setmltask as an addition to the more common regression and classification tasks.
 
 It is of utmost importance to identify and specify the survival task correctly, as misspecification cannot be detected by comparing the predictive performance of alternate models via evaluation measures.
 Evaluation measure can only detect if one model is better suited to minimize the obejective function, but not whether or not the obejective function is correct.
@@ -52,22 +52,23 @@ In this section, we introduce different functions that represent a distribution 
 
 For now, assume a continuous, positive, random variable $Y$ t.v.i. $\NNReals$. A standard representation of the distribution of $Y$ is given by the probability density function (pdf), $f_Y: \NNReals \rightarrow \NNReals$, and cumulative distribution function (cdf), $F_Y: \NNReals \rightarrow [0,1]; (\tau) \mapsto P(Y \leq \tau)$.
 
-For reasons that will become apparent later and partly for historical reasons, in survival analysis, it is more common to describe the distribution of event times $Y$ via the so called *survival function* and *hazard rate* (or *hazard function*).
+For reasons that will become apparent later and partly for historical reasons, in survival analysis, it is more common to describe the distribution of event times $Y$ via the so called *survival function* and *hazard function* (often also refered to as *hazard rate*).
 
 The survival function is defined as
 $$
 S_Y: \NNReals \rightarrow [0,1]; \quad
-(\tau) \mapsto P(Y \geq \tau) = \int^\infty_\tau f_Y(u) \ du
+(\tau) \mapsto P(Y > \tau) = \int^\infty_\tau f_Y(u) \ du,
 $$
-and so $S_Y(\tau) = 1-F_Y(\tau)$.
-This function is known as the survival function as it can be interpreted as the probability that a given individual survives until some point $\tau \geq 0$.
+is the probability of not observing an event until some point $\tau \geq 0$ and thus simply the compliment of the cdf: $S_Y(\tau) = 1-F_Y(\tau)$.
 
-Another common representation is the hazard function,
+The hazard function is given by
 $$
 h_Y: \NNReals \rightarrow \NNReals; \quad
-(\tau) \mapsto  \frac{f_Y(\tau)}{S_Y(\tau)}
+(\tau) \mapsto  \frac{f_Y(\tau)}{S_Y(\tau)}.
 $$
-The hazard function is interpreted as the instantaneous risk of death given that the observation has survived up until that point; note this is not a probability as $h_Y$ can be greater than one.
+
+The hazard function is interpreted as the instantaneous risk of death given that the observation has survived up until that point.
+Note this is not a probability as $h_Y$ can be greater than one.
 
 The cumulative hazard function (chf) can be derived from the hazard function by
 $$
@@ -95,59 +96,58 @@ However, in contrast to standard settings, $Y$ is only observed partially, due t
 Survival analysis has a more complicated data setting than other fields as the 'true' data generating process is not directly observable but instead engineered variables are defined to capture observed information. Let,
 
 * $X \ t.v.i. \ \calX \subseteq \Reals^p, p \in \PNaturals$ be the generative random variable  representing the data *features*/*covariates*/*independent variables*.
-* $Y \ t.v.i. \ \calY \subseteq \NNReals$ be the (unobservable) *true survival time*.
-* $C \ t.v.i. \ \calC \subseteq \NNReals$ be the (unobservable) *true censoring time*.
+* $Y \ t.v.i. \ \calY \subseteq \NNReals$ be the (patially unobservable) *true survival time*.
+* $C \ t.v.i. \ \calC \subseteq \NNReals$ be the (partially unobservable) *true censoring time*.
 
 
 Note that we are interested in the properties of $Y$.
-However, in the presence of censoring $C$, it is impossible to fully observe both $Y$.
+However, in the presence of censoring $C$, it is impossible to fully observe $Y$.
 Instead, the observable variables are given by
 
-* $T := \min\{Y,C\}$ be the *observed outcome time*.
-* $\Delta := \II(Y = T) = \II(Y \leq C)$ be the *survival indicator* (also known as the *censoring* or *event* indicator).\footnote{Indicators are usually named to reflect a positive condition in the function (in this case the event when $Y = T$), but counter to this convention the 'censoring indicator' is possibly the more common term.}
+* $T := \min\{Y,C\}$, the *outcome time* (realisations of this random variable will be refered to as *observed outcome time*).
+* $\Delta := \II(Y = T) = \II(Y \leq C)$ be the *event indicator* (also known as the *censoring* or *status* indicator).\footnote{Indicators are usually named to reflect a positive condition in the function (in this case the event when $Y = T$), but counter to this convention the censoring indicator is possibly the more common term.}
 
 
 Together $(T,\Delta)$ is referred to as the *survival outcome* or *survival tuple* and they form the dependent variables.
-The survival outcome provides a concise mechanism for representing the time of the *observed* outcome and indicating which outcome (event or censoring) took place.
+The survival outcome provides a concise mechanism for representing the outcome time and indicating which outcome (event or censoring) took place.
 
-<!-- Now the full generative template for survival analysis is given by \\ $(X, C, Y) \ t.v.i. \ \calX \times \calC \times \calY$ and with $(X_i, C_i, Y_i)$ jointly i.i.d. -->
-A *survival dataset* is defined by $\calD = \{(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n)\}$ where $(X_i,T_i,\Delta_i) \iid (X,T,\Delta)$ and $X_i$ is a $p$-vector, $X_i = (X_{i;1},...,X_{i;p})$.
-Though unobservable, the true outcome times are defined by $(Y_1,C_1),...,(Y_n,C_n)$ where $(Y_i,C_i) \iid (Y,C)$.
+A *survival dataset* is defined by $\calD = \{(\xx_1,t_1,\delta_1),...,(\xx_n,t_n,\delta_n)\}$, where $(t_i,\delta_i)$ are realisations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional row-vector, $\xx_i = (x_{i1},...,x_{ip})$.
 
-(@tab-surv-data-abs) exemplifies a random survival dataset with $n$ observations (rows) and $p$ features.
-
-| X | X | X | T | $\Delta$ | Y | C |
-| -- | -- | --- | -- | --| -- | -- |
-| $X_{11}$ | $\cdots$ | $X_{1p}$ | $T_1$ | $\Delta_1$ | $Y_1$ | $C_1$ |
-| $\vdots$ | $\ddots$ | $\vdots$ | $\vdots$ | $\vdots$ | $\vdots$ | $\vdots$ |
-| $X_{n1}$ | $\cdots$ | $X_{np}$ | $T_n$ | $\Delta_n$ | $Y_n$ | $C_n$ |
-
-: Theoretical time-to-event dataset. $(Y,C)$ are 'hypothetical' as they can never be directly observed. Rows are individual observations, $X$ columns are features, $T$ is observed time-to-event, $\Delta$ is the censoring indicator, and $(Y,C)$ are hypothetical true survival and censoring times. {#tbl-surv-data-abs}
-
-(@tab-surv-data-rats) exemplifies an observed survival dataset with a modified version of the `rats` dataset  [@pkgsurvival].
-
-| **litter** $(X_{.;1})$ | **rx** $(X_{.;2})$ | **sexF** $(X_{.;3})$ | **time** (T) | **status** ($\Delta$) | **survTime** (Y) | **censTime** (C) |
-| -- | -- | --- | -- | --| -- | -- |
-| 1 | 1 | 1 | 101 | 0 | 105 | 101  |
-| 1 | 0 | 1 | 49 | 1 | 49 | 55|
-| 1 | 0 | 1 | 104 | 0 | 200 | 104 |
-| 2 | 1 | 0 | 91 | 0 | 92 | 91 |
-| 2 | 0 | 0 | 104 | 1 | 104 | 104 |
-| 2 | 0 | 0 | 102 | 1 | 102 | 120 |
-
-: `rats`  [@pkgsurvival] time-to-event dataset with added hypothetical columns ($Y,C$).
-Rows are individual observations, $X$ columns are features, $T$ is observed time-to-event, $\Delta$ is the censoring indicator, and $(Y,C)$ are hypothetical (here arbitrary values dependent on $(T,\Delta)$) true survival and censoring times. {#tbl-surv-data-rats}
-
-Both datasets includes two extra columns, on the right of the triple vertical line, which imagine hypothetical data for the unobserved true survival and censoring times.
-
-Finally the following terms are used frequently throughout this report. Let $(T_i, \Delta_i) \iid (T,\Delta), i = 1,...,n$, be random survival outcomes.
+Finally the following terms are used frequently throughout this book.
+Let $(t_i, \delta_i) \iid (T,\Delta), i = 1,...,n$, be observed survival outcomes.
 Then,
 
-* The *set of unique* or *distinct time-points* refers to the set of time-points in which at least one observation dies or is censored, $\calU_O := \{T_i\}_{i \in \{1,...,n\}}$.
-* The *set of unique death times* refers to the set of unique time-points in which death (and not censoring) occurred, $\calU_D := \{T_i : \Delta_i = 1\}_{i \in \{1,...,n\}}$.
-* The *risk set* at a given time-point, $\tau$, is the set of subjects who are known to be alive (not dead or censored) just before that time, $\calR_\tau := \{i: T_i \geq \tau\}$ where $i$ is a unique row/subject in the data.
-* The *number of observations alive* at $\tau$ is the cardinality of the risk set, $|\calR_\tau|$, and is denoted by $n_\tau := \sum_i \II(T_i \geq \tau)$.
-* The *number of observations who die* at $\tau$ is denoted by $d_\tau := \sum_i \II(T_i = \tau, \Delta_i = 1)$.
+* The *set of unique* or *distinct time-points* refers to the set of time-points in which at least one observation dies or is censored, $\calU_O \subseteq \{t_i\}_{i \in \{1,...,n\}}\subseteq \calD$.
+* The *set of unique observed event times* refers to the set of unique time-points in which an event (and not censoring) occurred, $\calU_D := \{t_{i} : \delta_i = 1\}_{i \in \{1,...,n\}}\subseteq \calD$. Sometimes the ordered, unique events times are also denoted by $t_{(i)},\ i=1,\ldots,m \leq n,\ t_{(1)} < t_{(2)} < \cdots < t_{(m)}$.
+* The *risk set* at a given time-point, $\tau$, is the index-set of observation units at risk for the event just before $\tau$, $\calR_\tau := \{i: t_i \geq \tau\}$ where $i$ is a unique row/subject in the data. Consequently, for right-censored data, we have $\calR_0 = \{1,\ldots,n\}$ and $\calR_{\tau} \supseteq \calR_{\tau'}, \forall \tau < \tau'$.
+* The *number of observations at risk* at $\tau$ is the cardinality of the risk set, $|\calR_\tau|$, and is denoted by $n_\tau := \sum_i \II(t_i \geq \tau)$.
+* The *number of events* at $\tau$ is denoted by $d_\tau := \sum_i \II(t_i = \tau, \Delta_i = 1).$ Note: For truly continuous variables $T_i$ we would expect $d_{t_i} = 1,\forall i=,1\ldots,n$, however, in practice we often observe ties due to finite measurement precision, such that $d_{\tau} > 1$ occurs quite frequently in real-world datasets.
+
+The notion of the risk-set $\calR_\tau$ as well as $n_\tau$ and $d_\tau$ will be very important later in @sec-models-classical, as many non-parametric methods (that is methods that don't make an assumption about the underlying distribution of event times) like the famous Kaplan-Meier estimator [@Kaplan1958] are based on the ratio $\frac{d_\tau}{n_\tau}$.
+
+
+@tbl-surv-data-rats exemplifies an observed survival dataset with a modified version of the `rats` data  [@pkgsurvival], which contains the time until occurence of a tumor ($\delta_i=1$ if a tumor occured during the outcome time $t_i$ and $\delta_i = 0$ otherwise).
+In this example, the above terms are be given as
+
+* $\calU_0 = \{49, 91, 101, 102, 104\}$ (note that time $104$ occurs only once)
+* $\calU_D = \{49, 102, 104\}$ (here $104$ refers to $t_5$, not $t_3$)
+* $\calR_{\tau = 102} = \{3, 5, 6\}$ (these rats are at risk for the event shortly before $\tau = 102$, rats $1$ and $4$ are censored beforehand and rat $2$ already developed a tumor).
+* $n_{\tau = 102} = |\calR_{102}| = 3$
+* $d_{\tau = 102} = 1$ (note that while the observed outcome time is $104$ for rats 3 and 5, only the latter developed a tumor ($\delta_3=0$, but $\delta_5=1$), thus $d_{\tau = 104}=1$)
+
+| **ID** ($i$) | **litter** $(\xx_{;1})$ | **rx** $(\xx_{;2})$ | **sexF** $(\xx_{;3})$ | **time** ($\tt$) | **status** ($\dd$) |
+| -- | -- | -- | --- | -- | --|
+| 1 | 1 | 1 | 1 | 101 | 0 |
+| 2 | 1 | 0 | 1 | 49 | 1 |
+| 3 | 1 | 0 | 1 | 104 | 0 |
+| 4 | 2 | 1 | 0 | 91 | 0 |
+| 5 | 2 | 0 | 0 | 104 | 1 |
+| 6 | 2 | 0 | 0 | 102 | 1 |
+
+: Subset of the `rats`  [@pkgsurvival] time-to-event dataset.
+Rows are individual observations ($ID$), $\xx;j$ columns are features, $t$ is observed time-to-event, $\delta$ is the event indicator. {#tbl-surv-data-rats}
+
+
 * The Kaplan-Meier estimate of the average survival function of the training data *survival distribution* is the Kaplan-Meier estimator (@sec-surv-models-uncond) fit (@sec-surv-setml-meth) on training data $(T_i, \Delta_i)$ and is denoted by $\KMS$.
 * The Kaplan-Meier estimate of the average survival function of the training data *censoring distribution* is the Kaplan-Meier estimator fit on training data $(T_i, 1 - \Delta_i)$ and is denoted by $\KMG$.
 
@@ -178,13 +178,13 @@ In the latter case, a separate censoring event, such as drop-out or another comp
 ![Dead and censored subjects (y-axis) over time (x-axis). Black diamonds indicate true death times and white circles indicate censoring times. Vertical line is the study end time. Subjects 1 and 2 die in the study time. Subject 3 is censored in the study and (unknown) dies within the study time. Subject 4 is censored in the study and (unknown) dies after the study. Subject 5 dies after the end of the study.](Figures/survival/censoring.png){#fig-survset-censor fig-alt="TODO"}
 
 Sometimes, right-censoring is also subdivided into Type-I, Type-II and Type-III censoring.
-In Type-I, censoring occurs at the fixed, pre-difined end of the study $\tau_u$, in which case we observe $(T_i = \min(Y_i, \tau_u), \II(Y_i \leq \tau_u))$.
+In Type-I, censoring occurs at the fixed, pre-difined end of the study $\tau_u$, in which case we get $(T_i = \min(Y_i, \tau_u), \II(Y_i \leq \tau_u))$.
 Sometimes this is also refered to as *administrative* censoring, .
 Type-II censoring is similar, however, the study ends when a pre-defined number of subjects experienced the event of interest, in which case $\tau_u$ is random.
 Type-III censoring refers to random censoring, i.e. we assume the censoring times follow some unknown distribution and we observe $(T_i=\min(Y_i,C_i), \II(Y_i\leq C_i))$.
 Often, the different types of right-censorig can co-occur in any given data set.
 
-For the purposes of this book, however, the difference will be largely irrelevant, as the different types are treated the same at the modeling/estimation stage.
+For the purposes of this book, however, the difference will be largely irrelevant, as the different types are treated similarly at the modeling/estimation stage.
 
 
 #### Left-censoring {.unnumbered .unlisted}
@@ -298,31 +298,31 @@ In the most general, the *multi-state setting* (right panel, @sec-multi-state), 
 
 The *recurrent events setting* (not pictured, @sec-recurrent-events) can be viewed as a special case of the multi-state setting but can also be treated as a more general case of the single event setting (with correlated observations) and is thus treated seperately.
 
-![Illustration of different types of time-to-event outcomes. Left: Standard single-event setting with transition from initial state (0) to terminal state (1); Middle: Competing risks setting with $K$ competing events. Once one of the $\{1,\ldots, K\}$ events is observed, the others cannot be observed any more; Right: More general multi-state setting where subjects can transition between multiple transient and terminal states with possible back-transitions to previous states.](Figures/survival/event-history-analysis.svg){#fig-eha fig-alt="Schematic illustration of event history analysis."}
+![Illustration of different types of time-to-event outcomes. Left: Standard single-event setting with transition from initial state (0) to terminal state (1); Middle: Competing risks setting with $k$ competing events. Once one of the $\{1,\ldots, k\}$ events is observed, the others cannot be observed any more; Right: More general multi-state setting where subjects can transition between multiple transient and terminal states with possible back-transitions to previous states.](Figures/survival/event-history-analysis.svg){#fig-eha fig-alt="Schematic illustration of event history analysis."}
 
 
 ### Competing Risks {#sec-competing-risks}
 
-In constrast to single-event survival analysis, competing risks are concerned with time-to first of many, mutually exclusive events $E \in {1,\ldots, K}$.
+In constrast to single-event survival analysis, competing risks are concerned with time-to first of many, mutually exclusive events $E \in {1,\ldots, k}$.
 Mutually exclusive means that once one of the events occurs, we can not observe the other events any more.
 That doesn't mean, that the events have to be terminal (e.g. death), however, the observation of the process ends at the occurence of one of the events.
 
 Formally, let $Y$ the time-to-event as before.
-In CR we now have an additional random variable $E_Y\in \{1,\ldots,K\}$ which denotes one of $K$ competing events that can occur at event time $Y$.
+In CR we now have an additional random variable $E_Y\in \{1,\ldots,k\}$ which denotes one of $k$ competing events that can occur at event time $Y$.
 Absent of censoring, the data would be given as$(Y, E)$.
 However, in the presence of right-censoring we have $T = \min(Y, C), \Delta = I(Y\leq C) \cdot E$.
 Note that the status indicator can now take values $\Delta \in \{0, 1,\ldots, k\}$, compared to \Delta\in\{0,1\} in the single-event setting.
 
-The predominating approach to competing-risks analysis is the so called *cause-specific hazards* approach, where we define $h_{0e}$ the hazard for the transition from initial state 0 to state $e =1,\ldots,K$:
+The predominate approach to competing-risks analysis is the so called *cause-specific hazards* approach, where we define $h_{0e}$ the hazard for the transition from initial state 0 to state $e =1,\ldots,k$:
 
 $$
-h_{0e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}, \; e = 1, \dots, K.
+h_{0e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}, \; e = 1, \dots, k.
 $$
 
 As at any time $\tau$ the competing events are mutually exclusive, we can also define the
 
-- *all-cause hazard*: $h(\tau) = \sum_{e = 1}^{K}h_{0e}(\tau)$,
-- *all-cause cumulative hazard*: $H(\tau) = \int_{0}^\tau h(u)\ du = \sum_{e=1}^{K}\int_{0}^\tau h_{0e}(u)\ du = \sum_{e=1}^K H_{0e}(\tau)$, and
+- *all-cause hazard*: $h(\tau) = \sum_{e = 1}^{k}h_{0e}(\tau)$,
+- *all-cause cumulative hazard*: $H(\tau) = \int_{0}^\tau h(u)\ du = \sum_{e=1}^{k}\int_{0}^\tau h_{0e}(u)\ du = \sum_{e=1}^k H_{0e}(\tau)$, and
 - *all-cause survival probability*: $S(\tau) = P(Y \geq \tau) = \exp(-H(\tau))$
 
 Note that now the survival probability has the interpretation of non of the events occuring until time $\tau$ and can be calculated from the cause specific hazards.
@@ -330,9 +330,9 @@ Note that now the survival probability has the interpretation of non of the even
 Another important quantity often of interest in competing risks analysis is the *Cumulative Incidence Function* (CIF) which denote the probability of experiencing an event $E$ before time $\tau$
 
 $$
-F_{e}(\tau) = P(Y \leq \tau, E = e) = \int_{0}^\tau h_{0e}(u)S(u)\ du,
+F_{e}(\tau) = P(Y \leq \tau, E = e) = \int_{0}^\tau h_{0e}(u)S(u)\ du.
 $$
-intuitively the integrants are given as the probability of not experiencing *any* event at time $u$ ($S(u)$) multiplied with the instantaneous risk of experiencing an event of type $e$ ($h_{oe}(u)$).
+Intuitively the integrants are given as the probability of not experiencing any event,S(u), multiplied with the hazard of experiencing an event of type $e$, $h_{oe}(u)$.
 
 Calculating the CIF (in addition to the cause-specific hazards) is particularly important when making statements about the absolute risk (probability) for an event of type $e$, as it depends on all cause-specific hazards via $S(\tau)$.
 
@@ -340,9 +340,9 @@ This will be particularly relevant when assesing how features affect the probabi
 While some feautures might strongly affect some of the cause-specific hazards, events of type $e$ might have overall low prevalence and occur rarely (because competing events occur earlier on average), thus the absolut probability of observing an event of type $e$ might still be low.
 
 In order to estimate the cause-specific hazards, one creates a new event indicator for each event type, such that all events of a different type are considered censoring:
-$$\delta_{ie} = I(Y_i \leq C_i \wedge E_i = e) \in \{0, 1\},\ e=1,\ldots,K$$
+$$\delta_{ie} = I(Y_i \leq C_i \wedge E_i = e) \in \{0, 1\},\ e=1,\ldots,k$$
 
-Using this definition, we can construct a data set $(t_i, \delta_{ie}, \bx_i)$ and fit a separate model to each of the $K$ data sets in order to obtain cause-specific hazards using standard methods for the single-event case.
+Using this definition, we can construct a data set $(t_i, \delta_{ie}, \bx_i)$ and fit a separate model to each of the $k$ data sets in order to obtain cause-specific hazards using standard methods for the single-event case.
 Once we have the hazards, we can calculate the all-cause survival probability and the CIFs.
 
 Note that in this book we follow the exposition of competing risks offered in @beyersmann.competing.2012, particularly w.r.t. to the view that the cause-specific hazards model fully describes the data generating processes and doesn't require an independence assumption for the competing events.
@@ -361,75 +361,82 @@ Note that in this book we follow the exposition of competing risks offered in @b
 
 ## Survival Prediction Problems {#sec-surv-set-types}
 
-This section continues by defining the survival problem narrowed to the scope described in the previous section. Defining a single 'survival prediction problem' (or 'task') is important mathematically as conflating survival problems could lead to confused interpretation and evaluation of models. Let $(X,T,\Delta)$ and $\calD$ be as defined above. A general survival prediction problem is one in which:
+This section continues by defining the survival problem.
+Defining a single 'survival prediction problem' (or 'task') is important mathematically as conflating survival problems could lead to confused interpretation and evaluation of models.
+Let $(\XX,\tt,\dd)$ and $\calD$ be as defined in @sec-surv-set-math.
+A general survival prediction problem is one in which:
 
 * a survival dataset, $\calD$, is split (@sec-surv-setml-meth) for training, $\dtrain$, and testing, $\dtest$;
 * a survival model is fit on $\dtrain$; and
 * the model predicts some representation of the unknown true survival time, $Y$, given $\dtest$.
 
 
-The process of 'fitting' is model-dependent, and can range from simple maximum likelihood estimation of model coefficients, to complex algorithms.  The model fitting process is discussed in more abstract detail in (@sec-surv-setml) and then concrete algorithms are discussed in (@sec-review). The different survival problems are separated by 'prediction types' or 'prediction problems', these can also be thought of as predictions of different 'representations' of $Y$. Four prediction types are discussed in this paper, these may be the only possible survival prediction types and are certainly the most common as identified in chapters (@sec-review) and (@sec-eval).  They are predicting:
+The process of fitting is model-dependent, and can range from simple maximum likelihood estimation of model coefficients, to complex algorithms.
+The model fitting process is discussed in more abstract detail in (@sec-surv-setml) and then concrete algorithms are discussed in (@sec-review).
+The different survival problems are separated by *prediction types* or *prediction problems*, which can also be thought of as predictions of different representations of $Y$.
+Four prediction types are discussed in this paper, these may not be the only possible survival prediction types but are certainly the most common as identified in chapters (@sec-review) and (@sec-eval).
+They are predicting (conditional on features):
+
+1. The *relative risk* of an individual for experiencing an event -- A single continuous ranking.
+2. The *time until an event* occurs -- A single continuous value.
+3. The *prognostic index* for a model -- A single continuous value.
+4. The *survival distribution* -- A probability distribution.
 
 
-* The *relative risk* of an individual experiencing an event -- A single continuous ranking.
-* The *time until an event* occurs -- A single continuous value.
-* The *prognostic index* for a model -- A single continuous value.
-* The *survival distribution* (conditional on features) -- A probability distribution.
+The first three of these are referred to as *deterministic* problems as they predict a single value whereas the fourth is *probabilistic* and returns a full survival distribution.
+Definitions of these are expanded on below.
 
+Survival predictions differ from other fields in two respects:
 
-The first three of these are referred to as *deterministic* problems as they predict a single value whereas the fourth is *probabilistic* and returns a full survival distribution. Definitions of these are expanded on below.
+* The outcome of interest is $Y$, which is different to the outcome used for model training, $(T=\min(Y, C), \Delta=\II(Y\leq C))$.
+This differs from, say, regression in which the same object (a single continuous variable) is used for fitting and predicting.
+* With the exception of the time-to-event prediction, all other prediction types do not predict $\EE(Y)$ but some other related quantity.
 
-Survival predictions differ from other fields in two respects. Firstly, the predicted outcome, $Y$, is a different object than the outcome used for model training, $(T, \Delta)$. This differs from, say, regression in which the same object (a single continuous variable) is used for fitting and predicting. Secondly, with the exception of the time-to-event prediction, all other prediction types do not predict $Y$ but some other related quantity.
-
-Survival prediction problems must be clearly separated as they are inherently incompatible. For example it is not meaningful to compare a relative risk prediction from one observation to a survival distribution of another. Whilst these prediction types are separated above, they can be viewed as special cases of each other. Both (1) and (2) may be viewed as variants of (3); and (1), (2), and (3) can all be derived from (4); this is elaborated on below.
+Survival prediction problems must be clearly separated as they are inherently incompatible.
+For example it is not meaningful to compare a relative risk prediction from one observation to a survival distribution of another.
+Whilst these prediction types are separated above, they can be viewed as special cases of each other. Both (1.) and (2.) may be viewed as variants of (3.); and (1.), (2.), and (3.) can all be derived from (4.); this is elaborated on below.
 
 #### Relative Risk/Ranking {.unnumbered .unlisted}
 
-This is perhaps the most common survival problem and is defined as predicting a continuous rank for an individual's 'relative risk of experiencing the event'. For example, given three patients, $\{i,j,k\}$, a relative risk prediction may predict the 'risk of event' as $\{0.1, 0.5, 10\}$ respectively. From these predictions, the following types of conclusions can be drawn:
+This is a common survival problem and is defined as predicting a continuous rank for an individual's relative risk of experiencing the event.
+For example, given three patients, $\{i,j,k\}$, a relative risk prediction may predict the risk of event as $\{0.1, 0.5, 10\}$ respectively.
+From these predictions, the following types of conclusions can be drawn:
 
+* Conclusions comparing patients. For example: $i$ is at the least risk; the risk of $j$ is only slightly higher than that of $i$ but the risk of $k$ is considerably higher than $j$; the corresponding ranks for $i,j,k,$ are $1,2,3$;
+* Conclusions comparing risk groups. For example thresholding risks at $1.0$ places $i$ and $j$ in a low-risk group and $k$ in a high-risk group.
 
-* Conclusions comparing patients. e.g. $i$ is at the least risk; the risk of $j$ is only slightly higher than that of $i$ but the risk of $k$ is considerably higher than $j$; the corresponding ranks for $i,j,k,$ are $1,2,3$.
-* Conclusions comparing risk groups. e.g. thresholding risks at $1.0$ places $i$ and $j$ in a 'low-risk' group and $k$ in a 'high-risk' group
-
-So whilst many important conclusions can be drawn from these predictions, the values themselves have no meaning when not compared to other individuals. Interpretation of these rankings has historically been conflicting in implementation, with some software having the interpretation 'higher ranking implies higher risk' whereas others may indicate 'higher ranking implies lower risk' \ref{sec:tools_mlr3proba_api_learn}. In this book, a higher ranking will always imply a higher risk of event (as in the example above).
+So whilst many important conclusions can be drawn from these predictions, the values themselves have no meaning when not compared to other individuals.
+Interpretation of these rankings has historically been conflicting in implementation, with some software having the interpretation "higher ranking implies higher risk" whereas others may indicate "higher ranking implies lower risk".
+In this book, a higher ranking will always imply a higher risk of event (as in the example above).
 
 #### Time to Event {.unnumbered .unlisted}
-Predicting a time to event is the problem of predicting the deterministic survival time of a patient, i.e. the amount of time for which they are predicted to be alive after some given start time. Part of the reason this problem is less common in survival analysis is because it borders regression -- a single continuous value is predicted -- and survival -- the handling of censoring is required -- but neither is designed to solve this problem directly. Time-to-event predictions can be seen as a special-case of the ranking problem as an individual with a predicted longer survival time will have a lower overall risk, i.e. if $t_i,t_j$ and $r_i,r_j$ are survival time and ranking predictions for patients $i$ and $j$ respectively, then $t_i > t_j \rightarrow r_i < r_j$.
+Predicting a time to event is the problem of predicting the expectation $\hat{y}=\EE(y|\xx)$.
+The ranking problem can be seen as a special case of time-to-event prediction as an individual with a predicted longer survival time will have a lower overall risk, i.e. if $\hat{y}_i,\hat{y}_j$ and $\hat{r}_i,\hat{r}_j$ are survival time and ranking predictions for patients $i$ and $j$ respectively, then $\hat{y}_i > \hat{y}_j \rightarrow \hat{r}_i < \hat{r}_j$.
+
+For practical purposes time-to-event would be the ideal prediction type, as it is easy to interpret and communicate.
+However, due to the nature of survival data this type of prediction is rare in survival analysis because we only observe a subset of the domain of $Y$, for example due to random censoring or limited follow-up.
+For non-parametric methods, the estimated cdf is improper and thus integration requires extrapolation of the cdf.
+For parametric models, the distribution of event times is fully specified once the paramers of the assumed distribution have been estimated, however, if the parameters were estimated based on only a small subset of the possible domain of $Y$, this essentially still constitutes extraploation and will in most cases yield implausible predictions.
+A popular alternative is therefore to estimate the *restricted mean survival time* (RMST) [@han.restricted.2022; @andersen.regression.2004].
+
+<!-- FIXME add example -->
 
 #### Prognostic Index {.unnumbered .unlisted}
-Given covariates, $x \in \Reals^{n \times p}$, and a vector of model coefficients, $\beta \in \Reals^p$, the linear predictor is defined by $\eta := x^\top\beta \in \Reals^n$. The 'prognostic index' is a term that is often used in survival analysis papers that usually refers to some transformation (possibly identity), $\phi$, on the linear predictor, $\phi(\eta)$. Assuming a predictive function (for survival time, risk, or distribution defining function (see below)) of the form $g(\varphi)\phi(\eta)$, for some function $g$ and variables $\varphi$ where $g(\varphi)$ is constant for all observations (e.g. Cox PH (@sec-surv-models-crank)), then predictions of $\eta$ are a special case of predicting a relative risk, as are predictions of $\phi(\eta)$ if $\phi$ is rank preserving. A higher prognostic index may imply a higher or lower risk of event, dependent on the model structure.
+Given covariates, $\XX \in \Reals^{n \times p}$, and a vector of model coefficients, $\bbeta \in \Reals^p$, the linear predictor is defined by $\boldsymbol{\eta}:= \xx^\top\bbeta \in \Reals^n$.
+The prognostic index is a term that is often used in survival analysis papers that usually refers to some transformation (possibly identity), $\phi$, on the linear predictor, $\phi(\eta)$.
+Assuming a predictive function (for survival time, risk, or distribution defining function) of the form $g(\varphi)\phi(\eta)$, for some function $g$ and variables $\varphi$ where $g(\varphi)$ is constant for all observations (e.g. Cox PH (@sec-surv-models-crank)), then predictions of $\eta$ are a special case of predicting a relative risk, as predictions of $\phi(\eta)$ if $\phi$ is rank preserving.
+A higher prognostic index may imply a higher or lower risk of event, dependent on the model structure.
+
+<!-- FIXME example needed -->
 
 #### Survival Distribution {.unnumbered .unlisted}
-Predicting a survival distribution refers specifically to predicting the distribution of an individual patient's survival time, i.e. modelling the distribution of the event occurring over $\NNReals$. Therefore this is seen as the probabilistic analogue to the deterministic time-to-event prediction, these definitions are motivated by similar terminology in machine learning regression problems (@sec-surv-setml). The above three prediction types can all be derived from a probabilistic survival distribution prediction (@sec-car).
+Predicting a survival distribution refers specifically to predicting the distribution of an individual patient's survival time, i.e. modelling the distribution of the event occurring over $\NNReals$.
+Therefore this is seen as the probabilistic analogue to the deterministic time-to-event prediction, these definitions are motivated by similar terminology in machine learning regression problems (@sec-surv-setml).
+The above three prediction types can all be derived from a probabilistic survival distribution prediction (@sec-car).
 
-A survival distribution is a mathematical object that is estimated by predicting a *representation* of the distribution. Let $W$ be a continuous random variable t.v.i. $\NNReals$ with probability density function (pdf), $f_W: \NNReals \rightarrow \NNReals$, and cumulative distribution function (cdf), $F_W: \NNReals \rightarrow [0,1]; (\tau) \mapsto P(W \leq \tau)$. The pdf, $f_W(\tau)$, is the likelihood of an observation dying in a small interval around time $\tau$, and $F_W(\tau) = \int^\tau_0 f_W(\tau)$ is the probability of an observation being dead at time $\tau$ (i.e. dying at or before $\tau$). In survival analysis, it is generally more interesting to model the risk of the event taking place or the probability of the patient being alive, leading to other distribution representations of interest.
+Distributional prediction can in theory target any of the quantities introduced in @sec-distributions, however, in survival context $S(t)$ and $h(t)$ are the most common.
+Hazard based approaches are particularly relevant for non- and semi-parametric estimation of the distribution, where no assumptions are made about the underlying distribution of event times.
 
-The survival function is defined as
-$$
-S_W: \NNReals \rightarrow [0,1]; \quad
-(\tau) \mapsto P(W \geq \tau) = \int^\infty_\tau f_W(u) \ du
-$$
-and so $S_W(\tau) = 1-F_W(\tau)$. This function is known as the survival function as it can be interpreted as the probability that a given individual survives beyond some time point $\tau \geq 0$.
-
-Another common representation is the hazard function,
-$$
-h_W: \NNReals \rightarrow \NNReals; \quad
-(\tau) \mapsto  \frac{f_W(\tau)}{S_W(\tau)}
-$$
-The hazard function is interpreted as the instantaneous risk of death given that the observation has survived up until that point; note this is not a probability as $h_W$ can be greater than one.
-
-The cumulative hazard function (chf) can be derived from the hazard function by
-$$
-H_W: \NNReals \rightarrow \NNReals; \quad
-(\tau) \mapsto \int^\tau_0 h_W(u) \ du
-$$
-
-The cumulative hazard function relates simply to the survival function by
-$$
-H_W(\tau) = \int^\tau_0 h_W(u) \ du = \int^\tau_0 \frac{f_W(u)}{S_W(u)} \ du = \int^\tau_0 -\frac{S'_W(u)}{S_W(u)} \ du = -\log(S_W(\tau))
-$$
-
-Any of these representations may be predicted conditionally on covariates for an individual by a probabilistic survival distribution prediction. Once a function has been estimated, predictions can be made conditional on the given data. For example if $n$ survival functions are predicted, $\hat{S}_1,...,\hat{S}_n$, then $\hat{S}_i$ is interpreted as the predicted survival function given covariates of observation $i$, and analogously for the other representation functions.
 
 ## Survival Analysis Task {#sec-surv-setmltask}
 
@@ -440,22 +447,31 @@ The survival prediction problems identified in (@sec-surv-set-types) are now for
 ## Survival Task
 
 ::: {#cnj-task-surv}
-Let $(X,T,\Delta)$ be random variables t.v.i. $\calX \times \calT \times \bset$ where $\calX \subseteq \Reals^p$ and $\calT \subseteq \NNReals$. Let $\calS \subseteq \distrT$ be a convex set of distributions on $\calT$ and let $\calR \subseteq \Reals$. Then,
-
+Let $(X,T,\Delta)$ be random variables t.v.i. $\calX \times \calT \times \bset$ where $\calX \subseteq \Reals^p$ and $\calT \subseteq \NNReals$.
+Let $\calS \subseteq \distrT$ be a convex set of distributions on $\calT$ and let $\calR \subseteq \Reals$.
+Then,
 
 * The *probabilistic survival task* is the problem of predicting a conditional distribution over the positive Reals and is specified by $g: \calX \rightarrow \calS$.
 * The *deterministic survival task* is the problem of predicting a continuous value in the positive Reals and is specified by $g: \calX \rightarrow \calT$.
 * The *survival ranking task* is specified by predicting a continuous ranking in the Reals and is specified by $g: \calX \rightarrow \calR$.
 
-
-The estimated prediction functional $\hatg$ is fit on training data \\$(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n) \iid (X,T,\Delta)$ and is considered 'good' if \\$\EE[L(T^*, \Delta^*, \hatg(X^*))]$ is low, where $(X^*, T^*, \Delta^*) \sim (X, T, \Delta)$ is independent of $(X_1,T_1,\Delta_1),...,(X_n,T_n,\Delta_n)$ and $\hatg$.
 :::
 ::::
 
-Any other survival prediction type falls within one of these tasks above, for example predicting log-survival time is the deterministic task and predicting prognostic index or linear predictor is the ranking task. Removing the separation between the prognostic index and ranking prediction types is due to them both making predictions over the Reals; their mathematical difference lies in interpretation only. In general, the survival task will assume that $\calT \subseteq \NNReals$, and the terms 'discrete' or 'reduced survival task' will refer to the case when $\calT \subseteq \PNaturals$. Unless otherwise specified, the term 'survival task', will be used to refer to the probabilistic survival task.\footnote{These definitions are given in the most general case where the time variable is over $\NNReals$. In practice, all models instead assume time is over $\PReals$ and any death at $T_i = 0$ is set to $T_i = \epsilon$ for some very small $\epsilon \in \PReals$. Analogously for the discrete survival task. This assumption may not reflect reality as a patient could die at the study start however models cannot typically include this information in training.}
+Any other survival prediction type falls within one of the tasks in @cnj-task-surv, for example predicting log-survival time is the deterministic task and predicting prognostic index or linear predictor is the ranking task.
+Removing the separation between the prognostic index and ranking prediction types is due to them both making predictions over the Reals; their mathematical difference lies in interpretation only.
 
+In this book, unless otherwise specified, the term *survival task*, will be used to refer to the probabilistic survival task.\footnote{These definitions are given in the most general case where the time variable is over $\NNReals$. In practice, all models instead assume time is over $\PReals$ and any death at $T_i = 0$ is set to $T_i = \epsilon$ for some very small $\epsilon \in \PReals$. Analogously for the discrete survival task. This assumption may not reflect reality as a patient could die at the study start however models cannot typically include this information in training.}
+
+<!-- FIXME I got rid of these notation earlier, but don't see how the following is very usefull without them. On the other hand the connection to regression and classification could useful, but could also be introduced later when the actual reductions are introduced.
 #### Survival Analysis and Regression {.unnumbered .unlisted}
 
-Survival and regression tasks are closely related as can be observed from their respective definitions. Both are specified by $g : \calX \rightarrow \calS$ where for probabilistic regression $\calS \subseteq \Distr(\Reals)$ and for survival $\calS \subseteq \Distr(\NNReals)$. Furthermore both settings can be viewed to use the same generative process. In the survival setting in which there is no censoring then data is drawn from $(X,Y) \ t.v.i. \ \calX \times \calT, \calT \subseteq \NNReals$ and in regression from $(X,Y) \ t.v.i. \ \calX \times \calY, \calY \subseteq \Reals$, so that the only difference is whether the outcome data ranges over the Reals or positive Reals.
 
-These closely related tasks are discussed in more detail in (@sec-car), with a particular focus on how the more popular regression setting can be used to solve survival tasks. In (@sec-review) the models are first introduced in a regression setting and then the adaptations to survival are discussed, which is natural when considering that historically machine learning survival models have been developed by adapting regression models.
+
+Survival and regression tasks are closely related as can be observed from their respective definitions. Both are specified by $g : \calX \rightarrow \calS$ where for probabilistic regression $\calS \subseteq \Distr(\Reals)$ and for survival $\calS \subseteq \Distr(\NNReals)$.
+Furthermore both settings can be viewed to use the same generative process.
+In the survival setting in which there is no censoring then data is drawn from $(X,Y) \ t.v.i. \ \calX \times \calT, \calT \subseteq \NNReals$ and in regression from $(X,Y) \ t.v.i. \ \calX \times \calY, \calY \subseteq \Reals$, so that the only difference is whether the outcome data ranges over the Reals or positive Reals.
+
+These closely related tasks are discussed in more detail in (@sec-car), with a particular focus on how the more popular regression setting can be used to solve survival tasks.
+In (@sec-review) the models are first introduced in a regression setting and then the adaptations to survival are discussed, which is natural when considering that historically machine learning survival models have been developed by adapting regression models.
+-->
