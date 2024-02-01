@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.3.276">
+<meta name="generator" content="quarto-1.4.549">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 <meta name="author" content="Raphael Sonabend and Andreas Bender">
 <title>Machine Learning in Survival Analysis - 13&nbsp; Tree-Based Methods</title>
@@ -20,7 +20,7 @@ ul.task-list li input[type="checkbox"] {
 }
 /* CSS for syntax highlighting */
 pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span { line-height: 1.25; }
 pre > code.sourceCode > span:empty { height: 1.2em; }
 .sourceCode { overflow: visible; }
 code.sourceCode > span { color: inherit; text-decoration: inherit; }
@@ -56,6 +56,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 div.csl-bib-body { }
 div.csl-entry {
   clear: both;
+  margin-bottom: 0em;
 }
 .hanging-indent div.csl-entry {
   margin-left:2em;
@@ -80,7 +81,7 @@ div.csl-indent {
 <script src="site_libs/quarto-search/fuse.min.js"></script>
 <script src="site_libs/quarto-search/quarto-search.js"></script>
 <meta name="quarto:offset" content="./">
-<link href="./boosting.html" rel="next">
+<link href="./svm.html" rel="next">
 <link href="./mlmodels.html" rel="prev">
 <script src="site_libs/quarto-html/quarto.js"></script>
 <script src="site_libs/quarto-html/popper.min.js"></script>
@@ -96,7 +97,13 @@ div.csl-indent {
   "collapse-after": 3,
   "panel-placement": "start",
   "type": "textbox",
-  "limit": 20,
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
   "language": {
     "search-no-results-text": "No results",
     "search-matching-documents-text": "matching documents",
@@ -105,28 +112,55 @@ div.csl-indent {
     "search-more-match-text": "more match in this document",
     "search-more-matches-text": "more matches in this document",
     "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
     "search-detached-cancel-button-title": "Cancel",
-    "search-submit-button-title": "Submit"
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
   }
-}</script><script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script><script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script><link rel="stylesheet" href="styles.css">
+}</script><script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script><script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script><script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script><link rel="stylesheet" href="styles.css">
 </head>
 <body class="nav-sidebar floating">
 
 <div id="quarto-search-results"></div>
   <header id="quarto-header" class="headroom fixed-top"><nav class="quarto-secondary-nav"><div class="container-fluid d-flex">
-      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
         <i class="bi bi-layout-text-sidebar-reverse"></i>
       </button>
-      <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./classical.html">Models</a></li><li class="breadcrumb-item"><a href="./forests.html"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Tree-Based Methods</span></a></li></ol></nav>
-      <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
-      </a>
-      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./classical.html">Models</a></li><li class="breadcrumb-item"><a href="./forests.html"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Tree-Based Methods</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="" onclick="window.quartoOpenSearch();">
         <i class="bi bi-search"></i>
       </button>
     </div>
   </nav></header><!-- content --><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
 <!-- sidebar -->
-  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal sidebar-navigation floating overflow-auto"><div class="pt-lg-2 mt-2 text-left sidebar-header">
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto"><div class="pt-lg-2 mt-2 text-left sidebar-header">
     <div class="sidebar-title mb-0 py-0">
       <a href="./">Machine Learning in Survival Analysis</a> 
         <div class="sidebar-tools-main tools-wide">
@@ -270,8 +304,32 @@ div.csl-indent {
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
+  <a href="./svm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Support Vector Machines</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
   <a href="./boosting.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Boosting Methods</span></span></a>
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Boosting Methods</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./neuralnetworks.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">16</span>&nbsp; <span class="chapter-title">Neural Networks</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./alternatives.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">17</span>&nbsp; <span class="chapter-title">Alternative Methods</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./models_choosing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">18</span>&nbsp; <span class="chapter-title">Choosing Models</span></span></a>
   </div>
 </li>
       </ul>
@@ -288,16 +346,75 @@ div.csl-indent {
 <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./reductions.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Reductions</span></span></a>
+ <span class="menu-text"><span class="chapter-number">19</span>&nbsp; <span class="chapter-title">Reductions</span></span></a>
   </div>
 </li>
           <li class="sidebar-item">
   <div class="sidebar-item-container"> 
   <a href="./competing.html" class="sidebar-item-text sidebar-link">
- <span class="menu-text"><span class="chapter-number">16</span>&nbsp; <span class="chapter-title">Competing Risks Pipelines</span></span></a>
+ <span class="menu-text"><span class="chapter-number">20</span>&nbsp; <span class="chapter-title">Competing Risks Pipelines</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./discretetime.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">21</span>&nbsp; <span class="chapter-title">Discrete Time Survival Analysis</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./poisson.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">22</span>&nbsp; <span class="chapter-title">Connections to Poisson Regression and Processes</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./pseudo.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">23</span>&nbsp; <span class="chapter-title">Connections to Regression and Imputation</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./advanced.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">24</span>&nbsp; <span class="chapter-title">Advanced Methods</span></span></a>
   </div>
 </li>
       </ul>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" aria-expanded="false">
+ <span class="menu-text">Extensions and Outlook</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth1 ">
+<li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./common.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">25</span>&nbsp; <span class="chapter-title">Common problems in survival analysis</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./software.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">26</span>&nbsp; <span class="chapter-title">Survival Software</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./next.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">27</span>&nbsp; <span class="chapter-title">What’s next for MLSA?</span></span></a>
+  </div>
+</li>
+      </ul>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./exercises.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Exercises</span></a>
+  </div>
 </li>
         <li class="sidebar-item">
   <div class="sidebar-item-container"> 
@@ -307,7 +424,7 @@ div.csl-indent {
 </li>
     </ul>
 </div>
-</nav><div id="quarto-sidebar-glass" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass"></div>
+</nav><div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
 <!-- margin-sidebar -->
     <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
         <nav id="TOC" role="doc-toc" class="toc-active"><h2 id="toc-title">Table of contents</h2>
@@ -321,10 +438,10 @@ div.csl-indent {
   <li><a href="#conclusions" id="toc-conclusions" class="nav-link" data-scroll-target="#conclusions"><span class="header-section-number">13.1.3</span> Conclusions</a></li>
   </ul>
 </li>
-  </ul><div class="toc-actions"><div><i class="bi bi-github"></i></div><div class="action-links"><p><a href="https://github.com/RaphaelS1/MLSA/issues/new" class="toc-action">Report an issue</a></p><p><a href="https://github.com/RaphaelS1/MLSA/edit/main/book/forests.qmd" class="toc-action">Edit this page</a></p><p><a href="https://github.com/RaphaelS1/MLSA/blob/main/book/forests.qmd" class="toc-action">View source</a></p></div></div></nav>
+  </ul><div class="toc-actions"><ul><li><a href="https://github.com/RaphaelS1/MLSA/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li><li><a href="https://github.com/RaphaelS1/MLSA/edit/main/book/forests.qmd" class="toc-action"><i class="bi empty"></i>Edit this page</a></li><li><a href="https://github.com/RaphaelS1/MLSA/blob/main/book/forests.qmd" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
     </div>
 <!-- main -->
-<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block default"><div class="quarto-title">
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./classical.html">Models</a></li><li class="breadcrumb-item"><a href="./forests.html"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Tree-Based Methods</span></a></li></ol></nav><div class="quarto-title">
 <div class="quarto-title-block"><div><h1 class="title">
 <span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Tree-Based Methods</span>
 </h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
@@ -341,10 +458,11 @@ div.csl-indent {
   
 <div>
   <div class="abstract">
-    <div class="abstract-title">Abstract</div>
+    <div class="block-title">Abstract</div>
     TODO (150-200 WORDS)
   </div>
 </div>
+
 
 </header><div class="callout callout-style-default callout-important callout-titled">
 <div class="callout-header d-flex align-content-center">
@@ -352,11 +470,11 @@ div.csl-indent {
 <i class="callout-icon"></i>
 </div>
 <div class="callout-title-container flex-fill">
-Page in progress!
+Major changes expected!
 </div>
 </div>
 <div class="callout-body-container callout-body">
-<p><strong>This page is a work in progress and will change significantly over time.</strong></p>
+<p><strong>This page is a work in progress and major changes will be made over time.</strong></p>
 </div>
 </div>
 <section id="sec-surv-ml-models-ranfor" class="level2" data-number="13.1"><h2 data-number="13.1" class="anchored" data-anchor-id="sec-surv-ml-models-ranfor">
@@ -365,21 +483,24 @@ Page in progress!
 <span class="header-section-number">13.1.1</span> Random Forests for Regression</h3>
 <p>Random forests are a composite algorithm built by fitting many simpler component models, decision trees, and then averaging the results of predictions from these trees. Decision trees are first briefly introduced before the key ‘bagging’ algorithm that composes these trees to a random forest. Woodland terminology is used throughout this subsection.</p>
 <section id="decision-trees" class="level4 unnumbered unlisted"><h4 class="unnumbered unlisted anchored" data-anchor-id="decision-trees">Decision Trees</h4>
-<p>Decision trees are a common model class in machine learning and have the advantage of being (relatively) simple to implement and highly interpretable. A decision tree takes a set of inputs and a given <em>splitting rule</em> in order to create a series of splits, or branches, in the tree that culminates in a final <em>leaf</em>, or <em>terminal node</em>. Each terminal node has a corresponding prediction, which for regression is usually the sample mean of the training outcome data. This is made clearer by example, (<a href="#fig-surv-ranfor">Figure&nbsp;<span>13.1</span></a>) demonstrates a decision tree predicting the miles per gallon (<code>mpg</code>) of a car from the <code>mtcars</code> <span class="citation" data-cites="datamtcars">(<a href="references.html#ref-datamtcars" role="doc-biblioref">Henderson and Velleman 1981</a>)</span> dataset. With this tree a new prediction is made by feeding the input variables from the top to the bottom, for example given new data, <span class="math inline">\(x = \{`wt` = 3, `disp` = 250\}\)</span>, then in the first split the right branch is taken as <code>wt</code> <span class="math inline">\(= 3 &gt; 2.32\)</span> and in the second split the left branch is taken as <code>disp</code> <span class="math inline">\(= 250 \leq 258\)</span>, therefore the new data point ‘lands’ in the final leaf and is predicted to have an <code>mpg</code> of <span class="math inline">\(20.8\)</span>. This value of <span class="math inline">\(20.8\)</span> arises as the sample mean of <code>mpg</code> for the <span class="math inline">\(11\)</span> (which can be seen in the box) observations in the training data who were sorted into this terminal node. Algorithmically, as splits are always binary, predictions are simply a series of conditional logical statements.</p>
-<div id="fig-surv-ranfor" class="quarto-figure quarto-figure-center anchored">
-<figure class="figure"><p><img src="Figures/forests/iris_tree.png" class="quarto-discovered-preview-image img-fluid figure-img" alt="TODO"></p>
-<p></p><figcaption class="figure-caption">Figure&nbsp;13.1: Demonstrating classification trees using the <code>mtcars</code> <span class="citation" data-cites="datamtcars">(<a href="references.html#ref-datamtcars" role="doc-biblioref">Henderson and Velleman 1981</a>)</span> dataset and the <span class="math inline">\(\textbf{party}\)</span> <span class="citation" data-cites="pkgparty">(<a href="references.html#ref-pkgparty" role="doc-biblioref">Hothorn, Hornik, and Zeileis 2006</a>)</span> package. Ovals are leaves, which indicate the variable that is being split. Edges are branches, which indicate the cut-off at which the variable is split. Rectangles are terminal nodes and include information about the number of training observations in the node and the terminal node prediction.</figcaption><p></p>
-</figure>
+<p>Decision trees are a common model class in machine learning and have the advantage of being (relatively) simple to implement and highly interpretable. A decision tree takes a set of inputs and a given <em>splitting rule</em> in order to create a series of splits, or branches, in the tree that culminates in a final <em>leaf</em>, or <em>terminal node</em>. Each terminal node has a corresponding prediction, which for regression is usually the sample mean of the training outcome data. This is made clearer by example, (<a href="#fig-surv-ranfor" class="quarto-xref">Figure&nbsp;<span>13.1</span></a>) demonstrates a decision tree predicting the miles per gallon (<code>mpg</code>) of a car from the <code>mtcars</code> <span class="citation" data-cites="datamtcars">(<a href="references.html#ref-datamtcars" role="doc-biblioref">Henderson and Velleman 1981</a>)</span> dataset. With this tree a new prediction is made by feeding the input variables from the top to the bottom, for example given new data, <span class="math inline">\(x = \{`wt` = 3, `disp` = 250\}\)</span>, then in the first split the right branch is taken as <code>wt</code> <span class="math inline">\(= 3 &gt; 2.32\)</span> and in the second split the left branch is taken as <code>disp</code> <span class="math inline">\(= 250 \leq 258\)</span>, therefore the new data point ‘lands’ in the final leaf and is predicted to have an <code>mpg</code> of <span class="math inline">\(20.8\)</span>. This value of <span class="math inline">\(20.8\)</span> arises as the sample mean of <code>mpg</code> for the <span class="math inline">\(11\)</span> (which can be seen in the box) observations in the training data who were sorted into this terminal node. Algorithmically, as splits are always binary, predictions are simply a series of conditional logical statements.</p>
+<div id="fig-surv-ranfor" class="quarto-figure quarto-figure-center quarto-float anchored" alt="TODO">
+<figure class="quarto-float quarto-float-fig figure"><div aria-describedby="fig-surv-ranfor-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="Figures/forests/iris_tree.png" class="img-fluid figure-img" alt="TODO">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-surv-ranfor-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;13.1: Demonstrating classification trees using the <code>mtcars</code> <span class="citation" data-cites="datamtcars">(<a href="references.html#ref-datamtcars" role="doc-biblioref">Henderson and Velleman 1981</a>)</span> dataset and the <span class="math inline">\(\textbf{party}\)</span> <span class="citation" data-cites="pkgparty">(<a href="references.html#ref-pkgparty" role="doc-biblioref">Hothorn, Hornik, and Zeileis 2006</a>)</span> package. Ovals are leaves, which indicate the variable that is being split. Edges are branches, which indicate the cut-off at which the variable is split. Rectangles are terminal nodes and include information about the number of training observations in the node and the terminal node prediction.
+</figcaption></figure>
 </div>
 </section><section id="splitting-rules" class="level4 unnumbered unlisted"><h4 class="unnumbered unlisted anchored" data-anchor-id="splitting-rules">Splitting Rules</h4>
 <p>Precisely how the splits are derived and which variables are utilised is determined by the splitting rule. In regression, the most common splitting rule is to select the cut-off for a given variable that minimises the mean squared error in each hypothetical resultant leaf. The goal is to find the variable and cutoff that leads to the greatest difference between the two resultant leaves and thus the maximal homogeneity within each leaf. For all decision tree and random forest algorithms going forward, let <span class="math inline">\(L\)</span> denote some leaf, then let <span class="math inline">\(L_{xy}, L_x, L_y\)</span> respectively be the set of observations, features, and outcomes in leaf <span class="math inline">\(L\)</span>. Let <span class="math inline">\(L_{y;i}\)</span> be the <span class="math inline">\(i\)</span>th outcome in <span class="math inline">\(L_y\)</span> and finally let <span class="math inline">\(L_{\bar{y}} = \frac{1}{n} \sum^{n}_{i = 1} L_{y;i}\)</span>. To simplify notation, <span class="math inline">\(i \in L\)</span> is taken to be equivalent to <span class="math inline">\(i \in \{i: X_i \in L_X\}\)</span>, i.e.&nbsp;the indices of the observations in leaf <span class="math inline">\(L\)</span>.</p>
 <p>Let <span class="math inline">\(c \in \mathbb{R}\)</span> be some cutoff parameter and let <span class="math inline">\(L^a_{xy}(j,c) := \{(X_i,Y_i)|X_{ij} &lt; c, i = 1,...,n\}, L^b_{xy}(j,c) = \{(X_i,Y_i)|X_{ij} \geq c, i = 1,...,n\}\)</span> be the two leaves containing the set of observations resulting from partitioning variable <span class="math inline">\(j\)</span> at cutoff <span class="math inline">\(c\)</span>. Then a split is determined by finding the arguments, <span class="math inline">\((j^*,c^*)\)</span> that minimise the sum of the mean squared errors (MSE) in both leaves <span class="citation" data-cites="Hastie2013">(<a href="references.html#ref-Hastie2013" role="doc-biblioref">James et al. 2013</a>)</span>, <span id="eq-dt-min"><span class="math display">\[
 (j^*, c^*) = \operatornamewithlimits{argmin}_{j, c} \sum_{y \in L^a_{y}(j,c)} (y - L^a_{\bar{Y}}(j,c))^2 + \sum_{y \in L^b_{y}(j,c)} (y - L^b_{\bar{Y}}(j,c))^2
 \tag{13.1}\]</span></span> This method is repeated from the first branch of the tree down to the very last such that observations are included in a given leaf <span class="math inline">\(L\)</span> if they satisfy all conditions from all previous branches; features may be considered multiple times in the growing process. This is an intuitive method as minimising the above sum results in the set of observations within each individual leaf being as similar as possible, thus as an observation is passed down the tree, it becomes more similar to the subsequent leaves, eventually landing in a leaf containing homogeneous observations. Controlling how many variables to consider at each split and how many splits to make are determined by hyper-parameter tuning.</p>
-<p>Decision trees are a powerful method for high-dimensional data as only a small sample of variables will be used for growing a tree, and therefore they are also useful for variable importance by identifying which variables were utilised in growth (other importance methods are also available). Decision trees are also highly interpretable, as demonstrated by (<a href="#fig-surv-ranfor">Figure&nbsp;<span>13.1</span></a>). The recursive pseudo-algorithm in (<span class="citation" data-cites="alg-dt-fit">(<a href="references.html#ref-alg-dt-fit" role="doc-biblioref"><strong>alg-dt-fit?</strong></a>)</span>) demonstrates the simplicity in growing a decision tree (again methods such as pruning are omitted).</p>
+<p>Decision trees are a powerful method for high-dimensional data as only a small sample of variables will be used for growing a tree, and therefore they are also useful for variable importance by identifying which variables were utilised in growth (other importance methods are also available). Decision trees are also highly interpretable, as demonstrated by (<a href="#fig-surv-ranfor" class="quarto-xref">Figure&nbsp;<span>13.1</span></a>). The recursive pseudo-algorithm in (<span class="citation" data-cites="alg-dt-fit">(<a href="references.html#ref-alg-dt-fit" role="doc-biblioref"><strong>alg-dt-fit?</strong></a>)</span>) demonstrates the simplicity in growing a decision tree (again methods such as pruning are omitted).</p>
 <!-- {#alg-dt-fit} -->
 </section><section id="stopping-rules" class="level4 unnumbered unlisted"><h4 class="unnumbered unlisted anchored" data-anchor-id="stopping-rules">Stopping Rules</h4>
-<p>The ‘stopping rule’ in (<span class="citation" data-cites="alg-dt-fit">(<a href="references.html#ref-alg-dt-fit" role="doc-biblioref"><strong>alg-dt-fit?</strong></a>)</span>) is usually a condition on the number of observations in each leaf such that leaves will continue to be split until some minimum number of observations has been reached in a leaf. Other conditions may be on the ‘depth’ of the tree, which corresponds to the number of levels of splitting, for example the tree in (<a href="#fig-surv-ranfor">Figure&nbsp;<span>13.1</span></a>) has a depth of <span class="math inline">\(2\)</span> (the first level is not counted).</p>
+<p>The ‘stopping rule’ in (<span class="citation" data-cites="alg-dt-fit">(<a href="references.html#ref-alg-dt-fit" role="doc-biblioref"><strong>alg-dt-fit?</strong></a>)</span>) is usually a condition on the number of observations in each leaf such that leaves will continue to be split until some minimum number of observations has been reached in a leaf. Other conditions may be on the ‘depth’ of the tree, which corresponds to the number of levels of splitting, for example the tree in (<a href="#fig-surv-ranfor" class="quarto-xref">Figure&nbsp;<span>13.1</span></a>) has a depth of <span class="math inline">\(2\)</span> (the first level is not counted).</p>
 </section><section id="random-forests" class="level4 unnumbered unlisted"><h4 class="unnumbered unlisted anchored" data-anchor-id="random-forests">Random Forests</h4>
 <p>Despite being more interpretable than other machine learning methods, decision trees usually have poor predictive performance, high variance and are not robust to changes in the data. As such, <em>random forests</em> are preferred to improve prediction accuracy and decrease variance. Random forests utilise bootstrap aggregation, or <em>bagging</em> <span class="citation" data-cites="Breiman1996a">(<a href="references.html#ref-Breiman1996a" role="doc-biblioref">Breiman 1996</a>)</span>, to aggregate many decision trees. A pseudo fitting algorithm is given in (<span class="citation" data-cites="alg-rsf-fit">(<a href="references.html#ref-alg-rsf-fit" role="doc-biblioref"><strong>alg-rsf-fit?</strong></a>)</span>).</p>
 <!-- {#alg-rsf-fit} -->
@@ -426,13 +547,13 @@ v^A_{\tau} := e^A_{\tau} \Big(\frac{n_\tau - d_\tau}{n_\tau}\Big)\Big(\frac{n_\t
 \hat{\theta}_m^{j+1} = \frac{\sum_{i \in L^m} \Delta_i}{\sum_{i \in L^m} \hat{H}^j_0(T_i)}
 \]</span> where as before <span class="math inline">\(L^m\)</span> is the set of observations in leaf <span class="math inline">\(m\)</span> and <span class="math display">\[
 \hat{H}^{j}_0(\tau) = \frac{\sum_{i:T_i \leq \tau} \Delta_i}{\sum_{m = 1}^M\sum_{\{i:i \in \mathcal{R}_\tau \cap L^a\}} \hat{\theta}^{j}_m}
-\]</span> which is repeated until some stopping criterion is reached. The same cumulative hazard is estimated for all nodes however <span class="math inline">\(\hat{\theta}_m\)</span> varies across nodes. This method lends itself naturally to a composition to a full distribution (<a href="reductions.html"><span>Chapter&nbsp;15</span></a>) as it assumes a PH form and separately estimates the cumulative hazard and relative risk (<span class="quarto-unresolved-ref">?sec-surv-ml-models-ranfor-nov</span>), though no implementation of this composition could be found.</p>
+\]</span> which is repeated until some stopping criterion is reached. The same cumulative hazard is estimated for all nodes however <span class="math inline">\(\hat{\theta}_m\)</span> varies across nodes. This method lends itself naturally to a composition to a full distribution (<a href="reductions.html" class="quarto-xref"><span>Chapter 19</span></a>) as it assumes a PH form and separately estimates the cumulative hazard and relative risk (<span class="quarto-unresolved-ref">?sec-surv-ml-models-ranfor-nov</span>), though no implementation of this composition could be found.</p>
 </section><section id="predict-survival-distribution" class="level4 unnumbered unlisted"><h4 class="unnumbered unlisted anchored" data-anchor-id="predict-survival-distribution">Predict: Survival Distribution</h4>
 <p>The most common terminal node prediction appears to be predicting the survival distribution by estimating the survival function, using the Kaplan-Meier or Nelson-Aalen estimators, on the sample in the terminal node <span class="citation" data-cites="Hothorn2004 Ishwaran2008 LeBlanc1993 Segal1988">(<a href="references.html#ref-Hothorn2004" role="doc-biblioref">Hothorn et al. 2004</a>; <a href="references.html#ref-Ishwaran2008" role="doc-biblioref">B. H. Ishwaran et al. 2008</a>; <a href="references.html#ref-LeBlanc1993" role="doc-biblioref">LeBlanc and Crowley 1993</a>; <a href="references.html#ref-Segal1988" role="doc-biblioref">Segal 1988</a>)</span>. Estimating a survival function by a non-parametric estimator is a natural choice for terminal node prediction as these are natural ‘baselines’ in survival, similarly to taking the sample mean in regression. The prediction for SDTs is straightforward, the non-parametric estimator is fit on all observations in each of the terminal nodes. This is adapted to RSFs by bagging the estimator across all decision trees <span class="citation" data-cites="Hothorn2004">(<a href="references.html#ref-Hothorn2004" role="doc-biblioref">Hothorn et al. 2004</a>)</span>. Using the Nelson-Aalen estimator as an example, let <span class="math inline">\(m\)</span> be a terminal node in an SDT, then the terminal node prediction is given by, <span id="eq-surv-nelson"><span class="math display">\[
 \hat{H}_m(\tau) = \sum_{\{i: i \in L^m \cap T_i \leq \tau\}} \frac{d_i}{n_i}
 \tag{13.2}\]</span></span> where <span class="math inline">\(d_i\)</span> and <span class="math inline">\(n_i\)</span> are the number of events and observations at risk at time <span class="math inline">\(T_i\)</span> in terminal node <span class="math inline">\(m\)</span>. Ishwaran <span class="citation" data-cites="Ishwaran2008">(<a href="references.html#ref-Ishwaran2008" role="doc-biblioref">B. H. Ishwaran et al. 2008</a>)</span> defined the bootstrapped Nelson-Aalen estimator as <span id="eq-surv-nelson-boot"><span class="math display">\[
 \hat{H}_{Boot}(\tau) = \frac{1}{B} \sum^B_{b=1} \hat{H}_{m, b}(\tau), \quad m \in 1,...,M
-\tag{13.3}\]</span></span> where <span class="math inline">\(B\)</span> is the total number of bootstrapped estimators, <span class="math inline">\(M\)</span> is the number of terminal nodes, and <span class="math inline">\(\hat{H}_{m,b}\)</span> is the cumulative hazard for the <span class="math inline">\(m\)</span>th terminal node in the <span class="math inline">\(b\)</span>th tree. The bootstrapped Kaplan-Meier estimator is calculated analogously. More generally these can be considered as a uniform mixture of <span class="math inline">\(B\)</span> distributions (<a href="reductions.html"><span>Chapter&nbsp;15</span></a>).</p>
+\tag{13.3}\]</span></span> where <span class="math inline">\(B\)</span> is the total number of bootstrapped estimators, <span class="math inline">\(M\)</span> is the number of terminal nodes, and <span class="math inline">\(\hat{H}_{m,b}\)</span> is the cumulative hazard for the <span class="math inline">\(m\)</span>th terminal node in the <span class="math inline">\(b\)</span>th tree. The bootstrapped Kaplan-Meier estimator is calculated analogously. More generally these can be considered as a uniform mixture of <span class="math inline">\(B\)</span> distributions (<a href="reductions.html" class="quarto-xref"><span>Chapter 19</span></a>).</p>
 <p>All implemented RSFs can now be summarised into the following five algorithms:</p>
 <p><strong>RRT</strong> {#mod-rrt}\ LeBlanc and Crowley’s (1992) <span class="citation" data-cites="LeBlanc1992">(<a href="references.html#ref-LeBlanc1992" role="doc-biblioref">LeBlanc and Crowley 1992</a>)</span> survival decision tree uses a deviance splitting rule with a terminal node ranking prediction, which assumes a PH model form. These ‘relative risk trees’ (RRTs) are implemented in the package <span class="math inline">\(\textbf{rpart}\)</span> <span class="citation" data-cites="pkgrpart">(<a href="references.html#ref-pkgrpart" role="doc-biblioref">Therneau and Atkinson 2019</a>)</span>. This model is considered the least accessible and transparent of all discussed in this section as: few implementations exist, it requires assumptions that may not be realistic, and predictions are harder to interpret than other models. Predictive performance of the model is expected to be worse than RSFs as this is a decision tree; this is confirmed in <span class="citation" data-cites="Sonabend2021b">(<a href="references.html#ref-Sonabend2021b" role="doc-biblioref">Sonabend 2021</a>)</span>.</p>
 <p><strong>RRF</strong> {#mod-rrf}\ Ishwaran <span class="math inline">\(\textit{et al.}\)</span> (2004) <span class="citation" data-cites="Ishwaran2004">(<a href="references.html#ref-Ishwaran2004" role="doc-biblioref">H. Ishwaran et al. 2004</a>)</span> proposed a random forest framework for the relative risk trees, which makes a slight adaptation and applies the iteration of the terminal node prediction after the tree is grown as opposed to during the growing process. No implementation for these ‘relative risk forests’ (RRFs) could be found or any usage in the literature.</p>
@@ -447,7 +568,7 @@ v^A_{\tau} := e^A_{\tau} \Big(\frac{n_\tau - d_\tau}{n_\tau}\Big)\Big(\frac{n_\t
 
 <!-- -->
 
-<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+<div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list" style="display: none">
 <div id="ref-Bland2004" class="csl-entry" role="listitem">
 Bland, J Martin, and Douglas G. Altman. 2004. <span>“<span class="nocase">The logrank test</span>.”</span> <em>BMJ (Clinical Research Ed.)</em> 328 (7447): 1073. <a href="https://doi.org/10.1136/bmj.328.7447.1073">https://doi.org/10.1136/bmj.328.7447.1073</a>.
 </div>
@@ -669,10 +790,9 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   if (showAllCode) {
     showAllCode.addEventListener("click", toggleCodeHandler(true));
   }
-  function tippyHover(el, contentFn) {
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
     const config = {
       allowHTML: true,
-      content: contentFn,
       maxWidth: 500,
       delay: 100,
       arrow: false,
@@ -682,8 +802,17 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       interactive: true,
       interactiveBorder: 10,
       theme: 'quarto',
-      placement: 'bottom-start'
+      placement: 'bottom-start',
     };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
     window.tippy(el, config); 
   }
   const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
@@ -696,6 +825,125 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
       const id = href.replace(/^#\/?/, "");
       const note = window.document.getElementById(id);
       return note.innerHTML;
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
     });
   }
       let selectedAnnoteEl;
@@ -739,6 +987,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
             }
             div.style.top = top - 2 + "px";
             div.style.height = height + 4 + "px";
+            div.style.left = 0;
             let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
             if (gutterDiv === null) {
               gutterDiv = window.document.createElement("div");
@@ -764,6 +1013,32 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
         });
         selectedAnnoteEl = undefined;
       };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
       // Attach click handler to the DT
       const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
       for (const annoteDlNode of annoteDls) {
@@ -823,13 +1098,13 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
   }
 });
 </script><nav class="page-navigation"><div class="nav-page nav-page-previous">
-      <a href="./mlmodels.html" class="pagination-link">
+      <a href="./mlmodels.html" class="pagination-link  aria-label=" learning="" survival="" models="">
         <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Machine Learning Survival Models</span></span>
       </a>          
   </div>
   <div class="nav-page nav-page-next">
-      <a href="./boosting.html" class="pagination-link">
-        <span class="nav-page-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Boosting Methods</span></span> <i class="bi bi-arrow-right-short"></i>
+      <a href="./svm.html" class="pagination-link" aria-label="<span class='chapter-number'>14</span>&nbsp; <span class='chapter-title'>Support Vector Machines</span>">
+        <span class="nav-page-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Support Vector Machines</span></span> <i class="bi bi-arrow-right-short"></i>
       </a>
   </div>
 </nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
@@ -991,7 +1266,7 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 <span id="cb1-156"><a href="#cb1-156" aria-hidden="true" tabindex="-1"></a>$$</span>
 <span id="cb1-157"><a href="#cb1-157" aria-hidden="true" tabindex="-1"></a>where as before $L^m$ is the set of observations in leaf $m$ and</span>
 <span id="cb1-158"><a href="#cb1-158" aria-hidden="true" tabindex="-1"></a>$$</span>
-<span id="cb1-159"><a href="#cb1-159" aria-hidden="true" tabindex="-1"></a>\hat{H}^{j}_0(\tau) = \frac{\sum_{i:T_i \leq \tau} \Delta_i}{\sum_{m = 1}^M\sum_{\{i:i \in \calR_\tau \cap L^a\}} \hat{\theta}^{j}_m}</span>
+<span id="cb1-159"><a href="#cb1-159" aria-hidden="true" tabindex="-1"></a>\hat{H}^{j}_0(\tau) = \frac{\sum_{i:T_i \leq \tau} \Delta_i}{\sum_{m = 1}^M\sum_{\{i:i \in \calR_\tau \cap L^a<span class="sc">\}</span>} \hat{\theta}^{j}_m}</span>
 <span id="cb1-160"><a href="#cb1-160" aria-hidden="true" tabindex="-1"></a>$$</span>
 <span id="cb1-161"><a href="#cb1-161" aria-hidden="true" tabindex="-1"></a>which is repeated until some stopping criterion is reached. The same cumulative hazard is estimated for all nodes however $\hat{\theta}_m$ varies across nodes. This method lends itself naturally to a composition to a full distribution (@sec-car) as it assumes a PH form and separately estimates the cumulative hazard and relative risk (@sec-surv-ml-models-ranfor-nov), though no implementation of this composition could be found.</span>
 <span id="cb1-162"><a href="#cb1-162" aria-hidden="true" tabindex="-1"></a></span>
@@ -1033,9 +1308,15 @@ window.document.addEventListener("DOMContentLoaded", function (event) {
 </div></div></div></div></div>
 </div> <!-- /content -->
 <footer class="footer"><div class="nav-footer">
-    <div class="nav-footer-left">All content licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> <br> © Raphael Sonabend, Andreas Bender.</div>   
-    <div class="nav-footer-center"><a href="https://www.mlsabook.com">Website</a> | <a href="https://github.com/RaphaelS1/MLSA">GitHub</a></div>
-    <div class="nav-footer-right">Built with <a href="https://quarto.org/">Quarto</a>.</div>
+    <div class="nav-footer-left">
+<p>All content licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> <br> © Raphael Sonabend, Andreas Bender.</p>
+</div>   
+    <div class="nav-footer-center">
+<p><a href="https://www.mlsabook.com">Website</a> | <a href="https://github.com/RaphaelS1/MLSA">GitHub</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/RaphaelS1/MLSA/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li><li><a href="https://github.com/RaphaelS1/MLSA/edit/main/book/forests.qmd" class="toc-action"><i class="bi empty"></i>Edit this page</a></li><li><a href="https://github.com/RaphaelS1/MLSA/blob/main/book/forests.qmd" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+    <div class="nav-footer-right">
+<p>Built with <a href="https://quarto.org/">Quarto</a>.</p>
+</div>
   </div>
 </footer>
 
