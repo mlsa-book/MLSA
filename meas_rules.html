@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.276">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta name="author" content="Raphael Sonabend and Andreas Bender">
+<title>Machine Learning in Survival Analysis - 8&nbsp; Evaluating Distributions by Scoring Rules</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./meas_time.html" rel="next">
+<link href="./meas_calib.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light"><script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit"
+  }
+}</script><script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script><script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script><link rel="stylesheet" href="styles.css">
+</head>
+<body class="nav-sidebar floating">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top"><nav class="quarto-secondary-nav"><div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+      <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./meas_what.html">Evaluation</a></li><li class="breadcrumb-item"><a href="./meas_rules.html"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Evaluating Distributions by Scoring Rules</span></a></li></ol></nav>
+      <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+      </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav></header><!-- content --><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal sidebar-navigation floating overflow-auto"><div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">Machine Learning in Survival Analysis</a> 
+        <div class="sidebar-tools-main tools-wide">
+    <a href="https://github.com/RaphaelS1/MLSA/tree/main/book/" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+    <a href="./Machine-Learning-in-Survival-Analysis.pdf" title="Download PDF" class="quarto-navigation-tool px-1" aria-label="Download PDF"><i class="bi bi-file-pdf"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+<li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./notation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Symbols and Notation</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Introduction</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" aria-expanded="false">
+ <span class="menu-text">Survival Analysis and Machine Learning</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 ">
+<li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./preview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">MLSA From Start to Finish</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./machinelearning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Statistical Learning</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./survival.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Survival Analysis</span></span></a>
+  </div>
+</li>
+      </ul>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" aria-expanded="true">
+ <span class="menu-text">Evaluation</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">
+<li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./meas_what.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">What are Survival Measures?</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./meas_rank.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Discrimination Measures</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./meas_calib.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Calibration Measures</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./meas_rules.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Evaluating Distributions by Scoring Rules</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./meas_time.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Evaluating Survival Time</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./meas_choosing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Choosing Measures</span></span></a>
+  </div>
+</li>
+      </ul>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" aria-expanded="false">
+ <span class="menu-text">Models</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 ">
+<li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./classical.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Classical Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./mlmodels.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Machine Learning Survival Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./forests.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Tree-Based Methods</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./boosting.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Boosting Methods</span></span></a>
+  </div>
+</li>
+      </ul>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" aria-expanded="false">
+ <span class="menu-text">Reduction Techniques</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 ">
+<li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./reductions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Reductions</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./competing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">16</span>&nbsp; <span class="chapter-title">Competing Risks Pipelines</span></span></a>
+  </div>
+</li>
+      </ul>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+    </ul>
+</div>
+</nav><div id="quarto-sidebar-glass" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active"><h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+<li><a href="#classification-losses" id="toc-classification-losses" class="nav-link active" data-scroll-target="#classification-losses"><span class="header-section-number">8.1</span> Classification Losses</a></li>
+  <li>
+<a href="#sec-eval-distr-commonsurv" id="toc-sec-eval-distr-commonsurv" class="nav-link" data-scroll-target="#sec-eval-distr-commonsurv"><span class="header-section-number">8.2</span> Survival Losses</a>
+  <ul class="collapse">
+<li><a href="#integrated-graf-score" id="toc-integrated-graf-score" class="nav-link" data-scroll-target="#integrated-graf-score"><span class="header-section-number">8.2.1</span> Integrated Graf Score</a></li>
+  <li><a href="#integrated-survival-log-loss" id="toc-integrated-survival-log-loss" class="nav-link" data-scroll-target="#integrated-survival-log-loss"><span class="header-section-number">8.2.2</span> Integrated Survival Log Loss</a></li>
+  <li><a href="#survival-density-log-loss" id="toc-survival-density-log-loss" class="nav-link" data-scroll-target="#survival-density-log-loss"><span class="header-section-number">8.2.3</span> Survival density log loss</a></li>
+  <li><a href="#right-censored-log-loss" id="toc-right-censored-log-loss" class="nav-link" data-scroll-target="#right-censored-log-loss"><span class="header-section-number">8.2.4</span> Right-censored log loss</a></li>
+  <li><a href="#absolute-survival-loss" id="toc-absolute-survival-loss" class="nav-link" data-scroll-target="#absolute-survival-loss"><span class="header-section-number">8.2.5</span> Absolute Survival Loss</a></li>
+  </ul>
+</li>
+  <li><a href="#sec-pecs" id="toc-sec-pecs" class="nav-link" data-scroll-target="#sec-pecs"><span class="header-section-number">8.3</span> Prediction Error Curves</a></li>
+  <li><a href="#sec-eval-distr-score-base" id="toc-sec-eval-distr-score-base" class="nav-link" data-scroll-target="#sec-eval-distr-score-base"><span class="header-section-number">8.4</span> Baselines and ERV</a></li>
+  </ul><div class="toc-actions"><div><i class="bi bi-github"></i></div><div class="action-links"><p><a href="https://github.com/RaphaelS1/MLSA/issues/new" class="toc-action">Report an issue</a></p><p><a href="https://github.com/RaphaelS1/MLSA/edit/main/book/meas_rules.qmd" class="toc-action">Edit this page</a></p><p><a href="https://github.com/RaphaelS1/MLSA/blob/main/book/meas_rules.qmd" class="toc-action">View source</a></p></div></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content"><header id="title-block-header" class="quarto-title-block default"><div class="quarto-title">
+<div class="quarto-title-block"><div><h1 class="title"><span id="sec-eval-distr" class="quarto-section-identifier"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Evaluating Distributions by Scoring Rules</span></span></h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+<div>
+  <div class="abstract">
+    <div class="abstract-title">Abstract</div>
+    TODO (150-200 WORDS)
+  </div>
+</div>
+
+</header><div class="callout callout-style-default callout-important callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Page in progress!
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>This page is a work in progress and will change significantly over time.</strong></p>
+</div>
+</div>
+<p>Scoring rules evaluate probabilistic predictions and (attempt to) measure the overall predictive ability of a model in terms of both calibration and discrimination <span class="citation" data-cites="Gneiting2007 Murphy1973">(<a href="references.html#ref-Gneiting2007" role="doc-biblioref">Gneiting and Raftery 2007</a>; <a href="references.html#ref-Murphy1973" role="doc-biblioref">Murphy 1973</a>)</span>. In contrast to calibration measures, which assess the average performance across all observations on a population level, scoring rules evaluate the sample mean of individual predictions across all observations in a test set. As well as being able to provide information at an individual level, scoring rules are also popular as probabilistic forecasts are widely recognised to be superior than deterministic predictions for capturing uncertainty in predictions <span class="citation" data-cites="Dawid1984 Dawid1986">(<a href="references.html#ref-Dawid1984" role="doc-biblioref">A. P. Dawid 1984</a>; <a href="references.html#ref-Dawid1986" role="doc-biblioref">A. Philip Dawid 1986</a>)</span>. Formalisation and development of scoring rules has primarily been due to Dawid <span class="citation" data-cites="Dawid1984 Dawid1986 Dawid2014">(<a href="references.html#ref-Dawid1984" role="doc-biblioref">A. P. Dawid 1984</a>; <a href="references.html#ref-Dawid1986" role="doc-biblioref">A. Philip Dawid 1986</a>; <a href="references.html#ref-Dawid2014" role="doc-biblioref">A. Philip Dawid and Musio 2014</a>)</span> and Gneiting and Raftery <span class="citation" data-cites="Gneiting2007">(<a href="references.html#ref-Gneiting2007" role="doc-biblioref">Gneiting and Raftery 2007</a>)</span>; though the earliest measures promoting “rational” and “honest” decision making date back to the 1950s <span class="citation" data-cites="Brier1950 Good1952">(<a href="references.html#ref-Brier1950" role="doc-biblioref">Brier 1950</a>; <a href="references.html#ref-Good1952" role="doc-biblioref">Good 1952</a>)</span>. Few scoring rules have been proposed in survival analysis, although the past few years have seen an increase in popularity in these measures. Before delving into these measures, we will first describe scoring rules in the simpler classification setting.</p>
+<section id="classification-losses" class="level2" data-number="8.1"><h2 data-number="8.1" class="anchored" data-anchor-id="classification-losses">
+<span class="header-section-number">8.1</span> Classification Losses</h2>
+<p>In the simplest terms, a scoring rule compares two values and assigns them a score (hence ‘scoring rule’), formally we’d write <span class="math inline">\(L: \mathbb{R}\times \mathbb{R}\mapsto \bar{\mathbb{R}}\)</span>. In machine learning, this usually means comparing a prediction for an observation to the ground truth, so <span class="math inline">\(L: \mathbb{R}\times \mathcal{P}\mapsto \bar{\mathbb{R}}\)</span> where <span class="math inline">\(\mathcal{P}\)</span> is a set of distributions. Crucially, scoring rules usually refer to comparisons of true and predicted <em>distributions</em>. For example, let’s construct a scoring rule as follows: 1. Let <span class="math inline">\(y \in \{0,1\}\)</span> be the ground truth and let <span class="math inline">\(\hat{p}\)</span> be the predicted probability mass function such that <span class="math inline">\(\hat{p}(y)\)</span> is the probability of the observed event occurring; 2. Define <span class="math inline">\(\hat{y} := \mathbb{I}(\hat{p}(y) \geq 0.5)\)</span>, i.e., <span class="math inline">\(\hat{y}\)</span> is <span class="math inline">\(1\)</span> if the predicted probability of event <span class="math inline">\(1\)</span> is greater or equal than 0.5; 3. Then define our scoring rule such that we score <span class="math inline">\(1\)</span> if <span class="math inline">\(\hat{y}\)</span> equals <span class="math inline">\(y\)</span> or 0 otherwise: <span class="math inline">\(SR :=\mathbb{I}(\hat{y} == y)\)</span>.</p>
+<p>In practice, minimisation is often the goal in automated machine learning processes, so we usually talk about ‘losses’ (which are minimised) instead of scoring rules that are maximised, hence let’s adapt SR slightly to the loss <span class="math inline">\(L := \mathbb{I}(\hat{y} \neq y))\)</span>, and putting all the above together we get</p>
+<p><span class="math display">\[L_P(\hat{p}, y) = \mathbb{I}(y \neq \mathbb{I}(\hat{p}(y) \geq 0.5))\]</span></p>
+<p>This loss is interpretable and has a real world meaning, in fact it’s just the mean misclassification error after discretising a probabilistic classification prediction. Now consider the following loss:</p>
+<p><span class="math display">\[L_I(\hat{p}, y) = 1 - L_P\]</span></p>
+<p>This follows the definition of a scoring rule/loss as it maps a distribution and value to a real-valued number, but the loss is also terrible as it assigns lower scores to worse predictions!</p>
+<p>The difference between these losses is that the first is ‘proper’ whereas the latter is ‘improper’. A ‘proper’ loss is a loss that is minimised by the ‘correct’ prediction.</p>
+<p>Another important property is <em>strict</em> properness. A loss is strictly proper if the loss is <em>uniquely</em> minimised by the ‘correct’ prediction. Let’s modify <span class="math inline">\(L_P\)</span> slightly to become the squared difference between the true value and predicted probability (in fact this is the widely used Brier score <span class="citation" data-cites="Brier1950">(<a href="references.html#ref-Brier1950" role="doc-biblioref">Brier 1950</a>)</span>):</p>
+<p><span class="math display">\[L_S(\hat{p}, y) = (y - \hat{p}(y))^2\]</span></p>
+<p>Now if we compare <span class="math inline">\(L_P\)</span> and <span class="math inline">\(L_S\)</span> across different values of <span class="math inline">\(y\)</span> and <span class="math inline">\(\hat{p}_y\)</span> (<a href="#tbl-compare-scoring">Table&nbsp;<span>8.1</span></a>), we can easily see that whilst <span class="math inline">\(L_P\)</span> provides some utility, this is limited as we’d have no way to know that some predictions are closer to the truth than others. On the other hand, <span class="math inline">\(L_S\)</span> provides a quantitative method to compare predictions against the truth and between each other.</p>
+<div id="tbl-compare-scoring" class="anchored">
+<table class="table">
+<caption>Table&nbsp;8.1: Comparing improper proper (<span class="math inline">\(L_P\)</span>) and strictly proper (<span class="math inline">\(L_S\)</span>) scoring rules across different qualities of predictions.</caption>
+<thead><tr class="header">
+<th></th>
+<th><span class="math inline">\(y = 0\)</span></th>
+<th><span class="math inline">\(y = 1\)</span></th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td><span class="math inline">\(\hat{p}_y = 0\)</span></td>
+<td><span class="math inline">\(L_P = 0; L_S = 0\)</span></td>
+<td><span class="math inline">\(L_P = 0; L_S = 1\)</span></td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(\hat{p}_y = 0.3\)</span></td>
+<td><span class="math inline">\(L_P = 0; L_S = 0.09\)</span></td>
+<td><span class="math inline">\(L_P = 0; L_S = 0.49\)</span></td>
+</tr>
+<tr class="odd">
+<td><span class="math inline">\(\hat{p}_y = 0.6\)</span></td>
+<td><span class="math inline">\(L_P = 1; L_S = 0.36\)</span></td>
+<td><span class="math inline">\(L_P = 1; L_S = 0.16\)</span></td>
+</tr>
+<tr class="even">
+<td><span class="math inline">\(\hat{p}_y = 1\)</span></td>
+<td><span class="math inline">\(L_P = 1; L_S = 1\)</span></td>
+<td><span class="math inline">\(L_P = 1; L_S = 0\)</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Mathematically, a classification loss <span class="math inline">\(L: \mathcal{P}\times \mathcal{Y}\rightarrow \bar{\mathbb{R}}\)</span> is <em>proper</em> if for any distributions <span class="math inline">\(p_Y,p\)</span> in <span class="math inline">\(\mathcal{P}\)</span> and for any random variables <span class="math inline">\(Y \sim p_Y\)</span>, it holds that <span class="math inline">\(\mathbb{E}[L(p_Y, Y)] \leq \mathbb{E}[L(p, Y)]\)</span>. The loss is <em>strictly proper</em> if, in addition, <span class="math inline">\(p = p_Y\)</span> uniquely minimizes the loss.</p>
+<p>Proper losses provide a method of model comparison as, by definition, predictions closest to the true distribution will result in lower expected losses. Strictly proper losses have additional important uses such as in model optimisation, as minimisation of the loss will result in the ‘optimum score estimator based on the scoring rule’ <span class="citation" data-cites="Gneiting2007">(<a href="references.html#ref-Gneiting2007" role="doc-biblioref">Gneiting and Raftery 2007</a>)</span>. Whilst properness is usually a minimal acceptable property for a loss, it is generally not sufficient on its own, for example consider the measure <span class="math inline">\(L(\hat{p}_y, y) = 0\)</span>, which is proper as it is minimised by <span class="math inline">\(L(y, y)\)</span> but it is clearly useless.</p>
+<p>The two most widely used losses for classification are the Brier score <span class="citation" data-cites="Brier1950">(<a href="references.html#ref-Brier1950" role="doc-biblioref">Brier 1950</a>)</span> and log loss <span class="citation" data-cites="Good1952">(<a href="references.html#ref-Good1952" role="doc-biblioref">Good 1952</a>)</span>, defined respectively by</p>
+<p><span class="math display">\[
+L_{brier}(\hat{p}, y) \mapsto (y - \hat{p}(y))^2
+\]</span></p>
+<p>and</p>
+<p><span class="math display">\[
+L_{logloss}(\hat{p}, y) = -\log \hat{p}(y)
+\]</span></p>
+<p>These losses are visualised in <a href="#fig-eval-brierlog">Figure&nbsp;<span>8.1</span></a>, which highlights that both losses are strictly proper <span class="citation" data-cites="Dawid2014">(<a href="references.html#ref-Dawid2014" role="doc-biblioref">A. Philip Dawid and Musio 2014</a>)</span> as they are minimised when the true prediction is made, and we can say that we converge to the minimum as predictions are increasingly improved.</p>
+<div id="fig-eval-brierlog" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure"><p><img src="Figures/evaluation/brier_logloss.png" class="quarto-discovered-preview-image img-fluid figure-img" alt="TODO"></p>
+<p></p><figcaption class="figure-caption">Figure&nbsp;8.1: Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in <span class="math inline">\([0,1]\)</span>, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimised with the correct prediction, i.e.&nbsp;if <span class="math inline">\(\zeta.p(1) = 1\)</span> when <span class="math inline">\(y = 1\)</span> and <span class="math inline">\(\zeta.p(1) = 0\)</span> when <span class="math inline">\(y = 0\)</span> for a predicted discrete distribution <span class="math inline">\(\zeta\)</span>.</figcaption><p></p>
+</figure>
+</div>
+<!-- FIXME - I THINK THIS CAN PROBABLY BE DELETED -->
+<!-- #### Regression {#sec-eval-distr-score-reg-reg}
+
+The definition of a probabilistic regression scoring rule follows similarly to the classification setting after a re-specification of the target domain.
+
+:::: {.callout-note icon=false}
+
+## Probabilistic regression loss
+
+::: {#cnj-loss-regr}
+Let $\calP$ be some family of distributions over $\calY \subseteq \Reals$ containing at least two elements. Then for a predicted distribution in $\calP$, any real-valued function with the signature $L: \calP \times \calY \rightarrow \ExtReals$ will be considered as a *probabilistic regression loss*.
+
+:::
+
+::::
+
+::: {#def-regr-proper}
+
+## Regression loss properness
+
+A probabilistic regression loss  $L: \calP \times \calY \rightarrow \ExtReals$ is called:
+
+i. *Proper* if: for any distributions $p_Y,p$ in $\calP$ and for any random variables $Y \sim p_Y$, it holds that
+
+$$
+\EE[L(p_Y, Y)] \leq \EE[L(p, Y)]
+$$
+i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, Y)] = \EE[L(p, Y)] \Leftrightarrow p = p_Y
+$$
+
+:::
+
+#### Losses {.unnumbered .unlisted}
+
+In the regression setting, classification scoring rules are extended by instead considering distribution functions and integrating these over $\calY \subseteq \Reals$.
+
+The Integrated Brier Score (IBS) is defined by,^[also known as the Continuous Ranked Probability Score (CRPS).]
+
+$$
+L_{IBS}:\calP \times \calY \rightarrow [0,1]; \quad
+(\zeta, y) \mapsto \int_{\calY} (\II(y \leq \tau) - \zeta.F(\tau))^2 \ d\tau
+$$ {#eq-ibs}
+
+The extension from the classification Brier score is intuitive, instead of evaluating if the predicted pmf is 'correct' at a single point, the predicted cumulative distribution function is compared with the true event status over the entire distribution.
+
+The log loss has two adaptations for continuous predictions. The first is analogous to the IBS and is termed the Integrated Log Loss (ILL)
+
+$$
+\begin{split}
+&L_{ILL}:\calP \times \calY \rightarrow \NNReals; \\
+&(\zeta, y) \mapsto - \int_{\calY} \II(y \leq \tau)\log[\zeta.F(\tau)] + \II(y > \tau)\log[\zeta.S(\tau)] \ d\tau
+\end{split}
+$$
+
+This follows the 'longer' form of the binary classification log loss and considers the cumulative probability of events over all time-points. A second adaptation to the log loss instead considers the 'simpler' form and replaces the probability mass function with the probability density function. Again this measure is intuitive as a perfect distributional prediction will assign the highest point of density to the point at which the event occurs. This variant of the log loss does not have a specific name but it is termed here the 'density log loss', $L_{DLL}$, and is formally defined by,
+
+$$
+L_{DLL}:\calP \times \calY \rightarrow \NNReals; \quad
+(\zeta, y) \mapsto - \log[\zeta.f(y)]
+$$ {#eq-density-logloss}
+where $\calP$ is a family of absolutely continuous distributions over $\calY$ with defined density functions.
+
+All three of these losses are strictly proper [@Gneiting2007; @Gressmann2018]. -->
+<!-- FIXME: NEED TO WORK ON THIS SECTION -->
+<!-- ## What makes a survival scoring rule? {#sec-eval-distr-score-surv}
+
+On the surface, a definition for survival losses may appear to trivially follow from the classification setting, however this is not the case as survival analysis has a unique property in that model predictions do not immediately align with observed outcomes.
+
+
+::: {.cell hash='meas_rules_cache/html/unnamed-chunk-1_3f2ad646c4604cc8b140ce4a48c85b9d'}
+:::{.callout-tip icon=false}
+## 🪧 Learn more about survival task
+See @sec-surv to learn more about survival task.
+:::
+:::
+
+
+The machine learning survival analysis task is to predict the distribution of the survival time, however in practice we observe the outcome time, which could be survival or censoring.
+Hence, a survival scoring rule does not compare the predicted survival time distribution, $p$, with $Y$ but with $T$.
+To make matters more complex, we are not interested in whether the true
+
+
+
+As we have seen in previous chapters, many measures incorporate IPCW, which is the process of weighting a measure by the inverse of the censoring distribution.
+
+
+Losses in the survival setting compare predicted survival distributions to the observed outcome tuple (time and censoring). A large class of survival losses additionally incorporate an estimator of the unknown censoring distribution, in order to attempt meaningful comparison. This second group of losses are termed here as 'approximate' losses as the true censoring distribution is never known and hence an estimate of the loss is approximate at best.
+
+:::: {.callout-note icon=false}
+
+## Survival loss
+
+::: {#cnj-loss-surv}
+Let $\calT \subseteq \NNReals$ and let $\calC, \calP$ be any two distinct families of distributions over $\calT$, containing at least two elements. Then,
+
+* Any real-valued function with the signature $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ will be considered as a *survival loss*.
+* Any real-valued function with the signature $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$ will be considered as an *approximate survival loss*.
+:::
+
+::::
+
+Two separate novel definitions for (strict) properness are provided: the first captures the general case in which no assumptions are made about the censoring distribution; the second assumes that censoring is conditionally event-independent.
+
+::: {#def-surv-proper}
+
+## Survival loss properness
+
+A survival loss $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ is called:
+
+i. *Proper* if: for any distributions $p_Y, p$ in $\calP$; and for any random variables $Y \sim p_Y$, and $C$ t.v.i. $\calT$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
+
+$$
+\EE[L(p_Y, T, \Delta)] \leq \EE[L(p, T, \Delta)]
+$$
+i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, T, \Delta)] = \EE[L(p, T, \Delta)] \Leftrightarrow p = p_Y
+$$
+i. *Outcome-independent proper* if: for any distributions $p_Y, p$ in $\calP$; and for any random variables $Y \sim p_Y$, and $C$ t.v.i. $\calT$, where $C \indep Y$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
+
+$$
+\EE[L(p_Y, T, \Delta)] \leq \EE[L(p, T, \Delta)]
+$$
+i. *Outcome-independent strictly proper* if in addition to being outcome-independent proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, T, \Delta)] = \EE[L(p, T, \Delta)] \Leftrightarrow p = p_Y
+$$
+
+:::
+
+These final two definitions are 'weaker' but provide a term for losses that are improper in general but are (strictly) proper under common (though possibly strict) assumptions about the censoring distribution. Note by definition that if a loss is:
+
+i. (strictly) proper then it is also outcome-independent (strictly) proper;
+i. (outcome-independent) strictly proper then it is also (outcome-independent) proper
+
+
+Analogous definitions are now provided for approximate survival losses.
+
+::: {#def-surv-approx-proper}
+
+## Survival approximate loss properness
+
+An approximate survival loss $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$ is called:
+
+i. *Proper* if: for any distributions $p_Y, p$ in $\calP$ and $c \in \calC$; and for any random variables $Y \sim p_Y$ and $C \sim c$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
+
+$$
+\EE[L(p_Y, T, \Delta|c)] \leq \EE[L(p, T, \Delta|c)]
+$$
+i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, T, \Delta|c)] = \EE[L(p, T, \Delta|c)] \Leftrightarrow p = p_Y
+$$
+i. *Outcome-independent proper* if: for any distributions $p_Y, p$ in $\calP$ and $c \in \calC$; and for any random variables $Y \sim p_Y$ and $C \sim c$, where $C \indep Y$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
+
+$$
+\EE[L(p_Y, T, \Delta|c)] \leq \EE[L(p, T, \Delta|c)]
+$$
+i. *Outcome-independent strictly proper* if in addition to being outcome-independent proper it holds, for the same quantification of variables, that
+
+$$
+\EE[L(p_Y, T, \Delta|c)] = \EE[L(p, T, \Delta|c)] \Leftrightarrow p = p_Y
+$$
+
+:::
+
+As the true censoring distribution, $c$, can never be known exactly, this definition allows for approximate losses to be proper in the asymptotic (with infinite training data) if they include estimators of $c$ that are convergent in distribution. Proper approximate losses are therefore useful in modern predictive settings in which 'big data' is very common and thus estimators, such as the Kaplan-Meier, can converge to the true censoring distribution. However approximate losses may provide misleading results when the sample size is small; future research should ascertain what 'small' means for individual losses. -->
+</section><section id="sec-eval-distr-commonsurv" class="level2" data-number="8.2"><h2 data-number="8.2" class="anchored" data-anchor-id="sec-eval-distr-commonsurv">
+<span class="header-section-number">8.2</span> Survival Losses</h2>
+<p>We are now ready to list common scoring rules in survival analysis and discuss some of their properties. As with other chapters, this list is likely not exhaustive but will cover commonly used losses.</p>
+<section id="integrated-graf-score" class="level3" data-number="8.2.1"><h3 data-number="8.2.1" class="anchored" data-anchor-id="integrated-graf-score">
+<span class="header-section-number">8.2.1</span> Integrated Graf Score</h3>
+<p>The Integrated Graf Score (IGS) was introduced by Graf <span class="citation" data-cites="Graf1995 Graf1999">(<a href="references.html#ref-Graf1995" role="doc-biblioref">Graf and Schumacher 1995</a>; <a href="references.html#ref-Graf1999" role="doc-biblioref">Graf et al. 1999</a>)</span> as an analogue to the integrated brier score (IBS) in regression. The loss is defined by</p>
+<p><span id="eq-igs"><span class="math display">\[
+\begin{split}
+L_{IGS}(\hat{S}, t, \delta|\hat{G}_{KM}) = \int^{\tau^*}_0  \frac{\hat{S}^2(\tau) \mathbb{I}(t \leq \tau, \delta=1)}{\hat{G}_{KM}(t)} + \frac{\hat{F}^2(\tau) \mathbb{I}(t &gt; \tau)}{\hat{G}_{KM}(\tau)} \ d\tau
+\end{split}
+\tag{8.1}\]</span></span> where <span class="math inline">\(\hat{S}^2(\tau) = (\hat{S}(\tau))^2\)</span> and <span class="math inline">\(\hat{F}^2(\tau) = (1 - \hat{S}(\tau)^2\)</span>, and <span class="math inline">\(\tau^* \in \mathbb{R}_{\geq 0}\)</span> is an upper threshold to compute the loss up to, and <span class="math inline">\(\hat{G}_{KM}\)</span> is the Kaplan-Meier trained on the censoring distribution for IPCW.</p>
+<div class="cell" data-hash="meas_rules_cache/html/unnamed-chunk-2_42db3a208f1bf85bc79e8eeef7b88aee">
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+🪧 Learn more about IPCW
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p>See <a href="meas_rank.html#sec-eval-crank-disc-conc"><span>Section&nbsp;6.1</span></a> to learn more about IPCW.</p>
+</div>
+</div>
+</div>
+<p>To understand this loss, let’s break it down and look at the computations at a single time-point, <span class="math inline">\(\tau\)</span>. At <span class="math inline">\(\tau\)</span> the loss will either be:</p>
+<ol type="1">
+<li>
+<span class="math inline">\(\frac{\hat{S}^2(\tau)}{\hat{G}_{KM}(t)}\)</span> - If the observation experiences the event before <span class="math inline">\(\tau\)</span>
+</li>
+<li>0 - If the observation is censored before <span class="math inline">\(\tau\)</span>
+</li>
+<li>
+<span class="math inline">\(\frac{\hat{F}^2(\tau)}{\hat{G}_{KM}(\tau)}\)</span> - If the observation’s outcome is after <span class="math inline">\(\tau\)</span>
+</li>
+</ol>
+<!-- FIXME: BELOW IS TERRIBLY WRITTEN! --><p>As we have no information about the true survival time of censored observations, it is sensible to not attempt to provide a meaningful score once censored, so their contribution is <span class="math inline">\(0\)</span>. For observations that are known to have experience the event at <span class="math inline">\(\tau\)</span>, then we would expect their survival probability to be zero as the event has occurred (and they cannot continue to survive) hence contributing <span class="math inline">\(\hat{S}^2\)</span> – the addition of <span class="math inline">\(\hat{G}_{KM}(t)\)</span> has the effect of placing more weight on the score at the observed event time if the proportion of censoring is lower at this time, the reason being that when the observations are alive (<span class="math inline">\(t &gt; \tau\)</span>) then their contributing the rest of the weighting after this time. Finally, for observations who are still alive, then we’d expect their survival probability to be as close to 1 as possible with inverse weighting at the current timepoint. As <span class="math inline">\(\tau \rightarrow \infty\)</span>, then <span class="math inline">\(\hat{G}_{KM}(\tau) \rightarrow 0\)</span> as the number of observations in the dataset decreases, hence this weighting ensures that observations that are still in the data can contribute as if all observations were still in the data.</p>
+<p>When censoring is uninformative, the IGS consistently estimates the mean square error <span class="math inline">\(L(t, S|\tau^*) = \int^{\tau^*}_0 [\mathbb{I}(t &gt; \tau) - S(\tau)]^2 d\tau\)</span>, where <span class="math inline">\(S\)</span> is the correctly specified survival function <span class="citation" data-cites="Gerds2006">(<a href="references.html#ref-Gerds2006" role="doc-biblioref">Gerds and Schumacher 2006</a>)</span>. However, despite these promising properties, the IGS is improper and must therefore be used with care <span class="citation" data-cites="Rindt2022 Sonabend2022b">(<a href="references.html#ref-Rindt2022" role="doc-biblioref">Rindt et al. 2022</a>; <a href="references.html#ref-Sonabend2022b" role="doc-biblioref">Sonabend 2022</a>)</span>.</p>
+<p>The reweighted IGS is a strictly proper outcome-independent loss <span class="citation" data-cites="Sonabend2022b">(<a href="references.html#ref-Sonabend2022b" role="doc-biblioref">Sonabend 2022</a>)</span> that reweights the IGS by removing censored observations and reweighting the denominator.</p>
+<p><span class="math display">\[
+L_{RIGS}(\hat{S}, t, \delta|\hat{G}_{KM}) = \frac{\delta \int_{\mathcal{T}} (\mathbb{I}(t \leq \tau) - \hat{F}(\tau))^2 \ d\tau}{\hat{G}_{KM}(t)}
+\]</span></p>
+<p>This loss removes all censored observations, which can be problematic if the proportion of censoring is high. <!-- FIXME: THIS IS ALSO TERRIBLY WRITTEN! --> For uncensored observations we expect the predicted survival probability to be <span class="math inline">\(1\)</span> before any outcome is observed and <span class="math inline">\(0\)</span> otherwise, which follows more closely to the integrated Brier score. By changing the weighting the interpretation of contributions at time-points changes slightly, in the original IGS we may think of this as “inverse weighting for as long as the observation remains in the data”, which means the weight of a contribution at a time-point will be different for all observations and all time-points. On the other hand, for RIGS, we weight by the outcome time for each observation, which remains the same over time. Hence we instead inflate scores for observations whose outcome are later in the dataset, this is intuitive as it essentially places more importance on observations that are representative of being alive at those time points.</p>
+<p>As the loss is strictly proper it may be ‘safer’ to use than the IGS in automated experiments, however this does come at the expense of removing censored observations.</p>
+</section><section id="integrated-survival-log-loss" class="level3" data-number="8.2.2"><h3 data-number="8.2.2" class="anchored" data-anchor-id="integrated-survival-log-loss">
+<span class="header-section-number">8.2.2</span> Integrated Survival Log Loss</h3>
+<!-- FIXME - SHOULD WE JUST DELETE? -->
+<p>The integrated survival log loss (ISLL) was also proposed by <span class="citation" data-cites="Graf1999">Graf et al. (<a href="references.html#ref-Graf1999" role="doc-biblioref">1999</a>)</span>.</p>
+<p><span class="math display">\[
+L_{ISLL}(\hat{S},t,\delta|\hat{G}_{KM}) = -\int^{\tau^*}_0  \frac{\log[\hat{F}(\tau)] \mathbb{I}(t \leq \tau, \delta=1)}{\hat{G}_{KM}(t)} + \frac{\log[\hat{S}(\tau)] \mathbb{I}(t &gt; \tau)}{\hat{G}_{KM}(\tau)} \ d\tau
+\]</span></p>
+<p>where <span class="math inline">\(\tau^* \in \mathcal{T}\)</span> is an upper threshold to compute the loss up to.</p>
+<p>Similarly to the IGS, there are three ways to contribute to the loss depending on whether an observation is censored, experienced the event, or alive, at <span class="math inline">\(\tau\)</span>. Whilst the IGS is routinely used in practice, there is no evidence that ISLL is used, and moreover there are no proofs (or claims) that it is proper.</p>
+<p>The reweighted ISLL (RISLL) follows similarly to the RIGS and is also outcome-independent strictly proper <span class="citation" data-cites="Sonabend2022b">(<a href="references.html#ref-Sonabend2022b" role="doc-biblioref">Sonabend 2022</a>)</span>.</p>
+<p><span class="math display">\[
+L_{RISLL}(\hat{S}, t, \delta|\hat{G}_{KM}) \mapsto -\frac{\delta \int_{\mathcal{T}} \mathbb{I}(t \leq \tau)\log[\hat{F}(\tau)] + \mathbb{I}(t &gt; \tau)\log[\hat{S}(\tau)] \ d\tau}{\hat{G}_{KM}(t)}
+\]</span></p>
+</section><section id="survival-density-log-loss" class="level3" data-number="8.2.3"><h3 data-number="8.2.3" class="anchored" data-anchor-id="survival-density-log-loss">
+<span class="header-section-number">8.2.3</span> Survival density log loss</h3>
+<p>Another outcome-independent strictly proper scoring rule is the survival density log loss (SDLL) <span class="citation" data-cites="Sonabend2022b">(<a href="references.html#ref-Sonabend2022b" role="doc-biblioref">Sonabend 2022</a>)</span>, which is given by</p>
+<p><span class="math display">\[
+L_{SDLL}(\hat{f}, t, \delta|\hat{G}_{KM}) = - \frac{\delta \log[\hat{f}(t)]}{\hat{G}_{KM}(t)}
+\]</span></p>
+<p>where <span class="math inline">\(\hat{f}\)</span> is the predicted probability density function. This loss is essentially the classification log loss (<span class="math inline">\(-log(\hat{p}(t))\)</span>) with added IPCW. Whilst the classification log loss has beneficial properties such as being differentiable, this is more complex for the SDLL, which is also only an approximate loss. A useful alternative to the SDLL which can be readily used in automated procedures is the right-censored log loss.</p>
+</section><section id="right-censored-log-loss" class="level3" data-number="8.2.4"><h3 data-number="8.2.4" class="anchored" data-anchor-id="right-censored-log-loss">
+<span class="header-section-number">8.2.4</span> Right-censored log loss</h3>
+<p>The right-censored log loss (RCLL) is an outcome-independent strictly proper scoring rule <span class="citation" data-cites="Avati2020">(<a href="references.html#ref-Avati2020" role="doc-biblioref">Avati et al. 2020</a>)</span> that does not make use of IPCW and is thus not considered to be an approximate loss. The RCLL is defined by</p>
+<p><span class="math display">\[
+L_{RCLL}(\hat{S}, t, \delta) = -\log[\delta\hat{f}(t) + (1-\delta)\hat{S}(t)]
+\]</span></p>
+<p>This loss is easily interpretable when we break it down into its two halves:</p>
+<ol type="1">
+<li>If an observation is censored at <span class="math inline">\(t\)</span> then all the information we have is that they did not experience the event at the time, so they must be ‘alive’, hence the optimal value is <span class="math inline">\(\hat{S}(t) = 1\)</span> (which becomes <span class="math inline">\(-log(1) = 0\)</span>).</li>
+<li>If an observation experiences the event then the ‘best’ prediction is for the probability of the event at that time to be maximised, as pdfs are not upper-bounded this means <span class="math inline">\(\hat{f}(t) = \infty\)</span> (and <span class="math inline">\(-log(t) \rightarrow \infty\)</span> as <span class="math inline">\(t \rightarrow \infty\)</span>).</li>
+</ol></section><section id="absolute-survival-loss" class="level3" data-number="8.2.5"><h3 data-number="8.2.5" class="anchored" data-anchor-id="absolute-survival-loss">
+<span class="header-section-number">8.2.5</span> Absolute Survival Loss</h3>
+<p>The absolute survival loss, developed over time by <span class="citation" data-cites="Schemper2000">Schemper and Henderson (<a href="references.html#ref-Schemper2000" role="doc-biblioref">2000</a>)</span> and <span class="citation" data-cites="Schmid2011">Schmid et al. (<a href="references.html#ref-Schmid2011" role="doc-biblioref">2011</a>)</span>, is based on the mean absolute error is very similar to the IGS but removes the squared time:</p>
+<p><span class="math display">\[
+L_{ASL}(\hat{S}, t, \delta|\hat{G}_{KM}) = \int^{\tau^*}_0 \frac{\zeta.S(\tau)\mathbb{I}(t \leq \tau, \delta = 1)}{\hat{G}_{KM}(t)} + \frac{\zeta.F(\tau)\mathbb{I}(t &gt; \tau)}{\hat{G}_{KM}(\tau)} \ d\tau
+\]</span> where <span class="math inline">\(\hat{G}_{KM}\)</span> and <span class="math inline">\(\tau^*\)</span> are as defined above. Analogously to the IGS, the ASL score consistently estimates the mean absolute error when censoring is uninformative <span class="citation" data-cites="Schmid2011">(<a href="references.html#ref-Schmid2011" role="doc-biblioref">Schmid et al. 2011</a>)</span> but there are also no proofs or claims of properness. The ASL and IGS tend to yield similar results <span class="citation" data-cites="Schmid2011">(<a href="references.html#ref-Schmid2011" role="doc-biblioref">Schmid et al. 2011</a>)</span> but in practice there is no evidence of the ASL being widely used.</p>
+<!-- FIXME - ADD FURTHER SCORING RULES HERE -->
+</section></section><section id="sec-pecs" class="level2" data-number="8.3"><h2 data-number="8.3" class="anchored" data-anchor-id="sec-pecs">
+<span class="header-section-number">8.3</span> Prediction Error Curves</h2>
+<!-- FIXME - UNCHANGED FROM THESIS. I THINK FINE FOR NOW BUT NEEDS TO BE REWRITTEN IN THE FUTURE (MAINLY TO AVOID SELF PLAGIARISM) -->
+<p>As well as evaluating probabilistic outcomes with integrated scoring rules, non-integrated scoring rules can be utilised for evaluating distributions at a single point. For example, instead of evaluating a probabilistic prediction with the IGS over <span class="math inline">\(\mathbb{R}_{\geq 0}\)</span>, instead one could compute the IGS at a single time-point, <span class="math inline">\(\tau \in \mathbb{R}_{\geq 0}\)</span>, only. Plotting these for varying values of <span class="math inline">\(\tau\)</span> results in ‘prediction error curves’ (PECs), which provide a simple visualisation for how predictions vary over the outcome. PECs are especially useful for survival predictions as they can visualise the prediction ‘over time’. PECs should only be used as a graphical guide and never for model comparison as they only provide information at a limited number of points. An example is provided in <a href="#fig-eval-pecs">Figure&nbsp;<span>8.2</span></a> for the IGS where the the Cox PH consistently outperforms the SVM.</p>
+<div id="fig-eval-pecs" class="quarto-figure quarto-figure-center anchored">
+<figure class="figure"><p><img src="Figures/evaluation/pecs.png" class="img-fluid figure-img" alt="TODO"></p>
+<p></p><figcaption class="figure-caption">Figure&nbsp;8.2: Prediction error curves for the CPH and SVM models from <a href="meas_calib.html"><span>Chapter&nbsp;7</span></a>. x-axis is time and y-axis is the IGS computed at different time-points. The CPH (red) performs better than the SVM (blue) as it scores consistently lower. Trained and tested on randomly simulated data from <span class="math inline">\(\textbf{mlr3proba}\)</span>.</figcaption><p></p>
+</figure>
+</div>
+</section><section id="sec-eval-distr-score-base" class="level2" data-number="8.4"><h2 data-number="8.4" class="anchored" data-anchor-id="sec-eval-distr-score-base">
+<span class="header-section-number">8.4</span> Baselines and ERV</h2>
+<p>A common criticism of scoring rules is a lack of interpretability, for example, an IGS of 0.5 or 0.0005 has no meaning by itself, so below we present two methods to help overcome this problem.</p>
+<p>The first method, is to make use of baselines for model comparison, which are models or values that can be utilised to provide a reference for a loss, they provide a universal method to judge all models of the same class by <span class="citation" data-cites="Gressmann2018">(<a href="references.html#ref-Gressmann2018" role="doc-biblioref">Gressmann et al. 2018</a>)</span>. In classification, it is possible to derive analytical baseline values, for example a Brier score is considered ‘good’ if it is below 0.25 or a log loss if it is below 0.693 (<a href="#fig-eval-brierlog">Figure&nbsp;<span>8.1</span></a>), this is because these are the values obtained if you always predicted probabilties as <span class="math inline">\(0.5\)</span>, which is a reasonable basline guess in a binary classificaiton problem. In survival analysis, simple analytical expressions are not possible as losses are dependent on the unknown distributions of both the survival and censoring time. Therefore all experiments in survival analysis must include a baseline model that can produce a reference value in order to derive meaningful results. A suitable baseline model is the Kaplan-Meier estimator <span class="citation" data-cites="Graf1995 Lawless2010 Royston2013">(<a href="references.html#ref-Graf1995" role="doc-biblioref">Graf and Schumacher 1995</a>; <a href="references.html#ref-Lawless2010" role="doc-biblioref">Lawless and Yuan 2010</a>; <a href="references.html#ref-Royston2013" role="doc-biblioref">Royston and Altman 2013</a>)</span>, which is the simplest model that can consistently estimate the true survival function.</p>
+<p>As well as directly comparing losses from a ‘sophisticated’ model to a baseline, one can also compute the percentage increase in performance between the sophisicated and baseline models, which produces a measure of explained residual variation (ERV) <span class="citation" data-cites="Korn1990 Korn1991">(<a href="references.html#ref-Korn1990" role="doc-biblioref">Edward L. Korn and Simon 1990</a>; <a href="references.html#ref-Korn1991" role="doc-biblioref">Edward L. Korn and Simon 1991</a>)</span>. For any survival loss <span class="math inline">\(L\)</span>, the ERV is,</p>
+<p><span class="math display">\[
+R_L(S, B) = 1 - \frac{L|S}{L|B}
+\]</span></p>
+<p>where <span class="math inline">\(L|S\)</span> and <span class="math inline">\(L|B\)</span> is the loss computed with respect to predictions from the sophisticated and baseline models respectively.</p>
+<p>The ERV interpretation makes reporting of scoring rules easier within and between experiments. For example, say in experiment A we have <span class="math inline">\(L|S = 0.004\)</span> and <span class="math inline">\(L|B = 0.006\)</span>, and in experiment B we have <span class="math inline">\(L|S = 4\)</span> and <span class="math inline">\(L|B = 6\)</span>. The sophisticated model may appear worse at first glance in experiment A (as the losses are very close) but when considering the ERV we see that the performance increase is identical (both <span class="math inline">\(R_L = 33\%\)</span>), thus providing a clearer way to compare models.</p>
+
+
+<!-- -->
+
+<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
+<div id="ref-Avati2020" class="csl-entry" role="listitem">
+Avati, Anand, Tony Duan, Sharon Zhou, Kenneth Jung, Nigam H. Shah, and Andrew Ng. 2020. <span>“<span class="nocase">Countdown Regression: Sharp and Calibrated Survival Predictions</span>.”</span> In <em>Proceedings of Machine Learning Research</em>, 145—–155. <a href="https://proceedings.mlr.press/v115/avati20a.html%20http://arxiv.org/abs/1806.08324">https://proceedings.mlr.press/v115/avati20a.html http://arxiv.org/abs/1806.08324</a>.
+</div>
+<div id="ref-Brier1950" class="csl-entry" role="listitem">
+Brier, Glenn. 1950. <span>“<span class="nocase">Verification of forecasts expressed in terms of probability</span>.”</span> <em>Monthly Weather Review</em> 78 (1): 1–3.
+</div>
+<div id="ref-Dawid1984" class="csl-entry" role="listitem">
+Dawid, A P. 1984. <span>“<span class="nocase">Present Position and Potential Developments: Some Personal Views: Statistical Theory: The Prequential Approach</span>.”</span> <em>Journal of the Royal Statistical Society. Series A (General)</em> 147 (2): 278–92. <a href="https://doi.org/10.2307/2981683">https://doi.org/10.2307/2981683</a>.
+</div>
+<div id="ref-Dawid1986" class="csl-entry" role="listitem">
+Dawid, A Philip. 1986. <span>“<span>Probability Forecasting</span>.”</span> <em>Encyclopedia of Statistical Sciences</em> 7: 210—–218.
+</div>
+<div id="ref-Dawid2014" class="csl-entry" role="listitem">
+Dawid, A Philip, and Monica Musio. 2014. <span>“<span class="nocase">Theory and Applications of Proper Scoring Rules</span>.”</span> <em>Metron</em> 72 (2): 169–83. <a href="https://arxiv.org/abs/arXiv:1401.0398v1">https://arxiv.org/abs/arXiv:1401.0398v1</a>.
+</div>
+<div id="ref-Gerds2006" class="csl-entry" role="listitem">
+Gerds, Thomas A, and Martin Schumacher. 2006. <span>“<span class="nocase">Consistent Estimation of the Expected Brier Score in General Survival Models with Right-Censored Event Times</span>.”</span> <em>Biometrical Journal</em> 48 (6): 1029–40. <a href="https://doi.org/10.1002/bimj.200610301">https://doi.org/10.1002/bimj.200610301</a>.
+</div>
+<div id="ref-Gneiting2007" class="csl-entry" role="listitem">
+Gneiting, Tilmann, and Adrian E Raftery. 2007. <span>“<span class="nocase">Strictly Proper Scoring Rules, Prediction, and Estimation</span>.”</span> <em>Journal of the American Statistical Association</em> 102 (477): 359–78. <a href="https://doi.org/10.1198/016214506000001437">https://doi.org/10.1198/016214506000001437</a>.
+</div>
+<div id="ref-Good1952" class="csl-entry" role="listitem">
+Good, I J. 1952. <span>“<span>Rational Decisions</span>.”</span> <em>Journal of the Royal Statistical Society. Series B (Methodological)</em> 14 (1): 107–14. <a href="http://www.jstor.org/stable/2984087">http://www.jstor.org/stable/2984087</a>.
+</div>
+<div id="ref-Graf1999" class="csl-entry" role="listitem">
+Graf, Erika, Claudia Schmoor, Willi Sauerbrei, and Martin Schumacher. 1999. <span>“<span class="nocase">Assessment and comparison of prognostic classification schemes for survival data</span>.”</span> <em>Statistics in Medicine</em> 18 (17-18): 2529–45. <a href="https://doi.org/10.1002/(SICI)1097-0258(19990915/30)18:17/18<2529::AID-SIM274>3.0.CO;2-5">https://doi.org/10.1002/(SICI)1097-0258(19990915/30)18:17/18&lt;2529::AID-SIM274&gt;3.0.CO;2-5</a>.
+</div>
+<div id="ref-Graf1995" class="csl-entry" role="listitem">
+Graf, Erika, and Martin Schumacher. 1995. <span>“<span class="nocase">An Investigation on Measures of Explained Variation in Survival Analysis</span>.”</span> <em>Journal of the Royal Statistical Society. Series D (The Statistician)</em> 44 (4): 497–507. <a href="https://doi.org/10.2307/2348898">https://doi.org/10.2307/2348898</a>.
+</div>
+<div id="ref-Gressmann2018" class="csl-entry" role="listitem">
+Gressmann, Frithjof, Franz J. Király, Bilal Mateen, and Harald Oberhauser. 2018. <span>“<span class="nocase">Probabilistic supervised learning</span>.”</span> <a href="https://doi.org/10.1002/iub.552">https://doi.org/10.1002/iub.552</a>.
+</div>
+<div id="ref-Korn1990" class="csl-entry" role="listitem">
+Korn, Edward L., and Richard Simon. 1990. <span>“<span class="nocase">Measures of explained variation for survival data</span>.”</span> <em>Statistics in Medicine</em> 9 (5): 487–503. <a href="https://doi.org/10.1002/sim.4780090503">https://doi.org/10.1002/sim.4780090503</a>.
+</div>
+<div id="ref-Korn1991" class="csl-entry" role="listitem">
+Korn, Edward L, and Richard Simon. 1991. <span>“<span class="nocase">Explained Residual Variation, Explained Risk, and Goodness of Fit</span>.”</span> <em>The American Statistician</em> 45 (3): 201–6. <a href="https://doi.org/10.2307/2684290">https://doi.org/10.2307/2684290</a>.
+</div>
+<div id="ref-Lawless2010" class="csl-entry" role="listitem">
+Lawless, Jerald F, and Yan Yuan. 2010. <span>“<span class="nocase">Estimation of prediction error for survival models</span>.”</span> <em>Statistics in Medicine</em> 29 (2): 262–74. <a href="https://doi.org/10.1002/sim.3758">https://doi.org/10.1002/sim.3758</a>.
+</div>
+<div id="ref-Murphy1973" class="csl-entry" role="listitem">
+Murphy, Allan H. 1973. <span>“<span class="nocase">A New Vector Partition of the Probability Score</span>.”</span> <em>Journal of Applied Meteorology and Climatology</em> 12 (4): 595–600. <a href="https://doi.org/10.1175/1520-0450(1973)012<0595:ANVPOT>2.0.CO;2">https://doi.org/10.1175/1520-0450(1973)012&lt;0595:ANVPOT&gt;2.0.CO;2</a>.
+</div>
+<div id="ref-Rindt2022" class="csl-entry" role="listitem">
+Rindt, David, Robert Hu, David Steinsaltz, and Dino Sejdinovic. 2022. <span>“<span class="nocase">Survival Regression with Proper Scoring Rules and Monotonic Neural Networks</span>,”</span> March. <a href="http://arxiv.org/abs/2103.14755">http://arxiv.org/abs/2103.14755</a>.
+</div>
+<div id="ref-Royston2013" class="csl-entry" role="listitem">
+Royston, Patrick, and Douglas G. Altman. 2013. <span>“<span class="nocase">External validation of a Cox prognostic model: Principles and methods</span>.”</span> <em>BMC Medical Research Methodology</em> 13 (1). <a href="https://doi.org/10.1186/1471-2288-13-33">https://doi.org/10.1186/1471-2288-13-33</a>.
+</div>
+<div id="ref-Schemper2000" class="csl-entry" role="listitem">
+Schemper, Michael, and Robin Henderson. 2000. <span>“<span class="nocase">Predictive Accuracy and Explained Variation in Cox Regression</span>.”</span> <em>Biometrics</em> 56: 249–55. <a href="https://doi.org/10.1002/sim.1486">https://doi.org/10.1002/sim.1486</a>.
+</div>
+<div id="ref-Schmid2011" class="csl-entry" role="listitem">
+Schmid, Matthias, Thomas Hielscher, Thomas Augustin, and Olaf Gefeller. 2011. <span>“<span class="nocase">A Robust Alternative to the Schemper-Henderson Estimator of Prediction Error</span>.”</span> <em>Biometrics</em> 67 (2): 524–35. <a href="https://doi.org/10.1111/j.1541-0420.2010.01459.x">https://doi.org/10.1111/j.1541-0420.2010.01459.x</a>.
+</div>
+<div id="ref-Sonabend2022b" class="csl-entry" role="listitem">
+Sonabend, Raphael. 2022. <span>“<span class="nocase">Scoring rules in survival analysis</span>,”</span> December. <a href="http://arxiv.org/abs/2212.05260">http://arxiv.org/abs/2212.05260</a>.
+</div>
+</div>
+</section></main><!-- /main --><script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  const viewSource = window.document.getElementById('quarto-view-source') ||
+                     window.document.getElementById('quarto-code-tools-source');
+  if (viewSource) {
+    const sourceUrl = viewSource.getAttribute("data-quarto-source-url");
+    viewSource.addEventListener("click", function(e) {
+      if (sourceUrl) {
+        // rstudio viewer pane
+        if (/\bcapabilities=\b/.test(window.location)) {
+          window.open(sourceUrl);
+        } else {
+          window.location.href = sourceUrl;
+        }
+      } else {
+        const modal = new bootstrap.Modal(document.getElementById('quarto-embedded-source-code-modal'));
+        modal.show();
+      }
+      return false;
+    });
+  }
+  function toggleCodeHandler(show) {
+    return function(e) {
+      const detailsSrc = window.document.querySelectorAll(".cell > details > .sourceCode");
+      for (let i=0; i<detailsSrc.length; i++) {
+        const details = detailsSrc[i].parentElement;
+        if (show) {
+          details.open = true;
+        } else {
+          details.removeAttribute("open");
+        }
+      }
+      const cellCodeDivs = window.document.querySelectorAll(".cell > .sourceCode");
+      const fromCls = show ? "hidden" : "unhidden";
+      const toCls = show ? "unhidden" : "hidden";
+      for (let i=0; i<cellCodeDivs.length; i++) {
+        const codeDiv = cellCodeDivs[i];
+        if (codeDiv.classList.contains(fromCls)) {
+          codeDiv.classList.remove(fromCls);
+          codeDiv.classList.add(toCls);
+        } 
+      }
+      return false;
+    }
+  }
+  const hideAllCode = window.document.getElementById("quarto-hide-all-code");
+  if (hideAllCode) {
+    hideAllCode.addEventListener("click", toggleCodeHandler(false));
+  }
+  const showAllCode = window.document.getElementById("quarto-show-all-code");
+  if (showAllCode) {
+    showAllCode.addEventListener("click", toggleCodeHandler(true));
+  }
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script><nav class="page-navigation"><div class="nav-page nav-page-previous">
+      <a href="./meas_calib.html" class="pagination-link">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Calibration Measures</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="./meas_time.html" class="pagination-link">
+        <span class="nav-page-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Evaluating Survival Time</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
+<div class="sourceCode" id="cb1" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="an">abstract:</span><span class="co"> TODO (150-200 WORDS)</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>{{&lt; include _setup.qmd &gt;}}</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu"># Evaluating Distributions by Scoring Rules {#sec-eval-distr}</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>{{&lt; include _wip.qmd &gt;}}</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>Scoring rules evaluate probabilistic predictions and (attempt to) measure the overall predictive ability of a model in terms of both calibration and discrimination <span class="co">[</span><span class="ot">@Gneiting2007; @Murphy1973</span><span class="co">]</span>.</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>In contrast to calibration measures, which assess the average performance across all observations on a population level, scoring rules evaluate the sample mean of individual predictions across all observations in a test set.</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>As well as being able to provide information at an individual level, scoring rules are also popular as probabilistic forecasts are widely recognised to be superior than deterministic predictions for capturing uncertainty in predictions <span class="co">[</span><span class="ot">@Dawid1984; @Dawid1986</span><span class="co">]</span>.</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>Formalisation and development of scoring rules has primarily been due to Dawid <span class="co">[</span><span class="ot">@Dawid1984; @Dawid1986; @Dawid2014</span><span class="co">]</span> and Gneiting and Raftery <span class="co">[</span><span class="ot">@Gneiting2007</span><span class="co">]</span>; though the earliest measures promoting "rational" and "honest" decision making date back to the 1950s <span class="co">[</span><span class="ot">@Brier1950; @Good1952</span><span class="co">]</span>.</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>Few scoring rules have been proposed in survival analysis, although the past few years have seen an increase in popularity in these measures.</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>Before delving into these measures, we will first describe scoring rules in the simpler classification setting.</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="fu">## Classification Losses</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>In the simplest terms, a scoring rule compares two values and assigns them a score (hence 'scoring rule'), formally we'd write $L: \Reals \times \Reals \mapsto \ExtReals$.</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>In machine learning, this usually means comparing a prediction for an observation to the ground truth, so $L: \Reals \times \calP \mapsto \ExtReals$ where $\calP$ is a set of distributions.</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>Crucially, scoring rules usually refer to comparisons of true and predicted *distributions*.</span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>For example, let's construct a scoring rule as follows:</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>Let $y \in <span class="sc">\{</span>0,1<span class="sc">\}</span>$ be the ground truth and let $\hat{p}$ be the predicted probability mass function such that $\hat{p}(y)$ is the probability of the observed event occurring;</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>Define $\hat{y} := \II(\hat{p}(y) \geq 0.5)$, i.e., $\hat{y}$ is $1$ if the predicted probability of event $1$ is greater or equal than 0.5;</span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>Then define our scoring rule such that we score $1$ if $\hat{y}$ equals $y$ or 0 otherwise: $SR :=\II(\hat{y} == y)$.</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>In practice, minimisation is often the goal in automated machine learning processes, so we usually talk about 'losses' (which are minimised) instead of scoring rules that are maximised, hence let's adapt SR slightly to the loss $L := \II(\hat{y} \neq y))$, and putting all the above together we get</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>$$L_P(\hat{p}, y) = \II(y \neq \II(\hat{p}(y) \geq 0.5))$$</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>This loss is interpretable and has a real world meaning, in fact it's just the mean misclassification error after discretising a probabilistic classification prediction. Now consider the following loss:</span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>$$L_I(\hat{p}, y) = 1 - L_P$$</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>This follows the definition of a scoring rule/loss as it maps a distribution and value to a real-valued number, but the loss is also terrible as it assigns lower scores to worse predictions!</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>The difference between these losses is that the first is 'proper' whereas the latter is 'improper'.</span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>A 'proper' loss is a loss that is minimised by the 'correct' prediction.</span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>Another important property is *strict* properness.</span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a>A loss is strictly proper if the loss is *uniquely* minimised by the 'correct' prediction.</span>
+<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a>Let's modify $L_P$ slightly to become the squared difference between the true value and predicted probability (in fact this is the widely used Brier score <span class="co">[</span><span class="ot">@Brier1950</span><span class="co">]</span>):</span>
+<span id="cb1-44"><a href="#cb1-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-45"><a href="#cb1-45" aria-hidden="true" tabindex="-1"></a>$$L_S(\hat{p}, y) = (y - \hat{p}(y))^2$$</span>
+<span id="cb1-46"><a href="#cb1-46" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-47"><a href="#cb1-47" aria-hidden="true" tabindex="-1"></a>Now if we compare $L_P$ and $L_S$ across different values of $y$ and $\hat{p}_y$ (@tbl-compare-scoring), we can easily see that whilst $L_P$ provides some utility, this is limited as we'd have no way to know that some predictions are closer to the truth than others.</span>
+<span id="cb1-48"><a href="#cb1-48" aria-hidden="true" tabindex="-1"></a>On the other hand, $L_S$ provides a quantitative method to compare predictions against the truth and between each other.</span>
+<span id="cb1-49"><a href="#cb1-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-50"><a href="#cb1-50" aria-hidden="true" tabindex="-1"></a>| | $y = 0$ | $y = 1$ |</span>
+<span id="cb1-51"><a href="#cb1-51" aria-hidden="true" tabindex="-1"></a>|-|---|---|</span>
+<span id="cb1-52"><a href="#cb1-52" aria-hidden="true" tabindex="-1"></a>| $\hat{p}_y = 0$ | $L_P = 0; L_S = 0$ |  $L_P = 0; L_S = 1$ |</span>
+<span id="cb1-53"><a href="#cb1-53" aria-hidden="true" tabindex="-1"></a>| $\hat{p}_y = 0.3$ | $L_P = 0; L_S = 0.09$ |  $L_P = 0; L_S = 0.49$ |</span>
+<span id="cb1-54"><a href="#cb1-54" aria-hidden="true" tabindex="-1"></a>| $\hat{p}_y = 0.6$ | $L_P = 1; L_S = 0.36$ |  $L_P = 1; L_S = 0.16$ |</span>
+<span id="cb1-55"><a href="#cb1-55" aria-hidden="true" tabindex="-1"></a>| $\hat{p}_y = 1$ | $L_P = 1; L_S = 1$ |  $L_P = 1; L_S = 0$ |</span>
+<span id="cb1-56"><a href="#cb1-56" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-57"><a href="#cb1-57" aria-hidden="true" tabindex="-1"></a>: Comparing improper proper ($L_P$) and strictly proper ($L_S$) scoring rules across different qualities of predictions. {#tbl-compare-scoring}</span>
+<span id="cb1-58"><a href="#cb1-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-59"><a href="#cb1-59" aria-hidden="true" tabindex="-1"></a>Mathematically, a classification loss  $L: \calP \times \calY \rightarrow \ExtReals$ is *proper* if for any distributions $p_Y,p$ in $\calP$ and for any random variables $Y \sim p_Y$, it holds that $\EE<span class="co">[</span><span class="ot">L(p_Y, Y)</span><span class="co">]</span> \leq \EE<span class="co">[</span><span class="ot">L(p, Y)</span><span class="co">]</span>$.</span>
+<span id="cb1-60"><a href="#cb1-60" aria-hidden="true" tabindex="-1"></a>The loss is *strictly proper* if, in addition, $p = p_Y$ uniquely minimizes the loss.</span>
+<span id="cb1-61"><a href="#cb1-61" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-62"><a href="#cb1-62" aria-hidden="true" tabindex="-1"></a>Proper losses provide a method of model comparison as, by definition, predictions closest to the true distribution will result in lower expected losses.</span>
+<span id="cb1-63"><a href="#cb1-63" aria-hidden="true" tabindex="-1"></a>Strictly proper losses have additional important uses such as in model optimisation, as minimisation of the loss will result in the 'optimum score estimator based on the scoring rule' <span class="co">[</span><span class="ot">@Gneiting2007</span><span class="co">]</span>.</span>
+<span id="cb1-64"><a href="#cb1-64" aria-hidden="true" tabindex="-1"></a>Whilst properness is usually a minimal acceptable property for a loss, it is generally not sufficient on its own, for example consider the measure $L(\hat{p}_y, y) = 0$, which is proper as it is minimised by $L(y, y)$ but it is clearly useless.</span>
+<span id="cb1-65"><a href="#cb1-65" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-66"><a href="#cb1-66" aria-hidden="true" tabindex="-1"></a>The two most widely used losses for classification are the Brier score <span class="co">[</span><span class="ot">@Brier1950</span><span class="co">]</span> and log loss <span class="co">[</span><span class="ot">@Good1952</span><span class="co">]</span>, defined respectively by</span>
+<span id="cb1-67"><a href="#cb1-67" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-68"><a href="#cb1-68" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-69"><a href="#cb1-69" aria-hidden="true" tabindex="-1"></a>L_{brier}(\hat{p}, y) \mapsto (y - \hat{p}(y))^2</span>
+<span id="cb1-70"><a href="#cb1-70" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-71"><a href="#cb1-71" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-72"><a href="#cb1-72" aria-hidden="true" tabindex="-1"></a>and</span>
+<span id="cb1-73"><a href="#cb1-73" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-74"><a href="#cb1-74" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-75"><a href="#cb1-75" aria-hidden="true" tabindex="-1"></a>L_{logloss}(\hat{p}, y) = -\log \hat{p}(y)</span>
+<span id="cb1-76"><a href="#cb1-76" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-77"><a href="#cb1-77" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-78"><a href="#cb1-78" aria-hidden="true" tabindex="-1"></a>These losses are visualised in @fig-eval-brierlog, which highlights that both losses are strictly proper <span class="co">[</span><span class="ot">@Dawid2014</span><span class="co">]</span> as they are minimised when the true prediction is made, and we can say that we converge to the minimum as predictions are increasingly improved.</span>
+<span id="cb1-79"><a href="#cb1-79" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-80"><a href="#cb1-80" aria-hidden="true" tabindex="-1"></a>!<span class="co">[</span><span class="ot">Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in $[0,1]$, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimised with the correct prediction, i.e. if $\zeta.p(1) = 1$ when $y = 1$ and $\zeta.p(1) = 0$ when $y = 0$ for a predicted discrete distribution $\zeta$.</span><span class="co">](Figures/evaluation/brier_logloss.png)</span>{#fig-eval-brierlog fig-alt="TODO"}</span>
+<span id="cb1-81"><a href="#cb1-81" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-82"><a href="#cb1-82" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">FIXME</span><span class="co"> - I THINK THIS CAN PROBABLY BE DELETED --&gt;</span></span>
+<span id="cb1-83"><a href="#cb1-83" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- #### Regression {#sec-eval-distr-score-reg-reg}</span></span>
+<span id="cb1-84"><a href="#cb1-84" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-85"><a href="#cb1-85" aria-hidden="true" tabindex="-1"></a><span class="co">The definition of a probabilistic regression scoring rule follows similarly to the classification setting after a re-specification of the target domain.</span></span>
+<span id="cb1-86"><a href="#cb1-86" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-87"><a href="#cb1-87" aria-hidden="true" tabindex="-1"></a><span class="co">:::: {.callout-note icon=false}</span></span>
+<span id="cb1-88"><a href="#cb1-88" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-89"><a href="#cb1-89" aria-hidden="true" tabindex="-1"></a><span class="co">## Probabilistic regression loss</span></span>
+<span id="cb1-90"><a href="#cb1-90" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-91"><a href="#cb1-91" aria-hidden="true" tabindex="-1"></a><span class="co">::: {#cnj-loss-regr}</span></span>
+<span id="cb1-92"><a href="#cb1-92" aria-hidden="true" tabindex="-1"></a><span class="co">Let $\calP$ be some family of distributions over $\calY \subseteq \Reals$ containing at least two elements. Then for a predicted distribution in $\calP$, any real-valued function with the signature $L: \calP \times \calY \rightarrow \ExtReals$ will be considered as a *probabilistic regression loss*.</span></span>
+<span id="cb1-93"><a href="#cb1-93" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-94"><a href="#cb1-94" aria-hidden="true" tabindex="-1"></a><span class="co">:::</span></span>
+<span id="cb1-95"><a href="#cb1-95" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-96"><a href="#cb1-96" aria-hidden="true" tabindex="-1"></a><span class="co">::::</span></span>
+<span id="cb1-97"><a href="#cb1-97" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-98"><a href="#cb1-98" aria-hidden="true" tabindex="-1"></a><span class="co">::: {#def-regr-proper}</span></span>
+<span id="cb1-99"><a href="#cb1-99" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-100"><a href="#cb1-100" aria-hidden="true" tabindex="-1"></a><span class="co">## Regression loss properness</span></span>
+<span id="cb1-101"><a href="#cb1-101" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-102"><a href="#cb1-102" aria-hidden="true" tabindex="-1"></a><span class="co">A probabilistic regression loss  $L: \calP \times \calY \rightarrow \ExtReals$ is called:</span></span>
+<span id="cb1-103"><a href="#cb1-103" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-104"><a href="#cb1-104" aria-hidden="true" tabindex="-1"></a><span class="co">i. *Proper* if: for any distributions $p_Y,p$ in $\calP$ and for any random variables $Y \sim p_Y$, it holds that</span></span>
+<span id="cb1-105"><a href="#cb1-105" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-106"><a href="#cb1-106" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-107"><a href="#cb1-107" aria-hidden="true" tabindex="-1"></a><span class="co">\EE[L(p_Y, Y)] \leq \EE[L(p, Y)]</span></span>
+<span id="cb1-108"><a href="#cb1-108" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-109"><a href="#cb1-109" aria-hidden="true" tabindex="-1"></a><span class="co">i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that</span></span>
+<span id="cb1-110"><a href="#cb1-110" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-111"><a href="#cb1-111" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-112"><a href="#cb1-112" aria-hidden="true" tabindex="-1"></a><span class="co">\EE[L(p_Y, Y)] = \EE[L(p, Y)] \Leftrightarrow p = p_Y</span></span>
+<span id="cb1-113"><a href="#cb1-113" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-114"><a href="#cb1-114" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-115"><a href="#cb1-115" aria-hidden="true" tabindex="-1"></a><span class="co">:::</span></span>
+<span id="cb1-116"><a href="#cb1-116" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-117"><a href="#cb1-117" aria-hidden="true" tabindex="-1"></a><span class="co">#### Losses {.unnumbered .unlisted}</span></span>
+<span id="cb1-118"><a href="#cb1-118" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-119"><a href="#cb1-119" aria-hidden="true" tabindex="-1"></a><span class="co">In the regression setting, classification scoring rules are extended by instead considering distribution functions and integrating these over $\calY \subseteq \Reals$.</span></span>
+<span id="cb1-120"><a href="#cb1-120" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-121"><a href="#cb1-121" aria-hidden="true" tabindex="-1"></a><span class="co">The Integrated Brier Score (IBS) is defined by,^[also known as the Continuous Ranked Probability Score (CRPS).]</span></span>
+<span id="cb1-122"><a href="#cb1-122" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-123"><a href="#cb1-123" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-124"><a href="#cb1-124" aria-hidden="true" tabindex="-1"></a><span class="co">L_{IBS}:\calP \times \calY \rightarrow [0,1]; \quad</span></span>
+<span id="cb1-125"><a href="#cb1-125" aria-hidden="true" tabindex="-1"></a><span class="co">(\zeta, y) \mapsto \int_{\calY} (\II(y \leq \tau) - \zeta.F(\tau))^2 \ d\tau</span></span>
+<span id="cb1-126"><a href="#cb1-126" aria-hidden="true" tabindex="-1"></a><span class="co">$$ {#eq-ibs}</span></span>
+<span id="cb1-127"><a href="#cb1-127" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-128"><a href="#cb1-128" aria-hidden="true" tabindex="-1"></a><span class="co">The extension from the classification Brier score is intuitive, instead of evaluating if the predicted pmf is 'correct' at a single point, the predicted cumulative distribution function is compared with the true event status over the entire distribution.</span></span>
+<span id="cb1-129"><a href="#cb1-129" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-130"><a href="#cb1-130" aria-hidden="true" tabindex="-1"></a><span class="co">The log loss has two adaptations for continuous predictions. The first is analogous to the IBS and is termed the Integrated Log Loss (ILL)</span></span>
+<span id="cb1-131"><a href="#cb1-131" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-132"><a href="#cb1-132" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-133"><a href="#cb1-133" aria-hidden="true" tabindex="-1"></a><span class="co">\begin{split}</span></span>
+<span id="cb1-134"><a href="#cb1-134" aria-hidden="true" tabindex="-1"></a><span class="co">&amp;L_{ILL}:\calP \times \calY \rightarrow \NNReals; \\</span></span>
+<span id="cb1-135"><a href="#cb1-135" aria-hidden="true" tabindex="-1"></a><span class="co">&amp;(\zeta, y) \mapsto - \int_{\calY} \II(y \leq \tau)\log[\zeta.F(\tau)] + \II(y &gt; \tau)\log[\zeta.S(\tau)] \ d\tau</span></span>
+<span id="cb1-136"><a href="#cb1-136" aria-hidden="true" tabindex="-1"></a><span class="co">\end{split}</span></span>
+<span id="cb1-137"><a href="#cb1-137" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-138"><a href="#cb1-138" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-139"><a href="#cb1-139" aria-hidden="true" tabindex="-1"></a><span class="co">This follows the 'longer' form of the binary classification log loss and considers the cumulative probability of events over all time-points. A second adaptation to the log loss instead considers the 'simpler' form and replaces the probability mass function with the probability density function. Again this measure is intuitive as a perfect distributional prediction will assign the highest point of density to the point at which the event occurs. This variant of the log loss does not have a specific name but it is termed here the 'density log loss', $L_{DLL}$, and is formally defined by,</span></span>
+<span id="cb1-140"><a href="#cb1-140" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-141"><a href="#cb1-141" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-142"><a href="#cb1-142" aria-hidden="true" tabindex="-1"></a><span class="co">L_{DLL}:\calP \times \calY \rightarrow \NNReals; \quad</span></span>
+<span id="cb1-143"><a href="#cb1-143" aria-hidden="true" tabindex="-1"></a><span class="co">(\zeta, y) \mapsto - \log[\zeta.f(y)]</span></span>
+<span id="cb1-144"><a href="#cb1-144" aria-hidden="true" tabindex="-1"></a><span class="co">$$ {#eq-density-logloss}</span></span>
+<span id="cb1-145"><a href="#cb1-145" aria-hidden="true" tabindex="-1"></a><span class="co">where $\calP$ is a family of absolutely continuous distributions over $\calY$ with defined density functions.</span></span>
+<span id="cb1-146"><a href="#cb1-146" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-147"><a href="#cb1-147" aria-hidden="true" tabindex="-1"></a><span class="co">All three of these losses are strictly proper [@Gneiting2007; @Gressmann2018]. --&gt;</span></span>
+<span id="cb1-148"><a href="#cb1-148" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-149"><a href="#cb1-149" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">FIXME</span><span class="co">: NEED TO WORK ON THIS SECTION --&gt;</span></span>
+<span id="cb1-150"><a href="#cb1-150" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- ## What makes a survival scoring rule? {#sec-eval-distr-score-surv}</span></span>
+<span id="cb1-151"><a href="#cb1-151" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-152"><a href="#cb1-152" aria-hidden="true" tabindex="-1"></a><span class="co">On the surface, a definition for survival losses may appear to trivially follow from the classification setting, however this is not the case as survival analysis has a unique property in that model predictions do not immediately align with observed outcomes.</span></span>
+<span id="cb1-153"><a href="#cb1-153" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-154"><a href="#cb1-154" aria-hidden="true" tabindex="-1"></a><span class="co">```{r, echo = FALSE}</span></span>
+<span id="cb1-155"><a href="#cb1-155" aria-hidden="true" tabindex="-1"></a><span class="co">learn("sec-surv", "survival task")</span></span>
+<span id="cb1-156"><a href="#cb1-156" aria-hidden="true" tabindex="-1"></a><span class="co">```</span></span>
+<span id="cb1-157"><a href="#cb1-157" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-158"><a href="#cb1-158" aria-hidden="true" tabindex="-1"></a><span class="co">The machine learning survival analysis task is to predict the distribution of the survival time, however in practice we observe the outcome time, which could be survival or censoring.</span></span>
+<span id="cb1-159"><a href="#cb1-159" aria-hidden="true" tabindex="-1"></a><span class="co">Hence, a survival scoring rule does not compare the predicted survival time distribution, $p$, with $Y$ but with $T$.</span></span>
+<span id="cb1-160"><a href="#cb1-160" aria-hidden="true" tabindex="-1"></a><span class="co">To make matters more complex, we are not interested in whether the true</span></span>
+<span id="cb1-161"><a href="#cb1-161" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-162"><a href="#cb1-162" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-163"><a href="#cb1-163" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-164"><a href="#cb1-164" aria-hidden="true" tabindex="-1"></a><span class="co">As we have seen in previous chapters, many measures incorporate IPCW, which is the process of weighting a measure by the inverse of the censoring distribution.</span></span>
+<span id="cb1-165"><a href="#cb1-165" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-166"><a href="#cb1-166" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-167"><a href="#cb1-167" aria-hidden="true" tabindex="-1"></a><span class="co">Losses in the survival setting compare predicted survival distributions to the observed outcome tuple (time and censoring). A large class of survival losses additionally incorporate an estimator of the unknown censoring distribution, in order to attempt meaningful comparison. This second group of losses are termed here as 'approximate' losses as the true censoring distribution is never known and hence an estimate of the loss is approximate at best.</span></span>
+<span id="cb1-168"><a href="#cb1-168" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-169"><a href="#cb1-169" aria-hidden="true" tabindex="-1"></a><span class="co">:::: {.callout-note icon=false}</span></span>
+<span id="cb1-170"><a href="#cb1-170" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-171"><a href="#cb1-171" aria-hidden="true" tabindex="-1"></a><span class="co">## Survival loss</span></span>
+<span id="cb1-172"><a href="#cb1-172" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-173"><a href="#cb1-173" aria-hidden="true" tabindex="-1"></a><span class="co">::: {#cnj-loss-surv}</span></span>
+<span id="cb1-174"><a href="#cb1-174" aria-hidden="true" tabindex="-1"></a><span class="co">Let $\calT \subseteq \NNReals$ and let $\calC, \calP$ be any two distinct families of distributions over $\calT$, containing at least two elements. Then,</span></span>
+<span id="cb1-175"><a href="#cb1-175" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-176"><a href="#cb1-176" aria-hidden="true" tabindex="-1"></a><span class="co">* Any real-valued function with the signature $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ will be considered as a *survival loss*.</span></span>
+<span id="cb1-177"><a href="#cb1-177" aria-hidden="true" tabindex="-1"></a><span class="co">* Any real-valued function with the signature $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$ will be considered as an *approximate survival loss*.</span></span>
+<span id="cb1-178"><a href="#cb1-178" aria-hidden="true" tabindex="-1"></a><span class="co">:::</span></span>
+<span id="cb1-179"><a href="#cb1-179" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-180"><a href="#cb1-180" aria-hidden="true" tabindex="-1"></a><span class="co">::::</span></span>
+<span id="cb1-181"><a href="#cb1-181" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-182"><a href="#cb1-182" aria-hidden="true" tabindex="-1"></a><span class="co">Two separate novel definitions for (strict) properness are provided: the first captures the general case in which no assumptions are made about the censoring distribution; the second assumes that censoring is conditionally event-independent.</span></span>
+<span id="cb1-183"><a href="#cb1-183" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-184"><a href="#cb1-184" aria-hidden="true" tabindex="-1"></a><span class="co">::: {#def-surv-proper}</span></span>
+<span id="cb1-185"><a href="#cb1-185" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-186"><a href="#cb1-186" aria-hidden="true" tabindex="-1"></a><span class="co">## Survival loss properness</span></span>
+<span id="cb1-187"><a href="#cb1-187" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-188"><a href="#cb1-188" aria-hidden="true" tabindex="-1"></a><span class="co">A survival loss $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ is called:</span></span>
+<span id="cb1-189"><a href="#cb1-189" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-190"><a href="#cb1-190" aria-hidden="true" tabindex="-1"></a><span class="co">i. *Proper* if: for any distributions $p_Y, p$ in $\calP$; and for any random variables $Y \sim p_Y$, and $C$ t.v.i. $\calT$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,</span></span>
+<span id="cb1-191"><a href="#cb1-191" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-192"><a href="#cb1-192" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-193"><a href="#cb1-193" aria-hidden="true" tabindex="-1"></a><span class="co">\EE[L(p_Y, T, \Delta)] \leq \EE[L(p, T, \Delta)]</span></span>
+<span id="cb1-194"><a href="#cb1-194" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-195"><a href="#cb1-195" aria-hidden="true" tabindex="-1"></a><span class="co">i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that</span></span>
+<span id="cb1-196"><a href="#cb1-196" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-197"><a href="#cb1-197" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-198"><a href="#cb1-198" aria-hidden="true" tabindex="-1"></a><span class="co">\EE[L(p_Y, T, \Delta)] = \EE[L(p, T, \Delta)] \Leftrightarrow p = p_Y</span></span>
+<span id="cb1-199"><a href="#cb1-199" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-200"><a href="#cb1-200" aria-hidden="true" tabindex="-1"></a><span class="co">i. *Outcome-independent proper* if: for any distributions $p_Y, p$ in $\calP$; and for any random variables $Y \sim p_Y$, and $C$ t.v.i. $\calT$, where $C \indep Y$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,</span></span>
+<span id="cb1-201"><a href="#cb1-201" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-202"><a href="#cb1-202" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-203"><a href="#cb1-203" aria-hidden="true" tabindex="-1"></a><span class="co">\EE[L(p_Y, T, \Delta)] \leq \EE[L(p, T, \Delta)]</span></span>
+<span id="cb1-204"><a href="#cb1-204" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-205"><a href="#cb1-205" aria-hidden="true" tabindex="-1"></a><span class="co">i. *Outcome-independent strictly proper* if in addition to being outcome-independent proper it holds, for the same quantification of variables, that</span></span>
+<span id="cb1-206"><a href="#cb1-206" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-207"><a href="#cb1-207" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-208"><a href="#cb1-208" aria-hidden="true" tabindex="-1"></a><span class="co">\EE[L(p_Y, T, \Delta)] = \EE[L(p, T, \Delta)] \Leftrightarrow p = p_Y</span></span>
+<span id="cb1-209"><a href="#cb1-209" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-210"><a href="#cb1-210" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-211"><a href="#cb1-211" aria-hidden="true" tabindex="-1"></a><span class="co">:::</span></span>
+<span id="cb1-212"><a href="#cb1-212" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-213"><a href="#cb1-213" aria-hidden="true" tabindex="-1"></a><span class="co">These final two definitions are 'weaker' but provide a term for losses that are improper in general but are (strictly) proper under common (though possibly strict) assumptions about the censoring distribution. Note by definition that if a loss is:</span></span>
+<span id="cb1-214"><a href="#cb1-214" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-215"><a href="#cb1-215" aria-hidden="true" tabindex="-1"></a><span class="co">i. (strictly) proper then it is also outcome-independent (strictly) proper;</span></span>
+<span id="cb1-216"><a href="#cb1-216" aria-hidden="true" tabindex="-1"></a><span class="co">i. (outcome-independent) strictly proper then it is also (outcome-independent) proper</span></span>
+<span id="cb1-217"><a href="#cb1-217" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-218"><a href="#cb1-218" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-219"><a href="#cb1-219" aria-hidden="true" tabindex="-1"></a><span class="co">Analogous definitions are now provided for approximate survival losses.</span></span>
+<span id="cb1-220"><a href="#cb1-220" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-221"><a href="#cb1-221" aria-hidden="true" tabindex="-1"></a><span class="co">::: {#def-surv-approx-proper}</span></span>
+<span id="cb1-222"><a href="#cb1-222" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-223"><a href="#cb1-223" aria-hidden="true" tabindex="-1"></a><span class="co">## Survival approximate loss properness</span></span>
+<span id="cb1-224"><a href="#cb1-224" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-225"><a href="#cb1-225" aria-hidden="true" tabindex="-1"></a><span class="co">An approximate survival loss $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$ is called:</span></span>
+<span id="cb1-226"><a href="#cb1-226" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-227"><a href="#cb1-227" aria-hidden="true" tabindex="-1"></a><span class="co">i. *Proper* if: for any distributions $p_Y, p$ in $\calP$ and $c \in \calC$; and for any random variables $Y \sim p_Y$ and $C \sim c$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,</span></span>
+<span id="cb1-228"><a href="#cb1-228" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-229"><a href="#cb1-229" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-230"><a href="#cb1-230" aria-hidden="true" tabindex="-1"></a><span class="co">\EE[L(p_Y, T, \Delta|c)] \leq \EE[L(p, T, \Delta|c)]</span></span>
+<span id="cb1-231"><a href="#cb1-231" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-232"><a href="#cb1-232" aria-hidden="true" tabindex="-1"></a><span class="co">i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that</span></span>
+<span id="cb1-233"><a href="#cb1-233" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-234"><a href="#cb1-234" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-235"><a href="#cb1-235" aria-hidden="true" tabindex="-1"></a><span class="co">\EE[L(p_Y, T, \Delta|c)] = \EE[L(p, T, \Delta|c)] \Leftrightarrow p = p_Y</span></span>
+<span id="cb1-236"><a href="#cb1-236" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-237"><a href="#cb1-237" aria-hidden="true" tabindex="-1"></a><span class="co">i. *Outcome-independent proper* if: for any distributions $p_Y, p$ in $\calP$ and $c \in \calC$; and for any random variables $Y \sim p_Y$ and $C \sim c$, where $C \indep Y$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,</span></span>
+<span id="cb1-238"><a href="#cb1-238" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-239"><a href="#cb1-239" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-240"><a href="#cb1-240" aria-hidden="true" tabindex="-1"></a><span class="co">\EE[L(p_Y, T, \Delta|c)] \leq \EE[L(p, T, \Delta|c)]</span></span>
+<span id="cb1-241"><a href="#cb1-241" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-242"><a href="#cb1-242" aria-hidden="true" tabindex="-1"></a><span class="co">i. *Outcome-independent strictly proper* if in addition to being outcome-independent proper it holds, for the same quantification of variables, that</span></span>
+<span id="cb1-243"><a href="#cb1-243" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-244"><a href="#cb1-244" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-245"><a href="#cb1-245" aria-hidden="true" tabindex="-1"></a><span class="co">\EE[L(p_Y, T, \Delta|c)] = \EE[L(p, T, \Delta|c)] \Leftrightarrow p = p_Y</span></span>
+<span id="cb1-246"><a href="#cb1-246" aria-hidden="true" tabindex="-1"></a><span class="co">$$</span></span>
+<span id="cb1-247"><a href="#cb1-247" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-248"><a href="#cb1-248" aria-hidden="true" tabindex="-1"></a><span class="co">:::</span></span>
+<span id="cb1-249"><a href="#cb1-249" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-250"><a href="#cb1-250" aria-hidden="true" tabindex="-1"></a><span class="co">As the true censoring distribution, $c$, can never be known exactly, this definition allows for approximate losses to be proper in the asymptotic (with infinite training data) if they include estimators of $c$ that are convergent in distribution. Proper approximate losses are therefore useful in modern predictive settings in which 'big data' is very common and thus estimators, such as the Kaplan-Meier, can converge to the true censoring distribution. However approximate losses may provide misleading results when the sample size is small; future research should ascertain what 'small' means for individual losses. --&gt;</span></span>
+<span id="cb1-251"><a href="#cb1-251" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-252"><a href="#cb1-252" aria-hidden="true" tabindex="-1"></a><span class="fu">## Survival Losses {#sec-eval-distr-commonsurv}</span></span>
+<span id="cb1-253"><a href="#cb1-253" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-254"><a href="#cb1-254" aria-hidden="true" tabindex="-1"></a>We are now ready to list common scoring rules in survival analysis and discuss some of their properties.</span>
+<span id="cb1-255"><a href="#cb1-255" aria-hidden="true" tabindex="-1"></a>As with other chapters, this list is likely not exhaustive but will cover commonly used losses.</span>
+<span id="cb1-256"><a href="#cb1-256" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-257"><a href="#cb1-257" aria-hidden="true" tabindex="-1"></a><span class="fu">### Integrated Graf Score</span></span>
+<span id="cb1-258"><a href="#cb1-258" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-259"><a href="#cb1-259" aria-hidden="true" tabindex="-1"></a>The Integrated Graf Score (IGS) was introduced by Graf <span class="co">[</span><span class="ot">@Graf1995; @Graf1999</span><span class="co">]</span> as an analogue to the integrated brier score (IBS) in regression.</span>
+<span id="cb1-260"><a href="#cb1-260" aria-hidden="true" tabindex="-1"></a>The loss is defined by</span>
+<span id="cb1-261"><a href="#cb1-261" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-262"><a href="#cb1-262" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-263"><a href="#cb1-263" aria-hidden="true" tabindex="-1"></a>\begin{split}</span>
+<span id="cb1-264"><a href="#cb1-264" aria-hidden="true" tabindex="-1"></a>L_{IGS}(\hat{S}, t, \delta|\KMG) = \int^{\tau^*}_0  \frac{\hat{S}^2(\tau) \II(t \leq \tau, \delta=1)}{\KMG(t)} + \frac{\hat{F}^2(\tau) \II(t &gt; \tau)}{\KMG(\tau)} \ d\tau</span>
+<span id="cb1-265"><a href="#cb1-265" aria-hidden="true" tabindex="-1"></a>\end{split}</span>
+<span id="cb1-266"><a href="#cb1-266" aria-hidden="true" tabindex="-1"></a>$$ {#eq-igs}</span>
+<span id="cb1-267"><a href="#cb1-267" aria-hidden="true" tabindex="-1"></a>where  $\hatS^2(\tau) = (\hatS(\tau))^2$ and $\hatF^2(\tau) = (1 - \hatS(\tau)^2$, and $\tau^* \in \NNReals$ is an upper threshold to compute the loss up to, and $\KMG$ is the Kaplan-Meier trained on the censoring distribution for IPCW.</span>
+<span id="cb1-268"><a href="#cb1-268" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-269"><a href="#cb1-269" aria-hidden="true" tabindex="-1"></a><span class="in">```{r echo = FALSE}</span></span>
+<span id="cb1-270"><a href="#cb1-270" aria-hidden="true" tabindex="-1"></a><span class="fu">learn</span>(<span class="st">"sec-eval-crank-disc-conc"</span>, <span class="st">"IPCW"</span>)</span>
+<span id="cb1-271"><a href="#cb1-271" aria-hidden="true" tabindex="-1"></a><span class="in">```</span></span>
+<span id="cb1-272"><a href="#cb1-272" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-273"><a href="#cb1-273" aria-hidden="true" tabindex="-1"></a>To understand this loss, let's break it down and look at the computations at a single time-point, $\tau$.</span>
+<span id="cb1-274"><a href="#cb1-274" aria-hidden="true" tabindex="-1"></a>At $\tau$ the loss will either be:</span>
+<span id="cb1-275"><a href="#cb1-275" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-276"><a href="#cb1-276" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>$\frac{\hat{S}^2(\tau)}{\KMG(t)}$ - If the observation experiences the event before $\tau$</span>
+<span id="cb1-277"><a href="#cb1-277" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>0 - If the observation is censored before $\tau$</span>
+<span id="cb1-278"><a href="#cb1-278" aria-hidden="true" tabindex="-1"></a><span class="ss">3. </span>$\frac{\hat{F}^2(\tau)}{\KMG(\tau)}$ - If the observation's outcome is after $\tau$</span>
+<span id="cb1-279"><a href="#cb1-279" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-280"><a href="#cb1-280" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">FIXME</span><span class="co">: BELOW IS TERRIBLY WRITTEN! --&gt;</span></span>
+<span id="cb1-281"><a href="#cb1-281" aria-hidden="true" tabindex="-1"></a>As we have no information about the true survival time of censored observations, it is sensible to not attempt to provide a meaningful score once censored, so their contribution is $0$.</span>
+<span id="cb1-282"><a href="#cb1-282" aria-hidden="true" tabindex="-1"></a>For observations that are known to have experience the event at $\tau$, then we would expect their survival probability to be zero as the event has occurred (and they cannot continue to survive) hence contributing $\hatS^2$ -- the addition of $\KMG(t)$ has the effect of placing more weight on the score at the observed event time if the proportion of censoring is lower at this time, the reason being that when the observations are alive ($t &gt; \tau$) then their contributing the rest of the weighting after this time.</span>
+<span id="cb1-283"><a href="#cb1-283" aria-hidden="true" tabindex="-1"></a>Finally, for observations who are still alive, then we'd expect their survival probability to be as close to 1 as possible with inverse weighting at the current timepoint.</span>
+<span id="cb1-284"><a href="#cb1-284" aria-hidden="true" tabindex="-1"></a>As $\tau \rightarrow \infty$, then $\KMG(\tau) \rightarrow 0$ as the number of observations in the dataset decreases, hence this weighting ensures that observations that are still in the data can contribute as if all observations were still in the data.</span>
+<span id="cb1-285"><a href="#cb1-285" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-286"><a href="#cb1-286" aria-hidden="true" tabindex="-1"></a>When censoring is uninformative, the IGS consistently estimates the mean square error $L(t, S|\tau^*) = \int^{\tau^*}_0 <span class="co">[</span><span class="ot">\II(t &gt; \tau) - S(\tau)</span><span class="co">]</span>^2 d\tau$, where $S$ is the correctly specified survival function <span class="co">[</span><span class="ot">@Gerds2006</span><span class="co">]</span>.</span>
+<span id="cb1-287"><a href="#cb1-287" aria-hidden="true" tabindex="-1"></a>However, despite these promising properties, the IGS is improper and must therefore be used with care <span class="co">[</span><span class="ot">@Rindt2022; @Sonabend2022b</span><span class="co">]</span>.</span>
+<span id="cb1-288"><a href="#cb1-288" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-289"><a href="#cb1-289" aria-hidden="true" tabindex="-1"></a>The reweighted IGS is a strictly proper outcome-independent loss <span class="co">[</span><span class="ot">@Sonabend2022b</span><span class="co">]</span> that reweights the IGS by removing censored observations and reweighting the denominator.</span>
+<span id="cb1-290"><a href="#cb1-290" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-291"><a href="#cb1-291" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-292"><a href="#cb1-292" aria-hidden="true" tabindex="-1"></a>L_{RIGS}(\hatS, t, \delta|\KMG) = \frac{\delta \int_{\calT} (\II(t \leq \tau) - \hatF(\tau))^2 \ d\tau}{\KMG(t)}</span>
+<span id="cb1-293"><a href="#cb1-293" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-294"><a href="#cb1-294" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-295"><a href="#cb1-295" aria-hidden="true" tabindex="-1"></a>This loss removes all censored observations, which can be problematic if the proportion of censoring is high.</span>
+<span id="cb1-296"><a href="#cb1-296" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">FIXME</span><span class="co">: THIS IS ALSO TERRIBLY WRITTEN! --&gt;</span></span>
+<span id="cb1-297"><a href="#cb1-297" aria-hidden="true" tabindex="-1"></a>For uncensored observations we expect the predicted survival probability to be $1$ before any outcome is observed and $0$ otherwise, which follows more closely to the integrated Brier score.</span>
+<span id="cb1-298"><a href="#cb1-298" aria-hidden="true" tabindex="-1"></a>By changing the weighting the interpretation of contributions at time-points changes slightly, in the original IGS we may think of this as "inverse weighting for as long as the observation remains in the data", which means the weight of a contribution at a time-point will be different for all observations and all time-points.</span>
+<span id="cb1-299"><a href="#cb1-299" aria-hidden="true" tabindex="-1"></a>On the other hand, for RIGS, we weight by the outcome time for each observation, which remains the same over time.</span>
+<span id="cb1-300"><a href="#cb1-300" aria-hidden="true" tabindex="-1"></a>Hence we instead inflate scores for observations whose outcome are later in the dataset, this is intuitive as it essentially places more importance on observations that are representative of being alive at those time points.</span>
+<span id="cb1-301"><a href="#cb1-301" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-302"><a href="#cb1-302" aria-hidden="true" tabindex="-1"></a>As the loss is strictly proper it may be 'safer' to use than the IGS in automated experiments, however this does come at the expense of removing censored observations.</span>
+<span id="cb1-303"><a href="#cb1-303" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-304"><a href="#cb1-304" aria-hidden="true" tabindex="-1"></a><span class="fu">### Integrated Survival Log Loss</span></span>
+<span id="cb1-305"><a href="#cb1-305" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-306"><a href="#cb1-306" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">FIXME</span><span class="co"> - SHOULD WE JUST DELETE? --&gt;</span></span>
+<span id="cb1-307"><a href="#cb1-307" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-308"><a href="#cb1-308" aria-hidden="true" tabindex="-1"></a>The integrated survival log loss (ISLL) was also proposed by @Graf1999.</span>
+<span id="cb1-309"><a href="#cb1-309" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-310"><a href="#cb1-310" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-311"><a href="#cb1-311" aria-hidden="true" tabindex="-1"></a>L_{ISLL}(\hatS,t,\delta|\KMG) = -\int^{\tau^*}_0  \frac{\log<span class="co">[</span><span class="ot">\hatF(\tau)</span><span class="co">]</span> \II(t \leq \tau, \delta=1)}{\KMG(t)} + \frac{\log<span class="co">[</span><span class="ot">\hatS(\tau)</span><span class="co">]</span> \II(t &gt; \tau)}{\KMG(\tau)} \ d\tau</span>
+<span id="cb1-312"><a href="#cb1-312" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-313"><a href="#cb1-313" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-314"><a href="#cb1-314" aria-hidden="true" tabindex="-1"></a>where $\tau^* \in \calT$ is an upper threshold to compute the loss up to.</span>
+<span id="cb1-315"><a href="#cb1-315" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-316"><a href="#cb1-316" aria-hidden="true" tabindex="-1"></a>Similarly to the IGS, there are three ways to contribute to the loss depending on whether an observation is censored, experienced the event, or alive, at $\tau$.</span>
+<span id="cb1-317"><a href="#cb1-317" aria-hidden="true" tabindex="-1"></a>Whilst the IGS is routinely used in practice, there is no evidence that ISLL is used, and moreover there are no proofs (or claims) that it is proper.</span>
+<span id="cb1-318"><a href="#cb1-318" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-319"><a href="#cb1-319" aria-hidden="true" tabindex="-1"></a>The reweighted ISLL (RISLL) follows similarly to the RIGS and is also outcome-independent strictly proper <span class="co">[</span><span class="ot">@Sonabend2022b</span><span class="co">]</span>.</span>
+<span id="cb1-320"><a href="#cb1-320" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-321"><a href="#cb1-321" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-322"><a href="#cb1-322" aria-hidden="true" tabindex="-1"></a>L_{RISLL}(\hatS, t, \delta|\KMG) \mapsto -\frac{\delta \int_{\calT} \II(t \leq \tau)\log<span class="co">[</span><span class="ot">\hatF(\tau)</span><span class="co">]</span> + \II(t &gt; \tau)\log<span class="co">[</span><span class="ot">\hatS(\tau)</span><span class="co">]</span> \ d\tau}{\KMG(t)}</span>
+<span id="cb1-323"><a href="#cb1-323" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-324"><a href="#cb1-324" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-325"><a href="#cb1-325" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-326"><a href="#cb1-326" aria-hidden="true" tabindex="-1"></a><span class="fu">### Survival density log loss</span></span>
+<span id="cb1-327"><a href="#cb1-327" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-328"><a href="#cb1-328" aria-hidden="true" tabindex="-1"></a>Another outcome-independent strictly proper scoring rule is the survival density log loss (SDLL) <span class="co">[</span><span class="ot">@Sonabend2022b</span><span class="co">]</span>, which is given by</span>
+<span id="cb1-329"><a href="#cb1-329" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-330"><a href="#cb1-330" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-331"><a href="#cb1-331" aria-hidden="true" tabindex="-1"></a>L_{SDLL}(\hatf, t, \delta|\KMG) = - \frac{\delta \log<span class="co">[</span><span class="ot">\hatf(t)</span><span class="co">]</span>}{\KMG(t)}</span>
+<span id="cb1-332"><a href="#cb1-332" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-333"><a href="#cb1-333" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-334"><a href="#cb1-334" aria-hidden="true" tabindex="-1"></a>where $\hatf$ is the predicted probability density function.</span>
+<span id="cb1-335"><a href="#cb1-335" aria-hidden="true" tabindex="-1"></a>This loss is essentially the classification log loss ($-log(\hatp(t))$) with added IPCW.</span>
+<span id="cb1-336"><a href="#cb1-336" aria-hidden="true" tabindex="-1"></a>Whilst the classification log loss has beneficial properties such as being differentiable, this is more complex for the SDLL, which is also only an approximate loss.</span>
+<span id="cb1-337"><a href="#cb1-337" aria-hidden="true" tabindex="-1"></a>A useful alternative to the SDLL which can be readily used in automated procedures is the right-censored log loss.</span>
+<span id="cb1-338"><a href="#cb1-338" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-339"><a href="#cb1-339" aria-hidden="true" tabindex="-1"></a><span class="fu">### Right-censored log loss</span></span>
+<span id="cb1-340"><a href="#cb1-340" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-341"><a href="#cb1-341" aria-hidden="true" tabindex="-1"></a>The right-censored log loss (RCLL) is an outcome-independent strictly proper scoring rule <span class="co">[</span><span class="ot">@Avati2020</span><span class="co">]</span> that does not make use of IPCW and is thus not considered to be an approximate loss.</span>
+<span id="cb1-342"><a href="#cb1-342" aria-hidden="true" tabindex="-1"></a>The RCLL is defined by</span>
+<span id="cb1-343"><a href="#cb1-343" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-344"><a href="#cb1-344" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-345"><a href="#cb1-345" aria-hidden="true" tabindex="-1"></a>L_{RCLL}(\hatS, t, \delta) = -\log<span class="co">[</span><span class="ot">\delta\hatf(t) + (1-\delta)\hatS(t)</span><span class="co">]</span></span>
+<span id="cb1-346"><a href="#cb1-346" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-347"><a href="#cb1-347" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-348"><a href="#cb1-348" aria-hidden="true" tabindex="-1"></a>This loss is easily interpretable when we break it down into its two halves:</span>
+<span id="cb1-349"><a href="#cb1-349" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-350"><a href="#cb1-350" aria-hidden="true" tabindex="-1"></a><span class="ss">1. </span>If an observation is censored at $t$ then all the information we have is that they did not experience the event at the time, so they must be 'alive', hence the optimal value is $\hatS(t) = 1$ (which becomes $-log(1) = 0$).</span>
+<span id="cb1-351"><a href="#cb1-351" aria-hidden="true" tabindex="-1"></a><span class="ss">2. </span>If an observation experiences the event then the 'best' prediction is for the probability of the event at that time to be maximised, as pdfs are not upper-bounded this means $\hatf(t) = \infty$ (and $-log(t) \rightarrow \infty$ as $t \rightarrow \infty$).</span>
+<span id="cb1-352"><a href="#cb1-352" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-353"><a href="#cb1-353" aria-hidden="true" tabindex="-1"></a><span class="fu">### Absolute Survival Loss</span></span>
+<span id="cb1-354"><a href="#cb1-354" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-355"><a href="#cb1-355" aria-hidden="true" tabindex="-1"></a>The absolute survival loss, developed over time by @Schemper2000 and @Schmid2011, is based on the mean absolute error is very similar to the IGS but removes the squared time:</span>
+<span id="cb1-356"><a href="#cb1-356" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-357"><a href="#cb1-357" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-358"><a href="#cb1-358" aria-hidden="true" tabindex="-1"></a>L_{ASL}(\hatS, t, \delta|\KMG) = \int^{\tau^*}_0 \frac{\zeta.S(\tau)\II(t \leq \tau, \delta = 1)}{\KMG(t)} + \frac{\zeta.F(\tau)\II(t &gt; \tau)}{\KMG(\tau)} \ d\tau</span>
+<span id="cb1-359"><a href="#cb1-359" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-360"><a href="#cb1-360" aria-hidden="true" tabindex="-1"></a>where $\KMG$ and $\tau^*$ are as defined above.</span>
+<span id="cb1-361"><a href="#cb1-361" aria-hidden="true" tabindex="-1"></a>Analogously to the IGS, the ASL score consistently estimates the mean absolute error when censoring is uninformative <span class="co">[</span><span class="ot">@Schmid2011</span><span class="co">]</span> but there are also no proofs or claims of properness.</span>
+<span id="cb1-362"><a href="#cb1-362" aria-hidden="true" tabindex="-1"></a>The ASL and IGS tend to yield similar results <span class="co">[</span><span class="ot">@Schmid2011</span><span class="co">]</span> but in practice there is no evidence of the ASL being widely used.</span>
+<span id="cb1-363"><a href="#cb1-363" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-364"><a href="#cb1-364" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">FIXME</span><span class="co"> - ADD FURTHER SCORING RULES HERE --&gt;</span></span>
+<span id="cb1-365"><a href="#cb1-365" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-366"><a href="#cb1-366" aria-hidden="true" tabindex="-1"></a><span class="fu">## Prediction Error Curves {#sec-pecs}</span></span>
+<span id="cb1-367"><a href="#cb1-367" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-368"><a href="#cb1-368" aria-hidden="true" tabindex="-1"></a><span class="co">&lt;!-- </span><span class="al">FIXME</span><span class="co"> - UNCHANGED FROM THESIS. I THINK FINE FOR NOW BUT NEEDS TO BE REWRITTEN IN THE FUTURE (MAINLY TO AVOID SELF PLAGIARISM) --&gt;</span></span>
+<span id="cb1-369"><a href="#cb1-369" aria-hidden="true" tabindex="-1"></a>As well as evaluating probabilistic outcomes with integrated scoring rules, non-integrated scoring rules can be utilised for evaluating distributions at a single point.</span>
+<span id="cb1-370"><a href="#cb1-370" aria-hidden="true" tabindex="-1"></a>For example, instead of evaluating a probabilistic prediction with the IGS over $\NNReals$, instead one could compute the IGS at a single time-point, $\tau \in \NNReals$, only.</span>
+<span id="cb1-371"><a href="#cb1-371" aria-hidden="true" tabindex="-1"></a>Plotting these for varying values of $\tau$ results in 'prediction error curves' (PECs), which provide a simple visualisation for how predictions vary over the outcome.</span>
+<span id="cb1-372"><a href="#cb1-372" aria-hidden="true" tabindex="-1"></a>PECs are especially useful for survival predictions as they can visualise the prediction 'over time'.</span>
+<span id="cb1-373"><a href="#cb1-373" aria-hidden="true" tabindex="-1"></a>PECs should only be used as a graphical guide and never for model comparison as they only provide information at a limited number of points.</span>
+<span id="cb1-374"><a href="#cb1-374" aria-hidden="true" tabindex="-1"></a>An example is provided in @fig-eval-pecs for the IGS where the the Cox PH consistently outperforms the SVM.</span>
+<span id="cb1-375"><a href="#cb1-375" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-376"><a href="#cb1-376" aria-hidden="true" tabindex="-1"></a><span class="al">![Prediction error curves for the CPH and SVM models from @sec-eval-distr-calib. x-axis is time and y-axis is the IGS computed at different time-points. The CPH (red) performs better than the SVM (blue) as it scores consistently lower. Trained and tested on randomly simulated data from $\proba$.](Figures/evaluation/pecs.png)</span>{#fig-eval-pecs fig-alt="TODO"}</span>
+<span id="cb1-377"><a href="#cb1-377" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-378"><a href="#cb1-378" aria-hidden="true" tabindex="-1"></a><span class="fu">## Baselines and ERV {#sec-eval-distr-score-base}</span></span>
+<span id="cb1-379"><a href="#cb1-379" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-380"><a href="#cb1-380" aria-hidden="true" tabindex="-1"></a>A common criticism of scoring rules is a lack of interpretability, for example, an IGS of 0.5 or 0.0005 has no meaning by itself, so below we present two methods to help overcome this problem.</span>
+<span id="cb1-381"><a href="#cb1-381" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-382"><a href="#cb1-382" aria-hidden="true" tabindex="-1"></a>The first method, is to make use of baselines for model comparison, which are models or values that can be utilised to provide a reference for a loss, they provide a universal method to judge all models of the same class by <span class="co">[</span><span class="ot">@Gressmann2018</span><span class="co">]</span>.</span>
+<span id="cb1-383"><a href="#cb1-383" aria-hidden="true" tabindex="-1"></a>In classification, it is possible to derive analytical baseline values, for example a Brier score is considered 'good' if it is below 0.25 or a log loss if it is below 0.693 (@fig-eval-brierlog), this is because these are the values obtained if you always predicted probabilties as $0.5$, which is a reasonable basline guess in a binary classificaiton problem.</span>
+<span id="cb1-384"><a href="#cb1-384" aria-hidden="true" tabindex="-1"></a>In survival analysis, simple analytical expressions are not possible as losses are dependent on the unknown distributions of both the survival and censoring time.</span>
+<span id="cb1-385"><a href="#cb1-385" aria-hidden="true" tabindex="-1"></a>Therefore all experiments in survival analysis must include a baseline model that can produce a reference value in order to derive meaningful results.</span>
+<span id="cb1-386"><a href="#cb1-386" aria-hidden="true" tabindex="-1"></a>A suitable baseline model is the Kaplan-Meier estimator <span class="co">[</span><span class="ot">@Graf1995; @Lawless2010; @Royston2013</span><span class="co">]</span>, which is the simplest model that can consistently estimate the true survival function.</span>
+<span id="cb1-387"><a href="#cb1-387" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-388"><a href="#cb1-388" aria-hidden="true" tabindex="-1"></a>As well as directly comparing losses from a 'sophisticated' model to a baseline, one can also compute the percentage increase in performance between the sophisicated and baseline models, which produces a measure of explained residual variation (ERV) <span class="co">[</span><span class="ot">@Korn1990; @Korn1991</span><span class="co">]</span>.</span>
+<span id="cb1-389"><a href="#cb1-389" aria-hidden="true" tabindex="-1"></a>For any survival loss $L$, the ERV is,</span>
+<span id="cb1-390"><a href="#cb1-390" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-391"><a href="#cb1-391" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-392"><a href="#cb1-392" aria-hidden="true" tabindex="-1"></a>R_L(S, B) = 1 - \frac{L|S}{L|B}</span>
+<span id="cb1-393"><a href="#cb1-393" aria-hidden="true" tabindex="-1"></a>$$</span>
+<span id="cb1-394"><a href="#cb1-394" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-395"><a href="#cb1-395" aria-hidden="true" tabindex="-1"></a>where $L|S$ and $L|B$ is the loss computed with respect to predictions from the sophisticated and baseline models respectively.</span>
+<span id="cb1-396"><a href="#cb1-396" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-397"><a href="#cb1-397" aria-hidden="true" tabindex="-1"></a>The ERV interpretation makes reporting of scoring rules easier within and between experiments.</span>
+<span id="cb1-398"><a href="#cb1-398" aria-hidden="true" tabindex="-1"></a>For example, say in experiment A we have $L|S = 0.004$ and $L|B = 0.006$, and in experiment B we have $L|S = 4$ and $L|B = 6$.</span>
+<span id="cb1-399"><a href="#cb1-399" aria-hidden="true" tabindex="-1"></a>The sophisticated model may appear worse at first glance in experiment A (as the losses are very close) but when considering the ERV we see that the performance increase is identical (both $R_L = 33\%$), thus providing a clearer way to compare models.</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div></div></div></div></div>
+</div> <!-- /content -->
+<footer class="footer"><div class="nav-footer">
+    <div class="nav-footer-left">All content licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> <br> © Raphael Sonabend, Andreas Bender.</div>   
+    <div class="nav-footer-center"><a href="https://www.mlsabook.com">Website</a> | <a href="https://github.com/RaphaelS1/MLSA">GitHub</a></div>
+    <div class="nav-footer-right">Built with <a href="https://quarto.org/">Quarto</a>.</div>
+  </div>
+</footer>
+
+
+</body></html>
