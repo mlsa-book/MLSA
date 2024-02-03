@@ -1,8 +1,5 @@
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
   pull_request:
     branches:
       - main
@@ -24,11 +21,11 @@ jobs:
       - name: Check TODO/FIXMEs
         run: |
           #!/bin/bash
-  
+
           # Search TODO/FIXME and strip whitespace
           count=$(grep -Rniwo --include="*.qmd" -e 'TODO\|FIXME' book/ | wc -l)
           count=$(echo "$count" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-  
+
           # Warn if count>0
           if [ "$count" -gt 0 ]; then
               echo "::warning::There are $count FIXMEs/TODOs."
@@ -48,26 +45,11 @@ jobs:
         with:
           use-public-rspm: true
 
-      - name: Install dependencies
-        uses: r-lib/actions/setup-r-dependencies@v2
+      - name: Install renv
+        run: Rscript -e 'install.packages("renv")'
 
       - name: Render book
         run: make render
-
-      # - name: Publish to Netlify (and render)
-      #   if: ${{ github.event_name == 'pull_request' }}
-      #   uses: quarto-dev/quarto-actions/publish@v2
-      #   with:
-      #     target: netlify
-      #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-      #     github_token: ${{ secrets.GITHUB_TOKEN }}
-      #     path: book/_book
-      #     netlify_url: MLSA.netlify.app
-
-      # - name: Publish to GitHub Pages (and render)
-      #   uses: quarto-dev/quarto-actions/publish@v2
-      #   with:
-      #     target: gh-pages
 
       - name: Upload pdf book
         uses: actions/upload-artifact@v3
@@ -75,7 +57,7 @@ jobs:
           name: MLSA
           path: book/_book/Machine-Learning-in-Survival-Analysis.pdf
           retention-days: 5
-          
+
       - name: Add & Commit
         if: ${{ github.event_name == 'pull_request' }}
         uses: EndBug/add-and-commit@v9.1.1
@@ -90,12 +72,3 @@ jobs:
           comment_tag: preview
           message: |
             [Book :open_book:](https://github.com/RaphaelS1/MLSA/blob/${{ github.event.pull_request.head.ref }}/book/_book/Machine-Learning-in-Survival-Analysis.pdf)
-
-      # - name: Deploy
-      #   if: ${{ github.event_name == 'push' }}
-      #   uses: JamesIves/github-pages-deploy-action@v4
-      #   with:
-      #     token: ${{ secrets.GITHUB_TOKEN }}
-      #     branch: gh-pages
-      #     folder: book/_book
-      #     single-commit: true
