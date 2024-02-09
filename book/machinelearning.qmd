@@ -12,39 +12,106 @@ This chapter covers core concepts in machine learning.
 This is not intended as a comprehensive introduction and does not cover mathematically theory nor how to run machine learning models using software.
 Instead, the focus is on introducing important concepts and providing basic intuition into how these can be applied to any machine learning problem, these include machine learning tasks, data splitting, model training and predicting, evaluation, and model comparison.
 @Hastie2013 provides a very good introduction to machine learning, with more detail in @Hastie2001.
-There are several books covering machine learning implementations in various programming languages, for example @Bischl2024 and @Kuhn2023 for $\RStats$ and @Geron2019 for Python.
+There are several books covering machine learning implementations in various programming languages, for example @Bischl2024 and @Kuhn2023 for $\Rstats$ and @Geron2019 for Python.
 
-## Machine learning tasks {#sec-ml-tasks}
+## Basic workflow {#sec-ml-basics}
 
 This book focuses on *supervised learning*, in which predictions are made for outcomes based on data with observed dependent and independent variables.
 For example, predicting someone's height is a supervised learning problem as data can be collected for features (independent variables) such as age and sex, and an observable outcome (dependent variable), which is height.
 Alternatives to supervised learning include *unsupervised learning*, *semi-supervised learning*, and *reinforcement learning*.
 This book is primarily concerned with *predictive* survival analysis, i.e., making future predictions based on (partially) observed survival outcomes, which falls naturally within the supervised learning domain.
 
+The basic machine learning workflow is represented in @fig-ml-basic.
+Data is split into training and test datasets.
+A learner is selected and is trained on the training data, becoming a fitted model.
+The features from the test data is passed to the model which makes predictions for the unseen labels.
+The labels from the test data are passed to a chosen measure with the predictions, which evaluates the performance of the model.
+The process if repeating this procedure to test different training and test data is called *resampling* and multiple resampling experiments with different models is called *benchmarking*.
+All these concepts will be explained in this chapter.
+
+<!-- FIXME - WE'LL WANT TO REDRAW THIS -->
+```{mermaid}
+%%| label: fig-ml-basic
+%%| fig-cap: "Basic machine learning workflow with data splitting, model training, predicting, and evaluating."
+flowchart LR
+  D(Data) --> Tr(Train)
+  D --> Te(Test)
+  Tr --> L(Learner)
+  L --> Mo(Model)
+  Te --Features--> Mo
+  Mo --> Pr(Prediction)
+  Pr --> Me(Measure)
+  Te --Labels--> Me
+  Me --> Pe(Performance)
+```
+
+## Tasks {#sec-ml-tasks}
+
+A machine learning task is the specification of the mathematical problem that is to be solved by a given algorithm.
+For example, "predict the height of a male, 13 year old child", is a machine learning task.
+Tasks are derived from datasets and one dataset will give rise to many tasks across any machine learning domain.
+The dataset described by columns: 'age', 'weight', 'height', 'sex', 'diagnosis', 'time of death', 'clinician notes', could give rise to any of the following tasks:
+
+* Predict age from all other features - supervised regression
+* Predict sex from a subset of features - supervised classification
+* Predict time of death from all other features - supervised survival
+* Categorise observations into clusters - unsupervised clustering
+* Learn to speak like a clinician depending on client diagnosis - natural language processing, likely with reinforcement learning
+
+As this book is focused only on supervised learning, only the first three of these is covered in this chapter and beyond.
+The specification of a task is vital for interpreting predictions from a model and its subsequent performance.
+Say three models are using the above features to predict 'sex', which of the following are comparable?
+
+* M1: Feature selection followed by training. During feature selection, only 'age', 'weight', and 'height' are kept;
+* M2: No feature selection. Trained on all features.
+* M3: No feature selection. Trained on 'age', 'weight', 'height'.
+
+Only M1 and M2 can be fairly compared as these are solving the same task: given all features predict 'sex'.
+In contrast M3 solves the task: given only 'age', 'weight' and 'height', predict 'sex'.
+This subtle difference is important for evaluating model performance and in a medical context can remove potential biases.
+For example, for M1 one might conclude "given all available data, XYZ", whereas with M3 data has been deliberately omitted.
+
+Formally, let $\xx \in \calX \subseteq \Reals^{n \times p}$ be a matrix with $p$ features for $n$ observations and let $y \in \calY$ be a vector of labels (or *outcomes* or *targets*) for all observations.
+A dataset is then given by $\calD = ((\xx_1, y_1) , . . . , (\xx_n, y_n))$ where it is assumed $\calD \iid (\mathbb{P}_{xy})^n$ for some unknown distribution $\mathbb{P}$.
+
+A machine learning task is the problem of learning the unknown function: $f : \calX \rightarrow \calY$ where $\calY$ specifies the nature of the task, for example classification, regression, or survival.
+
+Regression tasks make continuous predictions, for example someone's height, hence a regression task is specified by $f_R : \calX \rightarrow \calY \subseteq \Reals^n$.
+
+Classification tasks make discrete predictions, for example whether it will rain, snow, or be sunny tomorrow; these are given by $f_C : \calX \rightarrow \calY \subseteq \Naturals$.
+If only two categories are possible, for example whether it will rain tomorrow or not, then *binary classification* tasks are represented with $f_B: \calX \rightarrow \{0, 1\}$ or sometimes $f_B: \calX \rightarrow \{-1, 1\}$.
+
+## Learners and models {#sec-ml-learners}
+
+The terms *algorithm*, *learner*, and *model* are often conflated in machine learning.
+A *learning algorithm*, *algorithm*, or *learner*, is a strategy to estimate the unknown mapping from features to outcome as represented by a task, $f: \calX \rightarrow \calY$.
+Given a learner, $LA$ and data $\calD$, then $\hat{f} := LA(\calD | \theta, \Theta)$.
+The terms $\theta$ and $\Theta$ represent model parameters and hyperparameters that are used to fit and control the algorithm respectively.
+Model *parameters* (or *weights*) are coefficients to be estimated during model training, these are not directly controlled by a user (i.e., the person training the model) but are instead solely determined by the data and influenced by hyperparameters.
+Beta coefficients in a linear regression model, $y = \alpha + x\beta$, are model parameters.
+Model *hyperparameters* control *how* the algorithm is run, for example determining if the intercept, $\alpha$, should be included in a linear regression model is an example of setting a hyperparameter.
+The number of hyperparameters usually increases with learner complexity and performance, and often hyperparameters need to be tuned (@sec-ml-train) instead of manually set.
+
+The process of passing data, $\calD$, setting hyperparameters, $\Theta$, to a learner is known as *training* and the learner is *trained* by estimating the parameters, $\theta$, this trained learner is called a *model*.
+Computationally, storing $(\hat{\theta}, \Theta)$ is sufficient to recreate any trained model (assuming the learner is known), and sharing of model weights is common for deep learning models.
+
+
 ___
 
 TODO
 
-* Introduce notation (below)
-* ML dataset
-* Concept of a task
-* Regression and classification
-
-* $\calD$ - labeled data set with $n$ observation
-* Observations: $(\xx^{(i)}, y^{(i)})$ where $\xx^{(i)} \in \calX$ is a $p$-dimensional feature vector and $y^{(i)} \in \calY$ is a label
-* Data set: $\calD = ((\xx^{(1)}, y^{(1)}) , . . . , (\xx^{(n)}, y^{(n)}))$
-* Assume $\calD \iid (\mathbb{P}_{xy})^n$ (unknown distribution)
-* ML model: $f : \calX \rightarrow \mathbb{R}^g$ assigning a prediction in $\mathbb{R}^g$
-* ML learners, $\calI$, configured by hyperparameters $\lambda \in \Lambda$, are $\calI: \mathbb{D} \times \Lambda \rightarrow \calH, (\calD, \lambda) \mapsto \hatf$ where $\calH$ is the function space to which a model belongs and $\hatf$ is a trained model with learned hyperparameters $\hat{\theta} \in \calH$.
 * Models are evaluated with loss functions which measure the discrepancy between predictions and true values $L: \calY \times \Reals^g \rightarrow \Reals, (\hatf(\xx), \yy) \mapsto l(\hatf(\xx), \yy)$
 * To prevent overfitting, models are evaluated on unseen test data to ensure unbiased performance estimation and the generalization error $GE(\calI, \lambda, n_{train}, l) := \lim_{n_{test} \rightarrow \infty} \EE_{\calD_{train},\calD_{test}\sim\PP_{xy}}[l(\yy_{test}, \mathbf{F}_{\calD_{test},\calI(\calD_{train},\lambda)})]$ where $\mathbf{F}_{\calD_{test},\calI(\calD_{train},\lambda)}$ is the matrix of predictions from a model trained on $\calD_{train}$ and making predictions on $\calD_{test}$.
+* A predicted functional is considered 'good' if the *expected generalization error*, $\EE[L(Y^*, \hatg(X^*))]$, is low, where $(X^*, Y^*) \sim (X,Y)$ is independent of the training data $\calD_0$, and $L$ is some loss that is chosen according to the domain of interest (regression, classification, survival).
 
 ___
 
-#### Task {.unnumbered .unlisted}
-A machine learning *task* is a simple mechanism to outline the problem of interest by providing: i) the data specification; ii) the definition of learning; iii) the definition of success (when is a prediction 'good'?)  [@Kiraly2021]. All tasks in this paper have the same definitions of learning and success. For (ii), the aim is to learn the true prediction functional, $g$, by fitting the learning algorithm on training data, $\hatg := \calA(\calD_0)$. For (iii), a predicted functional is considered 'good' if the *expected generalization error*, $\EE[L(Y^*, \hatg(X^*))]$, is low, where $(X^*, Y^*) \sim (X,Y)$ is independent of the training data $\calD_0$, and $L$ is some loss that is chosen according to the domain of interest (regression, classification, survival).
-
 ## Training and predicting {#sec-ml-train}
+
+In practice, unless a model is being deployed for ongoing use, learners are not usually trained on all available data, $\calD$.
+Instead, data is split into *training data*, $\dtrain$ and *testing data*, $\dtest$, which are comprised of two non-overlapping
+
+
 
 ___
 
@@ -56,7 +123,6 @@ TODO
 
 ___
 
-Common supervised learning methods are discussed in a simplified setting with features $X \ t.v.i. \ \calX$ and outcomes $Y \ t.v.i. \ \calY$; usually outcomes are referred to as 'targets' (a 'target for prediction'). Let $\calD_0 = \{(X_1,Y_1),...,(X_n,Y_n)\}$ be a (training) dataset where $(X_i, Y_i) \iid (X, Y)$. The methods below extend naturally to the survival setting.
 
 #### Strategies and Models {.unnumbered .unlisted}
 In order to clearly separate between similar objects, several terms for machine learning are now introduced and clearly distinguished.
