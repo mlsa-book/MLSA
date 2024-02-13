@@ -88,8 +88,7 @@ A *learning algorithm*, *algorithm*, or *learner*, is a strategy to estimate the
 Given a learner, $LA$, and data, $\calD$, then $\hat{f} := LA(\calD | \theta, \Theta)$.
 The terms $\theta$ and $\Theta$ represent model parameters and hyperparameters that are used to fit and control the algorithm respectively.
 Model *parameters* (or *weights*) are coefficients to be estimated during model training, these are not directly controlled by a user (i.e., the person training the model) but are instead solely determined by the data and influenced by hyperparameters.
-Beta coefficients in a linear regression model, $y = \alpha + x\beta$, are model parameters.
-Model *hyperparameters* control *how* the algorithm is run, for example determining if the intercept, $\alpha$, should be included in a linear regression model is an example of setting a hyperparameter.
+Model *hyperparameters* control *how* the algorithm is run, for example determining if the intercept should be included in a linear regression model (@cnj-lm).
 The number of hyperparameters usually increases with learner complexity and performance, and often hyperparameters need to be tuned (@sec-ml-train) instead of manually set.
 
 The process of passing data, $\calD$, setting hyperparameters, $\Theta$, to a learner is known as *training* and the learner is *trained* by estimating the parameters, $\theta$, this trained learner is called a *model*.
@@ -101,63 +100,86 @@ For traditional statistical models this strategy might be a simple calculation b
 Given a trained model, $\hat{f}$, and some new features $\xx^* \in \Reals^p$, the model's prediction for the unseen label is $\haty := \hat{f}(\xx^* | \theta, \Theta)$ or more simply $\hatyy := \hatf(\xx^*)$.
 Note that there can also be hyperparameters specific to the prediction step.
 
+:::: {.callout-note icon=false}
+
+## Linear regression
+
+::: {#cnj-lm}
+Let $f_R : \calX \rightarrow \calY$ be the regression task of interest with $\calX \subseteq \Reals^n$ and $\calY \subseteq \Reals^n$.
+Let $(\xx, \yy)$ be data such that $\xx \in \calX$ and $\yy \in \calY$.
+
+Say the learner of interest is a linear regression model with learning algorithm:
+
+$$
+(\hat{\beta_0}, \hat{\beta_1}) := \argmin_{\beta_0,\beta_1} \Big\{\sum^n_{i=1} (y_i - \gamma\beta_0 - \beta_1 x_i)^2\Big\}\text{ for }i = 1,...,n
+$$
+
+and prediction algorithm:
+
+$$
+\hatg(x) = \gamma\hat{\beta_0} + \hat{\beta_1}x
+$$
+
+The learner hyperparameters are $\Theta = (\gamma)$ which can take values $0$ or $1$ and the parameters are $\theta = (\beta_0, \beta_1)$.
+The learner is fit by passing $(\xx, \yy)$ to the learning algorithm and thus estimating $\hat{\theta}$ and $\hatg$.
+A prediction, $\haty$, is made for a new observation by passing $x^* \in \calX$ to the fitted model $\hatg$.
+
+:::
+
+::::
+
+## Evaluating models {#sec-ml-train}
+
 To understand if a model is 'good', its predictions are evaluated with a *loss function*.
 Loss functions assign a score to the discrepancy between predictions and true values, $L: \calY \times \calY \rightarrow \ExtReals$.
 Given real-world data, $(\XX^*, \yy^*)$, and a trained model $\hatf$, then the loss is given by $L(\hatf{\XX^*}, \yy^*) = L(\hatyy, \yy^*)$.
 For a model to be useful, it should perform well in general, and not just for the data used for training and development, which is known as a model's *generalization error*.
-Estimating the generalization error requires data splitting, which is discussed next.
 
-## Training and predicting {#sec-ml-train}
+A model should not be deployed, i.e., manually or automatically used to make predictions, its generalization error must be estimated to understand if the model is 'good'.
+If a model were to be trained and evaluated on the same data, the resulting loss, known as the *training error*, would be an overoptimistic estimate of the true generalization error (@Hastie2013) as the model is making predictions for data it has already 'seen' and the loss is not evaluating its ability to generalize to new, unseen data.
+Estimation of the generalization error requires *data splitting*, which is the process of splitting available data, $\calD$, into *training data*, $\dtrain \subset \calD$, and *testing data*, $\dtest = \calD \setminus \dtrain$.
+<!-- FIXME: ABOVE COULD BE BETTER WORDED -->
 
-If a model is being deployed for ongoing predictions of newly collected data, then a learner may be trained on all available data, $\calD$.
-In practice, in scientific researcher and model development, learners are usually trained on a subset of the data and they are tested on the remainder.
-This separation of $\calD$ is known as *data splitting*, which creates *training data*, $\dtrain \subset \calD$, and *testing data*, $\dtest = \calD \setminus \dtrain$.
-To understand why data splitting is required, consider
+The simplest method to estimate the generalization error is to use *holdout resampling*, which is the process of partitioning the data into one training dataset and one testing dataset, with the model trained on the former and predictions made for the latter.
+Using 2/3 of the data for training and 1/3 for testing is a common splitting ratio (@Kohavi1995).
+When splitting, it is essential the data is partitioned randomly to ensure any information encoded in data ordering is removed.
+Ordering is often important in the real-world, for example in healthcare data when patients are recorded in order of enrolment to a study.
+Whilst ordering can provide useful information, it does not generalize to new, unseen data.
+For example, the number of days a patient has been in hospital is more useful than the patient's index in the dataset, as the former could be calculated for a new patient whereas the latter is meaningless.
+Another example is in the `rats` dataset that was briefly described in @sec-surv.
+The `rats` data explores how a novel drug effects tumor incidence.
+However, the data is ordered by rat litters with every three rats being in the same litter.
+Hence if rats were to be bred or raised differently over time,  even if the `litter` column were removed, this information would still be encoded in the order of the dataset and could impact upon any findings.
+Randomly splitting breaks any possible association between order and outcome.
+<!-- FIXME: ABOVE IS ALSO BAD! -->
 
-Data splitting is required to prevent overoptimism of the training error (@Hastie2013), which occurs when the model's performance
+Holdout resampling is a quick method to estimate the generalization error, however it is an imperfect method as, even with random splitting, it can still result in 'unlucky' splits.
+Returning to the `rats` data, consider a split that results in only male rats in the training data, the model would then be unable to handle female rats in the testing data, which it had never encountered before.
+Alternatively, consider a random split with an even sex balance, as only two out of the 150 rats have a tumor, there is a high probability that the training data will not include any male rat with a tumor.
+Hence, in the case of a male rat, the model is likely to ignore the treatment variable and instead just use sex as the most important predictor of tumor incidence.
+
+To deal with this problem, $k$-fold cross-validation (CV) can be used as a more robust method.
+$k$-fold CV partitions the data into $k$ subsets, called *folds*.
+The training data comprises of $k-1$ of the folds and the remaining one is used for testing and evaluation.
+This is repeated $k$ times until each of the folds has been used exactly once as the testing data.
+The performance from each fold is averaged into a final performance estimate.
+It is common to use $k = 5$ or $k = 10$.
+This process can be repeated multiple times (*repeated $k$-fold CV*) and/or $k$ can even be set to $n$, which is known as *leave-one-out cross-validation*.
+
+Cross-validation can also be stratified, which ensures that a variable of interest will have the same distribution in each fold as in the original data.
+This is important, and often recommended, in survival analysis to ensure that the proportion of censoring in each fold is representative of the full dataset.
+<!-- FIXME: CITE OUR SURVIVAL BENCHMARK PAPER -->
+
+See @Bischl2012 for discussion about more resampling strategies including bootstrapping and subsampling.
 
 
-
+## Optimization and benchmarking {#sec-ml-misc}
 
 ___
 
 TODO
 
-* Data splitting, holdout resampling
-* Parameters and hyperparameters
 * Optimisation and tuning
-
-___
-
-
-#### Strategies and Models {.unnumbered .unlisted}
-In order to clearly separate between similar objects, several terms for machine learning are now introduced and clearly distinguished.
-
-Let $g: \calX \rightarrow \calY$ be the true (but unknown) mapping from the features to outcomes, referred to as the *true prediction functional*. Let $\calG$ be the set of *prediction functionals* such that $\forall \Upsilon \in \calG, \Upsilon: \calX \rightarrow \calY$. A *learning* or *fitting algorithm* is defined to be any function of the form $\calA: \calX^n \times \calY^n \rightarrow \calG$. The goal of supervised learning is to *learn* $g$ with a learning algorithm *fit* on (i.e. the input to the algorithm is) training data, $\hatg := \calA(\dtrain) \in \calG$. Note that $\hatg$ may take hyper-parameters that can be set or tuned (see below). The learning algorithm is 'good' if $\hatg(X) \approx g(X)$ (see 'Evaluation' below).
-
-The learning algorithm is determined by the chosen *learning strategy* and *model*, where a model is a complete specification of a learning strategy including hyper-parameters. These terms are more clearly illustrated by example:
-
-i. Learning strategy -- simple linear regression
-i. Model -- $y = \beta_0 + \beta_1 x$ where $x \in \Reals$ is a single covariate, $y \in \Reals$ is the target, and $\beta_0,\beta_1 \in \Reals$ are model coefficients.
-i. Learning algorithm (model fitting) -- Minimise the residual sum of squares: $(\hat{\beta_0}, \hat{\beta_1}) := \argmin_{\beta_0,\beta_1} \{\sum^n_{i=1} (y_i - \beta_0 - \beta_1 x_i)^2\}$ for $(x_i,y_i) \in \dtrain, i = 1,...,n$.
-i. Prediction functional -- $\hatg(x) = \hat{\beta_0} + \hat{\beta_1}x$
-
-
-To further illustrate the difference between learning strategy and model, note that the same learning strategy 'simple linear regression' could either utilise the model above or instead a model without intercept, $y = \beta x$, in which case the learning algorithm and prediction functional would also be modified.
-
-The model in (ii) is called *unfitted* as the model coefficients are unknown and the model cannot be used for prediction. After step (iii) the model is said to be fit to the training data and therefore the model is *fitted*.\footnote{The terms 'fitted' and 'unfitted' are used instead of 'fit' and 'unfit' to prevent confusion with words such as 'suitable' and 'unsuitable'.} It is common to refer to the learning algorithm (and associated hyper-parameters) as the unfitted model and to refer to the prediction functional (and associated hyper-parameters) as the fitted model.
-
-#### Hyper-Parameters and Tuning {.unnumbered .unlisted}
-A *hyper-parameter* is a model parameter that can be set by the user, as opposed to coefficients that are estimated as part of model fitting. A hyper-parameter can be set before training, or it can be tuned. *Tuning* is the process of choosing the optimal hyper-parameter value via automation. In the simplest setting, tuning is performed by selecting a range of values for the hyper-parameter(s) and treating each choice (combination) as a different model. For example if tuning the number of trees in a random forest (@sec-surv-ml-models-ranfor), $m_r$, then a range of values, say $100, 200, 500$ are chosen, and three models $m_{r100}, m_{r200}, m_{r500}$ are benchmarked. The optimal hyper-parameter is given by whichever model is the best performing. *Nested resampling* is a common method to prevent overfitting that could occur from using overlapping data for tuning, training, or testing. Nested resampling is the process of resampling the training set again for tuning.
-
-## Evaluation and model comparison {#sec-ml-eval}
-
-___
-
-TODO
-
-* CV and resampling
-* Generalisation error
 * Benchmarking
 
 ___
@@ -173,6 +195,9 @@ Whilst *benchmarking* often refers to speed tests, i.e. the time taken to comple
 
 #### Model Comparison {.unnumbered .unlisted}
 Models can be analytically compared on how well they make predictions for new data. Model comparison is a complex topic with many open questions  [@Demsar2006; @Dietterich1998; @Nadeau2003] and as such discussion is limited here. When models are compared on multiple datasets, there is more of a consensus in how to evaluate models  [@Demsar2006] and this is expanded on further in [@Sonabend2021b]. Throughout this book there are small simulation experiments for model comparison on single datasets however as these are primarily intended to aid exposition and not to generalise results, it suffices to compare models with the conservative method of constructing confidence intervals around the sample mean and standard error of the loss when available  [@Nadeau2003].
+
+#### Hyper-Parameters and Tuning {.unnumbered .unlisted}
+*Tuning* is the process of choosing the optimal hyper-parameter value via automation. In the simplest setting, tuning is performed by selecting a range of values for the hyper-parameter(s) and treating each choice (combination) as a different model. For example if tuning the number of trees in a random forest (@sec-surv-ml-models-ranfor), $m_r$, then a range of values, say $100, 200, 500$ are chosen, and three models $m_{r100}, m_{r200}, m_{r500}$ are benchmarked. The optimal hyper-parameter is given by whichever model is the best performing. *Nested resampling* is a common method to prevent overfitting that could occur from using overlapping data for tuning, training, or testing. Nested resampling is the process of resampling the training set again for tuning.
 
 ## Classification and regression {#sec-surv-ml-car}
 
