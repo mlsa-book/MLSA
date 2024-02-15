@@ -29,21 +29,9 @@ The labels from the test data are passed to a chosen measure with the prediction
 The process if repeating this procedure to test different training and test data is called *resampling* and multiple resampling experiments with different models is called *benchmarking*.
 All these concepts will be explained in this chapter.
 
-<!-- FIXME - WE'LL WANT TO REDRAW THIS -->
-```{mermaid}
-%%| label: fig-ml-basic
-%%| fig-cap: "Basic machine learning workflow with data splitting, model training, predicting, and evaluating."
-flowchart LR
-  D(Data) --> Tr(Train)
-  D --> Te(Test)
-  Tr --> L(Learner)
-  L --> Mo(Model)
-  Te --Features--> Mo
-  Mo --> Pr(Prediction)
-  Pr --> Me(Measure)
-  Te --Labels--> Me
-  Me --> Pe(Performance)
-```
+![Basic machine learning workflow with data splitting, model training, predicting, and evaluating. Image from @Foss2024 (CC BY-NC-SA 4.0).](https://mlr3book.mlr-org.com/chapters/chapter2/Figures/mlr3book_figures-1.svg){#fig-ml-basic}
+
+<!-- FIXME - TO USE IN PRINT WE NEED PERMISSION FROM ALL AUTHORS OR NEED TO MAKE OUR OWN VERSION -->
 
 ## Tasks {#sec-ml-tasks}
 
@@ -76,12 +64,31 @@ A dataset is then given by $\calD = ((\xx_1, y_1) , . . . , (\xx_n, y_n))$ where
 
 A machine learning task is the problem of learning the unknown function: $f : \calX \rightarrow \calY$ where $\calY$ specifies the nature of the task, for example classification, regression, or survival.
 
-Regression tasks make continuous predictions, for example someone's height, hence a regression task is specified by $f_R : \calX \rightarrow \calY \subseteq \Reals^n$.
+### Regression {#sec-ml-tasks-regr}
 
-Classification tasks make discrete predictions, for example whether it will rain, snow, or be sunny tomorrow; these are given by $f_C : \calX \rightarrow \calY \subseteq \Naturals$.
-If only two categories are possible, for example whether it will rain tomorrow or not, then *binary classification* tasks are represented with $f_B: \calX \rightarrow \{0, 1\}$ or sometimes $f_B: \calX \rightarrow \{-1, 1\}$.
+Regression tasks make continuous predictions, for example someone's height.
+Regression may be deterministic, in which case a single continuous value is predicted, or probabilistic, where a probability distribution over the Reals is predicted.
+For example, predicting an individual's height as 165cm would be a deterministic regression prediction, whereas predicting their height follows a $\calN(165, 2)$ distribution would be probabilistic.
 
-## Training and evaluating models {#sec-ml-models}
+Formally, a deterministic regression task is specified by $f_{Rd} : \calX \rightarrow \calY \subseteq \Reals^n$, and a probabilistic regression task by $f_{Rp} : \calX \rightarrow \calS$ where $\calS \subset \Distr(\calY)$.
+
+Deterministic regression is much more common than probabilistic and hence the shorthand 'regression' is used to refer to deterministic regression unless otherwise stated.
+
+### Classification {#sec-ml-tasks-classif}
+
+Classification tasks make discrete predictions, for example whether it will rain, snow, or be sunny tomorrow.
+Similarly to regression, predictions may be deterministic or probabilistic.
+Deterministic classification predicts which category an observation falls into, whereas probabilistic classification predicts the probability of an observation falling into each category.
+Predicting it will rain tomorrow is a deterministic prediction whereas predicting $\hatp(rain) = 0.6; \hatp(snow) = 0.1; \hatp(sunny) = 0.3$ is probabilistic.
+
+Formally, a deterministic classification task is given by $f_{Cd} : \calX \rightarrow \calY \subseteq \Naturals$, and a probabilistic classification task as $f_{Cp} : \calX \rightarrow \calY \subseteq [0,1]^k$ where $k$ is the number of categories an observation may fall into.
+Practically this latter prediction is estimation of the probability mass function $\hat{p}_Y(y) = P(Y = y)$.
+If only two categories are possible, these reduce to the *binary classification* tasks: $f_{Bd}: \calX \rightarrow \{0, 1\}$ and $f_{Bp}: \calX \rightarrow [0, 1]$ for deterministic and probabilistic binary classification respectively.
+
+Note that in the probabilistic binary case it is common to write the task as predicting $[0,1]$ not $[0,1]^2$ as the classes are mutually exclusive.
+The class for which probabilities are predicted is referred to as the *positive class*, and the other as the *negative class*.
+
+## Training and predicting {#sec-ml-models}
 
 The terms *algorithm*, *learner*, and *model* are often conflated in machine learning.
 A *learning algorithm*, *algorithm*, or *learner*, is a strategy to estimate the unknown mapping from features to outcome as represented by a task, $f: \calX \rightarrow \calY$.
@@ -89,7 +96,7 @@ Given a learner, $LA$, and data, $\calD$, then $\hat{f} := LA(\calD | \theta, \T
 The terms $\theta$ and $\Theta$ represent model parameters and hyperparameters that are used to fit and control the algorithm respectively.
 Model *parameters* (or *weights*) are coefficients to be estimated during model training, these are not directly controlled by a user (i.e., the person training the model) but are instead solely determined by the data and influenced by hyperparameters.
 Model *hyperparameters* control *how* the algorithm is run, for example determining if the intercept should be included in a linear regression model (@cnj-lm).
-The number of hyperparameters usually increases with learner complexity and performance, and often hyperparameters need to be tuned (@sec-ml-train) instead of manually set.
+The number of hyperparameters usually increases with learner complexity and performance, and often hyperparameters need to be tuned (@sec-ml-opt) instead of manually set.
 
 The process of passing data, $\calD$, setting hyperparameters, $\Theta$, to a learner is known as *training* and the learner is *trained* by estimating the parameters, $\theta$, this trained learner is called a *model*.
 Computationally, storing $(\hat{\theta}, \Theta)$ is sufficient to recreate any trained model (assuming the learner is known), and sharing of model weights is common for deep learning models.
@@ -128,7 +135,7 @@ A prediction, $\haty$, is made for a new observation by passing $x^* \in \calX$ 
 
 ::::
 
-## Evaluating models {#sec-ml-train}
+## Evaluating and benchmarking {#sec-ml-eval}
 
 To understand if a model is 'good', its predictions are evaluated with a *loss function*.
 Loss functions assign a score to the discrepancy between predictions and true values, $L: \calY \times \calY \rightarrow \ExtReals$.
@@ -158,93 +165,54 @@ Returning to the `rats` data, consider a split that results in only male rats in
 Alternatively, consider a random split with an even sex balance, as only two out of the 150 rats have a tumor, there is a high probability that the training data will not include any male rat with a tumor.
 Hence, in the case of a male rat, the model is likely to ignore the treatment variable and instead just use sex as the most important predictor of tumor incidence.
 
-To deal with this problem, $k$-fold cross-validation (CV) can be used as a more robust method.
+To deal with this problem, $k$-fold cross-validation (CV) can be used as a more robust method and to better estimate the generalization error [@Hastie2001].
 $k$-fold CV partitions the data into $k$ subsets, called *folds*.
 The training data comprises of $k-1$ of the folds and the remaining one is used for testing and evaluation.
 This is repeated $k$ times until each of the folds has been used exactly once as the testing data.
 The performance from each fold is averaged into a final performance estimate.
-It is common to use $k = 5$ or $k = 10$.
+It is common to use $k = 5$ or $k = 10$ [@Breiman1992; @Kohavi1995].
 This process can be repeated multiple times (*repeated $k$-fold CV*) and/or $k$ can even be set to $n$, which is known as *leave-one-out cross-validation*.
 
 Cross-validation can also be stratified, which ensures that a variable of interest will have the same distribution in each fold as in the original data.
 This is important, and often recommended, in survival analysis to ensure that the proportion of censoring in each fold is representative of the full dataset.
 <!-- FIXME: CITE OUR SURVIVAL BENCHMARK PAPER -->
 
-See @Bischl2012 for discussion about more resampling strategies including bootstrapping and subsampling.
+Repeating resampling experiments with multiple models is referred to as a *benchmark experiment*.
+A benchmark experiment compares models by evaluating their performance on *identical* data, which means the same resampling strategy and folds should be used for all models.
+Determining if one model is actually better than another is a surprisingly complex topic [@Demsar2006; @Dietterich1998; @Nadeau2003] and is out of scope for this book, instead any benchmark experiments performed in this book are purely for illustrative reasons and no results are expected to generalize outside of these experiments.
 
+## Optimization {#sec-ml-opt}
 
-## Optimization and benchmarking {#sec-ml-misc}
+@sec-ml-models introduced model hyperparameters, which control how training and prediction algorithms are run.
+Setting hyperparameters is a critical part of model fitting and can significantly change model performance.
+*Tuning* is the process of using internal benchmark experiment to automatically select the optimal hyper-parameter configuration.
+For example, the number of trees, $m_r$ in a random forest (@sec-surv-ml-models-ranfor) is a potential hyperparameter to tune.
+This hyperparameter may be tuned over a range of values, say $[10, 1000]$ or over a discrete subset, say $\{10, 100, 1000\}$, for now assume the latter.
+Three random forests with $10$, $100$, and $1000$ trees respectively are compared in a benchmark experiment.
+The number of trees that results in the model with the optimal performance is then selected for the hyperparameter value going forward.
+*Nested resampling* is a common method to prevent overfitting that could occur from using overlapping data for tuning, training, or testing.
+Nested resampling is the process of resampling the training set again for tuning and then the optimal model is refit on the entire training data (@fig-ml-nested).
 
-___
+![An illustration of nested resampling. The large blocks represent three-fold CV for the outer resampling for model evaluation and the small blocks represent four-fold CV for the inner resampling for HPO. The light blue blocks are the training sets and the dark blue blocks are the test sets. Image and caption from @Becker2024 (CC BY-NC-SA 4.0).](https://mlr3book.mlr-org.com/chapters/chapter4/Figures/mlr3book_figures-11.svg){#fig-ml-nested}
 
-TODO
+## Conclusion
 
-* Optimisation and tuning
-* Benchmarking
+:::: {.callout-warning icon=false}
 
-___
+## Key takeaways
 
-#### Evaluation {.unnumbered .unlisted}
-Models are *evaluated* by evaluation measures called *losses* or *scores*,\footnote{The term 'loss' is usually utilised to refer to evaluation measures to be minimised, whereas 'scores' should be maximised, this is returned to in (@sec-eval).} $L: \calY \times \calY \rightarrow \ExtReals$. Let $(X^*, Y^*) \sim (X,Y)$ be test data (i.e. independent of $\dtrain$) and let $\hatg: \calX \rightarrow \calY$ be a prediction functional fit on $\dtrain$, then these evaluation measures determine how closely predictions, $\hatg(X^*)$, relate to the truth, $Y^*$, thereby providing a method for determining if a model is 'good'.\footnote{Here evaluation refers specifically to predictive ability; other forms of evaluation and further discussion of the area are provided in (@sec-eval).}
-
-#### Resampling {.unnumbered .unlisted}
-Models are *tested* on their ability to make predictions. In order to avoid 'optimism of training error'  [@Hastie2013] -- overconfidence caused by testing the model on training data -- models are tested on previously unseen or 'held-out' data. *Resampling* is the procedure of splitting one dataset into two or more for separated training and testing. In this paper only two resampling methods are utilised: *holdout* and *cross-validation*. Holdout is the process of splitting a primary dataset into training data for model fitting and testing data for model predicting. This is an efficient method but may not accurately estimate the expected generalisation error for future model performance, instead this is well-estimated by $K$-fold cross-validation (KCV)  [@Hastie2001]. In KCV, data is split into $K \in \PNaturals$ 'folds' such that $K-1$ of the folds are used for model training and the final $K$th fold for testing. The testing fold is iterated over all $K$ folds, so that each at some point is used for testing and then training (though never at the same time). In each iteration the model is fit on the training folds, and predictions are made and evaluated on the testing fold, giving a loss $L_k := L(\hatg(X^k), Y^k)$, where $(X^k, Y^k)$ are data from the $k$th fold. A final loss is defined by, $L^* := \frac{1}{K} \sum^K_{k = 1} L_k$. Commonly $K = 5$ or $K = 10$  [@Breiman1992; @Kohavi1995].
-
-#### Model Performance Benchmarking {.unnumbered .unlisted}
-Whilst *benchmarking* often refers to speed tests, i.e. the time taken to complete an operation, it can also refer to any experiment in which objects (mathematical or computational) are compared. In this report, a benchmark experiment will either refer to the comparison of multiple models' predictive abilities, or comparison of computational speeds and object sizes for model fitting; which of these will be clear from context.
-
-#### Model Comparison {.unnumbered .unlisted}
-Models can be analytically compared on how well they make predictions for new data. Model comparison is a complex topic with many open questions  [@Demsar2006; @Dietterich1998; @Nadeau2003] and as such discussion is limited here. When models are compared on multiple datasets, there is more of a consensus in how to evaluate models  [@Demsar2006] and this is expanded on further in [@Sonabend2021b]. Throughout this book there are small simulation experiments for model comparison on single datasets however as these are primarily intended to aid exposition and not to generalise results, it suffices to compare models with the conservative method of constructing confidence intervals around the sample mean and standard error of the loss when available  [@Nadeau2003].
-
-#### Hyper-Parameters and Tuning {.unnumbered .unlisted}
-*Tuning* is the process of choosing the optimal hyper-parameter value via automation. In the simplest setting, tuning is performed by selecting a range of values for the hyper-parameter(s) and treating each choice (combination) as a different model. For example if tuning the number of trees in a random forest (@sec-surv-ml-models-ranfor), $m_r$, then a range of values, say $100, 200, 500$ are chosen, and three models $m_{r100}, m_{r200}, m_{r500}$ are benchmarked. The optimal hyper-parameter is given by whichever model is the best performing. *Nested resampling* is a common method to prevent overfitting that could occur from using overlapping data for tuning, training, or testing. Nested resampling is the process of resampling the training set again for tuning.
-
-## Classification and regression {#sec-surv-ml-car}
-
-Before introducing machine learning for survival analysis, which is considered 'non-classical', the more standard classification and regression set-ups are provided; these are referenced throughout this book.
-
-#### Classification {#sec-surv-ml-car-class}
-
-Classification problems make predictions about categorical (or discrete) events, these may be *deterministic* or *probabilistic*.  Deterministic classification predicts which category an observation falls into, whereas probabilistic classification predicts the probability of an observation falling into each category. In this brief introduction only binary single-label classification is discussed, though the multi-label case is considered in \ref{sec:car_reduxes_r7_mlc}. In binary classification, there are two possible categories an observation can fall into, usually referred to as the 'positive' and 'negative' class. For example predicting the probability of death due to a virus is a probabilistic classification task where the 'positive' event is death.
-
-A probabilistic prediction is more informative than a deterministic one as it encodes uncertainty about the prediction. For example it is clearly more informative to predict a $70%$ chance of rain tomorrow instead of simply 'rain'. Moreover the latter prediction implicitly contains an erroneous assumption of certainty, e.g. 'it will rain tomorrow'.
-
-:::: {.callout-note icon=false}
-
-## Classification Task
-
-::: {#cnj-task-classif}
-Let $(X,Y)$ be random variables t.v.i. $\calX \times \calY$ where $\calX \subseteq \Reals^p$ and $\calY = \{0, 1\}$. Then,
-
-
-* The *probabilistic classification task* is the problem of predicting the probability of a single event taking place and is specified by $g: \calX \rightarrow [0, 1]$.
-* The *deterministic classification task* is the problem of predicting if a single event takes place and is specified by $g: \calX \rightarrow \calY$.
-
-
-The estimated prediction functional $\hatg$ is fit on training data \\$(X_1,Y_1),...,(X_n,Y_n) \iid (X,Y)$ and is considered 'good' if $\EE[L(Y^*, \hatg(X^*))]$ is low, where $(X^*, Y^*) \sim (X, Y)$ is independent of $(X_1,Y_1),...,(X_n,Y_n)$ and $\hatg$.
-
-In the probabilistic case, the prediction $\hat{g}$ maps to the estimated probability mass function $\hat{p}_Y$ such that $\hat{p}_Y(1) = 1 - \hat{p}_Y(0)$.
-:::
+* Machine learning tasks define the predictive problem of interest;
+* Regression tasks make continuous predictions and classification tasks make discrete predictions;
+* Models have parameters that are fit during training and hyperparameters that are set or tuned;
+* Models should be resampled to estimate the generalization error to understand future performance.
 
 ::::
 
-#### Regression {#sec-surv-ml-regr}
+:::: {.callout-tip icon=false}
 
-A regression prediction is one in which the goal is to predict a continuous outcome from a set of features. For example predicting the time until an event (without censoring) occurs, is a regression problem.
+## Further reading
 
-:::: {.callout-note icon=false}
+* @Hastie2001 and @Hastie2013 for comprehensive introductions and overviews to machine learning.
+* @Bischl2012 for discussion about more resampling strategies including bootstrapping and subsampling.
 
-## Regression Task
-
-::: {#cnj-task-regr}
-Let $(X,Y)$ be random variables t.v.i. $\calX \times \calY$ where $\calX \subseteq \Reals^p$ and $\calY \subseteq \Reals$. Let $\calS \subset \Distr(\calY)$ be a convex set of distributions on $\calY$. Then,
-
-* The *probabilistic regression task* is the problem of predicting a conditional distribution over the Reals and is specified by $g : \calX \rightarrow \calS$.
-* The *deterministic regression task* is the problem of predicting a single continuous value in the Reals and is specified by $g: \calX \rightarrow \calY$.
-
-
-The estimated prediction functional $\hatg$ is fit on training data \\$(X_1,Y_1),...,(X_n,Y_n) \iid (X,Y)$ and is considered 'good' if $\EE[L(Y^*, \hatg(X^*))]$ is low, where $(X^*, Y^*) \sim (X, Y)$ is independent of $(X_1,Y_1),...,(X_n,Y_n)$ and $\hatg$.
-:::
 ::::
-
-Whilst regression can be either probabilistic or deterministic, the latter is much more common and therefore in this book 'regression' refers to the deterministic case unless otherwise stated.
