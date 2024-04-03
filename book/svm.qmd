@@ -10,43 +10,72 @@ abstract: TODO (150-200 WORDS)
 
 ## SVMs for Regression
 
-In the simplest explanation, support vector machines (SVMs)  [@CortesVapnik1995] fit a hyperplane, $g$, on given training data and make predictions for new values as $\hatg(X^*)$ for some testing covariate $X^*$. One may expect the hyperplane to be fit so that all training covariates would map perfectly to the observed labels (a 'hard-boundary') however this would result in overfitting and instead an acceptable ('soft'-)boundary of error, the `$\epsilon$-tube', dictates how 'incorrect' predictions may be, i.e. how large an underestimate or overestimate. (@fig-surv-svm) visualises support vector machines for regression with a linear hyperplane $g$, and an acceptable boundary of error within the dashed lines (the $\epsilon$-tube). SVMs are not limited to linear boundaries and *kernel* functions are utilised to specify more complex hyperplanes. Exact details of the optimization/separating procedure are not discussed here but many off-shelf 'solvers' exist in different programming languages for fitting SVMs.
+In simple linear regression, the aim is to estimate the line $y = \beta_0 + x\beta_1$ by estimating the $\beta_0,\beta_1$ coefficients.
+As the number of coefficients increases, the goal becomes to instead estimate the *hyperplane* that divides the higher-dimensional space into two separate parts.
+To visualize a hyperplane, imagine looking at a room from a birds eye view that has a dividing wall cutting the room into two halves (@fig-svm-hyper).
+In this view, the room appears to have dimensions (x=left-right, y=top-bottom) and the divider is a simple line of the form $y = \beta_0 + x\beta_1$.
+In reality, this room is actually three dimensional and has a third dimension (z=up-down) and the divider occupies these dimensions as a hyperplane of the form $y = \beta_0 + x\beta_1 + z\beta_2$.
 
-In the regression setting, the goal of SVMs is to estimate the function
+![Visualising a hyperplane by viewing a 3D room in two-dimensions with a wall that is now seen as a simple line. When standing in this room, the wall will clearly exist in three dimensional space.](Figures/svm/hyperplane.webp){#fig-svm-hyper fig-alt="AI generated image of an office cut in half by a dividing wall." width=400}
+
+Similarly to multiple linear regression (MLR), support vector machines (SVMs)  [@CortesVapnik1995] fit a hyperplane, $g$, on given training data, $\XX$.
+In contrast to MLR, the hyperplane is not restricted to a linear boundary but instead fits a more flexible hyperplane while simultaneously minimizing model complexity by optimizing a regularized error function that allows a margin of tolerance for 'incorrect' predictions and using kernel functions to transform high-dimensional spaces.
+The terms introduced above will be broken down and visualized to aid in exposition in the survival setting later.
+
+In penalized simple linear regression, used to reduce model complexity, the aim is to minimize the error function
+
 $$
-g: \Reals^p \rightarrow \Reals; \quad (x) \mapsto x\beta + \beta_0
-$$ {#eq-svm}
-by estimation of the weights $\beta \in \Reals^p, \beta_0 \in \Reals$ via the optimisation problem
+\frac{1}{2} \sum^n_{i=1} (g(x) - y)^2 + \frac{\lambda}{2} \|\beta\|^2
+$$
+
+for some error function $\lambda$.
+In MLR, the goal of fitting the model is to find the hyperplane that represents the best linear relationship between coefficients and outcomes - where an observation lies on the line determines the prediction and the goal is to minimize the average difference between all predictions and true outcomes.
+SVMs instead aim to find the hyperplane that minimizes the difference between predictions and the truth for individual observations.
+A core feature of SVMs is that one does not try to fit a hyperplane that makes perfect predictions as this would overfit the training data and is unlikely to perform well on unseen data.
+Instead, the optimization problem allows incorrect errors for some observations, with the magnitude of error controlled by an $\epsilon>0$ parameter as well as slack parameters, $\xi, \xi^*$:
+
 $$
 \begin{aligned}
 & \min_{\beta,\beta_0, \xi, \xi^*} \frac{1}{2} \|\beta\|^2 + \gamma \sum^n_{i=1}(\xi_i + \xi_i^*) \\
 & \textrm{subject to}
 \begin{dcases}
-y_i - g(x_i) & \leq \epsilon + \xi_i \\
-g(x_i) - y_i & \leq \epsilon + \xi_i^* \\
+g(\xx_i) & \geq y_i -\epsilon - \xi_i \\
+g(\xx_i) & \leq y_i + \epsilon + \xi_i^* \\
 \xi_i, \xi_i^* & \geq 0 \\
 \forall i\in 1,...,n
 \end{dcases}
 \end{aligned}
 $$ {#eq-svm-opt}
-where $\gamma \in \Reals$ is the regularization/cost parameter, $\xi_i,\xi_i^*$ are slack parameters and $\epsilon$ is a margin of error for observations on the wrong side of the hyperplane, and $g$ is defined in (@eq-svm). The effect of the slack parameters is seen in (@fig-surv-svm) in which a maximal distance from the $\epsilon$-tube is dictated by the slack variables.
 
-In fitting, the dual of the optimisation is instead solved and substituting the optimised parameters into (@eq-svm) gives the prediction function,
+@fig-svm-over visualizes a support vector regression model in two dimensions.
+The red circles are values within the $\epsilon$-tube and are thus considered to have a negligible error.
+In fact, the red circles do not affect the fitting of the optimal line $g$ and as long as they remain within the tube, the shape of $g$ would not change.
+In contrast the blue diamonds have an unacceptable margin of error - as an example the top blue diamond will have $\xi_i = 0$ but $\xi_i^* > 0$, thus influencing the estimation of $g$.
+Points on or outside the epsilon tube are referred to as *support vectors* as they affect the construction of the hyperplane.
+The $\gamma \in \PReals$ hyperparameter controls the slack parameters and thus as $\gamma$ increases, the number of errors (and subsequently support vectors) is allowed to increase resulting in low variance but higher bias, in contrast a lower $\gamma$ is more likely to introduce overfitting with low bias but high variance [@Hastie2001].
+$\gamma$ should be tuned to control this trade-off.
+
+![Visualising a support vector machine with an $\epsilon$-tube and slack parameters $\xi$ and $\xi^*$. Red circles are values within the $\epsilon$-tube and blue diamonds are support vectors outside the tube. x-axis is single covariate, $x$, and y-axis is $g(\xx) = x\beta + \beta_0$.](Figures/svm/regression.png){#fig-svm-over fig-alt="TODO" width=500}
+
+The other core feature of SVMs is exploiting the *kernel trick*, which uses functions known as *kernels* to allow the model to learn a non-linear hyperplane whilst keeping the computations limited to lower-dimensional settings.
+Once the model coefficients have been estimated using the optimization above, predictions for a new observation $\xx^*$ can be made using a function of the form
+
 $$
-\hatg(x^*) = \sum^n_{i=1} (\alpha_i - \alpha_i^*)K(x^*,x_i) + \beta_0
-$$
-where $\alpha_i, \alpha_i^*$ are Lagrangrian multipliers and $K$ is some kernel function.\footnote{Discussion about the purpose of kernels and sensible choices can be found in  [@pkgsurvivalsvm; @Hastie2013; @Vapnik1998].} The Karush-Kuhn-Tucker conditions required to solve the optimisation for $\alpha$ result in the key property of SVMs, which is that values $\alpha_i = \alpha_i^* = 0$ indicate that observation $i$ is 'inside' the $\epsilon$-tube and if $\alpha_i \neq 0$ or $\alpha^*_i \neq 0$ then $i$ is outside the tube and termed a *support vector*. It is these 'support vectors' that influence the shape of the separating boundary.
+\hatg(\xx^*) = \sum^n_{i=1} \alpha_iK(\xx^*,\xx_i) + \beta_0
+$$ {#eq-svm-pred}
 
-The choice of kernel and its parameters, the regularization parameter $\gamma$, and the acceptable error $\epsilon$, are all tunable hyper-parameters, which makes the support vector machine a highly adaptable and often well-performing machine learning method. However the parameters $\gamma$ and $\epsilon$ often have no clear apriori meaning (especially true when predicting abstract rankings) and thus require extensive tuning over a great range of values; no tuning will result in a very poor model fit.
+$K$ is some kernel function, and details (including estimation) of the $\alpha$ Lagrange multipliers are beyond the scope of this book, references are given at the end of this chapter for the interested reader.
 
-![Visualising a support vector machine with an $\epsilon$-tube and slack parameters $\xi$ and $\xi^*$. Red circles are values within the $\epsilon$-tube and blue diamonds are values outside the tube. x-axis is single covariate, $x$, and y-axis is $g(x) = x\beta + \beta_0$.](Figures/svm/svm.png){#fig-surv-svm fig-alt="TODO"}
+Common kernel functions include the linear kernel, $K(x^*,x_i) = \sum^p_{j=1} x_{ij}x^*_j$, radial kernel, $K(x^*,x_i) = \exp(-\omega\sum^p_{j=1} (x_{ij} - x^*_j)^2)$ for some $\omega \in \PReals$, and polynomial kernel, $K(x^*,x_i) = (1 + \sum^p_{j=1} x_{ij}x^*_j)^d$ for some $d \in \PNaturals$.
+
+The choice of kernel and its parameters, the regularization parameter $\gamma$, and the acceptable error $\epsilon$, are all tunable hyper-parameters, which makes the support vector machine a highly adaptable and often well-performing machine learning method.
+The parameters $\gamma$ and $\epsilon$ often have no clear apriori meaning (especially true in the survival setting predicting abstract rankings) and thus require tuning over a great range of values; no tuning usually results in a poor model fit.
 
 ## SVMs for Survival Analysis {#sec-surv-ml-models-svm-surv}
 
-From predicting continuous values in regression, SVMs can be extended to survival analysis by either making survival time or survival ranking predictions.
-To distinguish between prediction types, this chapter separates between survival time support vector machines (SSVMs) and ranking SSVMs, which will be discussed in turn.
-
-For both types of SSVM let: $\xi_i,\xi_i^*,\xi_i'$ be slack variables; $\bb,\beta_0$ be model weights in $\Reals$; $\gamma, \mu$ be regularisation hyper-parameters in $\Reals$; $(\XX, \tt, \dd)$ be the usual training data; and $g(x_i) = x_i\beta_i + \beta_0$.
+Extending SVMs to the survival domain (SSVMs) is a case of: i) identifying the quantity to predict; and ii) updating the optimization problem (@eq-svm-opt) and prediction function (@eq-svm-pred) to accommodate for censoring.
+In the first case, SSVMs can be used to either make survival time or ranking predictions, which are discussed in turn.
+For both types of SSVM let: $\xi_i,\xi_i^*,\xi_i'$ be slack variables; $\bb,\beta_0$ be model weights in $\Reals$; $\gamma, \mu$ be regularisation hyper-parameters in $\Reals$; $(\XX, \tt, \dd)$ be the usual training data; and $g(\xx_i) = \bb^T\xx_i + \beta_0$.
 <!-- FIXME: CHECK BETA_0 CORRECT ABOVE -->
 
 ### Survival time SSVMs
@@ -58,8 +87,8 @@ $$
 & \min_{\beta,\beta_0, \xi, \xi^*} \frac{1}{2} \|\beta\|^2 + \gamma \sum^n_{i=1}(\xi_i + \xi_i^*) \\
 & \textrm{subject to}
 \begin{dcases}
-t_i - g(x_i) & \leq \epsilon + \xi_i \\
-g(x_i) - t_i & \leq \epsilon + \xi_i^* \\
+g(\xx_i) & \geq t_i -\epsilon - \xi_i \\
+g(\xx_i) & \leq t_i + \epsilon + \xi_i^* \\
 \xi_i, \xi_i^* & \geq 0 \\
 \forall i\in 1,...,n
 \end{dcases}
@@ -68,50 +97,55 @@ $$
 
 In survival analysis, this translates to fitting a hyperplane in order to predict the true survival time.
 However, as with all adaptations from regression to survival analysis, there needs to be a method for incorporating censoring.
-Beginning with the simple right-censoring setting, consider how censoring effects the constraints above.
 
-When $g(x_i) < t_i$ it is clear the model has made an under-prediction, regardless of whether an observation is censored at $t_i$ or experiences the event.
-In contrast, when $g(x_i) > t_i$ it is *known* that this is an over-prediction if $i$ experiences the event but it is unknown if it's an over-prediction otherwise.
-As a concrete example, say a patient is discharged from hospital after three weeks and Model A predicts they died after two weeks whereas Model B predicts they died after four.
-It is clear Model A made an under-prediction as the patient was at least alive long enough to be discharged, on the other hand it is unknown if they died immediately after, making Model B's prediction correct, if if they died ten years after, making its prediction very wrong.
-With no way to know the truth, over-predictions must be omitted when an observation is censored, leading to the optimization problem [@Shivaswamy2007]:
+Recall the $(t_l, t_u)$ notation to describe censoring as introduced in @sec-surv where an observation is left-censored if the survival time is known to be less than some $t \in \PReals$, hence $(t_l, t_u) = (-\infty, t)$, right-censored if $(t_l, t_u) = (t, \infty)$, or uncensored if $(t_l, t_u) = (t, t)$.
+<!-- FIXME: MAKE CROSS-REFERENCE MORE SPECIFIC -->
+Define $L$ as the set of observations with a finite lower-bound time, which are those who are right-censored or uncensored, and define $U$ as the analogous set of observations with a finite upper-bounded time.
 
-$$
-\begin{aligned}
-& \min_{\beta, \beta_0, \xi, \xi^*} \frac{1}{2}\|\beta\|^2 + \gamma\Big(\sum_{i = 1}^n \xi_i + \xi_i^*\Big) \\
-& \textrm{subject to}
-\begin{dcases}
-t_i - g(x_i) & \leq \xi^*_i \\
-\Delta_i(g(x_i) - t_i) & \leq \xi_i \\
-\xi_i, \xi_i^* & \geq 0 \\
-\forall i\in 1,...,n
-\end{dcases}
-\end{aligned}
-$$
-
-To clarify how this relates to the discussion above note that in the first constraint $\xi^*_i$ must be $\geq 0$ and hence $t_i - g(x_i) \geq 0$ and $t_i \geq g(x_i)$, and analogously in the second equation.
-Note that in SSVMs, the $\epsilon$ parameters are typically removed to better accommodate censoring and to help prevent the same penalization of over- and under-predictions.
-In contrast, one could introduce more $\epsilon$ and $\gamma$ parameters to separate between under- and over-predictions and to separate right- and left-censoring, however this leads to eight tunable hyperparameters, which is inefficient and may actually increase overfitting [@pkgsurvivalsvm; @Land2011].
-
-The above algorithm can also be extended to incorporate left-censoring relatively trivially by using a similar argument to the right-censoring case and noting that an under-prediction can only be known if there is no left-censoring, hence [@Shivaswamy2007]:
+Now consider these bounds in the context of the constraints above.
+The first constraint ensures the hyperplane is greater than some lower-bound created by subtracting the slack parameter from the true outcome -- given the set definitions above this constraint only has meaning for observations with a finite lower-bound, $i \in L$, otherwise $g(\xx_i \geq -\infty$), which is not a particularly useful constraint.
+Similarly the second constraint ensures the hyperplane is less than some upper-bound, which again can only be meaningful for observations $i \in R$.
+Restricting the constraints in this way leads to the optimization problem [@Shivaswamy2007]:
 
 $$
 \begin{aligned}
 & \min_{\beta, \beta_0, \xi, \xi^*} \frac{1}{2}\|\beta\|^2 + \gamma\Big(\sum_{i \in R} \xi_i + \sum_{i \in L} \xi_i^*\Big) \\
 & \textrm{subject to}
 \begin{dcases}
-t_i - g(x_i) & \leq \xi_i, i \in L \\
-g(x_i) - t_i & \leq \xi^*_i, i \in U \\
-\xi_i \geq 0, i\in U; \xi^*_i \geq 0, i \in L
+g(\xx_i) & \geq t_i -\xi_i, i \in L \\
+g(\xx_i) & \leq t_i + \xi^*_i, i \in U \\
+\xi_i \geq 0, i\in L; \xi^*_i \geq 0, i \in U
 \end{dcases}
 \end{aligned}
 $$
 
-Recall the $(t_l, t_u)$ notation to describe censoring as introduced in @sec-surv where an observation is left-censored if the survival time is known to be less than some $t \in \PReals$, hence $(t_l, t_u) = (\infty, t)$, right-censored if $(t_l, t_u) = (t, \infty)$, or uncensored if $(t_l, t_u) = (t, t)$.
-<!-- FIXME: MAKE CROSS-REFERENCE MORE SPECIFIC -->
-In the constraints above, $L$ is the set of observations with a finite lower-bound time such as those who are right-censored or uncensored, and $U$ is the analogous set of observations with a finite upper-bounded time.
-Once again to aid in interpretation, the first constraint penalizes over-predictions which occur when $t_i \geq g(x_i)$ and thus can only be identified if the survival time outcome has a finite lower-bound, in contrast the second constraint penalizes under-predictions when $t_i \leq g(x_i)$ which are only knowable if the outcome has a finite upper-bound.
 If no one is censored then the optimisation is identical to the regression optimisation in (@eq-svm-opt).
+Note that in SSVMs, the $\epsilon$ parameters are typically removed to better accommodate censoring and to help prevent the same penalization of over- and under-predictions.
+In contrast, one could introduce more $\epsilon$ and $\gamma$ parameters to separate between under- and over-predictions and to separate right- and left-censoring, however this leads to eight tunable hyperparameters, which is inefficient and may actually increase overfitting [@pkgsurvivalsvm; @Land2011].
+The algorithm can be simplified to right-censoring only by removing the second constraint completely for anyone censored:
+
+$$
+\begin{aligned}
+& \min_{\beta, \beta_0, \xi, \xi^*} \frac{1}{2}\|\beta\|^2 + \gamma \sum_{i = 1}^n (\xi_i + \xi_i^*) \\
+& \textrm{subject to}
+\begin{dcases}
+g(\xx_i) & \geq t_i - \xi^*_i \\
+\delta_i g(\xx_i) & \leq \delta_i t_i + \xi_i \\
+\xi_i, \xi_i^* & \geq 0 \\
+\forall i\in 1,...,n
+\end{dcases}
+\end{aligned}
+$$
+
+With the prediction for a new observation $\xx^*$ calculated as,
+
+$$
+\hatg(\xx^*) = \sum^n_{i=1} \alpha^*_i K(\xx_i, \xx^*) - \delta_i\alpha_i'K(\xx_i, \xx^*) + \beta_0
+$$
+
+Where again $K$ is a kernel function and the calculation of the $\alpha^*, \alpha'$ Lagrange multipliers that are beyond the scope of this book.
+
+![Visualising a survival time SVM. Blue diamonds are influential support vectors, which are uncensored or left-censored when $g(\xx)<t$ or uncensored or right-censored when $g(\xx)>t$. Red circles are non-influential observations.](Figures/svm/survival.png){#fig-svm-over fig-alt="TODO" width=500}
 
 ### Ranking SSVMs
 
@@ -120,20 +154,18 @@ However, when ranking is the primary goal, SSVMs can be more effectively trained
 
 A natural method to optimize with respect to ranking is to penalize predictions that result in disconcordant predictions.
 Recall the definition of concordance from @sec-eval-crank: ranking predictions for a pair of comparable observations $(i, j)$ where $t_i < t_j \cap \delta_i = 1$, is called concordant if $r_i > r_j$.
-Using the prognostic index as a ranking prediction (@sec-surv-setmltask), a pair of observations is concordant if $g(x_i) < g(x_j)$ when $t_i < t_j$, leading to:
+Using the prognostic index as a ranking prediction (@sec-surv-setmltask), a pair of observations is concordant if $g(\xx_i) > g(\xx_j)$ when $t_i < t_j$, leading to:
 
 $$
 \begin{aligned}
 & \min_{\beta, \beta_0, \xi} \frac{1}{2}\|\beta\|^2 + \gamma\sum_{i =1}^n \xi_i \\
 & \textrm{subject to}
 \begin{dcases}
-g(x_i) - g(x_j) & \leq \xi_i, \forall i,j \in CP \\
+g(\xx_i) - g(\xx_j) & \geq \xi_i, \forall i,j \in CP \\
 \xi_i & \geq 0, i = 1,...,n \\
 \end{dcases}
 \end{aligned}
 $$
-
-<!-- FIXME: CONFIRM INEQUALITY IN FIRST CONSTRAINT CORRECT -->
 
 where $CP$ is the set of comparable pairs defined by $CP = \{(i, j) : t_i < t_j \wedge \delta_i = 1\}$.
 Given the number of pairs, the optimization problem quickly becomes difficult to solve with a very long runtime.
@@ -148,7 +180,7 @@ $$
 & \min_{\beta, \beta_0, \xi} \frac{1}{2}\|\beta\|^2 + \gamma\sum_{i =1}^n \xi_i \\
 & \textrm{subject to}
 \begin{dcases}
-g(x_i) - g(x_{j(i)}) & \leq t_i - t_{j(i)} + \xi_i \\
+g(\xx_i) - g(\xx_{j(i)}) & \geq t_i - t_{j(i)} - \xi_i \\
 \xi_i & \geq 0 \\
 \forall i = 1,...,n
 \end{dcases}
@@ -156,7 +188,16 @@ g(x_i) - g(x_{j(i)}) & \leq t_i - t_{j(i)} + \xi_i \\
 $$
 
 where $j(i)$ is the observation with the next smallest survival time compared to $i$.
-Note the updated right hand side of the constraint, which, plays a similar role to the $\epsilon$ parameter, by allowing prediction mistakes without penalty but where the $\epsilon$-tube is defined by the true difference between the observed outcomes.
+Note the updated right hand side of the constraint, which plays a similar role to the $\epsilon$ parameter by allowing 'mistakes' in predictions without penalty.
+
+Prediction for a new observation $\xx^*$ are calculated as,
+
+$$
+\hatg(\xx^*) = \sum^n_{i=1} \alpha_i(K(\xx_i, \xx^*) - K(\XX_{j(i)}, \xx^*)) + \beta_0
+$$
+
+Where $\alpha$ are again Lagrange multipliers.
+
 
 ### Hybrid SSVMs
 
@@ -168,9 +209,9 @@ $$
 & \min_{\beta, \beta_0, \xi, \xi', \xi^*} \frac{1}{2}\|\beta\|^2 + \textcolor{CornflowerBlue}{\gamma\sum_{i =1}^n \xi_i} + \textcolor{Rhodamine}{\mu \sum^n_{i=1}(\xi_i' + \xi_i^*)} \\
 & \textrm{subject to}
 \begin{dcases}
-\textcolor{CornflowerBlue}{g(x_i) - g(x_{j(i)})} & \textcolor{CornflowerBlue}{\leq t_i - t_{j(i)} + \xi_i} \\
-\textcolor{Rhodamine}{\Delta_i(g(x_i) - t_i)} & \textcolor{Rhodamine}{\leq \xi^*_i} \\
-\textcolor{Rhodamine}{t_i - g(x_i)} & \textcolor{Rhodamine}{\leq \xi'_i} \\
+\textcolor{CornflowerBlue}{g(\xx_i) - g(\xx_{j(i)})} & \textcolor{CornflowerBlue}{\geq t_i - t_{j(i)} + \xi_i} \\
+\textcolor{Rhodamine}{\delta_i g(\xx_i)} & \textcolor{Rhodamine}{\leq \delta_i t_i + \xi^*_i} \\
+\textcolor{Rhodamine}{g(\xx_i)} & \textcolor{Rhodamine}{\geq t_i - \xi'_i} \\
 \textcolor{CornflowerBlue}{\xi_i}, \textcolor{Rhodamine}{\xi_i', \xi_i^*} & \geq 0 \\
 \forall i = 1,...,n \\
 \end{dcases}
@@ -190,12 +231,25 @@ $$
 
 where $\alpha_i, \alpha_i^*, \alpha_i'$ are Lagrange multipliers and $K$ is a chosen kernel function, which may have further hyper-parameters to select or tune.
 
+## Conclusion
 
-### Conclusions
+:::: {.callout-warning icon=false}
 
-#### Further reading
+## Key takeaways
 
-* To learn more about regression SSVMs see [@Shivaswamy2007, @Khan2008, @Land2011, @VanBelle2011b]
-* For more information about ranking SSVMs, the following may be useful resources [@Evers2008; @VanBelle2007; @VanBelle2008; @VanBelle2011b].
-* Whilst most research and implementation of SSVMs has focused on the classes above, also of note is the mean residual lifetime optimization introduced in [@Goli2016a; @Goli2016b].
-* A survey of SSVMs can be found in @pkgsurvivalsvm
+* Support vector machines (SVMs) are a highly flexible machine learning method that can use the 'kernel trick' to represent infinite dimensional spaces in finite domains;
+* Survival SVMs (SSVMs) extend regression SVMs by either making survival time predictions, ranking predictions, or a combination of the two;
+* The hybrid SSVM provides an efficient method that encapsulates all the elements of regression and ranking SSVMs and is therefore a good model to include in benchmark experiments to test the potential of SSVMs.
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* @Shivaswamy2007, @Khan2008, @Land2011, and @VanBelle2011b to learn more about regression SSVMs.
+* @Evers2008, @VanBelle2007, @VanBelle2008, and @VanBelle2011b for more information about ranking SSVMs.
+* @Goli2016a and @Goli2016b introduce mean residual lifetime optimization SSVMs.
+* @pkgsurvivalsvm surveys and benchmarks SSVMs.
+
+::::
