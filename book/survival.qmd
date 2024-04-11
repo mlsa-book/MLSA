@@ -120,7 +120,7 @@ Then,
 
 * The *set of unique* or *distinct time-points* refers to the set of time-points in which at least one observation dies or is censored, $\calU_O \subseteq \{t_i\}_{i \in \{1,...,n\}}\subseteq \calD$.
 * The *set of unique observed event times* refers to the set of unique time-points in which an event (and not censoring) occurred, $\calU_D := \{t_{i} : \delta_i = 1\}_{i \in \{1,...,n\}}\subseteq \calD$. Sometimes the ordered, unique events times are also denoted by $t_{(i)},\ i=1,\ldots,m \leq n,\ t_{(1)} < t_{(2)} < \cdots < t_{(m)}$.
-* The *risk set* at a given time-point, $\tau$, is the index-set of observation units at risk for the event just before $\tau$, $\calR_\tau := \{i: t_i \geq \tau\}$ where $i$ is a unique row/subject in the data. Consequently, for right-censored data, we have $\calR_0 = \{1,\ldots,n\}$ and $\calR_{\tau} \supseteq \calR_{\tau'}, \forall \tau < \tau'$. Note that in a continuous setting, 'just before' refers to an infinitesimally smaller time than $\tau$, in practice as this is unobservable the risk set is defined at $\tau$. 
+* The *risk set* at a given time-point, $\tau$, is the index-set of observation units at risk for the event just before $\tau$, $\calR_\tau := \{i: t_i \geq \tau\}$ where $i$ is a unique row/subject in the data. Consequently, for right-censored data, we have $\calR_0 = \{1,\ldots,n\}$ and $\calR_{\tau} \supseteq \calR_{\tau'}, \forall \tau < \tau'$. Note that in a continuous setting, 'just before' refers to an infinitesimally smaller time than $\tau$, in practice as this is unobservable the risk set is defined at $\tau$.
 * The *number of observations at risk* at $\tau$ is the cardinality of the risk set, $|\calR_\tau|$, and is denoted by $n_\tau := \sum_i \II(t_i \geq \tau)$.
 * The *number of events* at $\tau$ is denoted by $d_\tau := \sum_i \II(t_i = \tau, \Delta_i = 1).$ Note: For truly continuous variables $T_i$ we would expect $d_{t_i} = 1,\forall i=,1\ldots,n$, however, in practice we often observe ties due to finite measurement precision, such that $d_{\tau} > 1$ occurs quite frequently in real-world datasets.
 
@@ -196,9 +196,9 @@ Let $A_i$ denote the age of the participants during the interview, let $T_i$ be 
 If the participant remembers the age they first used a phone then $(T_i, \Delta_i) = (Y_i, 1)$ where $Y_i \leq A_i$.
 However, if the individual does not remember when the event occured, then they are left-censored at $A_i$ and $(T_i, \Delta_i) = (A_i, 0)$, where $A_i < Y_i$.
 
-In this example, right-censoring was ignored so $\Delta_i$ could be used as a simple binary ($0/1$) indicator.
+<!-- In this example, right-censoring was ignored so $\Delta_i$ could be used as a simple binary ($0/1$) indicator.
 In practice, when left- and right-censoring are both present, an additional variable is required to differentiate between left- and right-censoring as well as exact event times.
-This is often solved by removing the censoring indicator from the data and adding a second time column, then left-censored data is given by $(-\infty, A_i)$, right-censored data is denoted by $(A_i, \infty)$, and actual event times are $(T_i, T_i)$.
+This is often solved by removing the censoring indicator from the data and adding a second time column, then left-censored data is given by $(-\infty, A_i)$, right-censored data is denoted by $(A_i, \infty)$, and actual event times are $(T_i, T_i)$. -->
 
 
 #### Interval-censoring {.unnumbered .unlisted}
@@ -224,6 +224,16 @@ In this case, the second patient is interval censored between years one and thre
 Formally, consider $L_i$ the subject-specific check-up time and $R_i$ the current check-up time.
 If the event is observed at $R_i$ then it must have occurred sometime before then, hence $T_i = (L_i, R_i]$.
 If no event occured then $Y_i > T_i = C_i = R_i$.
+
+
+### Censoring Notation {.unnumbered .unlisted}
+
+The survival outcome notation defined above, $(T, \Delta)$, can lead to ambiguity when multiple censoring types are present.
+For example, the survival outcome $(T, 0)$ might indicate right-censoring at time $T$ or left-censoring at time $T$.
+One could resolve this by re-defining the survival tuple such that $(T, -1)$ indicates left-censoring, $(T, 0)$ indicates right-censoring, and $(T, 1)$ indicates no censoring, but this quickly clashes with notation when multiple events of interest may occur (discussed below).
+Instead the survival outcome may instead be presented as a tuple of times between $(0, \infty)$ which indicate the range at which the event could take place, then if an observation is left-censored at $\tau$ their outcome is (0, t), as it is known their outcome occurred before $t$.
+Alternatively $(t, \infty)$ would indicate right-censoring, and $(t_1, t_2) would indicate interval-censoring.
+If the event is observed, the range is just the observed time $(t, t)$.
 
 
 
@@ -258,15 +268,13 @@ For example, if studying the survival time of ill pregnant patients in hospital,
 ### Censoring vs. Truncation {#sec-truncation}
 While sometimes confused or missnamed, it is very important to differentiate between censoring and truncation, as the methods for handling them differ substantially.
 Truncation can occur in non time-to-event settings, however this usually refers to truncating (or removing) an entire subject from a dataset.
-As discussed in @sec-intro, truncation in survival analysis refers to partially truncating a period of time.
-Left truncation is especially common in survival analysis.
+As discussed in @sec-intro, truncation in survival analysis refers to partially truncating a period of time and is quite relevant in survival analysis (e.g. in multi-state settings, @sec-multi-state).
 
 In general, while censored observations have incomplete information about the time-to-event, they are still part of the data set.
 Truncation on the other hand often leads to observations not entering the data set (at least not at time 0).
 This will usually introduce bias that needs to be accounted for.
 
 #### Left-truncation {.unnumbered .unlisted}
-
 
 Left-truncation often occurs when study participation is conditional on the occurence of another event.
 This is best explained through examples:
@@ -284,10 +292,21 @@ Notably, left-truncation also plays an important role when modeling recurrent ev
 
 #### Right-truncation {.unnumbered .unlisted}
 
-Right-truncation mostly occurs in analyses based on registry data.
-When sampling the registry for events, some subjects might already have experienced the event, but the registry data at a given time-point does not reflect this yet.
+Right-truncation often occurs in retrospective sampling based on registry data, that is the registry is querried for cases reported by a certain cut-off time (see for example @vakulenko-lagun.inverse.2020).
+A common example is the estimation of the incubation period of an infectious disease, that is time from infection to the disease onset.
+Known cases are entered into a data base.
+However, at anytime when we querry the data base, we only observe the subset of the infected population that already experienced the disease onset and not the subset with a longer incubation periods.
 
-Formally, let $T_i^r$ the right-truncation time, then subjects only enter the data set when $T_i < T_i^r$.
+Formally, let $T_i^r$ the right-truncation time (here time from infection until the time at which the registry is querried), then subjects only enter the data set when $T_i < T_i^r$.
+This is illustrated in @fig-right-truncation using 3 subjects.
+All 3 subjects were infected during the observation period, however,
+the right-truncation time $T_2^r$ of subject 2 is shorter than the incubation period $T_2$ for this subject, thus at the time of querying the data base, this subject will no be included in the sample, as $T_2 > T_2^r$.
+Note the difference to right-censoring.
+If subject 2 was right-cesored, the subject would be in our sample and we would know time of infection, but not the time of disease onset.
+In case of right-truncation on the other hand, the subject is not included in the sample at time of data extraction, as subject are only included in the registry after disease onset.
+Overall this leads to a bias towards shorter incubation times and potentially feature values that lead to shorter incubation times.
+
+![Illustration of right-truncation based on registry data. For subjects 1 and 3 the right-truncation time is longer than the incubation period, therefore they are included in the sample when the registry is querried. For subject 2 on the other hand the right-truncation time is shorter, therefore it's excluded from the sample.](Figures/survival/right-truncation.drawio.svg){#fig-right-truncation fig-alt="Schematic illustration of right-truncation."}
 
 
 ### Objective functions
@@ -301,21 +320,27 @@ For machine learning survival analysis this can be used to construct the objecti
 
 ## Event-history Analysis {#sec-eha}
 
-In this section we will go beyond single-event data or at least view time-to-event data more generally as data in which one could observe multiple, potentially mutually exclusive events.
-From this more general point of view such data is sometimes refered to *event-history data* and its analysis as *event-history analysis*.
+In this section we will go beyond single-event data or at least view time-to-event data more generally as data in which one could observe multiple, potentially mutually exclusive events. From this more general point of view such data is sometimes refered to *event-history data* and its analysis as *event-history analysis* (EHA).
+The table below gives one way to classify the different types of data that could occur in EHA, where we differentiate between the number of occurences of the same event type (rows) and whether we consider the occurence of the same event or different events (columns).
 
-It may be easiest to think of event history in terms of transitions between different states, as illustrated in @fig-eha.
+| | single outcome | many outcomes |
+|-|-|-|
+| one/first event | single event | competing risks |
+| multiple events | recurrent events | multi state |
+
+Another way to think about event history is in terms of transitions between different states, as illustrated in @fig-eha.
 Usually, a subject starts out in state 0 (for example, healthy) and transitions to different states from there.
 States from which a further transitions are possible are called *transient*, otherwise a state is called *terminal*.
 If no transition happens within the follow-up time, the subject remains in the initial state, in event history terms the observation is censored for this transition.
 
-In the *single-event setting* (@fig-eha, left panel), a subject can only transition to one, terminal, state (for example, death caused by the event of interest).
+In the *single-event setting* (@fig-eha, left panel), a subject can only transition to one state (the event of interest).
 In the *competing risks setting* (@fig-eha, middle panel, see @sec-competing-risks), a subject could transition to any of the $K$ mutually exclusive states, thus the subject is *at risk* for a transition to multiple states.
-However, once one of them occurs, it is impossible to transition to another (for example, death from different causes).
-In the most general case, the *multi-state setting* (@fig-eha right panel, see @sec-multi-state), there are multiple transient and terminal states with potential back transitions (for example, moving between different stages of an illness with the possibility of (partial) recovery and death as terminal event).
-The *recurrent events setting* (@sec-recurrent-events) is as a special case of the multi-state setting but could also be treated as a more general case of the single event setting (with correlated observations) and is thus treated seperately.
+However, once one of them occurs, it is impossible to transition to another (for example, death from different causes). In both settings, the event needs not be terminal, we just end the observation after the first occurence of the/an event.
 
-![Illustration of different types of time-to-event outcomes. Left: Standard single-event setting with transition from initial state (0) to terminal state (1); Middle: Competing risks setting with $k$ competing events. Once one of the $\{1,\ldots, k\}$ events is observed, the others cannot be observed; Right: Multi-state setting where subjects can transition between multiple transient and terminal states with possible back-transitions.](Figures/survival/event-history-analysis.svg){#fig-eha fig-alt="Schematic illustration of event history analysis."}
+In the most general case, the *multi-state setting* (@fig-eha right panel, see @sec-multi-state), there are multiple transient and terminal states with potential back transitions (for example, moving between different stages of an illness with the possibility of (partial) recovery and death as terminal event).
+The *recurrent events setting* is as a special case of the multi-state setting but could also be treated as a more general case of the single event setting with correlated observations (@sec-recurrent-events and @fig-recurrent-events) .
+
+![Illustration of different types of time-to-event outcomes. Left: Standard single-event setting with transition from initial state (0) to state (1); Middle: Competing risks setting with $k$ competing events. Once one of the $\{1,\ldots, k\}$ events is observed, the others cannot be observed; Right: Multi-state setting where subjects can transition between multiple transient and terminal states with possible back-transitions.](Figures/survival/event-history-analysis.svg){#fig-eha fig-alt="Schematic illustration of event history analysis."}
 
 
 ### Competing Risks {#sec-competing-risks}
@@ -377,6 +402,7 @@ Following @beyersmann.competing.2012, this book assumes that the cause-specific 
 
 {{< include _wip.qmd >}}
 
+![Illustration of transitions in the recurrent events setting. Left: "Clock reset" representation of recurrent events. Each time an event occurs, the clock is reset to 0 and we once again wait for occurence of an event (of the same type); Right: "Clock forward" representation. A subject transitions from 1-st, to 2-nd, etc. to K-th event occurence](Figures/survival/recurrent-events.svg){#fig-recurrent-events fig-alt="Schematic illustration of recurrent events transitions."}
 
 ## Survival Prediction Problems {#sec-surv-set-types}
 
@@ -480,7 +506,7 @@ Removing the separation between the prognostic index and ranking prediction type
 
 In this book, unless otherwise specified, the term *survival task*, will be used to refer to the probabilistic survival task.
 As a final note, these definitions are given in the most general case where the time variable is over $\NNReals$.
-In practice, all models instead assume time is over $\PReals$ and so a subject $i$ that experiences an outcome at $0$ is either deleted or their outcome time is set to $T_i = \epsilon$ for some very small $\epsilon \in \PReals$. 
+In practice, all models instead assume time is over $\PReals$ and so a subject $i$ that experiences an outcome at $0$ is either deleted or their outcome time is set to $T_i = \epsilon$ for some very small $\epsilon \in \PReals$.
 
 <!-- FIXME I got rid of these notation earlier, but don't see how the following is very usefull without them. On the other hand the connection to regression and classification could useful, but could also be introduced later when the actual reductions are introduced.
 #### Survival Analysis and Regression {.unnumbered .unlisted}
