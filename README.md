@@ -29,4 +29,6 @@ Or in BibTeX format
 
 ## Contributing to this book
 
-We welcome contributions to the electronic copy of the book, whether they're issues picking up on typos, requests for additional content, or pull requests with contributions from any size. All contributions will be acknowledged in the preface of the book. Before making any contributions please read our [code of conduct](https://github.com/RaphaelS1/MLSA/blob/main/.github/CODE_OF_CONDUCT.md).
+We welcome contributions to the electronic copy of the book, whether they're [issues](https://github.com/mlsa-book/MLSA/issues) picking up on typos or [discussions](https://github.com/mlsa-book/MLSA/discussions) about additional content.
+All contributions will be acknowledged in the preface of the online book (otherwise it won't be fair if we can't acknowledge everyone in print!).
+Before making any contributions please read our [code of conduct](https://github.com/mlsa-book/MLSA?tab=coc-ov-file#readme).
