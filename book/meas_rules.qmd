@@ -10,296 +10,140 @@ abstract: TODO (150-200 WORDS)
 
 Scoring rules evaluate probabilistic predictions and (attempt to) measure the overall predictive ability of a model in terms of both calibration and discrimination [@Gneiting2007; @Murphy1973].
 In contrast to calibration measures, which assess the average performance across all observations on a population level, scoring rules evaluate the sample mean of individual predictions across all observations in a test set.
-As well as being able to provide information at an individual level, scoring rules are also popular as probabilistic forecasts are widely recognised to be superior than deterministic predictions for capturing uncertainty in predictions [@Dawid1984; @Dawid1986].
+As well as being able to provide information at an individual level, scoring rules are also popular as probabilistic forecasts are widely recognised to be superior to deterministic predictions for capturing uncertainty in predictions [@Dawid1984; @Dawid1986].
 Formalisation and development of scoring rules has primarily been due to Dawid [@Dawid1984; @Dawid1986; @Dawid2014] and Gneiting and Raftery [@Gneiting2007]; though the earliest measures promoting "rational" and "honest" decision making date back to the 1950s [@Brier1950; @Good1952].
 Few scoring rules have been proposed in survival analysis, although the past few years have seen an increase in popularity in these measures.
 Before delving into these measures, we will first describe scoring rules in the simpler classification setting.
+
+Scoring rules are pointwise losses, which means a loss is calculated for all observations and the sample mean is taken as the final score.
+To simplify notation, we only discuss scoring rules in the context of a single observation where $L_i(\hatS_i, t_i, \delta_i)$ would be the loss calculated for some observation $i$ where $\hatS_i$ is the predicted survival function (from which other distribution functions can be derived), and $(t_i, \delta_i)$ is the observed survival outcome.
 
 ## Classification Losses
 
 In the simplest terms, a scoring rule compares two values and assigns them a score (hence 'scoring rule'), formally we'd write $L: \Reals \times \Reals \mapsto \ExtReals$.
 In machine learning, this usually means comparing a prediction for an observation to the ground truth, so $L: \Reals \times \calP \mapsto \ExtReals$ where $\calP$ is a set of distributions.
 Crucially, scoring rules usually refer to comparisons of true and predicted *distributions*.
-For example, let's construct a scoring rule as follows:
-1. Let $y \in \{0,1\}$ be the ground truth and let $\hat{p}$ be the predicted probability mass function such that $\hat{p}(y)$ is the probability of the observed event occurring;
-2. Define $\hat{y} := \II(\hat{p}(y) \geq 0.5)$, i.e., $\hat{y}$ is $1$ if the predicted probability of event $1$ is greater or equal than 0.5;
-3. Then define our scoring rule such that we score $1$ if $\hat{y}$ equals $y$ or 0 otherwise: $SR :=\II(\hat{y} == y)$.
+As an example, take the Brier score [@Brier1950] defined by:
+$$L_{Brier}(\hatp_i, y_i) = (y_i - \hatp_i(y_i))^2$$
 
-In practice, minimisation is often the goal in automated machine learning processes, so we usually talk about 'losses' (which are minimised) instead of scoring rules that are maximised, hence let's adapt SR slightly to the loss $L := \II(\hat{y} \neq y))$, and putting all the above together we get
+This scoring rule compares the ground truth to the predicted probability distribution by testing if the difference between the observed event and the truth is minimized.
+This is intuitive as if the event occurs and $y_i = 1$, then $\hatp_i(y_i)$ should be as close to one as possible to minimize the loss.
+On the other hand, if $y_i = 0$ then the better prediction would be $\hatp_i(y_i) = 0$.
 
-$$L_P(\hat{p}, y) = \II(y \neq \II(\hat{p}(y) \geq 0.5))$$
-
-This loss is interpretable and has a real world meaning, in fact it's just the mean misclassification error after discretising a probabilistic classification prediction. Now consider the following loss:
-
-$$L_I(\hat{p}, y) = 1 - L_P$$
-
-This follows the definition of a scoring rule/loss as it maps a distribution and value to a real-valued number, but the loss is also terrible as it assigns lower scores to worse predictions!
-
-The difference between these losses is that the first is 'proper' whereas the latter is 'improper'.
-A 'proper' loss is a loss that is minimised by the 'correct' prediction.
+This demonstrates an important property of the scoring rule, *properness*.
+A loss is *proper*, if it is minimized by the correct prediction.
+In contrast, the loss $L_{improper}(\hatp_i, y_i) = 1 - L_{Brier}(\hatp_i, y_i)$ is still a scoring rule as it compares the ground truth to the prediction probability distribution, but it is clearly improper as the perfect prediction ($\hatp_i(y_i) = y_i$) would result in a score of $1$ whereas the worst prediction would result in a score or $0$.
+Proper losses provide a method of model comparison as, by definition, predictions closest to the true distribution will result in lower expected losses.
 
 Another important property is *strict* properness.
-A loss is strictly proper if the loss is *uniquely* minimised by the 'correct' prediction.
-Let's modify $L_P$ slightly to become the squared difference between the true value and predicted probability (in fact this is the widely used Brier score [@Brier1950]):
-
-$$L_S(\hat{p}, y) = (y - \hat{p}(y))^2$$
-
-Now if we compare $L_P$ and $L_S$ across different values of $y$ and $\hat{p}_y$ (@tbl-compare-scoring), we can easily see that whilst $L_P$ provides some utility, this is limited as we'd have no way to know that some predictions are closer to the truth than others.
-On the other hand, $L_S$ provides a quantitative method to compare predictions against the truth and between each other.
-
-| | $y = 0$ | $y = 1$ |
-|-|---|---|
-| $\hat{p}_y = 0$ | $L_P = 0; L_S = 0$ |  $L_P = 0; L_S = 1$ |
-| $\hat{p}_y = 0.3$ | $L_P = 0; L_S = 0.09$ |  $L_P = 0; L_S = 0.49$ |
-| $\hat{p}_y = 0.6$ | $L_P = 1; L_S = 0.36$ |  $L_P = 1; L_S = 0.16$ |
-| $\hat{p}_y = 1$ | $L_P = 1; L_S = 1$ |  $L_P = 1; L_S = 0$ |
-
-: Comparing improper proper ($L_P$) and strictly proper ($L_S$) scoring rules across different qualities of predictions. {#tbl-compare-scoring}
+A loss is *strictly proper* if the loss is uniquely minimized by the 'correct' prediction.
+Consider now the loss $L_0(\hatp_i, y_i) = 0$.
+Not only is this a strictly proper scoring rule but it is also proper.
+The loss can only take the value $0$ and is therefore guaranteed to be minimized by the correct prediction.
+It is clear however that this loss is useless.
+In contrast, the Brier score is minimized by only one value, which is the optimal prediction ([@fig-eval-brierlog]).
+Strictly proper losses are particular important for automated model optimisation, as minimization of the loss will result in the 'optimum score estimator based on the scoring rule' [@Gneiting2007].
 
 Mathematically, a classification loss  $L: \calP \times \calY \rightarrow \ExtReals$ is *proper* if for any distributions $p_Y,p$ in $\calP$ and for any random variables $Y \sim p_Y$, it holds that $\EE[L(p_Y, Y)] \leq \EE[L(p, Y)]$.
 The loss is *strictly proper* if, in addition, $p = p_Y$ uniquely minimizes the loss.
 
-Proper losses provide a method of model comparison as, by definition, predictions closest to the true distribution will result in lower expected losses.
-Strictly proper losses have additional important uses such as in model optimisation, as minimisation of the loss will result in the 'optimum score estimator based on the scoring rule' [@Gneiting2007].
-Whilst properness is usually a minimal acceptable property for a loss, it is generally not sufficient on its own, for example consider the measure $L(\hat{p}_y, y) = 0$, which is proper as it is minimised by $L(y, y)$ but it is clearly useless.
-
-The two most widely used losses for classification are the Brier score [@Brier1950] and log loss [@Good1952], defined respectively by
+As well as the Brier score, which was defined above, another widely used loss is the log loss [@Good1952], defined by
 
 $$
-L_{brier}(\hat{p}, y) \mapsto (y - \hat{p}(y))^2
+L_{logloss}(\hatp_i, y_i) = -\log \hat{p}_i(y_i)
 $$
 
-and
+These losses are visualised in @fig-eval-brierlog, which highlights that both losses are strictly proper [@Dawid2014] as they are minimized when the true prediction is made, and converge to the minimum as predictions are increasingly improved.
 
-$$
-L_{logloss}(\hat{p}, y) = -\log \hat{p}(y)
-$$
-
-These losses are visualised in @fig-eval-brierlog, which highlights that both losses are strictly proper [@Dawid2014] as they are minimised when the true prediction is made, and we can say that we converge to the minimum as predictions are increasingly improved.
-
-![Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in $[0,1]$, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimised with the correct prediction, i.e. if $\zeta.p(1) = 1$ when $y = 1$ and $\zeta.p(1) = 0$ when $y = 0$ for a predicted discrete distribution $\zeta$.](Figures/evaluation/brier_logloss.png){#fig-eval-brierlog fig-alt="TODO"}
-
-<!-- FIXME - I THINK THIS CAN PROBABLY BE DELETED -->
-<!-- #### Regression {#sec-eval-distr-score-reg-reg}
-
-The definition of a probabilistic regression scoring rule follows similarly to the classification setting after a re-specification of the target domain.
-
-:::: {.callout-note icon=false}
-
-## Probabilistic regression loss
-
-::: {#cnj-loss-regr}
-Let $\calP$ be some family of distributions over $\calY \subseteq \Reals$ containing at least two elements. Then for a predicted distribution in $\calP$, any real-valued function with the signature $L: \calP \times \calY \rightarrow \ExtReals$ will be considered as a *probabilistic regression loss*.
-
-:::
-
-::::
-
-::: {#def-regr-proper}
-
-## Regression loss properness
-
-A probabilistic regression loss  $L: \calP \times \calY \rightarrow \ExtReals$ is called:
-
-i. *Proper* if: for any distributions $p_Y,p$ in $\calP$ and for any random variables $Y \sim p_Y$, it holds that
-
-$$
-\EE[L(p_Y, Y)] \leq \EE[L(p, Y)]
-$$
-i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that
-
-$$
-\EE[L(p_Y, Y)] = \EE[L(p, Y)] \Leftrightarrow p = p_Y
-$$
-
-:::
-
-#### Losses {.unnumbered .unlisted}
-
-In the regression setting, classification scoring rules are extended by instead considering distribution functions and integrating these over $\calY \subseteq \Reals$.
-
-The Integrated Brier Score (IBS) is defined by,^[also known as the Continuous Ranked Probability Score (CRPS).]
-
-$$
-L_{IBS}:\calP \times \calY \rightarrow [0,1]; \quad
-(\zeta, y) \mapsto \int_{\calY} (\II(y \leq \tau) - \zeta.F(\tau))^2 \ d\tau
-$$ {#eq-ibs}
-
-The extension from the classification Brier score is intuitive, instead of evaluating if the predicted pmf is 'correct' at a single point, the predicted cumulative distribution function is compared with the true event status over the entire distribution.
-
-The log loss has two adaptations for continuous predictions. The first is analogous to the IBS and is termed the Integrated Log Loss (ILL)
-
-$$
-\begin{split}
-&L_{ILL}:\calP \times \calY \rightarrow \NNReals; \\
-&(\zeta, y) \mapsto - \int_{\calY} \II(y \leq \tau)\log[\zeta.F(\tau)] + \II(y > \tau)\log[\zeta.S(\tau)] \ d\tau
-\end{split}
-$$
-
-This follows the 'longer' form of the binary classification log loss and considers the cumulative probability of events over all time-points. A second adaptation to the log loss instead considers the 'simpler' form and replaces the probability mass function with the probability density function. Again this measure is intuitive as a perfect distributional prediction will assign the highest point of density to the point at which the event occurs. This variant of the log loss does not have a specific name but it is termed here the 'density log loss', $L_{DLL}$, and is formally defined by,
-
-$$
-L_{DLL}:\calP \times \calY \rightarrow \NNReals; \quad
-(\zeta, y) \mapsto - \log[\zeta.f(y)]
-$$ {#eq-density-logloss}
-where $\calP$ is a family of absolutely continuous distributions over $\calY$ with defined density functions.
-
-All three of these losses are strictly proper [@Gneiting2007; @Gressmann2018]. -->
-
-<!-- FIXME: NEED TO WORK ON THIS SECTION -->
-<!-- ## What makes a survival scoring rule? {#sec-eval-distr-score-surv}
-
-On the surface, a definition for survival losses may appear to trivially follow from the classification setting, however this is not the case as survival analysis has a unique property in that model predictions do not immediately align with observed outcomes.
-
-```{r, echo = FALSE}
-learn("sec-surv", "survival task")
-```
-
-The machine learning survival analysis task is to predict the distribution of the survival time, however in practice we observe the outcome time, which could be survival or censoring.
-Hence, a survival scoring rule does not compare the predicted survival time distribution, $p$, with $Y$ but with $T$.
-To make matters more complex, we are not interested in whether the true
-
-
-
-As we have seen in previous chapters, many measures incorporate IPCW, which is the process of weighting a measure by the inverse of the censoring distribution.
-
-
-Losses in the survival setting compare predicted survival distributions to the observed outcome tuple (time and censoring). A large class of survival losses additionally incorporate an estimator of the unknown censoring distribution, in order to attempt meaningful comparison. This second group of losses are termed here as 'approximate' losses as the true censoring distribution is never known and hence an estimate of the loss is approximate at best.
-
-:::: {.callout-note icon=false}
-
-## Survival loss
-
-::: {#cnj-loss-surv}
-Let $\calT \subseteq \NNReals$ and let $\calC, \calP$ be any two distinct families of distributions over $\calT$, containing at least two elements. Then,
-
-* Any real-valued function with the signature $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ will be considered as a *survival loss*.
-* Any real-valued function with the signature $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$ will be considered as an *approximate survival loss*.
-:::
-
-::::
-
-Two separate novel definitions for (strict) properness are provided: the first captures the general case in which no assumptions are made about the censoring distribution; the second assumes that censoring is conditionally event-independent.
-
-::: {#def-surv-proper}
-
-## Survival loss properness
-
-A survival loss $L: \calP \times \calT \times \bset \rightarrow \ExtReals$ is called:
-
-i. *Proper* if: for any distributions $p_Y, p$ in $\calP$; and for any random variables $Y \sim p_Y$, and $C$ t.v.i. $\calT$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
-
-$$
-\EE[L(p_Y, T, \Delta)] \leq \EE[L(p, T, \Delta)]
-$$
-i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that
-
-$$
-\EE[L(p_Y, T, \Delta)] = \EE[L(p, T, \Delta)] \Leftrightarrow p = p_Y
-$$
-i. *Outcome-independent proper* if: for any distributions $p_Y, p$ in $\calP$; and for any random variables $Y \sim p_Y$, and $C$ t.v.i. $\calT$, where $C \indep Y$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
-
-$$
-\EE[L(p_Y, T, \Delta)] \leq \EE[L(p, T, \Delta)]
-$$
-i. *Outcome-independent strictly proper* if in addition to being outcome-independent proper it holds, for the same quantification of variables, that
-
-$$
-\EE[L(p_Y, T, \Delta)] = \EE[L(p, T, \Delta)] \Leftrightarrow p = p_Y
-$$
-
-:::
-
-These final two definitions are 'weaker' but provide a term for losses that are improper in general but are (strictly) proper under common (though possibly strict) assumptions about the censoring distribution. Note by definition that if a loss is:
-
-i. (strictly) proper then it is also outcome-independent (strictly) proper;
-i. (outcome-independent) strictly proper then it is also (outcome-independent) proper
-
-
-Analogous definitions are now provided for approximate survival losses.
-
-::: {#def-surv-approx-proper}
-
-## Survival approximate loss properness
-
-An approximate survival loss $L: \calP \times \calT \times \bset \times \calC \rightarrow \ExtReals$ is called:
-
-i. *Proper* if: for any distributions $p_Y, p$ in $\calP$ and $c \in \calC$; and for any random variables $Y \sim p_Y$ and $C \sim c$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
-
-$$
-\EE[L(p_Y, T, \Delta|c)] \leq \EE[L(p, T, \Delta|c)]
-$$
-i. *Strictly proper* if in addition to being proper it holds, for the same quantification of variables, that
-
-$$
-\EE[L(p_Y, T, \Delta|c)] = \EE[L(p, T, \Delta|c)] \Leftrightarrow p = p_Y
-$$
-i. *Outcome-independent proper* if: for any distributions $p_Y, p$ in $\calP$ and $c \in \calC$; and for any random variables $Y \sim p_Y$ and $C \sim c$, where $C \indep Y$; with $T := \min\{Y,C\}$ and $\Delta := \II(T=Y)$; it holds that,
-
-$$
-\EE[L(p_Y, T, \Delta|c)] \leq \EE[L(p, T, \Delta|c)]
-$$
-i. *Outcome-independent strictly proper* if in addition to being outcome-independent proper it holds, for the same quantification of variables, that
-
-$$
-\EE[L(p_Y, T, \Delta|c)] = \EE[L(p, T, \Delta|c)] \Leftrightarrow p = p_Y
-$$
-
-:::
-
-As the true censoring distribution, $c$, can never be known exactly, this definition allows for approximate losses to be proper in the asymptotic (with infinite training data) if they include estimators of $c$ that are convergent in distribution. Proper approximate losses are therefore useful in modern predictive settings in which 'big data' is very common and thus estimators, such as the Kaplan-Meier, can converge to the true censoring distribution. However approximate losses may provide misleading results when the sample size is small; future research should ascertain what 'small' means for individual losses. -->
+![Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in $[0,1]$, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimized when $\hatp_i(y_i) = y_i$.](Figures/evaluation/brier_logloss.png){#fig-eval-brierlog fig-alt="TODO"}
 
 ## Survival Losses {#sec-eval-distr-commonsurv}
 
-We are now ready to list common scoring rules in survival analysis and discuss some of their properties.
+<!-- FIXME: COPY FINAL DEFINITION FROM PROPERNESS PAPER -->
+Analogously to classification losses, a survival loss $L: \calP \times \PReals \times \bset \rightarrow \ExtReals$ is *proper* if for any distributions $p_Y, p$ in $\calP$, and for any random variables $Y \sim p_Y$, and $C$ t.v.i. $\PReals$; with $T := \min(Y,C)$ and $\Delta := \II(T=Y)$; it holds that, $\EE[L(p_Y, T, \Delta)] \leq \EE[L(p, T, \Delta)]$.
+The loss is *strictly proper* if, in addition, $p = p_Y$ uniquely minimizes the loss. A survival loss is referred to as outcome-independent (strictly) proper if it is only (strictly) proper when $C$ and $Y$ are independent.
+
+With these definitions, the rest of this chapter lists common scoring rules in survival analysis and discusses some of their properties.
 As with other chapters, this list is likely not exhaustive but will cover commonly used losses.
 
 ### Integrated Graf Score
 
 The Integrated Graf Score (IGS) was introduced by Graf [@Graf1995; @Graf1999] as an analogue to the integrated brier score (IBS) in regression.
+It is likely the commonly used scoring rule in survival analysis, possibly due to its intuitive interpretation.
+
 The loss is defined by
 
 $$
 \begin{split}
-L_{IGS}(\hat{S}, t, \delta|\KMG) = \int^{\tau^*}_0  \frac{\hat{S}^2(\tau) \II(t \leq \tau, \delta=1)}{\KMG(t)} + \frac{\hat{F}^2(\tau) \II(t > \tau)}{\KMG(\tau)} \ d\tau
+L_{IGS}(\hat{S}_i, t_i, \delta_i|\KMG) = \int^{\tau^*}_0  \frac{\hatS_i^2(\tau) \II(t_i \leq \tau, \delta_i=1)}{\KMG(t_i)} + \frac{\hatF_i^2(\tau) \II(t_i > \tau)}{\KMG(\tau)} \ d\tau
 \end{split}
 $$ {#eq-igs}
-where  $\hatS^2(\tau) = (\hatS(\tau))^2$ and $\hatF^2(\tau) = (1 - \hatS(\tau)^2$, and $\tau^* \in \NNReals$ is an upper threshold to compute the loss up to, and $\KMG$ is the Kaplan-Meier trained on the censoring distribution for IPCW.
+where  $\hatS_i^2(\tau) = (\hatS_i(\tau))^2$ and $\hatF_i^2(\tau) = (1 - \hatS_i(\tau))^2$, and $\tau^* \in \NNReals$ is an upper threshold to compute the loss up to, and $\KMG$ is the Kaplan-Meier trained on the censoring distribution for IPCW (@sec-eval-crank-disc-conc).
 
-```{r echo = FALSE}
-learn("sec-eval-crank-disc-conc", "IPCW")
-```
+At first glance this might seem intimidating but it is worth taking the time to understand the intuition behind the loss.
+Recall the classification Brier score, $L(\hatp_i, y_i) = (y_i - \hatp_i(y))^2$, this provides a method to compare and evaluate a probability mass function at one time-point.
+The *integrated Brier score* (IBS), also known as the *CRPS*, is the integral of the Brier score for all real-valued thresholds [@Gneiting2007] and hence allows predictions to be evaluated over multiple points as $L(\hatF_i, y_i) = \int (\hatF_i(y_i) - \II(y_i \geq x))^2 dy$ where $\hatF_i$ is the predicted cumulative distribution function and $x$ is some meaningful threshold.
+In survival analysis, $\hatF_i(\tau)$ represents the probability of an observation having experienced the event at or before $\tau$, and the ground truth to compare to is therefore whether the observation has actually experienced the event at $\tau$, which is the case when $t_i \leq \tau$.
+Hence the IBS becomes $L(\hatF_i, t_i) = \int (\hatF_i(\tau) - \II(t_i \leq \tau))^2 d\tau$.
+Now for a given time $\tau$:
 
-To understand this loss, let's break it down and look at the computations at a single time-point, $\tau$.
-At $\tau$ the loss will either be:
+$$
+L(\hatF_i, t) =
+\begin{cases}
+(\hatF_i(\tau) - 1)^2 = (1 - \hatF_i(\tau)^2) = \hatS_i^2(\tau), & \text{ if } t_i \leq \tau \\
+(\hatF_i(\tau) - 0)^2 = \hatF_i^2(\tau), & \text{ if } t_i > \tau
+\end{cases}
+$$ {#eq-graf-cases}
 
-1. $\frac{\hat{S}^2(\tau)}{\KMG(t)}$ - If the observation experiences the event before $\tau$
-2. 0 - If the observation is censored before $\tau$
-3. $\frac{\hat{F}^2(\tau)}{\KMG(\tau)}$ - If the observation's outcome is after $\tau$
+In words, if an observation has not yet experienced an outcome ($t_i > \tau$) then the loss is minimized when the cumulative distribution function (the probability of having already died) is $0$, which is intuitive as the optimal prediction is correctly identifying the observation has yet to experience the event.
+In contrast, if the observation has experienced the outcome ($t_i \leq \tau$) then the loss is minimized when the survival function (the probability of surviving until $\tau$) is $0$, which follows from similar logic.
 
-<!-- FIXME: BELOW IS TERRIBLY WRITTEN! -->
-As we have no information about the true survival time of censored observations, it is sensible to not attempt to provide a meaningful score once censored, so their contribution is $0$.
-For observations that are known to have experience the event at $\tau$, then we would expect their survival probability to be zero as the event has occurred (and they cannot continue to survive) hence contributing $\hatS^2$ -- the addition of $\KMG(t)$ has the effect of placing more weight on the score at the observed event time if the proportion of censoring is lower at this time, the reason being that when the observations are alive ($t > \tau$) then their contributing the rest of the weighting after this time.
-Finally, for observations who are still alive, then we'd expect their survival probability to be as close to 1 as possible with inverse weighting at the current timepoint.
-As $\tau \rightarrow \infty$, then $\KMG(\tau) \rightarrow 0$ as the number of observations in the dataset decreases, hence this weighting ensures that observations that are still in the data can contribute as if all observations were still in the data.
+The final component of the Graf score is accommodating for censoring.
+At $\tau$ an observation will either have
 
-When censoring is uninformative, the IGS consistently estimates the mean square error $L(t, S|\tau^*) = \int^{\tau^*}_0 [\II(t > \tau) - S(\tau)]^2 d\tau$, where $S$ is the correctly specified survival function [@Gerds2006].
+1. Not experienced the event: $I(t_i > \tau)$;
+2. Experienced the event: $I(t_i \leq \tau, \delta_i = 1)$; or
+3. Been censored: $I(t_i \leq \tau, \delta_i = 0)$
+
+In the Graf score, censored observations are discarded.
+If they were not then @eq-graf-cases would imply their contribution would be treated the same as those who had experienced the event.
+However this assumption would be entirely wrong as a censored observation is guaranteed not to have experienced the event, hence an ideal prediction for a censored observation is a high survival probability up until the point of censoring, at which time comparison to ground truth is unknown as this is no longer observed.
+
+The act of discarding censored observations means that the sample size decreases over time.
+To compensate for this, IPCW is used to increasingly weight predictions as $\tau$ increases.
+Hence, IPCW weights, $W_i$ are defined such that
+
+$$
+W_i =
+\begin{cases}
+\KMG^{-1}(t_i), & \text{ if } \II(t_i \leq \tau, \delta_i = 1) \\
+\KMG^{-1}(\tau), & \text{ if } \II(t_i > \tau)
+\end{cases}
+$$
+
+The weights total $1$ when divided over all samples and summed [@Graf1999].
+They are also intuitive as observations are either weighted by $G(\tau)$ when they are still alive and therefore still part of the sample, or by $G(t_i)$ otherwise.
+
+As well as being intuitive, when censoring is uninformative, the Graf score consistently estimates the mean square error $L(t, S|\tau^*) = \int^{\tau^*}_0 [\II(t > \tau) - S(\tau)]^2 d\tau$, where $S$ is the correctly specified survival function [@Gerds2006].
 However, despite these promising properties, the IGS is improper and must therefore be used with care [@Rindt2022; @Sonabend2022b].
-
-The reweighted IGS is a strictly proper outcome-independent loss [@Sonabend2022b] that reweights the IGS by removing censored observations and reweighting the denominator.
+In practice, experiments have shown that the effect of improperness is minimal and therefore this loss should be avoided for automated routines such as model tuning, however it can still be used for model evaluation.
+<!-- CITE OUR PROPERNESS PAPER HERE -->
+In addition, a small adaptation of the loss results in a strictly proper scoring rule simply by altering the weights such that $W_i = \KMG^{-1}(t_i)$ for all uncensored observations and $0$ otherwise [@Sonabend2022b], resulting in the reweighted Graf score:
+<!-- CITE OUR PROPERNESS PAPER HERE -->
 
 $$
-L_{RIGS}(\hatS, t, \delta|\KMG) = \frac{\delta \int_{\calT} (\II(t \leq \tau) - \hatF(\tau))^2 \ d\tau}{\KMG(t)}
+L_{RGS}(\hatS_i, t_i, \delta_i|\KMG) = \delta_i\II(t_i \leq \tau^*) \int^{\tau^*}_0 \frac{(\II(t_i \leq \tau) - \hatF_i(\tau))^2}{\KMG(t_i)} \ d\tau
 $$
 
-This loss removes all censored observations, which can be problematic if the proportion of censoring is high.
-<!-- FIXME: THIS IS ALSO TERRIBLY WRITTEN! -->
-For uncensored observations we expect the predicted survival probability to be $1$ before any outcome is observed and $0$ otherwise, which follows more closely to the integrated Brier score.
-By changing the weighting the interpretation of contributions at time-points changes slightly, in the original IGS we may think of this as "inverse weighting for as long as the observation remains in the data", which means the weight of a contribution at a time-point will be different for all observations and all time-points.
-On the other hand, for RIGS, we weight by the outcome time for each observation, which remains the same over time.
-Hence we instead inflate scores for observations whose outcome are later in the dataset, this is intuitive as it essentially places more importance on observations that are representative of being alive at those time points.
+The addition of $\II(t_i \leq \tau^*)$ completely removes observations that experience the event after the cutoff time, $\tau^*$, this ensures there are no cases where the $G(t_i)$ weighting is calculated on time after the cutoff.
+Including an upper threshold (i.e, $\tau^* < \infty$) effects properness and generalization statements.
+For example, by evaluating a model using the RGS with a $\tau^*$ threshold, then the model may be said to only perform well up until $\tau^*$ with its performance unknown after this time.
 
-As the loss is strictly proper it may be 'safer' to use than the IGS in automated experiments, however this does come at the expense of removing censored observations.
+The change of weighting slightly alters the interpretation of the contributions at different time-points.
+By example, let $(t_i = 4, t_j = 5)$ be two observed survival times, then at $\tau = 3$, the Graf score weighting would be $\KMG^{-1}(4)$ for both observations, whereas the RGS weights would be $(KMG^{-1}(4), KMG^{-1}(5))$ respectively, hence there is always more 'importance' placed on observations that take longer to experience the event.
+In practice, the difference between these weights appears to be minimal [@Sonabend2022b] but as RGS is strictly proper, it is more suitable for automated experiments.
+<!-- FIXME: CITAITON ABOVE TO PROPERNESS PAPER -->
+
 
 ### Integrated Survival Log Loss
 
@@ -308,10 +152,10 @@ As the loss is strictly proper it may be 'safer' to use than the IGS in automate
 The integrated survival log loss (ISLL) was also proposed by @Graf1999.
 
 $$
-L_{ISLL}(\hatS,t,\delta|\KMG) = -\int^{\tau^*}_0  \frac{\log[\hatF(\tau)] \II(t \leq \tau, \delta=1)}{\KMG(t)} + \frac{\log[\hatS(\tau)] \II(t > \tau)}{\KMG(\tau)} \ d\tau
+L_{ISLL}(\hatS_i,t_i,\delta_i|\KMG) = -\int^{\tau^*}_0  \frac{\log[\hatF_i(\tau)] \II(t_i \leq \tau, \delta_i=1)}{\KMG(t_i)} + \frac{\log[\hatS_i(\tau)] \II(t_i > \tau)}{\KMG(\tau)} \ d\tau
 $$
 
-where $\tau^* \in \calT$ is an upper threshold to compute the loss up to.
+where $\tau^* \in \PReals$ is an upper threshold to compute the loss up to.
 
 Similarly to the IGS, there are three ways to contribute to the loss depending on whether an observation is censored, experienced the event, or alive, at $\tau$.
 Whilst the IGS is routinely used in practice, there is no evidence that ISLL is used, and moreover there are no proofs (or claims) that it is proper.
@@ -319,7 +163,7 @@ Whilst the IGS is routinely used in practice, there is no evidence that ISLL is 
 The reweighted ISLL (RISLL) follows similarly to the RIGS and is also outcome-independent strictly proper [@Sonabend2022b].
 
 $$
-L_{RISLL}(\hatS, t, \delta|\KMG) \mapsto -\frac{\delta \int_{\calT} \II(t \leq \tau)\log[\hatF(\tau)] + \II(t > \tau)\log[\hatS(\tau)] \ d\tau}{\KMG(t)}
+L_{RISLL}(\hatS_i, t_i, \delta_i|\KMG) = -\delta_i\II(t_i \leq \tau^*) \int^{\tau^*}_0 \frac{\II(t_i \leq \tau)\log[\hatF_i(\tau)] + \II(t_i > \tau)\log[\hatS_i(\tau)] \ d\tau}{\KMG(t_i)}
 $$
 
 
@@ -328,34 +172,34 @@ $$
 Another outcome-independent strictly proper scoring rule is the survival density log loss (SDLL) [@Sonabend2022b], which is given by
 
 $$
-L_{SDLL}(\hatf, t, \delta|\KMG) = - \frac{\delta \log[\hatf(t)]}{\KMG(t)}
+L_{SDLL}(\hatf_i, t_i, \delta_i|\KMG) = - \frac{\delta_i \log[\hatf_i(t_i)]}{\KMG(t_i)}
 $$
 
-where $\hatf$ is the predicted probability density function.
-This loss is essentially the classification log loss ($-log(\hatp(t))$) with added IPCW.
-Whilst the classification log loss has beneficial properties such as being differentiable, this is more complex for the SDLL, which is also only an approximate loss.
+where $\hatf_i$ is the predicted probability density function.
+This loss is essentially the classification log loss ($-\log(\hatp_i(t_i))$) with added IPCW.
+Whilst the classification log loss has beneficial properties such as being differentiable, this is more complex for the SDLL and it is not widely used in practice.
 A useful alternative to the SDLL which can be readily used in automated procedures is the right-censored log loss.
 
 ### Right-censored log loss
 
-The right-censored log loss (RCLL) is an outcome-independent strictly proper scoring rule [@Avati2020] that does not make use of IPCW and is thus not considered to be an approximate loss.
+The right-censored log loss (RCLL) is an outcome-independent strictly proper scoring rule [@Avati2020] that benefits from not depending on IPCW in its construction.
 The RCLL is defined by
 
 $$
-L_{RCLL}(\hatS, t, \delta) = -\log[\delta\hatf(t) + (1-\delta)\hatS(t)]
+L_{RCLL}(\hatS_i, t_i, \delta_i) = -\log[\delta_i\hatf_i(t_i) + (1-\delta_i)\hatS_i(t_i)]
 $$
 
-This loss is easily interpretable when we break it down into its two halves:
+This loss is interpretable when we break it down into its two halves:
 
-1. If an observation is censored at $t$ then all the information we have is that they did not experience the event at the time, so they must be 'alive', hence the optimal value is $\hatS(t) = 1$ (which becomes $-log(1) = 0$).
-2. If an observation experiences the event then the 'best' prediction is for the probability of the event at that time to be maximised, as pdfs are not upper-bounded this means $\hatf(t) = \infty$ (and $-log(t) \rightarrow \infty$ as $t \rightarrow \infty$).
+1. If an observation is censored at $t_i$ then all the information we have is that they did not experience the event at the time, so they must be 'alive', hence the optimal value is $\hatS_i(t_i) = 1$ (which becomes $-log(1) = 0$).
+2. If an observation experiences the event then the 'best' prediction is for the probability of the event at that time to be maximised, as pdfs are not upper-bounded this means $\hatf_i(t_i) = \infty$ (and $-log(t_i) \rightarrow \infty$ as $t_i \rightarrow \infty$).
 
 ### Absolute Survival Loss
 
-The absolute survival loss, developed over time by @Schemper2000 and @Schmid2011, is based on the mean absolute error is very similar to the IGS but removes the squared time:
+The absolute survival loss, developed over time by @Schemper2000 and @Schmid2011, is based on the mean absolute error is very similar to the IGS but removes the squared term:
 
 $$
-L_{ASL}(\hatS, t, \delta|\KMG) = \int^{\tau^*}_0 \frac{\zeta.S(\tau)\II(t \leq \tau, \delta = 1)}{\KMG(t)} + \frac{\zeta.F(\tau)\II(t > \tau)}{\KMG(\tau)} \ d\tau
+L_{ASL}(\hatS_i, t_i, \delta_i|\KMG) = \int^{\tau^*}_0 \frac{\hatS_i(\tau)\II(t_i \leq \tau, \delta_i = 1)}{\KMG(t_i)} + \frac{\hatF_i(\tau)\II(t_i > \tau)}{\KMG(\tau)} \ d\tau
 $$
 where $\KMG$ and $\tau^*$ are as defined above.
 Analogously to the IGS, the ASL score consistently estimates the mean absolute error when censoring is uninformative [@Schmid2011] but there are also no proofs or claims of properness.
@@ -370,8 +214,8 @@ As well as evaluating probabilistic outcomes with integrated scoring rules, non-
 For example, instead of evaluating a probabilistic prediction with the IGS over $\NNReals$, instead one could compute the IGS at a single time-point, $\tau \in \NNReals$, only.
 Plotting these for varying values of $\tau$ results in 'prediction error curves' (PECs), which provide a simple visualisation for how predictions vary over the outcome.
 PECs are especially useful for survival predictions as they can visualise the prediction 'over time'.
-PECs should only be used as a graphical guide and never for model comparison as they only provide information at a limited number of points.
-An example is provided in @fig-eval-pecs for the IGS where the the Cox PH consistently outperforms the SVM.
+PECs are mostly used as a graphical guide when comparing few models, rather than as a formal tool for model comparison.
+An example for PECs is provided in @fig-eval-pecs for the IGS where the the Cox PH consistently outperforms the SVM.
 
 ![Prediction error curves for the CPH and SVM models from @sec-eval-distr-calib. x-axis is time and y-axis is the IGS computed at different time-points. The CPH (red) performs better than the SVM (blue) as it scores consistently lower. Trained and tested on randomly simulated data from $\proba$.](Figures/evaluation/pecs.png){#fig-eval-pecs fig-alt="TODO"}
 
