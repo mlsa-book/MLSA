@@ -79,52 +79,7 @@ Specific concordance indices can be constructed by assigning a weighting scheme 
 Measures that use $\KMG$ are referred to as Inverse Probability of Censoring Weighted (IPCW) measures as the estimated censoring distribution is utilised to weight the measure in order to compensate for removed censored observations.
 This is visualised in @fig-ipcw where $\KMG$, $\KMG^{-2}$, and $\KMS$ are computed based on the `whas` dataset [@dataapplied].
 
-```{r, echo=FALSE,message=FALSE,warnings=FALSE}
-#| fig-cap: "Weighting functions obtained on the `whas` dataset. x-axis is follow-up time. y-axis is outputs from one of three weighting functions: $\\KMG$, survival function based on the censoring distribution of the `whas` dataset (red), and $\\KMG^{-2}$ (green), $\\KMS$, marginal survival function based on original `whas` dataset (blue), . The vertical gray line at $t = \\tau=1267$ represents the point at which $\\hatG(t)<0.6$."
-#| fig-alt: "Line graph with three lines in green, red, and blue. x-axis is labelled 't' and ranges from 0 to 6000. y-axis is labelled 'W(t)' and ranges from 0 to 5. Legend for lines is titled 'W' with entries 'KMG' for the red line, 'KMG^-2' for the green line, and 'KMS' for the blue line. The blue line starts at (0,1), moves to around (1000, 0.5) then is relatively flat. The red line roughly linearly decreases from (0,1) to (6000,0). The green line sharply increases between (1, 1000) to (5, 3500). A vertical gray line passes through (0, 1267)."
-#| label: fig-ipcw
-library(dplyr)
-library(ggplot2)
-library(mlr3)
-library(mlr3proba)
-
-s_t = tsk("whas")
-time = s_t$unique_times()
-c_t = s_t$data() %>% mutate(status = 1 - status) %>% as_task_surv(event = "status")
-
-s_d = data.frame(t = time, surv = s_t$kaplan()$surv, W = "KMS")
-c_d = data.frame(t = time, surv = c_t$kaplan()$surv, W = "KMG")
-w_d = data.frame(t = time, surv = 1 / (c_t$kaplan()$surv^2), W = "KMG^-2")
-
-cutoff = time[which(s_t$kaplan()$surv < 0.6)[1]]
-
-d = rbind(s_d, c_d, w_d) %>% as.data.frame()
-ggplot(d, aes(x = t, y = surv, color = W)) +
-  geom_line() +
-  ylim(0, 5) +
-  theme_bw() +
-  labs(
-    y = "W(t)",
-    title = "Kaplan-Meier estimates and weighting on 'whas' data",
-    color = "Weight function") +
-  geom_vline(xintercept = cutoff, lty = 2, color = "gray") +
-  scale_color_discrete(labels = expression(hat(G)[KM], hat(G)[KM]^{-2}, hat(S)[KM]))
-```
-```{r, echo=FALSE, include=FALSE}
-ids = c("W=1", "W=G^-1", "W=G^-2")
-m_inf = c(msr("surv.cindex"),
-msr("surv.cindex", weight_meth = "G"),
-msr("surv.cindex", weight_meth = "G2"))
-
-m_80 = c(msr("surv.cindex", id = "W=1", cutoff = cutoff),
-msr("surv.cindex", weight_meth = "G", id = "W=G^-1", cutoff = cutoff),
-msr("surv.cindex", weight_meth = "G2", id = "W=G^-2", cutoff = cutoff))
-
-m = c(m_inf, m_80)
-
-set.seed(20231207)
-res = round(resample(s_t, lrn("surv.coxph"), rsmp("cv", folds = 3))$aggregate(m), 2)
-```
+![Weighting functions obtained on the `whas` dataset. x-axis is follow-up time. y-axis is outputs from one of three weighting functions: $\KMG$, survival function based on the censoring distribution of the `whas` dataset (red), and $\KMG^{-2}$ (green), $\KMS$, marginal survival function based on original `whas` dataset (blue), . The vertical gray line at $t = \tau=1267$ represents the point at which $\hatG(t)<0.6$.](Figures/evaluation/weights.png){#fig-ipcw fig-alt="Line graph with three lines in green, red, and blue. x-axis is labelled 't' and ranges from 0 to 6000. y-axis is labelled 'W(t)' and ranges from 0 to 5. Legend for lines is titled 'W' with entries 'KMG' for the red line, 'KMG^-2' for the green line, and 'KMS' for the blue line. The blue line starts at (0,1), moves to around (1000, 0.5) then is relatively flat. The red line roughly linearly decreases from (0,1) to (6000,0). The green line sharply increases between (1, 1000) to (5, 3500). A vertical gray line passes through (0, 1267)."}
 
 The following weights have been proposed for the concordance index:
 
@@ -144,11 +99,14 @@ In practice, when a suitable cut-of $\tau$ is chosen, all these weightings perfo
 For example, @tbl-ipcw uses the `whas` data again to compare Harrell's C with measures that include IPCW weighting, when no cutoff is applied (top row) and when a cutoff is applied when $\hat{G}(t)=0.6$ (grey line in @fig-ipcw).
 The results are almost identical when the cutoff is applied but still not massively different without the cutoff.
 
-```{r, echo=FALSE, results='asis'}
-#| label: tbl-ipcw
-#| tbl-cap: Comparing C-index measures (calculated on the `whas` dataset using a Cox model with three-fold cross-validation) with no cut-off (top) and a cut-off when $\hat{G}(t)=0.6$ (bottom). First column is Harrell's C, second is the weighting $1/\hat{G}(t)$, third is Uno's C.
-knitr::kable(matrix(res, 2, 3, TRUE, dimnames = list(c("tau=Inf", paste0("tau=", cutoff)), ids)))
-```
+<!-- results below from _experiments.R -->
+
+| | $W=1$ | $W= G^{-1}$ | $W=G^{-2}$ |
+|-|-|-|-|
+| $\tau=\infty$ | 0.74 | 0.73 | 0.71 |
+| $\tau=1267$ | 0.76 | 0.75 | 0.75 |
+
+: Comparing C-index measures (calculated on the `whas` dataset using a Cox model with three-fold cross-validation) with no cut-off (top) and a cut-off when $\hat{G}(t)=0.6$ (bottom). First column is Harrell's C, second is the weighting $1/\hat{G}(t)$, third is Uno's C. {#tbl-ipcw}
 
 On the other hand, if a poor choice is selected for $\tau$ (cutting off too late) then IPCW measures can be highly unstable [@Rahman2017], for example the variance of Uno's C drastically increases with increased censoring [@Schmid2012].
 
