@@ -1,4 +1,19 @@
+## Introduction
+library(distr6)
+library(ggplot2)
+g = dstr("Gompertz", shape = 2, decorators = "ExoticStatistics")
+t = seq.int(0, 1.5, length.out = 100)
+d = data.frame(t = t, fun = factor(rep(c("Density", "Hazard", "Cumulative Density", "Survival"), each = 100), levels = c("Density", "Hazard", "Cumulative Density", "Survival")), y = c(g$pdf(t), g$hazard(t), g$cdf(t), g$survival(t)))
+g = ggplot(d, aes(x = t, y = y, color = fun)) +
+  geom_line() +
+  facet_wrap(~fun, scales = "free", nrow = 2) +
+  theme_bw() +
+  theme(legend.position = "n")
+ggsave("book/Figures/introduction/gompertz.png", g, height = 3, units = "in",
+  dpi = 600)
+
 ## Ranking
+rm(list = ls())
 library(dplyr)
 library(ggplot2)
 library(mlr3)
