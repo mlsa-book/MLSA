@@ -46,7 +46,7 @@ van Houwelingen proposed several measures [@VanHouwelingen2000] for calibration 
 The measure assesses if the model correctly estimates the theoretical 'true' cumulative hazard function of the underlying data generating process, $H = \hatH$.
 
 The statistic is derived by noting the closely related nature of survival analysis and counting processes, and exploiting the fact that the sum of the cumulative hazard function is an estimate for the number of events in a given time-period [@dataapplied].
-As this result is often surprising result to readers, below is a short experiment using $\Rstats$ that demonstrates how the sum of the cumulative hazard estimated by a Kaplan-Meier estimator is identical to the number of randomly simulated deaths in a dataset:
+As this result may seem surprising, below is a short experiment using $\Rstats$ that demonstrates how the sum of the cumulative hazard estimated by a Kaplan-Meier estimator is identical to the number of randomly simulated deaths in a dataset:
 ```{r}
 #| collapse: true
 #| results: 'markup'
@@ -57,7 +57,7 @@ library(survival)
 event = rbinom(100, 1, 0.7)
 times = runif(100)
 H = survfit(Surv(times, event) ~ 1)$cumhaz
-sum(event) / sum(H)
+c("Num deaths" = sum(event), "Sum H" = sum(H))
 ```
 
 Houwelingen's $\alpha$ is then defined by substituting $H$ for the observed total number of deaths and summing over all predictions:
@@ -81,41 +81,13 @@ Graphical methods compare the average predicted distribution to the expected dis
 The simplest graphical comparison compares the average predicted survival curve to the Kaplan-Meier curve estimated on the testing data.
 Let $\hatS_1,...,\hatS_m$ be predicted survival functions, then the average predicted survival function is the mixture: $\bar{\hatS} = \mean[m]{\hatS_i(\tau)}$.
 This estimate can be plotted next to the Kaplan-Meier estimate of the survival distribution in a test dataset (i.e., the true data for model evaluation), allowing for visual comparison of how closely these curves align.
-An example is given in @fig-eval-calib, a Cox model (CPH), random survival forest, and relative risk tree with distribution composition, are all compared to the Kaplan-Meier estimator.
+An example is given in @fig-eval-calib, a Cox model (CPH), random survival forest, and relative risk tree, are all compared to the Kaplan-Meier estimator.
 This figure highlights the advantages and disadvantages of this method.
 The relative risk tree is clearly poorly calibrated as it increasingly diverges from the Kaplan-Meier.
 In contrast, the Cox model and random forest cannot be directly compared to one another, as both models frequently overlap with each other and the Kaplan-Meier estimator.
 Hence it is possible to say that the Cox and forests models are better calibrated than the risk tree, however it is not possible to say which of those two is better calibrated and whether their distance from the Kaplan-Meier is significant or not at a given time (when not clearly overlapping).
 
-```{r, message=FALSE,warning=FALSE,echo=FALSE}
-#| label: fig-eval-calib
-#| fig-cap: Comparing the calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the Kaplan-Meier estimate of the survival function calculated on a test set. The calibration of RRT notably decreases over time whereas RF and CPH are closer to the Kaplan-Meier curve.
-#| fig-alt: "x-axis is labelled 'T' and ranges from 20 to 100. y-axis is labelled 'S(T)' and rages from 0.8 to 1. Four lines are plotted: CPH (red), KM (green), RF (blue), RRT (purple). The RRT line is quite flat across y=1. The other lines overlap multiple times from (20, 1) to (100, 0.8)."
-library(mlr3proba)
-library(mlr3pipelines)
-library(mlr3extralearners)
-library(ggplot2)
-library(dplyr)
-set.seed(20231211)
-t = tgen("simsurv")$generate(400)
-s = partition(t)
-
-prrt = as_learner(ppl("distrcompositor", lrn("surv.rpart")))$
-  train(t, s$train)$predict(t, s$test)
-pcox = lrn("surv.coxph")$train(t, s$train)$predict(t, s$test)
-pran = lrn("surv.ranger")$train(t, s$train)$predict(t, s$test)
-
-drrt = autoplot(prrt, "calib", t, s$test)$data
-drrt = drrt %>% filter(Group == "Pred") %>% mutate(Group = "RRT")
-dcox = autoplot(pcox, "calib", t, s$test)$data
-dcox = dcox %>% mutate(Group = if_else(Group == "KM", "KM", "CPH"))
-dran = autoplot(pran, "calib", t, s$test)$data
-dran = dran %>% filter(Group == "Pred") %>% mutate(Group = "RF")
-
-ggplot(rbind(dcox, dran, drrt), aes(x = x, y = y, color = Group)) +
-  geom_line() + theme_bw() + ylim(0, 1) +
-  labs(x = "T", y = "S(T)", color = "Model")
-```
+![Comparing the calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the Kaplan-Meier estimate of the survival function calculated on a test set. The calibration of RRT notably decreases over time whereas RF and CPH are closer to the Kaplan-Meier curve.](Figures/evaluation/calibKM.png){#fig-eval-calib fig-alt="x-axis is labelled 'T' and ranges from 20 to 100. y-axis is labelled 'S(T)' and rages from 0.8 to 1. Four lines are plotted: CPH (red), KM (green), RF (blue), RRT (purple). The RRT line is quite flat across y=1. The other lines overlap multiple times from (20, 1) to (100, 0.8)."}
 
 This method is useful for making broad statements such as "model X is clearly better calibrated than model Y" or "model X appears to make average predictions close to the Kaplan-Meier estimate", but that is the limit in terms of useful conclusions.
 One could refine this method for more fine-grained information by instead using relative risk predictions to create 'risk groups' that can be plotted against a stratified Kaplan-Meier, however this method is harder to interpret and adds even more subjectivity around how many risk groups to create and how to create them [@Royston2013].
@@ -166,35 +138,7 @@ A D-calibrated model should result in a straight line on $x = y$.
 This is visualised in @fig-eval-dcalib for the same models as in @fig-eval-calib.
 This figure supports the previous findings that the relative risk tree is poorly calibrated in contrast to the Cox model and random forest but again no direct comparison between the latter models is possible.
 
-```{r, message=FALSE,warning=FALSE,echo=FALSE}
-#| label: fig-eval-dcalib
-#| fig-cap: Comparing the D-calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the expected distribution on y=x. As with @fig-eval-calib, the relative risk tree is clearly not D-calibrated (as supported by the figures in the bottom-right). The CPH and RF are closer to the y=x however neither follow it perfectly.
-#| fig-alt: "x-axis is labelled 'True (p)' and the y-axis is labelled 'Predicted', both range from 0 to 1. A box in the bottom right says 'DCal (p-values): CPH = 8.2 (0.51); RF = 10 (0.33); RRT = 170 (7e-32). There are four lines on the plot: a blue line (RRT) quickly ascends from (0,0) to (0.1,1) and then is flat; the red (CPH) and green (RF) lines are overlapping and run parallel but not on y=x. Finally a gray dashed line marks the y=x line."
-drrt = autoplot(prrt, "dcalib", t, s$test, extend_quantile = TRUE)$data
-drrt = drrt %>% mutate(Group = "RRT")
-dcox = autoplot(pcox, "dcalib", t, s$test, extend_quantile = TRUE)$data
-dcox = dcox %>% mutate(Group = "CPH")
-dran = autoplot(pran, "dcalib", t, s$test, extend_quantile = TRUE)$data
-dran = dran %>% mutate(Group = "RF")
-
-dcal_coxp = as.numeric(pcox$score(msr("surv.dcalib", truncate = Inf, chisq = TRUE)))
-dcal_cox = as.numeric(pcox$score(msr("surv.dcalib", truncate = Inf, chisq = FALSE)))
-
-dcal_ranp = as.numeric(pran$score(msr("surv.dcalib", truncate = Inf, chisq = TRUE)))
-dcal_ran = as.numeric(pran$score(msr("surv.dcalib", truncate = Inf, chisq = FALSE)))
-
-dcal_rrtp = as.numeric(prrt$score(msr("surv.dcalib", truncate = Inf, chisq = TRUE)))
-dcal_rrt = as.numeric(prrt$score(msr("surv.dcalib", truncate = Inf, chisq = FALSE)))
-
-scores = paste0(sprintf("   %s = %s (%s)", c("CPH", "RF", "RRT"), signif(c(dcal_cox, dcal_ran, dcal_rrt), 2), signif(c(dcal_coxp, dcal_ranp, dcal_rrtp), 2)), collapse = "\n")
-scores = paste0("DCal (p-values):\n", scores)
-
-ggplot(rbind(dcox, dran, drrt), aes(x = p, y = q, color = Group)) +
-  geom_line() + theme_bw() + ylim(0, 1) + xlim(0, 1) +
-  geom_abline(slope = 1, intercept = 0, color = "lightgray", lty = "dashed") +
-  labs(x = "True (p)", y = "Predicted", color = "Model") +
-  geom_label(aes(x = x, y = y), data.frame(x = 0.75, y = 0.1), label = scores, inherit.aes = FALSE, hjust = "left", size = 2.5)
-```
+![Comparing the D-calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the expected distribution on y=x. As with @fig-eval-calib, the relative risk tree is clearly not D-calibrated (as supported by the figures in the bottom-right). The CPH and RF are closer to the y=x however neither follow it perfectly.](Figures/evaluation/calibD.png){#fig-eval-dcalib fig-alt="x-axis is labelled 'True (p)' and the y-axis is labelled 'Predicted', both range from 0 to 1. A box in the bottom right says 'DCal (p-values): CPH = 8.2 (0.51); RF = 10 (0.33); RRT = 170 (7e-32). There are four lines on the plot: a blue line (RRT) quickly ascends from (0,0) to (0.1,1) and then is flat; the red (CPH) and green (RF) lines are overlapping and run parallel but not on y=x. Finally a gray dashed line marks the y=x line."}
 
 Whilst D-calibration has the same problems as the Kaplan-Meier method with respect to visual comparison, at least in this case there are quantities to help draw more concrete solutions.
 For the models in @fig-eval-dcalib, it is clear that the relative risk tree is not D-calibrated with $p<0.01$ indicating the null hypothesis of D-calibration, i.e., the predicted quantiles not following a Discrete Uniform distribution, can be comfortably rejected.
