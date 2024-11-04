@@ -1,3 +1,7 @@
+remotes::install_github("mlr-org/mlr3proba", ref = 'v0.5.7', upgrade = "never")
+remotes::install_github("mlr-org/mlr3", ref = 'v0.16.1', upgrade = "never")
+remotes::install_github("mlr-org/paradox", ref = 'v0.11.1', upgrade = "never")
+
 ## Ranking
 library(dplyr)
 library(ggplot2)
@@ -97,3 +101,25 @@ g = ggplot(rbind(dcox, dran, drrt), aes(x = p, y = q, color = Group)) +
   inherit.aes = FALSE, hjust = "left", size = 2.5)
 ggsave("book/Figures/evaluation/calibD.png", g, height = 3, units = "in",
   dpi = 600)
+
+
+## Random forests
+rm(list = ls())
+set.seed(20241104)
+titanic <- titanic::titanic_train
+titanic <- titanic[!is.na(titanic$Age),]
+fit <- rpart::rpart(Age ~ Pclass + Sex + Survived, titanic)
+
+
+png("book/Figures/forests/titanic.png", height = 400, width = 600)
+rattle::fancyRpartPlot(fit, caption = "")
+dev.off()
+
+rm(list = ls())
+set.seed(20241109)
+library(survival)
+library(party)
+fit <- party::ctree(Surv(time, status) ~ ., lung)
+png("book/Figures/forests/lung.png", height = 400, width = 600)
+plot(fit)
+dev.off()

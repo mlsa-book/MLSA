@@ -8,9 +8,9 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _wip.qmd >}}
 
-Random forests are a composite algorithm built by fitting many simpler component models, *decision trees*, and then averaging the results of predictions from these trees.
+Random forests are a composite (or ensemble) algorithm built by fitting many simpler component models, *decision trees*, and then averaging the results of predictions from these trees.
 Due to in-built variable importance properties, random forests are commonly used in high-dimensional settings when the number of variables in a dataset far exceeds the number of rows.
-High-dimensional datasets are very common in survival analysis, especially when considering clinical, genetic, and financial data.
+High-dimensional datasets are very common in survival analysis, especially when considering omics, genetic and financial data.
 It is therefore no surprise that *random survival forests*, remain a popular and well-performing model in the survival setting.
 
 ## Random Forests for Regression
@@ -21,24 +21,25 @@ This section will start by discussing decision trees and will then introduce the
 
 ### Decision Trees
 
-*Decision trees* are a (relatively) simple machine learning model that are relatively simple to implement in software and are highly interpretable.
-A decision tree takes a set of inputs and a given *splitting rule* in order to create a series of splits, or branches, in the tree that culminates in a final *leaf*, or *terminal node*.
+*Decision trees* are a (relatively) simple machine learning model that are comparatively easy to implement in software and are highly interpretable.
 The decision tree algorithm takes an input, a dataset, selects a variable that is used to partition the data according to some *splitting rule* into distinct non-overlapping datasets or *nodes* or *leaves*, and repeats this step for the resulting partitions, or *branches*, until some criterion has been reached.
 The final nodes are referred to as *terminal nodes*.
 
-This is made clearer by example, (@fig-surv-ranfor) demonstrates a decision tree predicting the miles per gallon (`mpg`) of a car from the `mtcars` dataset [@datamtcars].
-During training, the algorithm identified that the first optimal variable to split the data was the `wt` variable, and that the optimal partition occurs at `wt=2.32`, i.e., one dataset is created for observations with $\code{wt} > 32$ and the other for observations with $\code{wt} \leq 2.32$.
-One of the resulting nodes is left with only $7$ observations and is not split again, the other node is split according to the `disp` variable.
+This is made clearer by example, (@fig-surv-ranfor) demonstrates a decision tree predicting the age of passengers on the Titanic using as variables: the class the passenger was on (first, second, third) (`Pclass`), their sex, and whether they survived (`Survived`).
+It can be seen that the algorithm completely ignored the 'Sex' variable and only utilises class and survival status.
+During training, the algorithm identified that the first optimal variable to split the data was `Pclass`, and that the optimal partition occurs at `Pclass>=1.5`, i.e., one dataset is created for observations that are in first class (split to the right), and another for observations in second and third class (split to the left).
+Passengers in first class are split once again by survival status and a passenger in first class who survived is predicted to be 35 whereas one who died is predicted to be 44.
+In contrast, passengers in cheaper classes are split by survival and then passengers who did not survive are split again by class.
 
 The graphic highlights several core features of decision trees:
 
-1. They can model non-linear effects: The hierarchical structure allows for complex interactions between variables;
+1. They can model non-linear and interaction effects: The hierarchical structure allows for complex interactions between variables and variables can be used multiple times at different levels;
 2. They are highly interpretable: it is easy to visualise the tree and see how predictions are made;
-3. They perform variable selection: a very small subset of variables (2 out of 10) were used to train the model by carefully selecting the variables that would lead to the most heterogeneity in the resulting splits -- discussed next.
+3. They perform variable selection: not all variables were used to train the model.
 
 To understand how random forests work, it is worth looking a bit more into the most important components of decision trees: splitting rules, stopping rules, and terminal node predictions.
 
-![Demonstrating classification trees using the `mtcars`  [@datamtcars] dataset and the $\pkg{party}$  [@pkgparty] package. Ovals are leaves, which indicate the variable that is being split. Edges are branches, which indicate the cut-off at which the variable is split. Rectangles are terminal nodes and include information about the number of training observations in the node and the terminal node prediction.](Figures/forests/iris_tree.png){#fig-surv-ranfor fig-alt="TODO"}
+![Demonstrating regression trees using the `titanic_train` dataset from the \Rstats package **titanic**. Rounded rectangles are leaves, which indicate the variable that is being split. Edges are branches, which indicate the cut-off at which the variable is split. Each leaf contains information about the predicted age, number of observations in the leaf, and the proportion of data contained in the leaf.](Figures/forests/titanic.png){#fig-surv-ranfor fig-alt="Decision tree diagram with 9 green boxes in a hierarchical top-down structure. Top box says '30 n=714 100% and underneath it 'Pclass>=1.5' with 'yes' on the left and 'no' on the right. One level below are two further boxes indicator passengers in first class '38 n=186 26%' and other classes '27 n=528 74%'. The first class leaf splits again based on survival into passengers that do not survive '44 n=64 9%' and others '35 n=122 17%'. The leaf with other classes splits based on survival with surviving passengers ending in the final leaf '23 n=168 24%'. Passengers that die are split again based on class with dying passengers in third class '27 n=279 38%' and those in second class '34 n=90 13%'."}
 
 #### Splitting and Stopping Rules {.unnumbered .unlisted}
 
@@ -48,20 +49,20 @@ The splitting rule provides a way to measure the homogeneity within the resultin
 In regression, the most common splitting rule is to select a variable and cut-off (i.e., a threshold on the variable at which to separate observations) that minimises the mean squared error in the two potential resulting leaves.
 
 For all decision tree and random forest algorithms going forward, let $L$ denote some leaf, then let $L_{xy}, L_x, L_y$ respectively be the set of observations, features, and outcomes in leaf $L$.
-Let $L_{y;i}$ be the $i$th outcome in $L_y$ and finally let $L_{\bar{y}} = \mean{L_{y;i}}$.
+Let $L_{y;i}$ be the $i$th outcome in $L_y$ and finally let $L_{\bar{y}} = \mean[|L_y|]{L_{y;i}}$ be the mean outcome in leaf $L$.
 To simplify notation, $i \in L$ is taken to be equivalent to $i \in \{i: X_i \in L_X\}$, i.e. the indices of the observations in leaf $L$.
 
 Let $c \in \Reals$ be some cutoff parameter and let $L^a_{xy}(j,c) := \{(X_i,Y_i)|X_{ij} < c, i = 1,...,n\}, L^b_{xy}(j,c) = \{(X_i,Y_i)|X_{ij} \geq c, i = 1,...,n\}$ be the two leaves containing the set of observations resulting from partitioning variable $j$ at cutoff $c$.
 Then a split is determined by finding the arguments, $(j^*,c^*)$ that minimise the sum of the mean squared errors (MSE) in both leaves  [@Hastie2013],
 $$
-(j^*, c^*) = \argmin_{j, c} \sum_{y \in L^a_{y}(j,c)} (y - L^a_{\bar{Y}}(j,c))^2 + \sum_{y \in L^b_{y}(j,c)} (y - L^b_{\bar{Y}}(j,c))^2
+(j^*, c^*) = \argmin_{j, c} \sum_{y \in L^a_{y}(j,c)} (y - L^a_{\bar{y}}(j,c))^2 + \sum_{y \in L^b_{y}(j,c)} (y - L^b_{\bar{y}}(j,c))^2
 $$ {#eq-dt-min}
 
 This method is repeated from the first leaf to the last such that observations are included in a given leaf $L$ if they satisfy all conditions from all previous branches (splits); features may be considered multiple times in the growing process allowing complex interaction effects to be captured.
 
 Leaves are repeatedly split until a *stopping rule* has been triggered -- i.e., a criterion that tells the algorithm to stop partitioning data.
-The** 'stopping rule' is usually a condition on the number of observations in each leaf such that leaves will continue to be split until some minimum number of observations has been reached in a leaf.
-Other conditions may be on the 'depth' of the tree, which corresponds to the number of levels of splitting, for example the tree in (@fig-surv-ranfor) has a depth of $2$.
+The stopping rule is usually a condition on the number of observations in each leaf such that leaves will continue to be split until some minimum number of observations has been reached in a leaf.
+Other conditions may be on the 'depth' of the tree, which corresponds to the number of levels of splitting.
 Stopping rules are often used together, for example by setting a maximum tree depth *and* determining a minimum number of observations per leaf.
 Deciding the number of minimum observations and/or the maximum depth can be performed with automated hyper-parameter optimisation.
 
@@ -70,17 +71,16 @@ Deciding the number of minimum observations and/or the maximum depth can be perf
 The final major component of decision trees are *terminal node predictions*.
 As the name suggests, this is part of the algorithm that determines how to actually make a prediction for a new observation.
 A prediction is made for some new data by 'dropping' the new data 'down' the tree according to the optimal splits that were found during training.
-Returning to @fig-surv-ranfor, say a new data point is $x = \{`wt` = 3, `disp` = 250\}$, then in the first split the right branch is taken as `wt` $= 3 > 2.32$ and in the second split the left branch is taken as `disp` $= 250 \leq 258$, therefore the new data point 'lands' in the final leaf (the middle gray box).
+Returning to @fig-surv-ranfor, say a new data point is $x = \{Pclass = 2, Survived = 0\}$, then in the first split the left branch is taken as `Pclass` $= 2 \geq 1.5$, in the second split the right branch is taken as `Survived` $= 0 < 0.5$, finally as `Pclass` $= 2 < 2.5$ the new data point 'lands' in the third terminal leaf.
 
 The resulting prediction is then a simple baseline statistic computed from the training data that fell into the corresponding node.
 In regression, this is most commonly (and simply) the sample mean of the training outcome data, but other terminal node predictions could be the sample median, a weighted average, or even a simple linear regression prediction from a model trained on the training data in the corresponding final leaf.
-In the example above, the final prediction would be $y = 20.755$, note how the final predictions are statistics based on training data, which means all potential predictions can be saved in the original trained mode and no complex computations are required during prediction.
+In the example above, the final prediction would be $y = 34$, note how the final predictions are statistics based on training data, which means all potential predictions can be saved in the original trained mode and no complex computations are required during prediction.
 
 ### Random Forests
 
-As is commonly the case in machine learning, higher interpretable yields poor predictive performance.
 Decision trees often overfit the training data, hence they have high variance, perform poorly on new data, and are not robust to even small changes in the original training data.
-Moreover, many important variables can be ignored as only a very small subset are selected, which can be particularly problematic in survival analysis when variables are often know *a priori* to have important clinical value.
+Moreover, important variables can end up being ignored as only subsets of dominant variables are selected for splitting.
 
 To counter these problems, *random forests* are preferred to improve prediction accuracy and decrease variance.
 Random forests utilise bootstrap aggregation, or *bagging*  [@Breiman1996a], to aggregate many decision trees.
@@ -88,14 +88,17 @@ Bagging is a relatively simple algorithm, as follows:
 
 1. **For** $b = 1,...,B$:
 2. $D_b \gets \text{ Randomly sample with replacement } \dtrain$
-3. $\hatg_b \gets$ \text{ Train a decision tree on } $D_b$
-4. **end For**
-5. $g_B \gets \{\hatg_b\}^B_{b=1}$
-6. **return** $\hatg = g_B$
+3. $D_{b;p} \gets \text{ Randomly subset features of } D_b$
+4. $\hatg_b \gets$ \text{ Train a decision tree on } $D_b$
+5. **end For**
+6. $g_B \gets \{\hatg_b\}^B_{b=1}$
+7. **return** $\hatg = g_B$
 
-Step $2$ is known as *bootstrapping*, which is the process of sampling a dataset, for example given data $\{1, 2, 3, 4\}$, standard sampling without replacement may result in the dataset $\{1, 3, 4\}$ as the first observation is drawn and removed from the original data, then the next two follow similarly.
-In contrast, a bootstrapped sample could look like $\{1, 3, 3\}$ or even $\{3, 3, 3\}$ as this time after the first observation is drawn, it is then *replaced* and put back in the original data, and could be randomly drawn again.
-Commonly, the bootstrapped sample is the same size as the original, however as it is sampled with replacement, the resulting data, on average, only contains around 63.2\% of the original observations being included at least once in each bootstrap sample [@Efron1997].
+Step 2 is known as *bootstrapping*, which is the process of sampling a dataset *with* replacement -- which is in contrast to more standard subsampling where data is sampled *without* replacement.
+Commonly, the bootstrapped sample size is the same as the original.
+However, as the same value may be sampled multiple times, on average the resulting data only contains around 63.2\% unique observations [@Efron1997].
+After data is bootstrapped, randomness is further injected to decorrelate the trees by randomly subsetting the data features (Step 3).
+The resulting dataset is used to train a decision tree (Step 4), and this is repeated for $B$ trees, with the final output being a collection of trained decision trees.
 
 Prediction from a random forest follows by making predictions from the individual trees and aggregating the results by some function $\sigma$, which is usually the sample mean for regression:
 
@@ -103,18 +106,18 @@ $$
 \hatg(X^*) = \sigma(\hatg_1(X^*),...,\hatg_B(X^*)) = \frac{1}{B} \sum^B_{b=1} \hatg_b(X^*)
 $$
 
-where $\hatg_b(X^*)$ is the terminal node prediction from the $b$th tree and $B$ are the total number of grown trees (`$B$' is commonly used instead of `$N$' to note the relation to bootstrapped data).
+where $\hatg_b(X^*)$ is the terminal node prediction from the $b$th tree and $B$ are the total number of grown trees.
 
 As discussed above, individual decision trees result in predictions with high variance that are not robust to small changes in the underlying data.
-Random forests decrease this variance by aggregating predictions over a large sample of independent trees, where a high degree of independence between trees is promoted through the use of bootstrapped samples and random feature selection at each split.
+Random forests decrease this variance by aggregating predictions over a large sample of independent trees, where a high degree of independence between trees is promoted through the use of bootstrapped samples and random candidate feature selection at each split.
 
 Usually many (hundreds or thousands) trees are grown, which makes random forests robust to changes in data and 'confident' about individual predictions.
-Other advantages include having tunable and meaningful hyper-parameters, including: the number of trees to grow, the number of variables to consider for a single tree, the splitting rule, and the stopping rule.
+Other advantages include having tunable and meaningful hyper-parameters, including: the number of variables to consider for a single tree, the splitting rule, and the stopping rule.
 By treating trees as *weak learners*, random forests remove a lot of decisions required when fitting decision trees, such as which variables to split and how.
 Weak learners, learn a small amount about the data but do not try to capture all relationships, making it less important how individual trees are grown.
 
-Whilst random forests are considered a 'black-box', in that one cannot be reasonably expected to inspect thousands of individual trees, variable importance can still be aggregated across trees.
-For example, by calculating which variables (and how many times) were selected across trees, hence the model remains more interpretable than many alternative methods.
+Whilst random forests are considered a 'black-box', in that one cannot be reasonably expected to inspect thousands of individual trees, variable importance can still be aggregated across trees, for example by counting the variables that were selected across trees.
+Hence the model remains more interpretable than many alternative methods.
 Finally, random forests are less prone to overfitting and this can be relatively easily controlled by using *early-stopping* methods, for example by continually growing trees until the performance of the model stops improving.
 
 ## Random Survival Forests
@@ -124,7 +127,7 @@ This chapter is therefore focused on outlining different choices of splitting ru
 
 ### Splitting Rules
 
-Survival trees and RSFs have been studied for the past four decades and whilst there are many possible splitting rules [@Bou-Hamad2011], only two broad classes are commonly utilised (as judged by number of available implementations) [e.g., @pkgsksurvival; @pkgranger].
+Survival trees and RSFs have been studied for the past four decades and whilst there are many possible splitting rules [@Bou-Hamad2011], only two broad classes are commonly utilised (as judged by number of available implementations, e.g., @pkgsksurvival; @pkgranger; @Ishwaran2011).
 The first class rely on hypothesis tests, and primarily the log-rank test, to maximise dissimilarity between splits, the second class utilises likelihood-based measures.
 The first is discussed in more detail as this is common in practice and is relatively straightforward to implement and understand, moreover it has been demonstrated to outperform other splitting rules [@Bou-Hamad2011].
 Likelihood rules are more complex and require assumptions that may not be realistic, these are discussed briefly.
@@ -134,7 +137,7 @@ Likelihood rules are more complex and require assumptions that may not be realis
 The log-rank test statistic has been widely utilised as the 'natural' splitting-rule for survival analysis  [@Ciampi1986; @Ishwaran2008; @LeBlanc1993; @Segal1988].
 The log-rank test compares the survival distributions of two groups and has the null-hypothesis that both groups have the same underlying risk of (immediate) events, i.e. identical hazard functions.
 
-Let $L^A$ and $L^B$ be two leaves and let $h^A,h^B$ be the (true) hazard functions derived from the observations in the two leaves respectively.
+Let $L^A$ and $L^B$ be two leaves and let $h^A,h^B$ be the (theoretical, true) hazard functions in the two leaves respectively.
 Further, define:
 
 * $\calU_D$, the set of unique event times across the data (in both leaves)
@@ -206,16 +209,20 @@ Whereas if the goal is to accurately rank observations, then a concordance split
 As in the regression setting, the usual strategy for predictions is to create a simple estimate based on the training data that lands in the terminal nodes.
 However, as seen throughout this book, the choice of estimator in the survival setting depends on the prediction task of interest, which are now considered in turn.
 First, note that all terminal node predictions can only yield useful results if there are a sufficient number of uncensored observations in each terminal node.
-Hence, a common RSF stopping rule is the minimum number of *uncensored* observations per leaf, i.e., a leaf is not split if that would result in there being too few uncensored observations in the resulting leaves.
+Hence, a common RSF stopping rule is the minimum number of *uncensored* observations per leaf, i.e., a leaf is not split if that would result in too few uncensored observations in the resulting leaves.
 
 
 #### Probabilistic Predictions {.unnumbered .unlisted}
 
 Starting with the most common survival prediction type, the algorithm requires a simple estimate for the underlying survival distribution in each of the terminal nodes, which can be estimated using the Kaplan-Meier or Nelson-Aalen methods [@Hothorn2004; @Ishwaran2008; @LeBlanc1993; @Segal1988].
+
+<!-- FIXME: REF KM DEFINITION ABOVE -->
+
 By convention, the Nelson-Aalen estimator is used more commonly for RSFs and is thus focused on in this section, but the same logic follows for the Kaplan-Meier estimator.
 
-Once the Nelson-Aalen estimate for the hazard function is estimated for individual trees, the question is then how how to combine them to create a single random forests prediction.
+Once the Nelson-Aalen estimate for the cumulative hazard function is estimated for individual trees, the question is then how how to combine them to create a single random forests prediction.
 As Nelson-Aalen estimates produce discrete hazard functions, the same bagging algorithm can be used relatively simply by averaging the estimated hazard probability at each observed time-point [@Hothorn2004].
+See @fig-surv-ranfor-lung for an example using the `lung` dataset [@pkgsurvival].
 
 Let $b_m \in \{1,...,b_M\}$ be a terminal node in a survival decision tree, $b$, with $b_M \in \PReals$ terminal nodes, then if an observation, $x$, lands in terminal node $b_m$, its predicted cumulative hazard is given by,
 
@@ -235,15 +242,14 @@ The bootstrapped Kaplan-Meier estimator is calculated analogously.
 More generally these can be considered as a uniform mixture of $B$ distributions (@sec-car).
 Extensions to competing risks follow naturally using bootstrapped cause-specific cumulative incidence functions.
 
-Whilst using the above method is by far the most common practice when building RSFs, one could also estimate survival distributions by fitting any other classical model (@sec-models-classical) on the training data and then using these models to make predictions for new data.
-For example, one could assume an $\Weib(\alpha, \beta)$ form and use the training data in each terminal node to estimate the model parameters, hence observations falling into terminal node $b_m$ would be predicted to follow a $\Weib(\alpha_{b_m}, \beta_{b_m})$ distribution.
-The same could be done for a Cox PH by simultaneously estimating the linear predictors and the baseline hazard on the training data.
-Finally, one could predict the probability of survival as the proportion of uncensored observations in each terminal node -- however, this is a non-standard prediction type and deciding how to evaluate this is non-trivial (common classification measures could not be used as they do not handle censoring).
+<!-- FIXME - ANDREAS TO ADD DETAILS ON COMPETING RISKS -->
+
+![Survival tree trained on the `lung` dataset from the \Rstats package **survival**. The terminal node predictions are bootstrapped survival curves.](Figures/forests/lung.png){#fig-surv-ranfor-lung fig-alt="Decision tree with two splits, the first is 'ph.ecog' with a p-value of <0.001, when ph.ecog > 1 a terminal prediction is made, otherwise the data is split at 'sex' with - = 0.015. Terminal node predictions are plots of survival functions."}
 
 #### Deterministic Predictions {.unnumbered .unlisted}
 
 Whilst predicting survival times is often a complex and fairly under-researched area, it becomes trivial when using RSFs.
-In this case a prediction could simply be the mean or median survival time for uncensored observations in the corresponding terminal node.
+In this case a prediction could simply be the median survival time for uncensored observations in the corresponding terminal node.
 Note however that even though prediction becomes trivial, evaluating these predictions still carries its own difficulties (see @sec-eval-det).
 
 As discussed, relative risks are arbitrary values where only the resulting rank comparing observations matters.
@@ -287,7 +293,7 @@ However, these do not appear to be in wide-spread usage, likely due to the compu
 ## Limitations
 
 * Due to the number of trees and the constant bootstrapping procedures, RSFs can be more computationally intensive than other models, though still much less intensive than neural networks and other deep learning methods.
-* Despite having some in-built methods, RSFs are still black-boxes that can be difficult to interpret.
+* Despite having some in-built methods for model interpretation, RSFs are still black-boxes that can be difficult to fully interpret.
 * With too few trees random forests can have similar limitations to decision trees and with too many random forests can overfit the data. Though most software has sensible defaults to prevent either scenario.
 
 ::::
@@ -297,8 +303,8 @@ However, these do not appear to be in wide-spread usage, likely due to the compu
 ## Further reading
 
 * A comprehensive review of random survival forests (RSFs) is provided in Bou-Hamad (2011) [@Bou-Hamad2011], which includes extensions to time-varying covariates and different censoring types.
-* The discussion of decision trees omitted many methods for growing and pruning trees, if you are interest in those technical details see [@Breiman1984].
-* RSFs have been proven to perform well in benchmark experiments, especially on high-dimensional data, see [@Herrmann2020; @] for examples.
-* This chapter considered the most 'traditional' forms of RSFs, conditional inference forests are popular in the regression setting and whilst they are under-researched in survival, see [@Hothorn2005] for is some literature on the topic.
+* The discussion of decision trees omitted many methods for growing and pruning trees, if you are interest in those technical details see @Breiman1984.
+* RSFs have been proven to perform well in benchmark experiments on high-dimensional data, see @Herrmann2020 and @Spooner2020 for examples.
+* This chapter considered the most 'traditional' forms of RSFs. Conditional inference forests are popular in the regression setting and whilst they are under-researched in survival, see @Hothorn2005 for literature on the topic. A more recent method that seems to perform well is the (accelerated) oblique random survival forest discussed in @Jaeger2024.
 
 ::::
