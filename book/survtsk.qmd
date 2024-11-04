@@ -22,8 +22,8 @@ A general survival prediction problem is one in which:
 * the model predicts a representation of the unknown true survival time, $Y$, given $\dtest$.
 
 
-The process of fitting is model-dependent, and can range from non-parametric methods and maximum likelihood estimation of model coefficients to machine learning approaches.
-The model fitting process is discussed abstractly in @sec-surv-setml and concrete algorithms are discussed in Part III of the book.
+The process of fitting is model-dependent, and can range from non-parametric methods and maximum likelihood estimation of model parameters to machine learning approaches.
+The model fitting process is discussed on a high-level in @sec-surv-setml and concrete algorithms are discussed in Part III of the book.
 The different survival problems are separated by *prediction types* or *prediction problems*, which can also be thought of as predictions of different representations of $Y$.
 We consider 4 commonly used prediction types:
 
@@ -36,7 +36,7 @@ We consider 4 commonly used prediction types:
 The first three of these are referred to as *deterministic* as they predict a single value whereas the fourth is *probabilistic* and returns a full survival distribution.
 Definitions of these are expanded on below but first note that survival predictions differ from other fields in two respects:
 
-* The observed data used for model training (observed times $T$) is different from the outcome of interest (event times $Y$).
+* The observed data used for model training (observed times $T$, status indicator $\Delta$) is different from the outcome of interest (event times $Y$).
 This differs from, say, standard regression in which the same object (a single continuous variable) is used for fitting and predicting.
 * With the exception of the time-to-event prediction, all other prediction types do not predict $\EE(Y)$, which is often of interest, but some other (related) quantity.
 
@@ -58,12 +58,20 @@ Interpretation of these rankings depends on the model class (for example, PH and
 For some higher ranking implies higher risk whereas others may assume that higher ranking implies lower risk.
 In this book, a higher ranking will always imply a higher risk of event (as in the example above).
 
+
+#### Survival Distribution {.unnumbered .unlisted}
+Predicting a survival distribution refers specifically to predicting the distribution of an individual subject's survival time, i.e., modelling the distribution of the event occurring over $\NNReals$.
+Therefore, this is seen as the probabilistic analogue to the deterministic time-to-event prediction, these definitions are motivated by similar terminology in machine learning regression problems (@sec-surv-setml).
+
+Distributional prediction can in theory target any of the quantities introduced in @sec-distributions but predicting $S(t)$ and/or $h(t)$ is most common.
+Hazard based approaches are particularly relevant for non- and semi-parametric estimation of the distribution, where no (or few) assumptions are made about the underlying distribution of event times.
+
 #### Time to Event {.unnumbered .unlisted}
-Predicting a time to event is the problem of predicting the expectation $\hat{y}=\EE(y|\xx)$.
+Predicting a time to event is the problem of predicting the expectation $\hat{y}=\EE(Y|\xx)$.
 A time-to-event prediction is a special case of a ranking prediction as an individual with a longer survival time will have a lower overall risk: if $\hat{y}_i,\hat{y}_j$ and $\hat{r}_i,\hat{r}_j$ are survival time and ranking predictions for subjects $i$ and $j$ respectively, then $\hat{y}_i > \hat{y}_j \rightarrow \hat{r}_i < \hat{r}_j$.
 
 For practical purposes, the expected time-to-event would be the ideal prediction type as it is easy to interpret and communicate.
-However, this type of prediction is rare because only a subset of the domain of $Y$ is observed due to censoring.
+However, this type of prediction is rare for multiple reasons. For one, an usuall loss based on $f(y_i)$ or some difference of true and predicted value, $y_i-\hat{y}_i$ is not suitable for censored data, as $y_i$ is not observed for some observations, so direct estimation/prediction of $\hat{y}_i = E(Y|\xx_i)$ requires some imputation of censored observations (and evaluation on new data can also only be done on observed or imputed values).
 For non-parametric methods, the estimated cdf is improper and thus integration requires extrapolation of the cdf.
 For parametric models, the distribution of event times is fully specified once the paramers of the assumed distribution have been estimated, however, if the parameters were estimated based on only a small subset of the possible domain of $Y$, this essentially still constitutes extraploation and will in most cases yield implausible predictions.
 A popular alternative is therefore to estimate the *restricted mean survival time* (RMST; @han.restricted.2022; @andersen.regression.2004).
@@ -71,20 +79,15 @@ A popular alternative is therefore to estimate the *restricted mean survival tim
 <!-- FIXME add example -->
 
 #### Prognostic Index {.unnumbered .unlisted}
-Given covariates, $\XX \in \Reals^{n \times p}$, and a vector of model coefficients, $\bbeta \in \Reals^p$, the predictor is defined by $\boldsymbol{\eta}:= g(\XX) \in \Reals^n$, where $g$ is a function of the covariates (for example $\XX\bbeta$ in linear models).
-The prognostic index is a term often used to refer to some transformation, $\phi$, on the linear predictor, $\phi(\eta)$, (which could simply be the identity function $(\phi(\eta) = \eta)$).
+Given covariates, $\XX \in \Reals^{n \times p}$, the predictor is defined by $\boldsymbol{\eta}:= g(\XX) \in \Reals^n$, where $g$ is a function of the covariates. In case of linear models that estimate a vector of model coefficients, $\bbeta \in \Reals^p$, this would be given by $\boldsymbol{\eta}=\XX\bbeta$.
+The prognostic index is a term often used to refer to some transformation, $\phi$, on the predictor, $\phi(\eta)$, (which could simply be the identity function $(\phi(\eta) = \eta)$).
 Assuming a predictive function (for survival time, risk, or distribution defining function) of the form $g(\varphi)\phi(\eta)$, for some function $g$ and variables $\varphi$ where $g(\varphi)$ is constant for all observations (for example Cox PH (@sec-surv-models-crank)), then predictions of $\eta$ are a special case of predicting a relative risk, as predictions of $\phi(\eta)$ if $\phi$ is rank preserving -- this assumptions is sometimes written as "if there is a one-to-one mapping between the prediction and the expected survival times".
 A higher prognostic index may imply a higher or lower risk of event, dependent on the model structure.
 As stated above, if the prognostic index is used for a rank prediction, then this book always assumes "higher value higher risk".
 
 <!-- FIXME example needed -->
 
-#### Survival Distribution {.unnumbered .unlisted}
-Predicting a survival distribution refers specifically to predicting the distribution of an individual subject's survival time, i.e., modelling the distribution of the event occurring over $\NNReals$.
-Therefore, this is seen as the probabilistic analogue to the deterministic time-to-event prediction, these definitions are motivated by similar terminology in machine learning regression problems (@sec-surv-setml).
 
-Distributional prediction can in theory target any of the quantities introduced in @sec-distributions but predicting $S(t)$ and/or $h(t)$ is most common.
-Hazard based approaches are particularly relevant for non- and semi-parametric estimation of the distribution, where no assumptions are made about the underlying distribution of event times.
 
 
 ## Survival Analysis Task {#sec-surv-setmltask}

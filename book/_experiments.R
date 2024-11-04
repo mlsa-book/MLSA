@@ -97,3 +97,30 @@ g = ggplot(rbind(dcox, dran, drrt), aes(x = p, y = q, color = Group)) +
   inherit.aes = FALSE, hjust = "left", size = 2.5)
 ggsave("book/Figures/evaluation/calibD.png", g, height = 3, units = "in",
   dpi = 600)
+
+
+
+## Illustration different prediction types survival
+
+
+### time to event
+
+
+library(pammtools)
+library(flexsurv)
+
+tumor2 <- tumor
+tumor2 <- tumor2[tumor2$age <= 60, ]
+
+m1 <- flexsurvreg(Surv(days, status)~1, data = tumor, dist = "weibull")
+m2 <- flexsurvreg(Surv(days, status)~1, data = tumor2, dist = "weibull")
+summary(m1, type = "mean")
+summary(m2, type = "mean")
+layout(matrix(1:2, nrow = 1))
+plot(m1)
+plot(m2)
+
+curve(hlnorm(x, meanlog = 4, sdlog = 0.2), 0, 120)
+curve(hgengamma(x, mu = 60, sigma = 1, Q = .4), 0, 120)
+
+t <- rlnorm(100, meanlog = 4, sdlog = .2, Q = 3)
