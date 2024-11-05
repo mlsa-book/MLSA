@@ -89,25 +89,25 @@ Bagging is a relatively simple algorithm, as follows:
 
 1. **For** $b = 1,...,B$:
 2. $D_b \gets \text{ Randomly sample with replacement } \dtrain$
-3. $D_{b;p} \gets \text{ Randomly subset features of } D_b$
-4. $\hatg_b \gets$ \text{ Train a decision tree on } $D_b$
-5. **end For**
-6. $g_B \gets \{\hatg_b\}^B_{b=1}$
-7. **return** $\hatg = g_B$
+3. $\hatg_b \gets$ \text{ Train a decision tree on } $D_b$
+4. **end For**
+5. $g_B \gets \{\hatg_b\}^B_{b=1}$
+6. **return** $\hatg = g_B$
 
 Step 2 is known as *bootstrapping*, which is the process of sampling a dataset *with* replacement -- which is in contrast to more standard subsampling where data is sampled *without* replacement.
 Commonly, the bootstrapped sample size is the same as the original.
 However, as the same value may be sampled multiple times, on average the resulting data only contains around 63.2\% unique observations [@Efron1997].
-After data is bootstrapped, randomness is further injected to decorrelate the trees by randomly subsetting the data features (Step 3).
-The resulting dataset is used to train a decision tree (Step 4), and this is repeated for $B$ trees, with the final output being a collection of trained decision trees.
+Randomness is further injected to decorrelate the trees by randomly subsetting the candidates of features to consider at each split of a tree.
+Therefore, every split of every tree may consider a different subset of variables.
+This process is repeated for $B$ trees, with the final output being a collection of trained decision trees.
 
 Prediction from a random forest follows by making predictions from the individual trees and aggregating the results by some function $\sigma$, which is usually the sample mean for regression:
 
 $$
-\hatg(X^*) = \sigma(\hatg_1(X^*),...,\hatg_B(X^*)) = \frac{1}{B} \sum^B_{b=1} \hatg_b(X^*)
+\hatg(\xx^*) = \sigma(\hatg_1(\xx^*),...,\hatg_B(\xx^*)) = \frac{1}{B} \sum^B_{b=1} \hatg_b(\xx^*)
 $$
 
-where $\hatg_b(X^*)$ is the terminal node prediction from the $b$th tree and $B$ are the total number of grown trees.
+where $\hatg_b(\xx^*)$ is the terminal node prediction from the $b$th tree and $B$ are the total number of grown trees.
 
 As discussed above, individual decision trees result in predictions with high variance that are not robust to small changes in the underlying data.
 Random forests decrease this variance by aggregating predictions over a large sample of decorrelated trees, where a high degree of difference between trees is promoted through the use of bootstrapped samples and random candidate feature selection at each split.
@@ -138,47 +138,47 @@ Likelihood rules are more complex and require assumptions that may not be realis
 The log-rank test statistic has been widely utilised as a splitting-rule for survival analysis  [@Ciampi1986; @Ishwaran2008; @LeBlanc1993; @Segal1988].
 The log-rank test compares the survival distributions of two groups and has the null-hypothesis that both groups have the same underlying risk of (immediate) events, i.e. identical hazard functions.
 
-Let $L^A$ and $L^B$ be two leaves and let $h^A,h^B$ be the (theoretical, true) hazard functions in the two leaves respectively and let $i \in L$ be a shorthand for $i = 1,\ldots,|L|$, i.e. the indices of the observations in leaf $L$, and define:
+Let $L^a$ and $L^b$ be two leaves and let $h^a,h^b$ be the (theoretical, true) hazard functions in the two leaves respectively and let $i \in L$ be a shorthand for $i = 1,\ldots,|L|$, i.e. the indices of the observations in leaf $L$, and define:
 
 * $\calU_D$, the set of unique event times across the data (in both leaves)
 
-* $n_\tau^A$, the number of observations at risk at $\tau$ in leaf $A$
+* $n_\tau^a$, the number of observations at risk at $\tau$ in leaf $a$
 
 $$
-n_\tau^A = \sum_{i \in L^A} \II(t_i \geq \tau)
+n_\tau^a = \sum_{i \in L^a} \II(t_i \geq \tau)
 $$
 
-* $o^A_{\tau}$, the observed number of events in leaf $A$ at $\tau$
+* $o^a_{\tau}$, the observed number of events in leaf $a$ at $\tau$
 
 $$
-o^A_{\tau} = \sum_{i \in L^A} \II(t_i = \tau, \delta_i = 1)
+o^a_{\tau} = \sum_{i \in L^a} \II(t_i = \tau, \delta_i = 1)
 $$
 
-* $n_\tau = n_\tau^A + n_\tau^B$, the number of observations at risk at $\tau$ in both leaves
-* $o_\tau = o^A_{\tau} + o^B_{\tau}$, the observed number of events at $\tau$ in both leaves
+* $n_\tau = n_\tau^a + n_\tau^b$, the number of observations at risk at $\tau$ in both leaves
+* $o_\tau = o^a_{\tau} + o^b_{\tau}$, the observed number of events at $\tau$ in both leaves
 
 
-Then, the log-rank hypothesis test is given by $H_0: h^A = h^B$ with test statistic  [@Segal1988],
+Then, the log-rank hypothesis test is given by $H_0: h^a = h^b$ with test statistic  [@Segal1988],
 $$
-LR(L^A) = \frac{\sum_{\tau \in \calU_D} (o^A_{\tau} - e^A_{\tau})}{\sqrt{\sum_{\tau \in \calU_D} v_\tau^A}}
+LR(L^a) = \frac{\sum_{\tau \in \calU_D} (o^a_{\tau} - e^a_{\tau})}{\sqrt{\sum_{\tau \in \calU_D} v_\tau^a}}
 $$
 
 where:
 
-* $e^A_{\tau}$ is the expected number of events in leaf $A$ at $\tau$
+* $e^a_{\tau}$ is the expected number of events in leaf $a$ at $\tau$
 
 $$
-e^A_{\tau} := \frac{n_\tau^A o_\tau}{n_\tau}
+e^a_{\tau} := \frac{n_\tau^a o_\tau}{n_\tau}
 $$
 
-* $v^A_\tau$ is the variance of the number of events in leaf $A$ at $\tau$
+* $v^a_\tau$ is the variance of the number of events in leaf $a$ at $\tau$
 
 $$
-v^A_{\tau} := e^A_{\tau} \Big(\frac{n_\tau - o_\tau}{n_\tau}\Big)\Big(\frac{n_\tau - n^A_\tau}{n_\tau - 1}\Big)
+v^a_{\tau} := e^a_{\tau} \Big(\frac{n_\tau - o_\tau}{n_\tau}\Big)\Big(\frac{n_\tau - n^a_\tau}{n_\tau - 1}\Big)
 $$
 
 These results follow as the number of events in a leaf is distributed according to a Hypergeometric distribution.
-The same statistic results if $L^B$ is instead considered.
+The same statistic results if $L^b$ is instead considered.
 
 The higher the log-rank statistic, the greater the dissimilarity between the two groups, thereby making it a sensible splitting rule for survival, moreover it has been shown that it works well for splitting censored data  [@LeBlanc1993].
 Additionally, the log-rank test requires no knowledge about the shape of the survival curves or distribution of the outcomes in either group  [@Bland2004], making it ideal for an automated process that requires no user intervention.
