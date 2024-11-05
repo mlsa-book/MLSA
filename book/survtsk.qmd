@@ -14,7 +14,7 @@ TODO
 
 ## Prediction Types and Survival Tasks {#sec-surv-set-types}
 
-In this section we spend some more time on the different prediction types that might be of interest the survival analysis context and introduce the notion of a survival task more formally.
+In this section we consider the different prediction types that might be of interest the survival analysis context and introduce the notion of a survival task more formally.
 A general survival prediction problem is one in which:
 
 * a survival dataset, $\calD$, is split (@sec-surv-setml-meth) for training, $\dtrain$, and testing, $\dtest$;
@@ -38,10 +38,10 @@ Definitions of these are expanded on below but first note that survival predicti
 
 * The observed data used for model training (observed times $T$, status indicator $\Delta$) is different from the outcome of interest (event times $Y$).
 This differs from, say, standard regression in which the same object (a single continuous variable) is used for fitting and predicting.
-* With the exception of the time-to-event prediction, all other prediction types do not predict $\EE(Y)$, which is often of interest, but some other (related) quantity.
+* With the exception of the time-to-event prediction, all other prediction types do not predict the expectation $\EE(Y)$, which is often of interest, but some other (related) quantity.
 
 Survival prediction problems must be clearly separated as they are inherently incompatible.
-For example, it is not meaningful to compare a relative risk prediction from one observation to a survival distribution of another.
+For example, it is not meaningful to compare a relative risk prediction from one model to a survival distribution prediction of another.
 Whilst these prediction types are separated above, they can be viewed as special cases of each other. Both (1.) and (2.) may be viewed as variants of (3.); and (1.), (2.), and (3.) can all be derived from (4.); this is elaborated on below and discussed fully in @sec-car.
 
 #### Relative Risk/Ranking {.unnumbered .unlisted}
@@ -59,28 +59,21 @@ For some higher ranking implies higher risk whereas others may assume that highe
 In this book, a higher ranking will always imply a higher risk of event (as in the example above).
 
 
-#### Survival Distribution {.unnumbered .unlisted}
-Predicting a survival distribution refers specifically to predicting the distribution of an individual subject's survival time, i.e., modelling the distribution of the event occurring over $\NNReals$.
-Therefore, this is seen as the probabilistic analogue to the deterministic time-to-event prediction, these definitions are motivated by similar terminology in machine learning regression problems (@sec-surv-setml).
-
-Distributional prediction can in theory target any of the quantities introduced in @sec-distributions but predicting $S(t)$ and/or $h(t)$ is most common.
-Hazard based approaches are particularly relevant for non- and semi-parametric estimation of the distribution, where no (or few) assumptions are made about the underlying distribution of event times.
 
 #### Time to Event {.unnumbered .unlisted}
 Predicting a time to event is the problem of predicting the expectation $\hat{y}=\EE(Y|\xx)$.
-A time-to-event prediction is a special case of a ranking prediction as an individual with a longer survival time will have a lower overall risk: if $\hat{y}_i,\hat{y}_j$ and $\hat{r}_i,\hat{r}_j$ are survival time and ranking predictions for subjects $i$ and $j$ respectively, then $\hat{y}_i > \hat{y}_j \rightarrow \hat{r}_i < \hat{r}_j$.
+A time-to-event prediction is a special case of a ranking prediction as an individual with a longer survival time will have a lower overall risk: if $\hat{y}_i,\hat{y}_j$ and $\hat{r}_i,\hat{r}_j$ are survival time and ranking predictions for subjects $i$ and $j$ respectively, then $\hat{y}_i > \hat{y}_j \Rightarrow \hat{r}_i < \hat{r}_j$.
 
 For practical purposes, the expected time-to-event would be the ideal prediction type as it is easy to interpret and communicate.
-However, this type of prediction is rare for multiple reasons. For one, an usuall loss based on $f(y_i)$ or some difference of true and predicted value, $y_i-\hat{y}_i$ is not suitable for censored data, as $y_i$ is not observed for some observations, so direct estimation/prediction of $\hat{y}_i = E(Y|\xx_i)$ requires some imputation of censored observations (and evaluation on new data can also only be done on observed or imputed values).
-For non-parametric methods, the estimated cdf is improper and thus integration requires extrapolation of the cdf.
-For parametric models, the distribution of event times is fully specified once the paramers of the assumed distribution have been estimated, however, if the parameters were estimated based on only a small subset of the possible domain of $Y$, this essentially still constitutes extraploation and will in most cases yield implausible predictions.
-A popular alternative is therefore to estimate the *restricted mean survival time* (RMST; @han.restricted.2022; @andersen.regression.2004).
+However, this type of prediction is rare for multiple reasons. For one, an usuall loss based on $f(y_i)$ or some difference of true and predicted value, $y_i-\hat{y}_i$ is not, suitable for censored data, as $y_i$ is not observed for some observations, so direct estimation/prediction of $\hat{y}_i = E(Y|\xx_i)$ requires some imputation of censored observations (and evaluation on new data can also only be done on observed or imputed values).
+
+Alternatively, one could derive the expectation by predicting the survival distribution while taking into account the censoring and obtain a time-to-event prediction by calculating expected values, but this brings its own challenges and pitfalls (see "Survival Distribution" below for details).
 
 <!-- FIXME add example -->
 
 #### Prognostic Index {.unnumbered .unlisted}
 Given covariates, $\XX \in \Reals^{n \times p}$, the predictor is defined by $\boldsymbol{\eta}:= g(\XX) \in \Reals^n$, where $g$ is a function of the covariates. In case of linear models that estimate a vector of model coefficients, $\bbeta \in \Reals^p$, this would be given by $\boldsymbol{\eta}=\XX\bbeta$.
-The prognostic index is a term often used to refer to some transformation, $\phi$, on the predictor, $\phi(\eta)$, (which could simply be the identity function $(\phi(\eta) = \eta)$).
+The prognostic index is a term often used to refer to some transformation, $\phi$, on the predictor, $\phi(\eta)$, (which could simply be the identity function, $\phi(\eta) = \eta$.
 Assuming a predictive function (for survival time, risk, or distribution defining function) of the form $g(\varphi)\phi(\eta)$, for some function $g$ and variables $\varphi$ where $g(\varphi)$ is constant for all observations (for example Cox PH (@sec-surv-models-crank)), then predictions of $\eta$ are a special case of predicting a relative risk, as predictions of $\phi(\eta)$ if $\phi$ is rank preserving -- this assumptions is sometimes written as "if there is a one-to-one mapping between the prediction and the expected survival times".
 A higher prognostic index may imply a higher or lower risk of event, dependent on the model structure.
 As stated above, if the prognostic index is used for a rank prediction, then this book always assumes "higher value higher risk".
@@ -88,44 +81,36 @@ As stated above, if the prognostic index is used for a rank prediction, then thi
 <!-- FIXME example needed -->
 
 
+#### Survival Distribution {.unnumbered .unlisted}
+Predicting a survival distribution refers specifically to predicting the distribution of a subject's survival time, i.e., modelling the distribution of the event occurring over $\NNReals$.
+Therefore, this is seen as the probabilistic analogue to the deterministic time-to-event prediction, these definitions are motivated by similar terminology in machine learning regression problems (@sec-surv-setml).
+
+Distributional prediction can in theory target any of the quantities introduced in @sec-distributions but predicting $S(t)$ and/or $h(t)$ is most common.
+Hazard based approaches are particularly relevant for non- and semi-parametric estimation of the distribution, where no (or few) assumptions are made about the underlying distribution of event times.
+
+As mentioned above, all prediction types can (in theory) be derived from a survival distribution prediction.
+For example, a time-to-event prediction can be obtained via $E(Y|\xx) = \int_0^\infty \hat{S}(t)$.
+For non-parametric methods, however, the estimated cdf is often improper in the presense of censoring and thus integration requires extrapolation of the cdf.
+For parametric models, the distribution of event times is fully specified once the paramers of the assumed distribution have been estimated, however, if the parameters were estimated based on only a small subset of the possible domain of $Y$, this essentially still constitutes extraploation and will in most cases yield implausible predictions.
+A popular alternative is therefore to estimate the *restricted mean survival time* (RMST; @han.restricted.2022; @andersen.regression.2004).
 
 
-## Survival Analysis Task {#sec-surv-setmltask}
+<!-- FIXME: Example + Illustration -->
 
-The survival prediction problems identified in @sec-surv-set-types are now formalised as machine learning tasks.
+## Survival Task {#sec-surv-setmltask}
 
-:::: {.callout-note icon=false}
-
-## Survival Task
-
-::: {#cnj-task-surv}
-Let $(X,T,\Delta)$ be random variables t.v.i. $\calX \times \calT \times \bset$ where $\calX \subseteq \Reals^p$ and $\calT \subseteq \NNReals$.
-Let $\calS \subseteq \distrT$ be a convex set of distributions on $\calT$ and let $\calR \subseteq \Reals$.
+To summarize, a survival task, Let $\calX$ the feature space such that $\xx\ t.v.i. \calX \subseteq \Reals^p$ as before, $Y\ t.v.i. \calT \subseteq \NNReals$,
+and $\calS \subseteq \distrT$ a convex set of distributions on $\calT$ and let $\calR \subseteq \Reals$.
 Then,
 
 * The *probabilistic survival task* is the problem of predicting a conditional distribution over the positive Reals and is specified by $g: \calX \rightarrow \calS$.
 * The *deterministic survival task* is the problem of predicting a continuous value in the positive Reals and is specified by $g: \calX \rightarrow \calT$.
 * The *survival ranking task* is specified by predicting a continuous ranking in the Reals and is specified by $g: \calX \rightarrow \calR$.
 
-:::
-::::
 
-Any other survival prediction type falls within one of the tasks in @cnj-task-surv, for example predicting log-survival time is the deterministic task and predicting prognostic index or linear predictor is the ranking task.
+Any other survival prediction type falls within one of these tasks for example predicting survival time is the deterministic task and predicting prognostic index or linear predictor is the ranking task.
 Removing the separation between the prognostic index and ranking prediction types is due to them both making predictions over $\Reals$ and hence their difference lies in interpretation only.
 
 In this book, unless otherwise specified, the term *survival task*, will be used to refer to the probabilistic survival task.
 As a final note, these definitions are given in the most general case where the time variable is over $\NNReals$.
 In practice, all models instead assume time is over $\PReals$ and so a subject $i$ that experiences an outcome at $0$ is either deleted or their outcome time is set to $T_i = \epsilon$ for some very small $\epsilon \in \PReals$.
-
-<!-- FIXME I got rid of these notation earlier, but don't see how the following is very usefull without them. On the other hand the connection to regression and classification could useful, but could also be introduced later when the actual reductions are introduced.
-#### Survival Analysis and Regression {.unnumbered .unlisted}
-
-
-
-Survival and regression tasks are closely related as can be observed from their respective definitions. Both are specified by $g : \calX \rightarrow \calS$ where for probabilistic regression $\calS \subseteq \Distr(\Reals)$ and for survival $\calS \subseteq \Distr(\NNReals)$.
-Furthermore both settings can be viewed to use the same generative process.
-In the survival setting in which there is no censoring then data is drawn from $(X,Y) \ t.v.i. \ \calX \times \calT, \calT \subseteq \NNReals$ and in regression from $(X,Y) \ t.v.i. \ \calX \times \calY, \calY \subseteq \Reals$, so that the only difference is whether the outcome data ranges over the Reals or positive Reals.
-
-These closely related tasks are discussed in more detail in (@sec-car), with a particular focus on how the more popular regression setting can be used to solve survival tasks.
-In (@sec-review) the models are first introduced in a regression setting and then the adaptations to survival are discussed, which is natural when considering that historically machine learning survival models have been developed by adapting regression models.
--->
