@@ -8,7 +8,6 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _wip_minor.qmd >}}
 
-
 Random forests are a composite (or ensemble) algorithm built by fitting many simpler component models, *decision trees*, and then averaging the results of predictions from these trees.
 Due to in-built variable importance properties, random forests are commonly used in high-dimensional settings when the number of variables in a dataset far exceeds the number of rows.
 High-dimensional datasets are very common in survival analysis, especially when considering omics, genetic and financial data.
@@ -26,21 +25,22 @@ This section will start by discussing decision trees and will then introduce the
 The decision tree algorithm takes an input, a dataset, selects a variable that is used to partition the data according to some *splitting rule* into distinct non-overlapping datasets or *nodes* or *leaves*, and repeats this step for the resulting partitions, or *branches*, until some criterion has been reached.
 The final nodes are referred to as *terminal nodes*.
 
-This is made clearer by example, (@fig-surv-ranfor) demonstrates a decision tree predicting the age of passengers on the Titanic using as variables: the class the passenger was on (first, second, third) (`Pclass`), their sex, and whether they survived (`Survived`).
-It can be seen that the algorithm completely ignored the 'Sex' variable and only utilises class and survival status.
-During training, the algorithm identified that the first optimal variable to split the data was `Pclass`, and that the optimal partition occurs at `Pclass>=1.5`, i.e., one dataset is created for observations that are in first class (split to the right), and another for observations in second and third class (split to the left).
-Passengers in first class are split once again by survival status and a passenger in first class who survived is predicted to be 35 whereas one who died is predicted to be 44.
-In contrast, passengers in cheaper classes are split by survival and then passengers who did not survive are split again by class.
+By example, (@fig-surv-ranfor) demonstrates a decision tree predicting the price that a car sells for in India (price in thousands of dollars).
+The dataset includes as variables the registration year, kilometrs drive, fuel type (petrol or automatic), seller type (individual or dealer), transmission type (manual or automatic), and number of owners.
+The decision tree was trained with a maximum depth of 2 (the number of rows excluding the top), and it can be seen that with this restriction only the transmission type, registration year, and fuel type were selected variables.
+During training, the algorithm identified that the first optimal variable to split the data was transmission type, partitioning data into manual and automatic cars.
+Manual cars are further subset by registration year whereas automatic cars are split by fuel type.
+It can also be seen how the predicted sale price (top value in each leaf) diverges between leaves as the tree splits
 
 The graphic highlights several core features of decision trees:
 
-1. They can model non-linear and interaction effects: The hierarchical structure allows for complex interactions between variables and variables can be used multiple times at different levels;
+1. They can model non-linear and interaction effects: The hierarchical structure allows for complex interactions between variables with some variables being used to separate all observations (transmission) and others only applied to subsets (year and fuel);
 2. They are highly interpretable: it is easy to visualise the tree and see how predictions are made;
 3. They perform variable selection: not all variables were used to train the model.
 
 To understand how random forests work, it is worth looking a bit more into the most important components of decision trees: splitting rules, stopping rules, and terminal node predictions.
 
-![Demonstrating regression trees using the `titanic_train` dataset from the \Rstats package **titanic**. Rounded rectangles are leaves, which indicate the variable that is being split. Edges are branches, which indicate the cut-off at which the variable is split. Each leaf contains information about the predicted age, number of observations in the leaf, and the proportion of data contained in the leaf.](Figures/forests/titanic.png){#fig-surv-ranfor fig-alt="Decision tree diagram with 9 green boxes in a hierarchical top-down structure. Top box says '30 n=714 100% and underneath it 'Pclass>=1.5' with 'yes' on the left and 'no' on the right. One level below are two further boxes indicator passengers in first class '38 n=186 26%' and other classes '27 n=528 74%'. The first class leaf splits again based on survival into passengers that do not survive '44 n=64 9%' and others '35 n=122 17%'. The leaf with other classes splits based on survival with surviving passengers ending in the final leaf '23 n=168 24%'. Passengers that die are split again based on class with dying passengers in third class '27 n=279 38%' and those in second class '34 n=90 13%'."}
+![Predicting the price a vehicle is sold for in India using a regression tree, dataset from kaggle.com/datasets/nehalbirla/vehicle-dataset-from-cardekho. Rounded rectangles are leaves, which indicate the variable that is being split. Edges are branches, which indicate the cut-off at which the variable is split. Variables are car transmission type (manual or automatic), fuel type (petrol or diesel) and registration year. The number at the top of each leaf is the average selling price in thousands of dollars for all observations in that leaf. The numbers at the bottom of each leaf are the number of observations in the leaf, and the proportion of data contained in the leaf.](Figures/forests/cars.png){#fig-surv-ranfor fig-alt="Decision tree diagram with 7 green boxes in a hierarchical top-down structure. The top box splits the data by transmission type, manual or automatic. Manual cars are then split into registration before or after 2014. Manual cars registered before 2014 are predicted to sell for $3.4K, whereas manual cars registered on or after 2014 are predicted to sell for $7.6K. On the other side of the plot, automatic cars are split according to whether they use petrol or diesel. Automatic, petrol cars are predicted to sell for $10K whereas automatic, diesel cars are predicted to sell for $26K."}
 
 #### Splitting and Stopping Rules {.unnumbered .unlisted}
 
@@ -53,7 +53,14 @@ For all decision tree and random forest algorithms going forward, let $L$ denote
 Let $L_{y;i}$ be the $i$th outcome in $L_y$ and finally let $L_{\bar{y}} = \mean[|L_y|]{L_{y;i}}$ be the mean outcome in leaf $L$.
 
 Let $j=1,\ldots,p$ be the index of features and let $c_j$ be a possible cutoff value for feature $\xx_{;j}$. 
-Then $L^a_{xy}(j,c_j) := \{(\xx_i,y_i)|x_{i;j} < c_j, i = 1,...,n\}, L^b_{xy}(j,c_j) = \{(\xx_i,y_i)|x_{i;j} \geq c_j, i = 1,...,n\}$ be the two leaves containing the set of observations resulting from partitioning variable $j$ at cutoff $c$.
+Define
+$$
+\begin{split}
+L^a_{xy}(j,c_j) := \{(\xx_i,y_i)|x_{i;j} \boldsymbol{<} c_j, i = 1,...,n\} \\
+L^b_{xy}(j,c_j) := \{(\xx_i,y_i)|x_{i;j} \boldsymbol{\geq} c_j, i = 1,...,n\}
+\end{split}
+$$
+as the two leaves containing the set of observations resulting from partitioning variable $j$ at cutoff $c$.
 To simplify equations let $L^a, L^b$ be shorthands for $L^a(j,c_j)$ and $L^b(j,c_j)$.
 Then a split is determined by finding the arguments, $(j^*,c_{j^*}^*)$ that minimise the residual sum of squares across both leaves  [@Hastie2013],
 $$
@@ -73,7 +80,8 @@ Deciding the number of minimum observations and/or the maximum depth can be perf
 The final major component of decision trees are *terminal node predictions*.
 As the name suggests, this is the part of the algorithm that determines how to actually make a prediction for a new observation.
 A prediction is made by 'dropping' the new data 'down' the tree according to the optimal splits that were found during training.
-Returning to @fig-surv-ranfor, say a new data point is $\{Pclass = 2, Survived = 0\}$, then in the first split the left branch is taken as `Pclass` $= 2 \geq 1.5$, in the second split the right branch is taken as `Survived` $= 0 < 0.5$, finally as `Pclass` $= 2 < 2.5$ the new data point 'lands' in the third terminal leaf.
+Returning to @fig-surv-ranfor, say a new data point is \{transmission = Manual, fuel = Diesel, year = 2015\}, then in the first split the left branch is taken as 'transmission = Manual', in the second split the right branch is taken as 'year' $= 2015 \geq 2014$, hence the new data point lands in the second terminal leaf and is predicted to sell for $7,600.
+The 'fuel' variable is ignored as it is only considered for automatic vehicles.
 
 The resulting prediction is then a simple baseline statistic computed from the training data that fell into the corresponding node.
 In regression, this is most commonly (and simply) the sample mean of the training outcome data, but other terminal node predictions could be the sample median, a weighted average, or even a simple linear regression prediction from a model trained on the training data in the corresponding final leaf.
@@ -218,33 +226,56 @@ Starting with the most common survival prediction type, the algorithm requires a
 
 <!-- FIXME: REF KM DEFINITION ABOVE -->
 
-By convention, the Nelson-Aalen estimator is used more commonly for RSFs and is thus focused on in this section, but the same logic follows for the Kaplan-Meier estimator.
-
-Once the Nelson-Aalen estimate for the cumulative hazard function is estimated for individual trees, the question is then how to combine them to create a single random forests prediction.
-As Nelson-Aalen estimates produce discrete hazard functions, the same bagging algorithm can be used relatively simply by averaging the estimated cumulative hazard at each observed time-point [@Hothorn2004].
-See @fig-surv-ranfor-lung for an example using the `lung` dataset [@pkgsurvival].
-
-Let $b_m \in \{1,...,b_M\}$ be a terminal node in a survival decision tree, $b$, with $b_M \in \PReals$ terminal nodes, then if an observation lands in terminal node $b_m$, its predicted cumulative hazard is given by,
+Denote $b$ as a decision tree and $L^{b(h)}$ as the terminal node $h$ in tree $b$.
+Then the predicted survival function and cumulative hazard for a new observation $\xx^*$ is,
 
 $$
-\hat{H}_b(\tau|\xx^*) = \sum_{\{i: i \in L^{b_m} \cap t_i \leq \tau\}} \frac{o_i}{n_i}
+\hat{S}_{b(h)}(\tau|\xx_i^*) = \prod_{i:t_{(i)} \leq \tau} 1-\frac{d_{\tbi}}{n_{t_{\tbi}}}, \quad \{i: \xx_i^* \in L^{b(h)}\}
+$$ {#eq-surv-kaplan}
+
+$$
+\hat{H}_{b(h)}(\tau|\xx_i^*) = \sum_{i:t_{(i)} \leq \tau} \frac{d_{\tbi}}{n_{\tbi}}, \quad \{i: \xx_i^* \in L^{b(h)}\}
 $$ {#eq-surv-nelson}
 
-where $o_i$ and $n_i$ are the observed number of events, and the observations at risk, respectively at time $t_i$.
-The bootstrapped Nelson-Aalen estimator is then defined as [@Ishwaran2008]
+where $t_{(i)}$ is the ordered event times and $d_{\tbi}$ and $n_{\tbi}$ are the observed number of events, and the number of observations at risk, respectively at $\tbi$.
+See @fig-surv-ranfor-lung for an example using the `lung` dataset [@pkgsurvival].
+
+![Survival tree trained on the `lung` dataset from the \Rstats package **survival**. The terminal node predictions are survival curves.](Figures/forests/lung.png){#fig-surv-ranfor-lung fig-alt="Decision tree with two splits, the first is 'ph.ecog' with a p-value of <0.001, when ph.ecog > 1 a terminal prediction is made, otherwise the data is split at 'sex' with - = 0.015. Terminal node predictions are plots of survival functions."}
+
+The bootstrapped predicted is the cumulative hazard function or survival function averaged over individual trees.
+Note that understanding what these bootstrapped functions represents depends on how they are calculated.
+By definition, a mixture of $n$ distributions with cumulative distribution functions $F_i, i = 1,...,n$ is given by
 
 $$
-\hat{H}_{Boot}(\tau|\xx^*) = \frac{1}{B} \sum^B_{b=1} \hat{H}_b(\tau|\xx^*)
+F(x) = \sum^n_{i=1} w_i F_i(x)
+$$
+
+Subsituting $F = 1 - S$ and noting $\sum w_i = 1$ gives the computation $S(x) = \sum^n_{i=1} w_i S_i(x)$, allowing the bootstrapped survival function to exactly represent the mixture distribution averaged over all trees:
+
+$$
+\hat{S}_{Boot}(\tau|\xx^*) = \frac{1}{B} \sum^B_{b=1} w_i\hat{S}_b(\tau|\xx^*)
+$$ {#eq-surv-kaplan-boot}
+
+usually with $w_i = 1/B$ where $B$ is the number of trees.
+
+In contrast, if one were to instead substitute $F = 1 - exp(-H)$, then the mixture distrubution depends on a logarithmic function that can only be approximated computed if predicted survival probabilites are close to one, which is an assumption that deteriorates over time.
+Therefore, to ensure the bootstrapped prediction accurately represents the underlying mixed probability distribution, the bootstrapped cumulative hazard function should be computed as:
+
+$$
+\hat{H}_{Boot}(\tau|\xx^*) = - \log (\hat{S}_{Boot}(\tau|\xx^*))
 $$ {#eq-surv-nelson-boot}
 
-where $B$ is the total number of bootstrapped estimators.
-The bootstrapped Kaplan-Meier estimator is calculated analogously.
-More generally these can be considered as a uniform mixture of $B$ distributions (@sec-car).
+Another practical consideration to take into account is how to average the survival probabilities over the decision trees as each individual Kaplan-Meier estimate may have been trained on different time points.
+This is overcome by recognising that the Kaplan-Meier estimation results in a piece-wise function that can be linearly interpolated between training data.
+@fig-surv-ranfor-bootstrap demonstrates this process for three decision trees (panel a), where the survival probability is calculated at all possible time points (panels b-c), and the average is computed with linear interpolation added between time-points (panel d).
+
+![Bootstrapping Kaplan-Meier estimators across three decision trees (red, blue, green). Panel a) shows the individual estimates, b) shows the time points to aggregate the trees over, c) is the predicted survival probability from each tree at the desired time points, and d) is the average survival probabilities connected by a step function.](Figures/forests/bootstrap.png){#fig-surv-ranfor-bootstrap fig-alt="Four panels with 't' on x-axis and 'S(t)' on y-axis. Panel a) shows three survival functions as piece-wise linearly decreasing step functions. Panel (b) shows the same but with vertical dotted lines added at all time-points. Panel (c) shows dots at each of the intersections between the vertical lines and the plotted decision trees. Panel (d) shows a single line with dots which are the average of the points in panel (c)."}
+
 Extensions to competing risks follow naturally using bootstrapped cause-specific cumulative incidence functions.
 
 <!-- FIXME - ANDREAS TO ADD DETAILS ON COMPETING RISKS -->
 
-![Survival tree trained on the `lung` dataset from the \Rstats package **survival**. The terminal node predictions are survival curves.](Figures/forests/lung.png){#fig-surv-ranfor-lung fig-alt="Decision tree with two splits, the first is 'ph.ecog' with a p-value of <0.001, when ph.ecog > 1 a terminal prediction is made, otherwise the data is split at 'sex' with - = 0.015. Terminal node predictions are plots of survival functions."}
+
 
 #### Deterministic Predictions {.unnumbered .unlisted}
 
