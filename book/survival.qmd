@@ -24,44 +24,38 @@ When collecting such data, however, the outcome of interest can often be not obs
 Often analysis of time-to-event data targets the estimation of the (improper) distribution of the event times or, equivalently, modelling the transitions between different states (e.g. alive -> dead) while taking into account censoring and truncation as well as other peculiarities of time-to-event data. However, the target of estimation can also be a relative risk score or the expected time-to-event (cf. @sec-surv-set-types for details).
  -->
 
+*Survival Analysis* is concerned with data where the outcome is the time until an event takes place (a 'time-to-event').
+Because the collection of such data takes place in the temporal domain (it takes time to observe a duration), the event of interest is often unobservable, for example because it did not occur by the end of the data collection period.
+In survival analysis terminology this is refered to as *censoring*.
 
- As discussed in the introduction, *Survival Analysis* is concerned with data where the outcome is a time-to-event.
-Because the collection of such data takes place in the temporal domain (it takes time to observe a duration), the event of interest is often unobservable.
-For example, because the event did not occur by the end of the data collection period or because of the occurrence of another event that prevents the event of interest from being observed.
- In survival analysis terminolgy these are refered to as *censoring* and *competing risks*.
-
-This chapter defines these and related terms and introduces basic terminology and mathematical definitions in survival analysis, starting with the common single-event, right-censored data setting and then extends to further types of censoring as well as truncation.
+This chapter defines basic terminology and mathematical definitions in survival analysis, which are used throughout this book.
 Building upon this chapter, @sec-eha introduces event-history analysis, which is a generalisation to settings with multiple, potentially competing or recurrent events, including multi-state outcomes.
-Then, @sec-survtsk defines common prediction types of survival models and defines  the *survival task* for machine learning.
+Concluding this part of the book, @sec-survtsk defines different prediction tasks in survival analysis that are used by models and measures to implement machine learning methods.
 
-While these definitions and concepts are not new to survival analysis, we feel that it is of utmost importance for machine learning practitioners to be able identify and specify the survival problem present in their data correctly, as misspecification cannot be detected by comparing the predictive performance of alternate models.
-The predictive performance can only detect if one model is better suited to minimize a given obejective function, but not whether or not the obejective function is specified correctly.
-The latter depends on the (assumptions about the) data generating process and has to be also reflected in the definition of the evaluation measure.
-
-
+While these definitions and concepts are not new to survival analysis, it is imperative they are understood to build successful models.
+Evaluation functions (Part II) can identify if one model is better suited than another to minimize a given objective function, however they cannot identify if the objective function itself was specified correctly, which depends on the assumptions about the data generating process.
+Evaluating models with the wrong objective function yields meaningless results.
+Hence, it is of utmost importance for machine learning practitioners to be able identify and specify the survival problem present in their data correctly to ensure models are correctly fit and evaluated.
 
 ## Quantifying the Distribution of Event Times {#sec-distributions}
 
-This section introduces functions that can be used to fully characteristise a probability distribution, termed here as *distribution defining functions*.
-Particular focus is given to distribution defining functions that are important in survival analysis.
+This section introduces functions that can be used to fully characteristise a probability distribution, particular focus is given to functions that are important in survival analysis.
 
 For now, assume a continuous, positive, random variable $Y$ taking values in (t.v.i.) $\NNReals$.
 A standard representation of the distribution of $Y$ is given by the probability density function (pdf), $f_Y: \NNReals \rightarrow \NNReals$, and cumulative distribution function (cdf), $F_Y: \NNReals \rightarrow [0,1]; (\tau) \mapsto P(Y \leq \tau)$.
 
-As discussed in @sec-intro, it is more common to describe the distribution of event times $Y$ via the *survival function* and *hazard function* (often also refered to as *hazard rate*) than the pdf or cdf.
-
-The survival function is defined as
+In survival analysis, it is most common to describe the distribution of event times $Y$ via the *survival function* and *hazard function* (or *hazard rate*) rather than the pdf or cdf. The survival function is defined as
 $$
 S_Y(\tau) = P(Y > \tau) = \int^\infty_\tau f_Y(u) \ du,
 $$
-is the probability of not observing an event until some point $\tau \geq 0$ and thus simply the compliment of the cdf: $S_Y(\tau) = 1-F_Y(\tau)$.
+which is the probability that an event has not occurred by $\tau \geq 0$ and thus the complement of the cdf: $S_Y(\tau) = 1-F_Y(\tau)$.
 
 The hazard function is given by
 $$
 h_Y(\tau) = \lim_{\Delta \searrow 0}\frac{P(\tau \leq Y < \tau + \Delta|Y \geq \tau)}{\Delta} = \frac{f_Y(\tau)}{S_Y(\tau)}.
 $$
 
-The hazard function is interpreted as the instantaneous risk to observe an event given that the event has not been observed up until that point.
+and is interpreted as the instantaneous risk of observing an event at $\tau$, given that the event has not been observed before $\tau$.
 This is not a probability and $h_Y$ can be greater than one.
 
 The cumulative hazard function (chf) can be derived from the hazard function by
@@ -78,44 +72,71 @@ $$
 These last relationships are particularly important, as many methods estimate the hazard rate, which is then used to calculate the cumulative hazard and survival probability
 $$S_Y(\tau) = \exp(-H_Y(\tau)) = \exp\left(-\int_0^\tau h_Y(u)\ du\right).$${#eq-surv-haz}
 
+Unless necessary to avoid confusion, subscripts are dropped from $S_Y, h_Y$ etc. going forward and instead these functions are referred to as $S$, $h$ (and so on).
 
-Unless necessary to avoid confusion, subscripts are dropped from $S_Y, h_Y$ etc. going forward and instead these functions are referred to as $S$ and $h$ (and so on).
-
-Normally, these quantities could be estimated using standard techniques like regression modeling (estimation of parameters of an assumed distribution).
-However, in contrast to standard settings, $Y$ is only observed partially, due to different types of censoring and truncation describeb below, which makes adjustements necessary.
-
+Usual regression techniques cannot be used to estimate these quantities as $Y$ is only partially observed, due to different types of censoring and truncation, which are now described.
 
 ## Single-event, right-censored data {#sec-data-rc}
 
-Survival analysis has a more complicated data setting than other fields as the 'true' data generating process is not directly observable but instead engineered variables are defined to capture observed information. Let,
+Survival analysis has a more complex data setting than other fields as the 'true' data generating process is not directly observable.
+The variables of interest are often theoretical and instead engineered variables are defined to capture observed information.
+Let,
 
-* $X \ t.v.i. \ \calX \subseteq \Reals^p, p \in \PNaturals$ be the generative random variable  representing the data *features*/*covariates*/*independent variables*.
-* $Y \ t.v.i. \ \calY \subseteq \NNReals$ be the (partially unobservable) *true survival time*.
-* $C \ t.v.i. \ \calC \subseteq \NNReals$ be the (partially unobservable) *true censoring time*.
+* $X$ taking values in $\Reals^p$ be the generative random variable representing the data *features*/*covariates*/*independent variables*.
+* $Y$ taking values in $\NNReals$ be the (partially unobservable) *true survival time*.
+* $C$ taking values in $\NNReals$ be the (partially unobservable) *true censoring time*.
 
+In the presence of censoring $C$, it is impossible to fully observe the true object of interest, $Y$.
+Instead, the observable variables are defined by
 
-The object of interest in survival analysis is $Y$.
-However, in the presence of censoring $C$, it is impossible to fully observe $Y$.
-Instead, the observable variables are given by
-
-* $T := \min\{Y,C\}$, the *outcome time* (realisations of this random variable will be refered to as *observed outcome time*).
+* $T := \min\{Y,C\}$, the *outcome time* (realisations are refered to as the *observed outcome time*); and
 * $\Delta := \II(Y = T) = \II(Y \leq C)$, the *event indicator* (also known as the *censoring* or *status* indicator).
-
 
 Together $(T,\Delta)$ is referred to as the *survival outcome* or *survival tuple* and they form the dependent variables.
 The survival outcome provides a concise mechanism for representing the outcome time and indicating which outcome (event or censoring) took place.
 
-A *survival dataset* is a $n \times p$ Real-valued matrix defined by $\calD = ((\xx_1 \ t_1 \ \delta_1) \cdots (\xx_n,t_n,\delta_n))^\trans$, where $(t_i,\delta_i)$ are realisations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional row-vector, $\xx_i = (x_{i1} \ x_{i2} \cdots x_{ip})$.
+A *survival dataset* is a $n \times p$ Real-valued matrix defined by $\calD = ((\xx_1 \ t_1 \ \delta_1) \cdots (\xx_n,t_n,\delta_n))^\trans$, where $(t_i,\delta_i)$ are realisations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i;1} \ x_{i;2} \cdots x_{i;p})^\trans$.
 
-Finally the following terms are used frequently throughout this book.
+Finally, the following quantities are used frequently throughout this book and survival analysis literature more generally.
 Let $(t_i, \delta_i) \iid (T,\Delta), i = 1,...,n$, be observed survival outcomes.
 Then,
 
-* The *set of unique* or *distinct time-points* refers to the set of time-points in which at least one observation experiences the event or is censored, $\calU_O \subseteq \{t_i\}_{i \in \{1,...,n\}}$.
-* The *set of unique observed event times* refers to the set of unique time-points in which an event (and not censoring) occurred, $\calU_D := \{t_{i} : \delta_i = 1\}_{i \in \{1,...,n\}}$. Sometimes the ordered, unique events times are also denoted by $t_{(i)},\ i=1,\ldots,m \leq n,\ t_{(1)} < t_{(2)} < \cdots < t_{(m)}$.
-* The *risk set* at a given time-point, $\tau$, is the index-set of observation units at risk for the event just before $\tau$, $\calR_\tau := \{i: t_i \geq \tau\}$ where $i$ is a unique row/subject in the data. Consequently, for right-censored data, we have $\calR_0 = \{1,\ldots,n\}$ and $\calR_{\tau} \supseteq \calR_{\tau'}, \forall \tau < \tau'$. Note that in a continuous setting, 'just before' refers to an infinitesimally smaller time than $\tau$, in practice as this is unobservable the risk set is defined at $\tau$.
-* The *number of observations at risk* at $\tau$ is the cardinality of the risk set, $|\calR_\tau|$, and is denoted by $n_\tau := \sum_i \II(t_i \geq \tau)$.
-* The *number of events* at $\tau$ is denoted by $d_\tau := \sum_i \II(t_i = \tau, \Delta_i = 1).$ Note: For truly continuous variables $T_i$ we would expect $d_{t_i} = 1,\forall i=1\ldots,n$, however, in practice we often observe ties due to finite measurement precision, such that $d_{\tau} > 1$ occurs quite frequently in real-world datasets.
+The **set of unique outcome times** is the set of time-points in which at least one observation experiences the event or is censored:
+
+$$
+\calU_O \subseteq \{t_i\}_{i \in \{1,...,n\}}
+$$
+
+The **set of unique event times** is the set of time-points in which at least one observation experiences the event (but not censored):
+
+$$
+\calU_D \subseteq \{t_i: \delta_i = 1\}_{i \in \{1,...,n\}}
+$$
+
+The **ordered, unique events times** may also be denoted by
+
+$$
+t_{(i)},\ i=1,\ldots,m \quad t_{(1)} < t_{(2)} < \cdots < t_{(m)}, \quad m \leq n
+$$
+
+The **risk set at $\tau$**, is the index-set of observation units at risk for the event just before $\tau$
+
+$$\calR_\tau := \{i: t_i \geq \tau\}$$
+
+where $i$ is the index of an observation in the data.
+For right-censored data, $\calR_0 = \{1,\ldots,n\}$ and $\calR_{\tau} \subseteq \calR_{\tau'}, \forall \tau > \tau'$.
+Note that in a continuous setting, 'just before' refers to an infinitesimally smaller time than $\tau$, in practice as this is unobservable the risk set is defined at $\tau$, hence an observation may both be at risk, and experience an event at $\tau$.
+
+The **number of observations at risk at $\tau$** is the cardinality of the risk set at $\tau$,
+
+$$n_\tau := \sum_i \II(t_i \geq \tau) = |\calR_\tau|$$
+
+Finally, the **number of events at $\tau$** is defined by,
+
+$$d_\tau := \sum_i \II(t_i = \tau, \delta_i = 1)$$
+
+For truly continuous variables, one might expect only one event to occur at each observed event time: $d_{t_i} = 1,\forall i$.
+In practice, ties are often observed due to finite measurement precision, such that $d_{\tau} > 1$ occurs frequently in real-world datasets.
 
 The quantities $\calR_\tau$, $n_\tau$, and $d_\tau$ underlie many models and measures in survival analysis.
 Particularly non-parametric methods (@sec-models-classical) like the Kaplan-Meier estimator [@Kaplan1958] are based on the ratio $d_\tau / n_\tau$.
