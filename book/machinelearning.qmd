@@ -22,7 +22,7 @@ This book is primarily concerned with *predictive* survival analysis, i.e., maki
 
 The basic machine learning workflow is represented in @fig-ml-basic.
 Data is split into training and test datasets.
-A learner is selected and is trained on the training data, becoming a fitted model.
+A learner is selected and is trained on the training data, inducing a fitted model.
 The features from the test data are passed to the model which makes predictions for the unseen labels.
 The labels from the test data are passed to a chosen measure with the predictions, which evaluates the performance of the model.
 The process of repeating this procedure to test different training and test data is called *resampling* and running multiple resampling experiments with different models is called *benchmarking*.
@@ -52,7 +52,7 @@ This is particularly true when separating between determinisitc and probabilisti
 Formally, let $\xx \in \calX \subseteq \Reals^{n \times p}$ be a matrix with $p$ features for $n$ observations and let $y \in \calY$ be a vector of labels (or *outcomes* or *targets*) for all observations.
 A dataset is then given by $\calD = ((\xx_1, y_1) , . . . , (\xx_n, y_n))$ where it is assumed $\calD \iid (\mathbb{P}_{xy})^n$ for some unknown distribution $\mathbb{P}$.
 
-A machine learning task is the problem of learning the unknown function: $f : \calX \rightarrow \calY$ where $\calY$ specifies the nature of the task, for example classification, regression, or survival.
+A machine learning task is the problem of learning the unknown function $f : \calX \rightarrow \calY$ where $\calY$ specifies the nature of the task, for example classification, regression, or survival.
 
 ### Regression {#sec-ml-tasks-regr}
 
@@ -81,51 +81,45 @@ The class for which probabilities are predicted is referred to as the *positive 
 ## Training and predicting {#sec-ml-models}
 
 The terms *algorithm*, *learner*, and *model* are often conflated in machine learning.
-A *learning algorithm*, *algorithm*, or *learner*, is a strategy to estimate the unknown mapping from features to outcome as represented by a task, $f: \calX \rightarrow \calY$.
-Given a learner, $LA$, and data, $\calD$, then $f := LA(\calD | \thethe, \lamlam)$.
-The terms $\thethe$ and $\lamlam$ represent model parameters and hyperparameters that are used to fit and control the algorithm respectively.
-Model *parameters* (or *weights*) are coefficients to be estimated during model training, these are not directly controlled by a user (i.e., the person training the model) but are instead solely determined by the data and influenced by hyperparameters.
-Model *hyperparameters* control *how* the algorithm is run, for example determining if the intercept should be included in a linear regression model (@cnj-lm).
+A *learner* is a description of a learning algorithm, prediction algorithm, parameters, and hyperparameters.
+The *learning algorithm* is a mathematical strategy to estimate the unknown mapping from features to outcome as represented by a task, $f: \calX \rightarrow \calY$.
+During *training*, data, $\calD$, is fed into the learning algorithm and induces the *model* $\hat{f}$.
+Whereas the learner defines the framework for training and prediction, the model is the specific instantiation of this framework after training on data.
+
+After training the model, new data, $\xx^*$, can be fed to the *prediction algorithm*, which is a mathematical strategy that uses the model to make predictions $\hatyy = \hatf(\xx^*)$.
+Algorithms can vary from simple linear equations with coefficients to estimate, to complex iterative procedures that differ considerably between training and predicting.
+
+Algorithms usually involve parameters and hyperparameters.
+Parameters are learned from data whereas hyperparameters are set beforehand to guide the algorithms.
+Model *parameters* (or *weights*), $\bstheta$, are coefficients to be estimated during model training.
+Hyperparameters, $\bslambda$, control how the algorithms are run but are not directly updated by them.
+Hyperparameters can be mathematical, for example the learning rate in a gradient boosting machine (@sec-boost), or structural, for example the depth of a decision tree (@sec-ranfor).
 The number of hyperparameters usually increases with learner complexity and affects its performance. 
 Often hyperparameters need to be tuned (@sec-ml-opt) instead of manually set.
-
-The process of passing data, $\calD$, setting hyperparameters, $\lamlam$, to a learner is known as *training* and the learner is *trained* by estimating the parameters, $\thethe$, this trained learner is called a *model*.
-Computationally, storing $(\hat{\thethe}, \lamlam)$ is sufficient to recreate any trained model (assuming the learner is known), and sharing of model weights is common for deep learning models.
-
-Once trained, a model can be used for predictions.
-As well as encoding a specific learning strategy, learners also define a prediction strategy.
-For traditional statistical models this strategy might be a simple calculation based on the trained coefficients (e.g., predicting a linear predictor @sec-surv-set-types). 
-For more complex machine learning models this could be an iterative algorithmic procedure with multiple steps.
-Given a trained model, $\hatf := LA(\calD | \hat{\thethe}, \lamlam)$, and some features for a new observation, $\xx^* \in \Reals^p$, the model's prediction for the unseen label is $\haty := \hatf(\xx^*)$.
-Note that there can also be hyperparameters specific to the prediction step.
+Computationally, storing $(\hat{\bstheta}, \bslambda)$ is sufficient to recreate any trained model.
 
 :::: {.callout-note icon=false}
 
-## Linear regression
+## Ridge regression
 
-::: {#cnj-lm}
-Note: this example is to demonstrate the terms discussed thus far in a simple model, however this exact setup does not make practical sense.
+Let $f : \calX \rightarrow \calY$ be the regression task of interest with $\calX \subseteq \Reals$ and $\calY \subseteq \Reals$.
+Let $(\xx, \yy) = ((x_1, y_1), \ldots, (x_n, y_n))$ be data such that $x_i \in \calX$ and $y_i \in \calY$.
 
-Let $f_R : \calX \rightarrow \calY$ be the regression task of interest with $\calX \subseteq \Reals^n$ and $\calY \subseteq \Reals^n$.
-Let $(\xx, \yy)$ be data such that $\xx \in \calX$ and $\yy \in \calY$.
-
-Say the learner of interest is a linear regression model with learning algorithm:
+Say the **learner** of interest is a regularized linear regression model with **learning algorithm**:
 
 $$
-(\hat{\beta}_0, \hat{\beta}_1) := \argmin_{\beta_0,\beta_1} \Big\{\sum^n_{i=1} (y_i - \gamma\beta_0 - \beta_1 x_i)^2\Big\}
+(\hat{\beta}_0,\hat{\beta}_1):=\argmin_{\beta_0,\beta_1}\Bigg\{\sum_{i=1}^n(y_i-(\beta_0 +\beta_1 x_i))^2+\gamma\beta_1^2\Bigg\}.
 $$
 
-and prediction algorithm:
+and **prediction algorithm**:
 
 $$
-\hatf(x) = \gamma\hat{\beta}_0 + \hat{\beta}_1x
+\hatf(\phi) = \hat{\beta}_0 + \hat{\beta}_1\phi
 $$
 
-The learner hyperparameters are $\lamlam = (\gamma)$ which can take values $0$ or $1$ and the parameters are $\thethe = (\beta_0, \beta_1)^\trans$.
-The learner is fit by passing $(\xx, \yy)$ to the learning algorithm and thus estimating $\hat{\thethe}$ and $\hatg$.
-A prediction, $\haty$, is made for a new observation by passing $x^* \in \calX$ to the fitted model $\hatf$.
-
-:::
+The **hyperparameters** are $\lambda = (\gamma \in \PReals)$ and the **parameters** are $\bstheta = (\beta_0, \beta_1)^\trans$.
+Say that $\gamma = 2$ is set and the learner is then trained by passing $(\xx, \yy)$ to the learning algorithm and thus estimating $\hat{\bstheta}$ and $\hatf$.
+A **prediction**, can then be made by passing $x^* \in \calX$ to the fitted model: $\haty := \hatf(x^*) = \hat{\beta}_0 + \hat{\beta}_1x^*$.
 
 ::::
 
@@ -177,7 +171,7 @@ Determining if one model is actually better than another is a surprisingly compl
 @sec-ml-models introduced model hyperparameters, which control how training and prediction algorithms are run.
 Setting hyperparameters is a critical part of model fitting and can significantly change model performance.
 *Tuning* is the process of using internal benchmark experiment to automatically select the optimal hyper-parameter configuration.
-For example, the depth of trees, $m_r$ in a random forest (@sec-surv-ml-models-ranfor) is a potential hyperparameter to tune.
+For example, the depth of trees, $m_r$ in a random forest (@sec-ranfor) is a potential hyperparameter to tune.
 This hyperparameter may be tuned over a range of values, say $[1, 15]$ or over a discrete subset, say $\{1, 5, 15\}$, for now assume the latter.
 Three random forests with $1$, $5$, and $15$ tree depth respectively are compared in a benchmark experiment.
 The depth that results in the model with the optimal performance is then selected for the hyperparameter value going forward.
