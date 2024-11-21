@@ -1,4 +1,9 @@
+remotes::install_github("mlr-org/mlr3proba", ref = 'v0.5.7', upgrade = "never")
+remotes::install_github("mlr-org/mlr3", ref = 'v0.16.1', upgrade = "never")
+remotes::install_github("mlr-org/paradox", ref = 'v0.11.1', upgrade = "never")
+
 ## Ranking
+rm(list = ls())
 library(dplyr)
 library(ggplot2)
 library(mlr3)
@@ -18,7 +23,7 @@ d = rbind(s_d, c_d, w_d) %>% as.data.frame()
 g = ggplot(d, aes(x = t, y = surv, color = W)) +
   geom_line() +
   ylim(0, 5) +
-  theme_bw() +
+  theme_classic() +
   labs(
     y = "W(t)",
     title = "Kaplan-Meier estimates and weighting on 'whas' data",
@@ -66,7 +71,7 @@ dran = autoplot(pran, "calib", t, s$test)$data
 dran = dran %>% filter(Group == "Pred") %>% mutate(Group = "RF")
 
 g = ggplot(rbind(dcox, dran, drrt), aes(x = x, y = y, color = Group)) +
-  geom_line() + theme_bw() + ylim(0, 1) +
+  geom_line() + theme_classic() + ylim(0, 1) +
   labs(x = "T", y = "S(T)", color = "Model")
 ggsave("book/Figures/evaluation/calibKM.png", g, height = 3, units = "in", dpi = 600)
 
@@ -90,7 +95,7 @@ scores = paste0(sprintf("   %s = %s (%s)", c("CPH", "RF", "RRT"), signif(c(dcal_
 scores = paste0("DCal (p-values):\n", scores)
 
 g = ggplot(rbind(dcox, dran, drrt), aes(x = p, y = q, color = Group)) +
-  geom_line() + theme_bw() + ylim(0, 1) + xlim(0, 1) +
+  geom_line() + theme_classic() + ylim(0, 1) + xlim(0, 1) +
   geom_abline(slope = 1, intercept = 0, color = "lightgray", lty = "dashed") +
   labs(x = "True (p)", y = "Predicted", color = "Model") +
   geom_label(aes(x = x, y = y), data.frame(x = 0.75, y = 0.1), label = scores,
@@ -98,7 +103,9 @@ g = ggplot(rbind(dcox, dran, drrt), aes(x = p, y = q, color = Group)) +
 ggsave("book/Figures/evaluation/calibD.png", g, height = 3, units = "in",
   dpi = 600)
 
+
 # Calibration point processes experiment
+rm(list = ls())
 set.seed(42)
 library(survival)
 
@@ -106,3 +113,78 @@ event = rbinom(100, 1, 0.7)
 times = runif(100)
 H = survfit(Surv(times, event) ~ 1)$cumhaz
 c("Num deaths" = sum(event), "Sum H" = sum(H))
+
+## Random forests
+rm(list = ls())
+set.seed(20241104)
+
+data <- read.csv("book/experiments/cars.csv")[, -1]
+colnames(data)[c(2, 3, 5)] <- c("price", "km", "seller")
+# convert INR to $000
+data$price <- data$price/73000
+data$km <- data$km/1000
+data <- data[data$fuel %in% c("Diesel", "Petrol"), ]
+
+train <- sample(nrow(data), nrow(data) * 2/3)
+train_set <- data[train, ]
+test_set <- data[setdiff(seq(nrow(data)), train), ]
+
+fit <- rpart::rpart(price ~ ., train_set, maxdepth = 2)
+
+# test model is 'good' before plotting
+pred <- predict(fit, test_set)
+base <- mean(train_set$price)
+truth <- test_set$price
+rmse <- function(yhat) sqrt(mean((truth - yhat)^2))
+mae <- function(yhat) mean(abs(truth - yhat))
+matrix(
+  c(rmse(base), rmse(pred), mae(base), mae(pred)),
+  2, 2, FALSE,
+  list(c("Baseline", "Prediction"), c("RMSE", "MAE"))
+)
+
+png("book/Figures/forests/cars.png", height = 400, width = 600)
+rattle::fancyRpartPlot(fit, caption = "")
+dev.off()
+
+rm(list = ls())
+set.seed(20241109)
+library(survival)
+library(party)
+fit <- party::ctree(Surv(time, status) ~ ., lung)
+png("book/Figures/forests/lung.png", height = 400, width = 600)
+plot(fit)
+dev.off()
+
+## bootstrapped rsfs
+rm(list = ls())
+library(ggplot2)
+library(patchwork)
+
+x = 0:13
+y1 = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.8, 0.1, 0.1)
+y2 = c(1, 1, 0.6, 0.6, 0.6, 0.6, 0.3, 0.3, 0.2, 0.2, 0, 0, 0, 0)
+y3 = c(1, 1, 1, 1, 1, 0.5, 0.5, 0.5, 0.5, 0.2, 0.2, 0.2, 0.2, 0.2)
+group = rep(c("blue", "red", "green"), each = 14)
+df = data.frame(x = x, y = c(y1, y2, y3), group = group)
+
+p0 <- ggplot(df, aes(x = x, y = y, color = group))
+p1 <-  p0 + geom_step()
+p2 <- p0 + geom_vline(xintercept = x, lty = 2, color = "gray") + geom_step()
+p3 <- p0 + geom_vline(xintercept = x, lty = 2, color = "gray") +  geom_point()
+
+df2 = data.frame(x = x, y = apply(data.frame(y1, y2, y3), 1, mean))
+p4 <- ggplot(df2, aes(x = x, y = y)) + geom_step() + geom_point()
+
+ybreaks = seq.int(0, 1, 0.25)
+xbreaks = seq.int(0, 12, 3)
+g = p1 + p2 + p3 + p4 &
+  labs(x = "t", y = "S(t)") &
+  theme_classic() &
+  guides(color = "none") &
+  scale_y_continuous(limits = c(0, 1), breaks = ybreaks, labels = ybreaks) &
+  scale_x_continuous(limits = c(0, 14), breaks = xbreaks, labels = xbreaks, expand = c(0, 0)) &
+  plot_annotation(tag_levels = 'a', tag_suffix = ")")
+
+ggsave("book/Figures/forests/bootstrap.png", g, height = 5, units = "in",
+  dpi = 600)
