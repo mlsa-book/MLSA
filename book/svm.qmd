@@ -2,7 +2,7 @@
 abstract: This chapter introduces support vector machines (SVMs) for regression and then describes the extensions to survival analysis. Regression SVMs extend simple linear methods by estimating flexible, non-linear hyperplanes that minimise the difference between predictions and the truth for individual observations. In survival analysis, SVMs may make survival time or ranking predictions, however there is no current formulation for survival distribution predictions. The chapter begins by discussing survival time SVMs and then ranking models before concluding with a hybrid formulation that combines both model forms. This primarily covers the work of Shivaswamy and Van Belle. SVMs are a powerful method for estimating non-linear relationships in data and have proven to be well-performing models in regression and classification. However, SVMs are less developed in survival analysis and have been shown to perform worse than other models in experiments.
 ---
 
-{{< include _setup.qmd >}}
+{{< include _macros.tex >}}
 
 # Support Vector Machines {#sec-surv-ml-models-svm}
 
@@ -22,11 +22,11 @@ In reality, this room is actually three dimensional and has a third dimension (z
 
 ![Visualising a hyperplane by viewing a 3D room in two-dimensions with a wall that is now seen as a simple line. When standing in this room, the wall will clearly exist in three dimensional space.](Figures/svm/hyperplane.png){#fig-svm-hyper fig-alt="AI generated image of a birds-eye view of an office cut in half by a dividing wall." width=400}
 
-Continuing the linear regression example, consider a simple model where the objective is to find the $\dvec{\beta}{p}$ coefficients that minimize $\sum^n_{i=1} (g(\xx_i) - y_i)^2$ where $g(\xx_i) = \alpha + \xx_i^\trans\bb$ and $(\XX, \yy)$ is training data such that $\XX \in \Reals^{n \times p}$ and $\yy \in \Reals^n$.
+Continuing the linear regression example, consider a simple model where the objective is to find the $\dvec{\beta}{p}$ coefficients that minimize $\sum^n_{i=1} (g(\xx_i) - y_i)^2$ where $g(\xx_i) = \alpha + \xx_i^\trans\bsbeta$ and $(\XX, \yy)$ is training data such that $\XX \in \Reals^{n \times p}$ and $\yy \in \Reals^n$.
 In a higher-dimensional space, a penalty term can be added for variable selection to reduce model complexity, commonly of the form
 
 $$
-\frac{1}{2} \sum^n_{i=1} (g(\xx_i) - y_i)^2 + \frac{\lambda}{2} \|\bb\|^2
+\frac{1}{2} \sum^n_{i=1} (g(\xx_i) - y_i)^2 + \frac{\lambda}{2} \|\bsbeta\|^2
 $$
 
 for some penalty term $\lambda \in \Reals$.
@@ -39,7 +39,7 @@ Instead, SVMs use a regularized error function, which allows incorrect predictio
 
 $$
 \begin{aligned}
-& \min_{\bb,\alpha, \xixi', \xixi^*} \frac{1}{2} \|\bb\|^2 + C \sum^n_{i=1}(\xi'_i + \xi_i^*) \\
+& \min_{\bsbeta,\alpha, \bsxi', \bsxi^*} \frac{1}{2} \|\bsbeta\|^2 + C \sum^n_{i=1}(\xi'_i + \xi_i^*) \\
 & \textrm{subject to}
 \begin{dcases}
 g(\xx_i) & \geq y_i -\epsilon - \xi'_i \\
@@ -49,7 +49,7 @@ g(\xx_i) & \leq y_i + \epsilon + \xi_i^* \\
 \end{aligned}
 $$ {#eq-svm-opt}
 
-$\forall i\in 1,...,n$ where $g(\xx_i) = \alpha + \xx_i^\trans\bb$ for model weights $\bb \in \Reals^p$ and $\alpha \in \Reals$ and the same training data $(\XX, \yy)$ as above.
+$\forall i\in 1,...,n$ where $g(\xx_i) = \alpha + \xx_i^\trans\bsbeta$ for model weights $\bsbeta \in \Reals^p$ and $\alpha \in \Reals$ and the same training data $(\XX, \yy)$ as above.
 
 @fig-svm-regr visualizes a support vector regression model in two dimensions.
 The red circles are values within the $\epsilon$-tube and are thus considered to have a negligible error.
@@ -59,7 +59,7 @@ Points on or outside the epsilon tube are referred to as *support vectors* as th
 The $C \in \PReals$ hyperparameter controls the slack parameters and thus as $C$ increases, the number of errors (and subsequently support vectors) is allowed to increase resulting in low variance but higher bias, in contrast a lower $C$ is more likely to introduce overfitting with low bias but high variance [@Hastie2001].
 $C$ should be tuned to control this trade-off.
 
-![Visualising a support vector machine with an $\epsilon$-tube and slack parameters $\xixi'$ and $\xixi^*$. Red circles are values within the $\epsilon$-tube and blue diamonds are support vectors on and outside the tube. x-axis is single covariate, $x$, and y-axis is $g(x) = x\beta_1 + \alpha$.](Figures/svm/regression.png){#fig-svm-regr fig-alt="Line graph with g(x) on the y-axis and 'x' on the x-axis. A solid black line labelled 'y' runs along g(x)=x, i.e., from the bottom-left to the top-right of the graph. Parallel to this line, above and below, are two dotted lines labelled 'y+epsilon' and 'y-epsilon' respectively. These dotted lines form the boundaries of the epsilon-tube. Red dots lie between the dotted lines and blue diamonds are outside the lines. One blue dot above the top dotted line is labelled to reflect that it represents the distance xi* and one blue dot below the bottom line is the distance xi." width=500}
+![Visualising a support vector machine with an $\epsilon$-tube and slack parameters $\bsxi'$ and $\bsxi^*$. Red circles are values within the $\epsilon$-tube and blue diamonds are support vectors on and outside the tube. x-axis is single covariate, $x$, and y-axis is $g(x) = x\beta_1 + \alpha$.](Figures/svm/regression.png){#fig-svm-regr fig-alt="Line graph with g(x) on the y-axis and 'x' on the x-axis. A solid black line labelled 'y' runs along g(x)=x, i.e., from the bottom-left to the top-right of the graph. Parallel to this line, above and below, are two dotted lines labelled 'y+epsilon' and 'y-epsilon' respectively. These dotted lines form the boundaries of the epsilon-tube. Red dots lie between the dotted lines and blue diamonds are outside the lines. One blue dot above the top dotted line is labelled to reflect that it represents the distance xi* and one blue dot below the bottom line is the distance xi." width=500}
 
 The other core feature of SVMs is exploiting the *kernel trick*, which uses functions known as *kernels* to allow the model to learn a non-linear hyperplane whilst keeping the computations limited to lower-dimensional settings.
 Once the model coefficients have been estimated using the optimization above, predictions for a new observation $\xx^*$ can be made using a function of the form
@@ -78,7 +78,7 @@ The parameters $C$ and $\epsilon$ often have no clear apriori meaning (especiall
 
 Extending SVMs to the survival domain (SSVMs) is a case of: i) identifying the quantity to predict; and ii) updating the optimization problem (@eq-svm-opt) and prediction function (@eq-svm-pred) to accommodate for censoring.
 In the first case, SSVMs can be used to either make survival time or ranking predictions, which are discussed in turn.
-The notation above is reused below for SSVMs, with additional notation introduced when required and now using the survival training data $(\XX, \tt, \dd)$.
+The notation above is reused below for SSVMs, with additional notation introduced when required and now using the survival training data $(\XX, \tt, \bsdelta)$.
 
 ### Survival time SSVMs
 
@@ -86,7 +86,7 @@ To begin, consider the objective for support vector regression with the $y$ vari
 
 $$
 \begin{aligned}
-& \min_{\bb, \alpha, \xixi', \xixi^*} \frac{1}{2} \|\bb\|^2 + C \sum^n_{i=1}(\xi'_i + \xi_i^*) \\
+& \min_{\bsbeta, \alpha, \bsxi', \bsxi^*} \frac{1}{2} \|\bsbeta\|^2 + C \sum^n_{i=1}(\xi'_i + \xi_i^*) \\
 & \textrm{subject to}
 \begin{dcases}
 g(\xx_i) & \geq t_i -\epsilon - \xi'_i \\
@@ -117,7 +117,7 @@ Restricting the constraints in this way leads to the optimization problem [@Shiv
 
 $$
 \begin{aligned}
-& \min_{\bb, \alpha, \xixi', \xixi^*} \frac{1}{2}\|\bb\|^2 + C\Big(\sum_{i \in \calU} \xi_i + \sum_{i \in \calL} \xi_i^*\Big) \\
+& \min_{\bsbeta, \alpha, \bsxi', \bsxi^*} \frac{1}{2}\|\bsbeta\|^2 + C\Big(\sum_{i \in \calU} \xi_i + \sum_{i \in \calL} \xi_i^*\Big) \\
 & \textrm{subject to}
 \begin{dcases}
 g(\xx_i) & \geq t_i -\xi'_i, i \in \calL \\
@@ -134,7 +134,7 @@ The algorithm can be simplified to right-censoring only by removing the second c
 
 $$
 \begin{aligned}
-& \min_{\bb, \alpha, \xixi', \xixi^*} \frac{1}{2}\|\bb\|^2 + C \sum_{i = 1}^n (\xi'_i + \xi_i^*) \\
+& \min_{\bsbeta, \alpha, \bsxi', \bsxi^*} \frac{1}{2}\|\bsbeta\|^2 + C \sum_{i = 1}^n (\xi'_i + \xi_i^*) \\
 & \textrm{subject to}
 \begin{dcases}
 g(\xx_i) & \geq t_i - \xi^*_i \\
@@ -162,7 +162,7 @@ Using the prognostic index as a ranking prediction (@sec-surv-setmltask), a pair
 
 $$
 \begin{aligned}
-& \min_{\bb, \alpha, \xixi} \frac{1}{2}\|\bb\|^2 + \gamma\sum_{i =1}^n \xi_i \\
+& \min_{\bsbeta, \alpha, \bsxi} \frac{1}{2}\|\bsbeta\|^2 + \gamma\sum_{i =1}^n \xi_i \\
 & \textrm{subject to}
 \begin{dcases}
 g(\xx_i) - g(\xx_j) & \geq \xi_i, \forall i,j \in CP \\
@@ -186,7 +186,7 @@ Using this reduction, the algorithm becomes
 
 $$
 \begin{aligned}
-& \min_{\bb, \alpha, \xixi} \frac{1}{2}\|\bb\|^2 + \gamma\sum_{i =1}^n \xi_i \\
+& \min_{\bsbeta, \alpha, \bsxi} \frac{1}{2}\|\bsbeta\|^2 + \gamma\sum_{i =1}^n \xi_i \\
 & \textrm{subject to}
 \begin{dcases}
 g(\xx_i) - g(\xx_{j(i)}) & \geq t_i - t_{j(i)} - \xi_i \\
@@ -214,7 +214,7 @@ This results in the hybrid SSVM with constraints $\forall i = 1,...,n$:
 
 $$
 \begin{aligned}
-& \min_{\bb, \alpha, \xixi, \xixi', \xixi^*} \frac{1}{2}\|\bb\|^2 + \textcolor{CornflowerBlue}{\gamma\sum_{i =1}^n \xi_i} + \textcolor{Rhodamine}{C \sum^n_{i=1}(\xi_i' + \xi_i^*)} \\
+& \min_{\bsbeta, \alpha, \bsxi, \bsxi', \bsxi^*} \frac{1}{2}\|\bsbeta\|^2 + \textcolor{CornflowerBlue}{\gamma\sum_{i =1}^n \xi_i} + \textcolor{Rhodamine}{C \sum^n_{i=1}(\xi_i' + \xi_i^*)} \\
 & \textrm{subject to}
 \begin{dcases}
 \textcolor{CornflowerBlue}{g(\xx_i) - g(\xx_{j(i)})} & \textcolor{CornflowerBlue}{\geq t_i - t_{j(i)} - \xi_i} \\
