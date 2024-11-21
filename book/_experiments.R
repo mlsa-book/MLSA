@@ -97,3 +97,12 @@ g = ggplot(rbind(dcox, dran, drrt), aes(x = p, y = q, color = Group)) +
   inherit.aes = FALSE, hjust = "left", size = 2.5)
 ggsave("book/Figures/evaluation/calibD.png", g, height = 3, units = "in",
   dpi = 600)
+
+# Calibration point processes experiment
+set.seed(42)
+library(survival)
+
+event = rbinom(100, 1, 0.7)
+times = runif(100)
+H = survfit(Surv(times, event) ~ 1)$cumhaz
+c("Num deaths" = sum(event), "Sum H" = sum(H))
