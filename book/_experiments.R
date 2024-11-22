@@ -1,6 +1,7 @@
 ## Ranking
 library(dplyr)
 library(ggplot2)
+theme_set(theme_bw())
 library(mlr3)
 library(mlr3proba)
 
@@ -100,27 +101,48 @@ ggsave("book/Figures/evaluation/calibD.png", g, height = 3, units = "in",
 
 
 
-## Illustration different prediction types survival
+## Kaplan Meier
+library(survival)
+data("tumor", package = "pammtools")
 
+km = survfit(Surv(days, status)~1, data = tumor)
+bkm = broom::tidy(km)
 
-### time to event
+df_med = data.frame(
+  x = c(0, median(km)), # Starting x-coordinates
+  y = c(0.5, 0),        # Starting y-coordinates
+  xend = c(median(km), median(km)),    # Ending x-coordinates
+  yend = c(0.5, 0.5)       # Ending y-coordinates
+)
 
+p_km = ggplot(bkm, aes(x = time, y = estimate)) +
+  geom_step() +
+  geom_segment(data=df_med, aes(x=x, xend=xend, y=y, yend=yend), lty = 3)+
+  ylim(c(0, 1)) +
+  ylab("S(t)") +
+  xlab("time")
+p_km
+ggsave("Figures/survival/km-tumor.png", p_km, height=3, units="in", dpi=600)
 
-library(pammtools)
-library(flexsurv)
+# stratified KM wrt complications
+tumor = tumor |>
+  mutate(age_bin = factor(age < 50, levels = c(TRUE, FALSE), labels = c("age < 50", "age >= 50")))
+km_age_bin = survfit(Surv(days, status)~age_bin, data = tumor)
+bkm_age_bin = broom::tidy(km_age_bin)
+med_km_age_bin = as.numeric(median(km_age_bin))
+df_age_bin = data.frame(
+  x = c(0, med_km_age_bin[2]), # Starting x-coordinates
+  y = c(0.5, 0),        # Starting y-coordinates
+  xend = c(med_km_age_bin[2], med_km_age_bin[2]),    # Ending x-coordinates
+  yend = c(0.5, 0.5)       # Ending y-coordinates
+)
 
-tumor2 <- tumor
-tumor2 <- tumor2[tumor2$age <= 60, ]
-
-m1 <- flexsurvreg(Surv(days, status)~1, data = tumor, dist = "weibull")
-m2 <- flexsurvreg(Surv(days, status)~1, data = tumor2, dist = "weibull")
-summary(m1, type = "mean")
-summary(m2, type = "mean")
-layout(matrix(1:2, nrow = 1))
-plot(m1)
-plot(m2)
-
-curve(hlnorm(x, meanlog = 4, sdlog = 0.2), 0, 120)
-curve(hgengamma(x, mu = 60, sigma = 1, Q = .4), 0, 120)
-
-t <- rlnorm(100, meanlog = 4, sdlog = .2, Q = 3)
+p_km_age_bin = ggplot(bkm_age_bin, aes(x = time, y = estimate)) +
+  geom_step(aes(col = strata)) +
+  geom_segment(data=df_age_bin, aes(x=x, xend=xend, y=y, yend=yend), lty = 3)+
+  geom_hline(yintercept =  .5, lty = 3) +
+  ylim(c(0, 1)) +
+  ylab("S(t)") +
+  xlab("time")
+p_km_age_bin
+ggsave("Figures/survival/km-age-bin-tumor.png", p_km_age_bin, height=3, units="in", dpi=600)

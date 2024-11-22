@@ -8,21 +8,6 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _wip.qmd >}}
 
-___
-
-TODO
-
-
-___
-
-<!-- In their broadest and most basic definitions, survival analysis is the study of temporal data from a given origin until the occurrence of one or more events or 'end-points'  [@Collett2014], and machine learning is the study of models and algorithms that learn from data in order to make predictions or find patterns  [@Hastie2001]. Reducing either field to these definitions is ill-advised. -->
-<!--
-Survival analysis is concerned with time-to-event data, i.e. data where the outcome is a duration from some origin until the occurrence of one or multiple events of interest.
-In many medical settings, this duration will often be literal survival time, i.e. time until death after some procedure or treatment.
-When collecting such data, however, the outcome of interest can often be not observed (fully), e.g. because subjects drop out of the study, haven't experienced the event of interest until end of study period or due to the occurence of another, competing event.
-
-Often analysis of time-to-event data targets the estimation of the (improper) distribution of the event times or, equivalently, modelling the transitions between different states (e.g. alive -> dead) while taking into account censoring and truncation as well as other peculiarities of time-to-event data. However, the target of estimation can also be a relative risk score or the expected time-to-event (cf. @sec-surv-set-types for details).
- -->
 
 *Survival Analysis* is concerned with data where the outcome is the time until an event takes place (a 'time-to-event').
 Because the collection of such data takes place in the temporal domain (it takes time to observe a duration), the event of interest is often unobservable, for example because it did not occur by the end of the data collection period.
@@ -177,8 +162,25 @@ $$
 $$ {#eq-km}
 which is a step-function at the  observed ordered event times $t_{(k)}, k=1,\ldots,m$ with $\hat{S}_{KM}(\tau) = 1\ \forall \tau < t_{(1)}$.
 
+
+![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools]. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time).](Figures/survival/km-tumor.png){#fig-km-tumor fig-alt="Illustration of the Kaplan-Meier estimate of the survival probability for the tumor data set. Median survival time is indicated by dotted lines."}
+
+@fig-km-tumor shows the estimated survival probablity obtained by applying the Kaplan-Meier estimator to the `tumor` data. By definition, the survival function starts at $S(t)=1$ at $t=0$ and monotonically decreases towards $S(t)=0$ at $t\rightarrow \infty$. As in practice, the follow-up time is limited, many subjects have often not experienced the event of interest at the end of the follow-up. For non-parametric methods like the KM, therefore, the survival function usually does not reach $S(t)=0$. We then speak of an *improper* distribution in such cases. For the same reason, the expected value of the distribution, that is the expected survival time, can not be calculated. Sometimes the median survival time is used instead, defined as the time at which the survival function reaches $S(t) = 0.5$. In this example, the median survival time is approximately 1500 days, as indicated by the dashed lines. This means that 50% of the subjects are expected to have died within 1500 days after operation.
+
+Note, however, that the median survival time is not always defined. For example, consider @fig-km-tumor-age-bin. Here, the median surival time for subjects aged 50 or higher is approximately 1400 days, while the median survival time for subjects below 50 years of age doesn't exist, as the survival function is always above the 0.5 threshold, that is more than 50% of the subjects in the younger age group were still alive at the end of the follow-up.
+
+![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools] applied to subgroups of subjects of 50 or more years old and less than 50 years old, respectively. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time).](Figures/survival/km-age-bin-tumor.png){#fig-km-tumor-age-bin fig-alt="Illustration of the Kaplan-Meier estimate of the survival probability for the tumor data set, separately for two groups, patients below and above 50 years of age. Median survival time is indicated by dotted lines. Fot the younger age group, the line doesn't intersect with the survival curve."}
+
+
 Sometimes the KM Estimator is also used to estimate the distribution of censoring times, for example to calculate inverse probability of censoring weights (@sec-eval-crank-conc).
 Throughout this book, we denote the Kaplan-Meier estimator applied to the observed censoring times $(t_i, 1-\delta_i)$ as $\hat{G}_{KM}$.
+
+
+
+
+
+
+
 
 ## Types of Censoring
 
@@ -353,12 +355,8 @@ Following @Klein2003, we can define the likelihood contributions for the differe
 - right-censoring: $P(Y_i > t_i|\bstheta) = S_Y(t_i|\bstheta)$
 - left-censoring: $P(Y_i < t_i|\bstheta) = F_Y(t_i|\bstheta) = 1 - S_Y(t_i|\bstheta)$
 - interval-censoring: $P(l_i \leq Y_i < r_i|\bstheta) = S_Y(l_i|\bstheta) - S_Y(r_i|\bstheta)$:
-- left-truncation:
-  - $\delta_i = 1$: $P(Y_i = t_i|Y_i \geq t_i^L|\bstheta) = \frac{f_Y(t_i|\bstheta)}{S_Y(t_i^L|\bstheta)}$
-  - $\delta_i = 0$: $P(Y_i > t_i|Y_i \geq t_i^L|\bstheta) = \frac{S_Y(t_i|\bstheta)}{S_Y(t_i^L|\bstheta)}$
-- right-truncation:
-  - $\delta_i = 1$: $P(Y_i = t_i|Y_i \leq t_i^R|\bstheta) = \frac{f_Y(t_i|\bstheta)}{F_Y(t_i^R|\bstheta)}$
-  - $\delta_i = 0$: $P(Y_i \geq t_i|Y_i \leq t_i^R|\bstheta) = \frac{F_Y(t_i^R|\bstheta) - F_Y(t_i|\bstheta)}{F_Y(t_i^R|\bstheta)}$
+- left-truncation: $f(Y_i = t_i|Y_i \geq t_i^L, \bstheta) = \frac{f_Y(t_i|\bstheta)}{S_Y(t_i^L|\bstheta)}$
+- right-truncation: $f(Y_i = t_i|Y_i \leq t_i^R, \bstheta) = \frac{f_Y(t_i|\bstheta)}{F_Y(t_i^R|\bstheta)}$
 
 Let $\mathcal{O}$, $\mathcal{RC}$, $\mathcal{LC}$, $\mathcal{IC}$, $\mathcal{LT}$, $\mathcal{RT} \subset \mathcal{D}$ be subsets of the observed data for subjects with observed event times, right-censoring, left-censoring, interval-censoring, left-truncation and right-truncation, respectively.
 
