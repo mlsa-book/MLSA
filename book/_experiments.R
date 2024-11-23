@@ -104,6 +104,17 @@ ggsave("book/Figures/evaluation/calibD.png", g, height = 3, units = "in",
 ## Kaplan Meier
 library(survival)
 data("tumor", package = "pammtools")
+tumor <- cbind(id = seq_len(nrow(tumor)), tumor)
+tumor_duplicated = tumor |>
+  filter(days %in% days[duplicated(days)]) |>
+  arrange(days)
+
+## Table for illustration of right-censored data
+tab_surv_tumor = tumor_duplicated |>
+  filter(id %in% c(13, 62, 185, 230, 431, 719)) |>
+  select(id, age, sex, complications, days, status) |>
+  arrange(id)
+knitr::kable(tab_surv_tumor)
 
 km = survfit(Surv(days, status)~1, data = tumor)
 bkm = broom::tidy(km)

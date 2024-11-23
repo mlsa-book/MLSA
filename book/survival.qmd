@@ -80,7 +80,7 @@ Instead, the observable variables are defined by
 Together $(T,\Delta)$ is referred to as the *survival outcome* or *survival tuple* and they form the dependent variables.
 The survival outcome provides a concise mechanism for representing the outcome time and indicating which outcome (event or censoring) took place.
 
-A *survival dataset* is a $n \times p$ Real-valued matrix defined by $\calD = ((\xx_1 \ t_1 \ \delta_1) \cdots (\xx_n,t_n,\delta_n))^\trans$, where $(t_i,\delta_i)$ are realisations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i;1} \ x_{i;2} \cdots x_{i;p})^\trans$.
+A *survival dataset* is a $n \times p$ Real-valued matrix defined by $\calD = ((\xx_1, \ t_1, \ \delta_1) \cdots (\xx_n,t_n,\delta_n))^\trans$, where $(t_i,\delta_i)$ are realisations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i;1} \ x_{i;2} \cdots x_{i;p})^\trans$.
 
 Finally, the following quantities are used frequently throughout this book and survival analysis literature more generally.
 Let $(t_i, \delta_i) \iid (T,\Delta), i = 1,...,n$, be observed survival outcomes.
@@ -124,50 +124,48 @@ For truly continuous variables, one might expect only one event to occur at each
 In practice, ties are often observed due to finite measurement precision, such that $d_{\tau} > 1$ occurs frequently in real-world datasets.
 
 The quantities $\calR_\tau$, $n_\tau$, and $d_\tau$ underlie many models and measures in survival analysis.
-Several non-parametric and semi-parametric methods (@sec-models-classical) like the Kaplan-Meier estimator [@Kaplan1958] are based on the ratio $d_\tau / n_\tau$.
+Several non-parametric and semi-parametric methods (@sec-models-classical) like the Kaplan-Meier estimator (see @sec-surv-km) are based on the ratio $d_\tau / n_\tau$.
 
 
-@tbl-surv-data-rats exemplifies an observed survival dataset with a modified version of the `rats` data  [@pkgsurvival], which contains the time until occurence of a tumor ($\delta_i=1$ if a tumor occured at the outcome time $t_i$ and $\delta_i = 0$ otherwise).
+@tbl-surv-data-tumor exemplifies an observed survival dataset, a subset of the `tumor` data  [@pkgpammtools], which contains the time until death in days after operation ($\delta_i=1$ if death occured at the outcome time $t_i$ and $\delta_i = 0$ otherwise).
 In this example, the above quantities would be:
 
-* $\calU_0 = \{49, 91, 101, 102, 104\}$: with $104$ included only once
-* $\calU_D = \{49, 102, 104\}$: with the inclusion of $104$ due to the event at $t_5$, not censoring at $t_3$
-* $\calR_{\tau = 102} = \{3, 5, 6\}$ (these rats' outcome times are greater or equal to $\tau = 102$ so they are at risk for the event at this time)
-* $n_{\tau = 102} = |\calR_{102}| = 3$
-* $d_{\tau = 104} = 1$: As only $i = 5$ experienced the event (and not censoring) at this time.
+* $\calU_0 = \{268, 397, 519, 1217, 2414\}$: with $1217$ included only once
+* $\calU_D = \{268, 397, 1217\}$: with the inclusion of $1217$ due to the event at $t_1$, not censoring at $t_5$
+* $\calR_{\tau = 1217} = \{1, 3, 5\}$ (these subjects' outcome times are greater or equal to $\tau = 1217$ so they are at risk for the event at this time)
+* $n_{\tau = 1217} = |\calR_{1217}| = 3$
+* $d_{\tau = 1217} = 1$: As only $i = 1$ experienced the event (and not censoring) at this time.
 
-| **ID** ($i$) | **litter** $(\xx_{;1})$ | **rx** $(\xx_{;2})$ | **sexF** $(\xx_{;3})$ | **time** ($\tt$) | **status** ($\dd$) |
-| -- | -- | -- | --- | -- | --|
-| 1 | 1 | 1 | 1 | 101 | 0 |
-| 2 | 1 | 0 | 1 | 49 | 1 |
-| 3 | 1 | 0 | 1 | 104 | 0 |
-| 4 | 2 | 1 | 0 | 91 | 0 |
-| 5 | 2 | 0 | 0 | 104 | 1 |
-| 6 | 2 | 0 | 0 | 102 | 1 |
+| **id** ($i$) | **age** $(\xx_{;1})$ | **sex** $(\xx_{;2})$ | **complications** $(\xx_{;3})$ | **days** ($\tt$) | **status** ($\dd$) |
+|---:|---:|:------|:-------------|----:|------:|
+|  1|  71|female |no            | 1217|      1|
+|  2|  70|male   |no            |  519|      0|
+|  3|  67|female |yes           | 2414|      0|
+|  4|  58|male   |no            |  397|      1|
+|  5|  39|female |yes           | 1217|      0|
+|  6|  59|female |no            |  268|      1|
 
-: Subset of the `rats`  [@pkgsurvival] time-to-event dataset.
-Rows are individual observations (ID), $\xx_{;j}$ columns are features, $t$ is observed time-to-event, $\delta$ is the event indicator. {#tbl-surv-data-rats}
+: Subset of the `tumor`  [@pkgpammtools] time-to-event dataset.
+Rows are individual observations (ID), $\xx_{;j}$ columns are features, $t$ is observed time-to-event, $\delta$ is the event indicator. {#tbl-surv-data-tumor}
 
 
 ## Kaplan-Meier estimator {#sec-surv-km}
-
-Tthe Kaplan-Meier Estimator is a non-parametric method to estimate the survival function (@eq-surv-haz).
+Before we go further, we introduce a simple, non-parametric estimator for the survival function (@eq-surv-haz), the Kaplan-Meier estimator [@Kaplan1958].
 The estimator is useful for visualising survival data and is a popular baseline model to compare to the predictive performance of more complex methods.
 In machine learning terms it can be viewed as a "featureless" learner for survival analysis.
 
-Using the quantities just introduced, the estimator is simply defined by:
+Using the quantities introduced in @sec-data-rc, the estimator is defined by:
 
 $$
 \KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{t_{(k)}}}{n_{t_{(k)}}}\right)
 $$ {#eq-km}
-which is a step-function at the  observed ordered event times $t_{(k)}, k=1,\ldots,m$ with $\hat{S}_{KM}(\tau) = 1\ \forall \tau < t_{(1)}$.
+which is a step-function at the  observed ordered event times $t_{(k)}, k=1,\ldots,m$ with $\hat{S}_{KM}(\tau) = 1\ \forall \tau < t_{(1)}$. It is usually estimated for all unique event times.
 
+For illustration, @fig-km-tumor shows the estimated survival probablity obtained by applying the Kaplan-Meier estimator to the full `tumor` data, containing observations of $n=776$ subjects. By definition, the survival function starts at $S(t)=1$ at $t=0$ and monotonically decreases towards $S(t)=0$ for $t\rightarrow \infty$. Dotted lines indicated the median survival, defined as the time at which the survival function reaches $S(t) = 0.5$. In this example, the median survival time is approximately 1500 days, as indicated by the dashed lines. This means that 50% of the subjects are expected die within 1500 days after operation.
 
 ![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools]. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time).](Figures/survival/km-tumor.png){#fig-km-tumor fig-alt="Illustration of the Kaplan-Meier estimate of the survival probability for the tumor data set. Median survival time is indicated by dotted lines."}
 
-@fig-km-tumor shows the estimated survival probablity obtained by applying the Kaplan-Meier estimator to the `tumor` data. By definition, the survival function starts at $S(t)=1$ at $t=0$ and monotonically decreases towards $S(t)=0$ at $t\rightarrow \infty$. As in practice, the follow-up time is limited, many subjects have often not experienced the event of interest at the end of the follow-up. For non-parametric methods like the KM, therefore, the survival function usually does not reach $S(t)=0$. We then speak of an *improper* distribution in such cases. For the same reason, the expected value of the distribution, that is the expected survival time, can not be calculated. Sometimes the median survival time is used instead, defined as the time at which the survival function reaches $S(t) = 0.5$. In this example, the median survival time is approximately 1500 days, as indicated by the dashed lines. This means that 50% of the subjects are expected to have died within 1500 days after operation.
-
-Note, however, that the median survival time is not always defined. For example, consider @fig-km-tumor-age-bin. Here, the median surival time for subjects aged 50 or higher is approximately 1400 days, while the median survival time for subjects below 50 years of age doesn't exist, as the survival function is always above the 0.5 threshold, that is more than 50% of the subjects in the younger age group were still alive at the end of the follow-up.
+While the Kaplan-Meier estimator does not directly support estimation of covariate effects on the estimated survival probabilities, it is often used for descriptive analysis by applying the estimator to different subgroups (refered to as stratification in survival analysis). For example, @fig-km-tumor-age-bin shows $\hat{S}_{KM}$ separately for subjects aged 50 years or older and subjects younger than 50 years, respectively. Dashed lines again illustrate median survival times. However, note that the median survival time does not exist for the younger age group, as their estimated survival function does not cross $0.5$.
 
 ![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools] applied to subgroups of subjects of 50 or more years old and less than 50 years old, respectively. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time).](Figures/survival/km-age-bin-tumor.png){#fig-km-tumor-age-bin fig-alt="Illustration of the Kaplan-Meier estimate of the survival probability for the tumor data set, separately for two groups, patients below and above 50 years of age. Median survival time is indicated by dotted lines. Fot the younger age group, the line doesn't intersect with the survival curve."}
 
