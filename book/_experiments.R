@@ -133,7 +133,7 @@ p_km = ggplot(bkm, aes(x = time, y = estimate)) +
   ylab("S(t)") +
   xlab("time")
 p_km
-ggsave("Figures/survival/km-tumor.png", p_km, height=3, units="in", dpi=600)
+ggsave("book/Figures/survival/km-tumor.png", p_km, height=3, units="in", dpi=600)
 
 # stratified KM wrt complications
 tumor = tumor |>
@@ -156,4 +156,42 @@ p_km_age_bin = ggplot(bkm_age_bin, aes(x = time, y = estimate)) +
   ylab("S(t)") +
   xlab("time")
 p_km_age_bin
-ggsave("Figures/survival/km-age-bin-tumor.png", p_km_age_bin, height=3, units="in", dpi=600)
+ggsave("book/Figures/survival/km-age-bin-tumor.png", p_km_age_bin, height=3, units="in", dpi=600)
+
+
+
+
+## Left-truncation
+data("infants", package = "eha")
+
+# KM for infants with dead/alive mothers
+km_infants = survfit(Surv(exit, event)~mother, data = infants)
+bkm_infants = broom::tidy(km_infants)
+
+p_km_infants = ggplot(bkm_infants, aes(x = time, y = estimate)) +
+  geom_step(aes(col = strata)) +
+  ylim(c(0, 1)) +
+  ylab("S(t)") +
+  xlab("time")
+# adjusted for left-truncation
+km_infants_lt = survfit(Surv(enter, exit, event)~mother, data = infants)
+bkm_infants_lt = broom::tidy(km_infants_lt)
+
+p_km_infants_lt = ggplot(bkm_infants_lt, aes(x = time, y = estimate)) +
+  geom_step(aes(col = strata)) +
+  ylim(c(0, 1)) +
+  ylab("S(t)") +
+  xlab("time")
+library(patchwork)
+
+p_km_infants_joined = p_km_infants + p_km_infants_lt + plot_layout(guides =  "collect")
+ggsave("book/Figures/survival/km-infants.png", p_km_infants_joined, height=3, width=7, units="in", dpi=600)
+
+
+## table infant data
+
+inf_sub = infants |>
+  filter(stratum %in% c(1, 2, 4)) |>
+  select(stratum, enter, exit, event, mother)
+
+inf_sub |> knitr::kable()
