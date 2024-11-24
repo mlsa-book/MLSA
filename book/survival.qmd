@@ -356,7 +356,7 @@ Rows are individual observations (id), `group` indicates matched infants, $t^L$ 
 Now recall the calculation of the Kaplan-Meier estimate from @sec-surv-km.
 In @tbl-surv-data-infants, without stratifying according to mother's status, the first observed event time is $t_{(1)} = t_7=16$. Then ignoring left-truncation,
 
-* $\calR(t_{(1)}) = \{1,2,3,4,5,6,7,8,9\}$
+* $\calR_{t_{(1)}} = \{1,2,3,4,5,6,7,8,9\}$
 * $d_{t_{(1)}} = 1$
 * $n_{t_{(1)}} = 9$
 * $S(t_{(1)}) = 1 - \frac{1}{9} \approx 0.9$
@@ -364,10 +364,13 @@ In @tbl-surv-data-infants, without stratifying according to mother's status, the
 
 In contrast, when we take left-truncation into account, subjects only enter the risk set for the event after their left-truncation time (we already know they survived until $t_i^L$ so they are not at risk for the event before that time), thus
 
-* $\calR(t_{(1)}) = \{4, 5, 6, 7, 8, 9\}$
+* $\calR_{t_{(1)}} = \{4, 5, 6, 7, 8, 9\}$
 * $d_{t_{(1)}} = 1$
 * $n_{t_{(1)}} = 6$
 * $S(t_{(1)}) = 1 - \frac{1}{6} \approx 0.8$
+
+Thus, the definition of the KM estimator in @eq-km can still be used in case of left-truncation using the more general risk set definition $\calR_\tau = \{i: t_i^L \ \geq \tau wedge t_i \geq \tau\}$
+
 
 
 
@@ -391,30 +394,76 @@ Overall this leads to a bias towards shorter incubation times and potentially fe
 ![Illustration of right-truncation based on registry data. For subjects 1 and 3 the right-truncation time is longer than the incubation period, therefore they are included in the sample when the registry is querried. For subject 2 on the other hand the right-truncation time is shorter, therefore it's excluded from the sample.](Figures/survival/right-truncation.png){#fig-right-truncation fig-alt="Schematic illustration of right-truncation."}
 
 
-## Objective functions  {#sec-surv-obj}
+As for left-truncation, ingoring right-truncation will lead to biased estimations.
+While for left-truncated data simple adjustments of the risk-set work for non- and semi-parametric methods like the Kaplan-Meier and Cox-type estimators, this is not the case for right-truncated data.
+However, parametric methods can be employed (see @sec-surv-obj) and generalised product limit estimators for right-truncated data exist [@akritasGeneralizedProductlimitEstimator2005].
 
-This section describes how the likelihood is constructed for observations subject to different types of censoring and truncation.
-For machine learning survival analysis this can be used to construct the objective (or loss) function for any survival task.
-Here we assume, that the distribution of event times depends on some parameter vector $\bstheta$.
-Following @Klein2003, we can define the likelihood contributions for the different censoring and truncation schemes via the probability of observing the specific outcome:
 
-- observed time to event at $t_i$: $P(Y_i = t_i|\bstheta) = f_y(t_i|\bstheta)$
+## Estimation  {#sec-surv-obj}
+
+While details about estimation will be given later, when different models are introduced in Part III of the book, it is worthwile discussing some general concepts here, namely parametric and non-parametric approaches.
+
+
+### Parametric estimation
+Consider for now uncensored data $(t_i, \delta_i=1), i=1,\ldots,n$.
+A standard approach would be to assume a suitable distribution for the event times $t_i \stackrel{iid}{\sim} F_Y(\boldsymbol{\theta}), \bstheta=(\theta_1,\theta_2,\ldots)^\top$, and define the likelihood of the data as
+<!--  -->
+$$\calL(\bstheta) = \prod_{i=1}^{n}f_Y(t_i|\bstheta),$${#eq-likelihood}
+<!--  -->
+where $f_Y$ is the pdf of $F_Y$.
+
+The model parameters can then be obtained by maximizing the likelhood such that
+
+$$\hat{\bstheta} = \argmax_\bstheta \calL(\bstheta).$$
+
+
+
+However, in the presence of censoring @eq-likelihood is incorrect, as the exact event time is only known for some subjects.
+For example, for right-censored data ($\delta_i = 0$) we only know that the event occured after observed censoring time $t_i$.
+Thus the likelihood contribution for such data points is $P(Y_i > t_i) = S_Y(t_i)$, whereas for observed event times ($\delta_i=0$) the likelihood contribution is $f_Y(t_i)$ as before.
+
+Let now $\calO = \{i:\delta_i = 1\}$ the index set of observed event times and $\mathcal{RC} = \{i:\delta_i = 0\}$ the index set of censored observations. The likelihood of this data can be written as
+
+$$\begin{align}\calL(\bstheta)
+  & \propto \prod_{i \in \calO}f_Y(t_i|\bstheta)\prod_{i \in \mathcal{RC}}S_Y(t_i|\bstheta)\nonumber\\
+  & = \prod_{i=1}^n f_y(t_i|\bstheta)^{\delta_i}S_Y(t_i|\bstheta)^{1-\delta_i}\\
+  & = \prod_{i=1}^n h_Y(t_i|\bstheta)^{\delta_i}S_Y(t_i|\bstheta)\nonumber,
+\end{align}$$ {#eq-right-censoring-likelihood}
+
+where the last equality follows from @eq-continuous-hazard.
+
+Similar adjustments to the likelihood can be made for other types of censoring and in the presence of truncation.
+Following @Klein2003, we can define the individual likelihood contributions for the different types of censoring as
+
+- observed event at $t_i$: $f_y(t_i|\bstheta)$
 - right-censoring: $P(Y_i > t_i|\bstheta) = S_Y(t_i|\bstheta)$
 - left-censoring: $P(Y_i < t_i|\bstheta) = F_Y(t_i|\bstheta) = 1 - S_Y(t_i|\bstheta)$
-- interval-censoring: $P(l_i \leq Y_i < r_i|\bstheta) = S_Y(l_i|\bstheta) - S_Y(r_i|\bstheta)$:
-- left-truncation: $f(Y_i = t_i|Y_i \geq t_i^L, \bstheta) = \frac{f_Y(t_i|\bstheta)}{S_Y(t_i^L|\bstheta)}$
-- right-truncation: $f(Y_i = t_i|Y_i \leq t_i^R, \bstheta) = \frac{f_Y(t_i|\bstheta)}{F_Y(t_i^R|\bstheta)}$
+- interval-censoring: $P(l_i < Y_i \leq r_i|\bstheta) = S_Y(l_i|\bstheta) - S_Y(r_i|\bstheta)$
 
-Let $\mathcal{O}$, $\mathcal{RC}$, $\mathcal{LC}$, $\mathcal{IC}$, $\mathcal{LT}$, $\mathcal{RT} \subset \mathcal{D}$ be subsets of the observed data for subjects with observed event times, right-censoring, left-censoring, interval-censoring, left-truncation and right-truncation, respectively.
 
-Then, assuming independence between observations, the objective function for the observed data can be defined as
+Depending on which of the above contributions occur in the data set, we can now construct our likelihood accordingly.
+Let $\mathcal{O}, \mathcal{RC}, \mathcal{LC}, \mathcal{IC}$ non-overlapping subsets of the observed data $\mathcal{D}$ for subjects with observed event times, right-censoring, left-censoring and interval-censoring, respectively.
+Assuming independence between observations and in absense of truncation, the likelihood for the observed data can be defined as
 
-$$\mathcal{L}(\bstheta) \propto \prod_{i \in \mathcal{O}}f_Y(t_i|\bstheta) \prod_{i \in \mathcal{RC}}S_Y(t_i|\bstheta) \prod_{i \in \mathcal{LC}}(1-S_Y(t_i|\bstheta))\cdots$$ {#eq-objective-function}
+$$\mathcal{L}(\bstheta) \propto \prod_{i \in \mathcal{O}}f_Y(t_i|\bstheta) \prod_{i \in \mathcal{RC}}S_Y(t_i|\bstheta) \prod_{i \in \mathcal{LC}}(1-S_Y(t_i|\bstheta))\prod_{i \in \mathcal{IC}}(S_Y(l_i|\bstheta)-S_Y(r_i|\bstheta))$$ {#eq-objective-function}
 
-Note that in in practice, data sets will often only contain one type of censoring or truncation, if any, in which case @eq-objective-function will contain only a few product terms.
-For the standard setting with right-censored data this will for example reduce to the familiar form
 
-$$\mathcal{L}(\bstheta) \propto \prod_{i \in \mathcal{O}}f_Y(t_i|\bstheta) \prod_{i \in \mathcal{RC}}S_Y(t_i|\bstheta) = \prod_{i=1}^{n}f_Y(t_i|\bstheta)^{\delta_i}S_Y(t_i|\bstheta)^{1-\delta_i}$$
+In case of truncation, the adjustments are made to all observations, as we have to condition on the event occuring after/before the truncation time. The truncation adjusted likelihood contributions (assuming independence of truncation and event/censoring times) would thus be given by
+
+* left-truncation:
+
+  * event: $f(Y_i = t_i|Y_i \geq t_i^L, \bstheta) = \frac{f_Y(t_i|\bstheta)}{S_Y(t_i^L|\bstheta)}$
+  * left-censoring: $P(Y_i < t_i|Y_i \geq t_i^L \bstheta) = \frac{S_Y(t_i|\bstheta)}{S_Y(t_i^L|\bstheta)}$
+  * interval-censoring: $P(l_i < Y_i \leq r_i|Y_i \geq t_i^L,\bstheta) = \frac{S_Y(l_i|\bstheta) - S_Y(r_i|\bstheta)}{S_Y(t_i^L|\bstheta)}$
+
+* right-truncation:
+
+  * event: $f(Y_i = t_i|Y_i \leq t_i^R, \bstheta) = \frac{f_Y(t_i|\bstheta)}{F_Y(t_i^R|\bstheta)}$
+  * left-censoring: $P(Y_i < t_i|Y_i \leq t_i^R \bstheta) = \frac{S_Y(t_i|\bstheta)}{F_Y(t_i^R|\bstheta)}$
+  * interval-censoring: $P(l_i < Y_i \leq r_i|Y_i \leq t_i^R,\bstheta) = \frac{S_Y(l_i|\bstheta) - S_Y(r_i|\bstheta)}{F_Y(t_i^R|\bstheta)}$
+
+
+Note that in in practice, data sets will often not contain all types of censoring or truncation, in which case @eq-objective-function will contain only a subset of the product terms. This has been illustrated in @eq-right-censoring-likelihood under absence of truncation and $\mathcal{LC}=\mathcal{IC}=\emptyset$.
 
 
 
