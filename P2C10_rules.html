@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.57">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Raphael Sonabend and Andreas Bender">
+
+<title>10&nbsp; Evaluating Distributions by Scoring Rules – Machine Learning in Survival Analysis</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./P2C11_time.html" rel="next">
+<link href="./P2C9_calib.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-sidebar floating">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./P2C7_what.html">Evaluation</a></li><li class="breadcrumb-item"><a href="./P2C10_rules.html"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Evaluating Distributions by Scoring Rules</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">Machine Learning in Survival Analysis</a> 
+        <div class="sidebar-tools-main tools-wide">
+    <a href="https://github.com/mlsa-book/MLSA/tree/main/book/" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+    <a href="./Machine-Learning-in-Survival-Analysis.pdf" title="Download PDF" class="quarto-navigation-tool px-1" aria-label="Download PDF"><i class="bi bi-file-pdf"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P0C0_notation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Symbols and Notation</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P0C1_intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Introduction</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false">
+ <span class="menu-text">Survival Analysis and Machine Learning</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P1C2_preview.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">MLSA From Start to Finish</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P1C3_machinelearning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Machine Learning</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P1C4_survival.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Survival Analysis</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P1C5_eha.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Event-history Analysis</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P1C6_survtsk.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Survival Task</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true">
+ <span class="menu-text">Evaluation</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P2C7_what.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">What are Survival Measures?</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P2C8_rank.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Discrimination Measures</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P2C9_calib.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Calibration Measures</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P2C10_rules.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Evaluating Distributions by Scoring Rules</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P2C11_time.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Evaluating Survival Time</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P2C12_choosing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Choosing Measures</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false">
+ <span class="menu-text">Models</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C13_classical.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Classical Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C14_forests.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Random Forests</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C15_svm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Support Vector Machines</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C16_boosting.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">16</span>&nbsp; <span class="chapter-title">Boosting Methods</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C17_neural.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">17</span>&nbsp; <span class="chapter-title">Neural Networks</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C18_choosing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">18</span>&nbsp; <span class="chapter-title">Choosing Models</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="false">
+ <span class="menu-text">Reduction Techniques</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P4C19_reductions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">19</span>&nbsp; <span class="chapter-title">Reductions</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P4C20_competing.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">20</span>&nbsp; <span class="chapter-title">Competing Risks Pipelines</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P4C21_discrete.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">21</span>&nbsp; <span class="chapter-title">Discrete Time Survival Analysis</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P4C22_poisson.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">22</span>&nbsp; <span class="chapter-title">Connections to Poisson Regression and Processes</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P4C23_pseudo.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">23</span>&nbsp; <span class="chapter-title">Connections to Regression and Imputation</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P5C24_conclusions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">24</span>&nbsp; <span class="chapter-title">Conclusions</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P5C25_exercises.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Exercises</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P5C26_references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#classification-losses" id="toc-classification-losses" class="nav-link active" data-scroll-target="#classification-losses"><span class="header-section-number">10.1</span> Classification Losses</a></li>
+  <li><a href="#sec-eval-distr-commonsurv" id="toc-sec-eval-distr-commonsurv" class="nav-link" data-scroll-target="#sec-eval-distr-commonsurv"><span class="header-section-number">10.2</span> Survival Losses</a>
+  <ul class="collapse">
+  <li><a href="#integrated-graf-score" id="toc-integrated-graf-score" class="nav-link" data-scroll-target="#integrated-graf-score"><span class="header-section-number">10.2.1</span> Integrated Graf Score</a></li>
+  <li><a href="#integrated-survival-log-loss" id="toc-integrated-survival-log-loss" class="nav-link" data-scroll-target="#integrated-survival-log-loss"><span class="header-section-number">10.2.2</span> Integrated Survival Log Loss</a></li>
+  <li><a href="#survival-density-log-loss" id="toc-survival-density-log-loss" class="nav-link" data-scroll-target="#survival-density-log-loss"><span class="header-section-number">10.2.3</span> Survival density log loss</a></li>
+  <li><a href="#right-censored-log-loss" id="toc-right-censored-log-loss" class="nav-link" data-scroll-target="#right-censored-log-loss"><span class="header-section-number">10.2.4</span> Right-censored log loss</a></li>
+  <li><a href="#absolute-survival-loss" id="toc-absolute-survival-loss" class="nav-link" data-scroll-target="#absolute-survival-loss"><span class="header-section-number">10.2.5</span> Absolute Survival Loss</a></li>
+  </ul></li>
+  <li><a href="#sec-pecs" id="toc-sec-pecs" class="nav-link" data-scroll-target="#sec-pecs"><span class="header-section-number">10.3</span> Prediction Error Curves</a></li>
+  <li><a href="#sec-eval-distr-score-base" id="toc-sec-eval-distr-score-base" class="nav-link" data-scroll-target="#sec-eval-distr-score-base"><span class="header-section-number">10.4</span> Baselines and ERV</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion"><span class="header-section-number">10.5</span> Conclusion</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/mlsa-book/MLSA/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li><li><a href="https://github.com/mlsa-book/MLSA/edit/main/book/P2C10_rules.qmd" class="toc-action"><i class="bi empty"></i>Edit this page</a></li><li><a href="https://github.com/mlsa-book/MLSA/blob/main/book/P2C10_rules.qmd" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./P2C7_what.html">Evaluation</a></li><li class="breadcrumb-item"><a href="./P2C10_rules.html"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Evaluating Distributions by Scoring Rules</span></a></li></ol></nav>
+<div class="quarto-title">
+<h1 class="title"><span id="sec-eval-distr" class="quarto-section-identifier"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Evaluating Distributions by Scoring Rules</span></span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+<div>
+  <div class="abstract">
+    <div class="block-title">Abstract</div>
+    TODO (150-200 WORDS)
+  </div>
+</div>
+
+
+</header>
+
+
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Minor changes expected!
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>This page is a work in progress and minor changes will be made over time.</strong></p>
+</div>
+</div>
+<p>Scoring rules evaluate probabilistic predictions and (attempt to) measure the overall predictive ability of a model in terms of both calibration and discrimination <span class="citation" data-cites="Gneiting2007 Murphy1973">(<a href="P5C26_references.html#ref-Gneiting2007" role="doc-biblioref">Gneiting and Raftery 2007</a>; <a href="P5C26_references.html#ref-Murphy1973" role="doc-biblioref">Murphy 1973</a>)</span>. In contrast to calibration measures, which assess the average performance across all observations on a population level, scoring rules evaluate the sample mean of individual predictions across all observations in a test set. As well as being able to provide information at an individual level, scoring rules are also popular as probabilistic forecasts are widely recognised to be superior to deterministic predictions for capturing uncertainty in predictions <span class="citation" data-cites="Dawid1984 Dawid1986">(<a href="P5C26_references.html#ref-Dawid1984" role="doc-biblioref">A. P. Dawid 1984</a>; <a href="P5C26_references.html#ref-Dawid1986" role="doc-biblioref">A. Philip Dawid 1986</a>)</span>. Formalisation and development of scoring rules has primarily been due to Dawid <span class="citation" data-cites="Dawid1984 Dawid1986 Dawid2014">(<a href="P5C26_references.html#ref-Dawid1984" role="doc-biblioref">A. P. Dawid 1984</a>; <a href="P5C26_references.html#ref-Dawid1986" role="doc-biblioref">A. Philip Dawid 1986</a>; <a href="P5C26_references.html#ref-Dawid2014" role="doc-biblioref">A. Philip Dawid and Musio 2014</a>)</span> and Gneiting and Raftery <span class="citation" data-cites="Gneiting2007">(<a href="P5C26_references.html#ref-Gneiting2007" role="doc-biblioref">Gneiting and Raftery 2007</a>)</span>; though the earliest measures promoting “rational” and “honest” decision making date back to the 1950s <span class="citation" data-cites="Brier1950 Good1952">(<a href="P5C26_references.html#ref-Brier1950" role="doc-biblioref">Brier 1950</a>; <a href="P5C26_references.html#ref-Good1952" role="doc-biblioref">Good 1952</a>)</span>. Few scoring rules have been proposed in survival analysis, although the past few years have seen an increase in popularity in these measures. Before delving into these measures, we will first describe scoring rules in the simpler classification setting.</p>
+<p>Scoring rules are pointwise losses, which means a loss is calculated for all observations and the sample mean is taken as the final score. To simplify notation, we only discuss scoring rules in the context of a single observation where <span class="math inline">\(L_i(\hat{S}_i, t_i, \delta_i)\)</span> would be the loss calculated for some observation <span class="math inline">\(i\)</span> where <span class="math inline">\(\hat{S}_i\)</span> is the predicted survival function (from which other distribution functions can be derived), and <span class="math inline">\((t_i, \delta_i)\)</span> is the observed survival outcome.</p>
+<section id="classification-losses" class="level2" data-number="10.1">
+<h2 data-number="10.1" class="anchored" data-anchor-id="classification-losses"><span class="header-section-number">10.1</span> Classification Losses</h2>
+<p>In the simplest terms, a scoring rule compares two values and assigns them a score (hence ‘scoring rule’), formally we’d write <span class="math inline">\(L: \mathbb{R}\times \mathbb{R}\mapsto \bar{\mathbb{R}}\)</span>. In machine learning, this usually means comparing a prediction for an observation to the ground truth, so <span class="math inline">\(L: \mathbb{R}\times \mathcal{P}\mapsto \bar{\mathbb{R}}\)</span> where <span class="math inline">\(\mathcal{P}\)</span> is a set of distributions. Crucially, scoring rules usually refer to comparisons of true and predicted <em>distributions</em>. As an example, take the Brier score <span class="citation" data-cites="Brier1950">(<a href="P5C26_references.html#ref-Brier1950" role="doc-biblioref">Brier 1950</a>)</span> defined by: <span class="math display">\[L_{Brier}(\hat{p}_i, y_i) = (y_i - \hat{p}_i(y_i))^2\]</span></p>
+<p>This scoring rule compares the ground truth to the predicted probability distribution by testing if the difference between the observed event and the truth is minimized. This is intuitive as if the event occurs and <span class="math inline">\(y_i = 1\)</span>, then <span class="math inline">\(\hat{p}_i(y_i)\)</span> should be as close to one as possible to minimize the loss. On the other hand, if <span class="math inline">\(y_i = 0\)</span> then the better prediction would be <span class="math inline">\(\hat{p}_i(y_i) = 0\)</span>.</p>
+<p>This demonstrates an important property of the scoring rule, <em>properness</em>. A loss is <em>proper</em>, if it is minimized by the correct prediction. In contrast, the loss <span class="math inline">\(L_{improper}(\hat{p}_i, y_i) = 1 - L_{Brier}(\hat{p}_i, y_i)\)</span> is still a scoring rule as it compares the ground truth to the prediction probability distribution, but it is clearly improper as the perfect prediction (<span class="math inline">\(\hat{p}_i(y_i) = y_i\)</span>) would result in a score of <span class="math inline">\(1\)</span> whereas the worst prediction would result in a score or <span class="math inline">\(0\)</span>. Proper losses provide a method of model comparison as, by definition, predictions closest to the true distribution will result in lower expected losses.</p>
+<p>Another important property is <em>strict</em> properness. A loss is <em>strictly proper</em> if the loss is uniquely minimized by the ‘correct’ prediction. Consider now the loss <span class="math inline">\(L_0(\hat{p}_i, y_i) = 0\)</span>. Not only is this a strictly proper scoring rule but it is also proper. The loss can only take the value <span class="math inline">\(0\)</span> and is therefore guaranteed to be minimized by the correct prediction. It is clear however that this loss is useless. In contrast, the Brier score is minimized by only one value, which is the optimal prediction (<a href="#fig-eval-brierlog" class="quarto-xref">Figure&nbsp;<span>10.1</span></a>). Strictly proper losses are particular important for automated model optimisation, as minimization of the loss will result in the ‘optimum score estimator based on the scoring rule’ <span class="citation" data-cites="Gneiting2007">(<a href="P5C26_references.html#ref-Gneiting2007" role="doc-biblioref">Gneiting and Raftery 2007</a>)</span>.</p>
+<p>Mathematically, a classification loss <span class="math inline">\(L: \mathcal{P}\times \mathcal{Y}\rightarrow \bar{\mathbb{R}}\)</span> is <em>proper</em> if for any distributions <span class="math inline">\(p_Y,p\)</span> in <span class="math inline">\(\mathcal{P}\)</span> and for any random variables <span class="math inline">\(Y \sim p_Y\)</span>, it holds that <span class="math inline">\(\mathbb{E}[L(p_Y, Y)] \leq \mathbb{E}[L(p, Y)]\)</span>. The loss is <em>strictly proper</em> if, in addition, <span class="math inline">\(p = p_Y\)</span> uniquely minimizes the loss.</p>
+<p>As well as the Brier score, which was defined above, another widely used loss is the log loss <span class="citation" data-cites="Good1952">(<a href="P5C26_references.html#ref-Good1952" role="doc-biblioref">Good 1952</a>)</span>, defined by</p>
+<p><span class="math display">\[
+L_{logloss}(\hat{p}_i, y_i) = -\log \hat{p}_i(y_i)
+\]</span></p>
+<p>These losses are visualised in <a href="#fig-eval-brierlog" class="quarto-xref">Figure&nbsp;<span>10.1</span></a>, which highlights that both losses are strictly proper <span class="citation" data-cites="Dawid2014">(<a href="P5C26_references.html#ref-Dawid2014" role="doc-biblioref">A. Philip Dawid and Musio 2014</a>)</span> as they are minimized when the true prediction is made, and converge to the minimum as predictions are increasingly improved.</p>
+<div id="fig-eval-brierlog" class="quarto-float quarto-figure quarto-figure-center anchored" alt="TODO">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-eval-brierlog-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="Figures/evaluation/brier_logloss.png" class="img-fluid figure-img" alt="TODO">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-eval-brierlog-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;10.1: Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in <span class="math inline">\([0,1]\)</span>, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimized when <span class="math inline">\(\hat{p}_i(y_i) = y_i\)</span>.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="sec-eval-distr-commonsurv" class="level2" data-number="10.2">
+<h2 data-number="10.2" class="anchored" data-anchor-id="sec-eval-distr-commonsurv"><span class="header-section-number">10.2</span> Survival Losses</h2>
+<!-- FIXME: COPY FINAL DEFINITION FROM PROPERNESS PAPER -->
+<p>Analogously to classification losses, a survival loss <span class="math inline">\(L: \mathcal{P}\times \mathbb{R}_{&gt;0}\times \{0,1\}\rightarrow \bar{\mathbb{R}}\)</span> is <em>proper</em> if for any distributions <span class="math inline">\(p_Y, p\)</span> in <span class="math inline">\(\mathcal{P}\)</span>, and for any random variables <span class="math inline">\(Y \sim p_Y\)</span>, and <span class="math inline">\(C\)</span> t.v.i. <span class="math inline">\(\mathbb{R}_{&gt;0}\)</span>; with <span class="math inline">\(T := \min(Y,C)\)</span> and <span class="math inline">\(\Delta := \mathbb{I}(T=Y)\)</span>; it holds that, <span class="math inline">\(\mathbb{E}[L(p_Y, T, \Delta)] \leq \mathbb{E}[L(p, T, \Delta)]\)</span>. The loss is <em>strictly proper</em> if, in addition, <span class="math inline">\(p = p_Y\)</span> uniquely minimizes the loss. A survival loss is referred to as outcome-independent (strictly) proper if it is only (strictly) proper when <span class="math inline">\(C\)</span> and <span class="math inline">\(Y\)</span> are independent.</p>
+<p>With these definitions, the rest of this chapter lists common scoring rules in survival analysis and discusses some of their properties. As with other chapters, this list is likely not exhaustive but will cover commonly used losses.</p>
+<section id="integrated-graf-score" class="level3" data-number="10.2.1">
+<h3 data-number="10.2.1" class="anchored" data-anchor-id="integrated-graf-score"><span class="header-section-number">10.2.1</span> Integrated Graf Score</h3>
+<p>The Integrated Graf Score (IGS) was introduced by Graf <span class="citation" data-cites="Graf1995 Graf1999">(<a href="P5C26_references.html#ref-Graf1995" role="doc-biblioref">Graf and Schumacher 1995</a>; <a href="P5C26_references.html#ref-Graf1999" role="doc-biblioref">Graf et al. 1999</a>)</span> as an analogue to the integrated brier score (IBS) in regression. It is likely the commonly used scoring rule in survival analysis, possibly due to its intuitive interpretation.</p>
+<p>The loss is defined by</p>
+<p><span id="eq-igs"><span class="math display">\[
+\begin{split}
+L_{IGS}(\hat{S}_i, t_i, \delta_i|\hat{G}_{KM}) = \int^{\tau^*}_0  \frac{\hat{S}_i^2(\tau) \mathbb{I}(t_i \leq \tau, \delta_i=1)}{\hat{G}_{KM}(t_i)} + \frac{\hat{F}_i^2(\tau) \mathbb{I}(t_i &gt; \tau)}{\hat{G}_{KM}(\tau)} \ d\tau
+\end{split}
+\tag{10.1}\]</span></span> where <span class="math inline">\(\hat{S}_i^2(\tau) = (\hat{S}_i(\tau))^2\)</span> and <span class="math inline">\(\hat{F}_i^2(\tau) = (1 - \hat{S}_i(\tau))^2\)</span>, and <span class="math inline">\(\tau^* \in \mathbb{R}_{\geq 0}\)</span> is an upper threshold to compute the loss up to, and <span class="math inline">\(\hat{G}_{KM}\)</span> is the Kaplan-Meier trained on the censoring distribution for IPCW (<a href="P2C8_rank.html#sec-eval-crank-disc-conc" class="quarto-xref"><span>Section 8.1</span></a>).</p>
+<p>At first glance this might seem intimidating but it is worth taking the time to understand the intuition behind the loss. Recall the classification Brier score, <span class="math inline">\(L(\hat{p}_i, y_i) = (y_i - \hat{p}_i(y))^2\)</span>, this provides a method to compare and evaluate a probability mass function at one time-point. The <em>integrated Brier score</em> (IBS), also known as the <em>CRPS</em>, is the integral of the Brier score for all real-valued thresholds <span class="citation" data-cites="Gneiting2007">(<a href="P5C26_references.html#ref-Gneiting2007" role="doc-biblioref">Gneiting and Raftery 2007</a>)</span> and hence allows predictions to be evaluated over multiple points as <span class="math inline">\(L(\hat{F}_i, y_i) = \int (\hat{F}_i(y_i) - \mathbb{I}(y_i \geq x))^2 dy\)</span> where <span class="math inline">\(\hat{F}_i\)</span> is the predicted cumulative distribution function and <span class="math inline">\(x\)</span> is some meaningful threshold. In survival analysis, <span class="math inline">\(\hat{F}_i(\tau)\)</span> represents the probability of an observation having experienced the event at or before <span class="math inline">\(\tau\)</span>, and the ground truth to compare to is therefore whether the observation has actually experienced the event at <span class="math inline">\(\tau\)</span>, which is the case when <span class="math inline">\(t_i \leq \tau\)</span>. Hence the IBS becomes <span class="math inline">\(L(\hat{F}_i, t_i) = \int (\hat{F}_i(\tau) - \mathbb{I}(t_i \leq \tau))^2 d\tau\)</span>. Now for a given time <span class="math inline">\(\tau\)</span>:</p>
+<p><span id="eq-graf-cases"><span class="math display">\[
+L(\hat{F}_i, t) =
+\begin{cases}
+(\hat{F}_i(\tau) - 1)^2 = (1 - \hat{F}_i(\tau)^2) = \hat{S}_i^2(\tau), &amp; \text{ if } t_i \leq \tau \\
+(\hat{F}_i(\tau) - 0)^2 = \hat{F}_i^2(\tau), &amp; \text{ if } t_i &gt; \tau
+\end{cases}
+\tag{10.2}\]</span></span></p>
+<p>In words, if an observation has not yet experienced an outcome (<span class="math inline">\(t_i &gt; \tau\)</span>) then the loss is minimized when the cumulative distribution function (the probability of having already died) is <span class="math inline">\(0\)</span>, which is intuitive as the optimal prediction is correctly identifying the observation has yet to experience the event. In contrast, if the observation has experienced the outcome (<span class="math inline">\(t_i \leq \tau\)</span>) then the loss is minimized when the survival function (the probability of surviving until <span class="math inline">\(\tau\)</span>) is <span class="math inline">\(0\)</span>, which follows from similar logic.</p>
+<p>The final component of the Graf score is accommodating for censoring. At <span class="math inline">\(\tau\)</span> an observation will either have</p>
+<ol type="1">
+<li>Not experienced the event: <span class="math inline">\(I(t_i &gt; \tau)\)</span>;</li>
+<li>Experienced the event: <span class="math inline">\(I(t_i \leq \tau, \delta_i = 1)\)</span>; or</li>
+<li>Been censored: <span class="math inline">\(I(t_i \leq \tau, \delta_i = 0)\)</span></li>
+</ol>
+<p>In the Graf score, censored observations are discarded. If they were not then <a href="#eq-graf-cases" class="quarto-xref">Equation&nbsp;<span>10.2</span></a> would imply their contribution would be treated the same as those who had experienced the event. However this assumption would be entirely wrong as a censored observation is guaranteed not to have experienced the event, hence an ideal prediction for a censored observation is a high survival probability up until the point of censoring, at which time comparison to ground truth is unknown as this is no longer observed.</p>
+<p>The act of discarding censored observations means that the sample size decreases over time. To compensate for this, IPCW is used to increasingly weight predictions as <span class="math inline">\(\tau\)</span> increases. Hence, IPCW weights, <span class="math inline">\(W_i\)</span> are defined such that</p>
+<p><span class="math display">\[
+W_i =
+\begin{cases}
+\hat{G}_{KM}^{-1}(t_i), &amp; \text{ if } \mathbb{I}(t_i \leq \tau, \delta_i = 1) \\
+\hat{G}_{KM}^{-1}(\tau), &amp; \text{ if } \mathbb{I}(t_i &gt; \tau)
+\end{cases}
+\]</span></p>
+<p>The weights total <span class="math inline">\(1\)</span> when divided over all samples and summed <span class="citation" data-cites="Graf1999">(<a href="P5C26_references.html#ref-Graf1999" role="doc-biblioref">Graf et al. 1999</a>)</span>. They are also intuitive as observations are either weighted by <span class="math inline">\(G(\tau)\)</span> when they are still alive and therefore still part of the sample, or by <span class="math inline">\(G(t_i)\)</span> otherwise.</p>
+<p>As well as being intuitive, when censoring is uninformative, the Graf score consistently estimates the mean square error <span class="math inline">\(L(t, S|\tau^*) = \int^{\tau^*}_0 [\mathbb{I}(t &gt; \tau) - S(\tau)]^2 d\tau\)</span>, where <span class="math inline">\(S\)</span> is the correctly specified survival function <span class="citation" data-cites="Gerds2006">(<a href="P5C26_references.html#ref-Gerds2006" role="doc-biblioref">Gerds and Schumacher 2006</a>)</span>. However, despite these promising properties, the IGS is improper and must therefore be used with care <span class="citation" data-cites="Rindt2022 Sonabend2022b">(<a href="P5C26_references.html#ref-Rindt2022" role="doc-biblioref">Rindt et al. 2022</a>; <a href="P5C26_references.html#ref-Sonabend2022b" role="doc-biblioref">Sonabend et al. 2024</a>)</span>. In practice, experiments have shown that the effect of improperness is minimal and therefore this loss should be avoided for automated routines such as model tuning, however it can still be used for model evaluation. <!-- CITE OUR PROPERNESS PAPER HERE --> In addition, a small adaptation of the loss results in a strictly proper scoring rule simply by altering the weights such that <span class="math inline">\(W_i = \hat{G}_{KM}^{-1}(t_i)\)</span> for all uncensored observations and <span class="math inline">\(0\)</span> otherwise <span class="citation" data-cites="Sonabend2022b">(<a href="P5C26_references.html#ref-Sonabend2022b" role="doc-biblioref">Sonabend et al. 2024</a>)</span>, resulting in the reweighted Graf score: <!-- CITE OUR PROPERNESS PAPER HERE --></p>
+<p><span class="math display">\[
+L_{RGS}(\hat{S}_i, t_i, \delta_i|\hat{G}_{KM}) = \delta_i\mathbb{I}(t_i \leq \tau^*) \int^{\tau^*}_0 \frac{(\mathbb{I}(t_i \leq \tau) - \hat{F}_i(\tau))^2}{\hat{G}_{KM}(t_i)} \ d\tau
+\]</span></p>
+<p>The addition of <span class="math inline">\(\mathbb{I}(t_i \leq \tau^*)\)</span> completely removes observations that experience the event after the cutoff time, <span class="math inline">\(\tau^*\)</span>, this ensures there are no cases where the <span class="math inline">\(G(t_i)\)</span> weighting is calculated on time after the cutoff. Including an upper threshold (i.e, <span class="math inline">\(\tau^* &lt; \infty\)</span>) effects properness and generalization statements. For example, by evaluating a model using the RGS with a <span class="math inline">\(\tau^*\)</span> threshold, then the model may be said to only perform well up until <span class="math inline">\(\tau^*\)</span> with its performance unknown after this time.</p>
+<p>The change of weighting slightly alters the interpretation of the contributions at different time-points. By example, let <span class="math inline">\((t_i = 4, t_j = 5)\)</span> be two observed survival times, then at <span class="math inline">\(\tau = 3\)</span>, the Graf score weighting would be <span class="math inline">\(\hat{G}_{KM}^{-1}(4)\)</span> for both observations, whereas the RGS weights would be <span class="math inline">\((KMG^{-1}(4), KMG^{-1}(5))\)</span> respectively, hence there is always more ‘importance’ placed on observations that take longer to experience the event. In practice, the difference between these weights appears to be minimal <span class="citation" data-cites="Sonabend2022b">(<a href="P5C26_references.html#ref-Sonabend2022b" role="doc-biblioref">Sonabend et al. 2024</a>)</span> but as RGS is strictly proper, it is more suitable for automated experiments. <!-- FIXME: CITAITON ABOVE TO PROPERNESS PAPER --></p>
+</section>
+<section id="integrated-survival-log-loss" class="level3" data-number="10.2.2">
+<h3 data-number="10.2.2" class="anchored" data-anchor-id="integrated-survival-log-loss"><span class="header-section-number">10.2.2</span> Integrated Survival Log Loss</h3>
+<!-- FIXME - SHOULD WE JUST DELETE? -->
+<p>The integrated survival log loss (ISLL) was also proposed by <span class="citation" data-cites="Graf1999">Graf et al. (<a href="P5C26_references.html#ref-Graf1999" role="doc-biblioref">1999</a>)</span>.</p>
+<p><span class="math display">\[
+L_{ISLL}(\hat{S}_i,t_i,\delta_i|\hat{G}_{KM}) = -\int^{\tau^*}_0  \frac{\log[\hat{F}_i(\tau)] \mathbb{I}(t_i \leq \tau, \delta_i=1)}{\hat{G}_{KM}(t_i)} + \frac{\log[\hat{S}_i(\tau)] \mathbb{I}(t_i &gt; \tau)}{\hat{G}_{KM}(\tau)} \ d\tau
+\]</span></p>
+<p>where <span class="math inline">\(\tau^* \in \mathbb{R}_{&gt;0}\)</span> is an upper threshold to compute the loss up to.</p>
+<p>Similarly to the IGS, there are three ways to contribute to the loss depending on whether an observation is censored, experienced the event, or alive, at <span class="math inline">\(\tau\)</span>. Whilst the IGS is routinely used in practice, there is no evidence that ISLL is used, and moreover there are no proofs (or claims) that it is proper.</p>
+<p>The reweighted ISLL (RISLL) follows similarly to the RIGS and is also outcome-independent strictly proper <span class="citation" data-cites="Sonabend2022b">(<a href="P5C26_references.html#ref-Sonabend2022b" role="doc-biblioref">Sonabend et al. 2024</a>)</span>.</p>
+<p><span class="math display">\[
+L_{RISLL}(\hat{S}_i, t_i, \delta_i|\hat{G}_{KM}) = -\delta_i\mathbb{I}(t_i \leq \tau^*) \int^{\tau^*}_0 \frac{\mathbb{I}(t_i \leq \tau)\log[\hat{F}_i(\tau)] + \mathbb{I}(t_i &gt; \tau)\log[\hat{S}_i(\tau)] \ d\tau}{\hat{G}_{KM}(t_i)}
+\]</span></p>
+</section>
+<section id="survival-density-log-loss" class="level3" data-number="10.2.3">
+<h3 data-number="10.2.3" class="anchored" data-anchor-id="survival-density-log-loss"><span class="header-section-number">10.2.3</span> Survival density log loss</h3>
+<p>Another outcome-independent strictly proper scoring rule is the survival density log loss (SDLL) <span class="citation" data-cites="Sonabend2022b">(<a href="P5C26_references.html#ref-Sonabend2022b" role="doc-biblioref">Sonabend et al. 2024</a>)</span>, which is given by</p>
+<p><span class="math display">\[
+L_{SDLL}(\hat{f}_i, t_i, \delta_i|\hat{G}_{KM}) = - \frac{\delta_i \log[\hat{f}_i(t_i)]}{\hat{G}_{KM}(t_i)}
+\]</span></p>
+<p>where <span class="math inline">\(\hat{f}_i\)</span> is the predicted probability density function. This loss is essentially the classification log loss (<span class="math inline">\(-\log(\hat{p}_i(t_i))\)</span>) with added IPCW. Whilst the classification log loss has beneficial properties such as being differentiable, this is more complex for the SDLL and it is not widely used in practice. A useful alternative to the SDLL which can be readily used in automated procedures is the right-censored log loss.</p>
+</section>
+<section id="right-censored-log-loss" class="level3" data-number="10.2.4">
+<h3 data-number="10.2.4" class="anchored" data-anchor-id="right-censored-log-loss"><span class="header-section-number">10.2.4</span> Right-censored log loss</h3>
+<p>The right-censored log loss (RCLL) is an outcome-independent strictly proper scoring rule <span class="citation" data-cites="Avati2020">(<a href="P5C26_references.html#ref-Avati2020" role="doc-biblioref">Avati et al. 2020</a>)</span> that benefits from not depending on IPCW in its construction. The RCLL is defined by</p>
+<p><span class="math display">\[
+L_{RCLL}(\hat{S}_i, t_i, \delta_i) = -\log[\delta_i\hat{f}_i(t_i) + (1-\delta_i)\hat{S}_i(t_i)]
+\]</span></p>
+<p>This loss is interpretable when we break it down into its two halves:</p>
+<ol type="1">
+<li>If an observation is censored at <span class="math inline">\(t_i\)</span> then all the information we have is that they did not experience the event at the time, so they must be ‘alive’, hence the optimal value is <span class="math inline">\(\hat{S}_i(t_i) = 1\)</span> (which becomes <span class="math inline">\(-log(1) = 0\)</span>).</li>
+<li>If an observation experiences the event then the ‘best’ prediction is for the probability of the event at that time to be maximised, as pdfs are not upper-bounded this means <span class="math inline">\(\hat{f}_i(t_i) = \infty\)</span> (and <span class="math inline">\(-log(t_i) \rightarrow \infty\)</span> as <span class="math inline">\(t_i \rightarrow \infty\)</span>).</li>
+</ol>
+</section>
+<section id="absolute-survival-loss" class="level3" data-number="10.2.5">
+<h3 data-number="10.2.5" class="anchored" data-anchor-id="absolute-survival-loss"><span class="header-section-number">10.2.5</span> Absolute Survival Loss</h3>
+<p>The absolute survival loss, developed over time by <span class="citation" data-cites="Schemper2000">Schemper and Henderson (<a href="P5C26_references.html#ref-Schemper2000" role="doc-biblioref">2000</a>)</span> and <span class="citation" data-cites="Schmid2011">Schmid et al. (<a href="P5C26_references.html#ref-Schmid2011" role="doc-biblioref">2011</a>)</span>, is based on the mean absolute error is very similar to the IGS but removes the squared term:</p>
+<p><span class="math display">\[
+L_{ASL}(\hat{S}_i, t_i, \delta_i|\hat{G}_{KM}) = \int^{\tau^*}_0 \frac{\hat{S}_i(\tau)\mathbb{I}(t_i \leq \tau, \delta_i = 1)}{\hat{G}_{KM}(t_i)} + \frac{\hat{F}_i(\tau)\mathbb{I}(t_i &gt; \tau)}{\hat{G}_{KM}(\tau)} \ d\tau
+\]</span> where <span class="math inline">\(\hat{G}_{KM}\)</span> and <span class="math inline">\(\tau^*\)</span> are as defined above. Analogously to the IGS, the ASL score consistently estimates the mean absolute error when censoring is uninformative <span class="citation" data-cites="Schmid2011">(<a href="P5C26_references.html#ref-Schmid2011" role="doc-biblioref">Schmid et al. 2011</a>)</span> but there are also no proofs or claims of properness. The ASL and IGS tend to yield similar results <span class="citation" data-cites="Schmid2011">(<a href="P5C26_references.html#ref-Schmid2011" role="doc-biblioref">Schmid et al. 2011</a>)</span> but in practice there is no evidence of the ASL being widely used.</p>
+<!-- FIXME - ADD FURTHER SCORING RULES HERE -->
+</section>
+</section>
+<section id="sec-pecs" class="level2" data-number="10.3">
+<h2 data-number="10.3" class="anchored" data-anchor-id="sec-pecs"><span class="header-section-number">10.3</span> Prediction Error Curves</h2>
+<!-- FIXME - UNCHANGED FROM THESIS. I THINK FINE FOR NOW BUT NEEDS TO BE REWRITTEN IN THE FUTURE (MAINLY TO AVOID SELF PLAGIARISM) -->
+<p>As well as evaluating probabilistic outcomes with integrated scoring rules, non-integrated scoring rules can be utilised for evaluating distributions at a single point. For example, instead of evaluating a probabilistic prediction with the IGS over <span class="math inline">\(\mathbb{R}_{\geq 0}\)</span>, instead one could compute the IGS at a single time-point, <span class="math inline">\(\tau \in \mathbb{R}_{\geq 0}\)</span>, only. Plotting these for varying values of <span class="math inline">\(\tau\)</span> results in ‘prediction error curves’ (PECs), which provide a simple visualisation for how predictions vary over the outcome. PECs are especially useful for survival predictions as they can visualise the prediction ‘over time’. PECs are mostly used as a graphical guide when comparing few models, rather than as a formal tool for model comparison. An example for PECs is provided in <a href="#fig-eval-pecs" class="quarto-xref">Figure&nbsp;<span>10.2</span></a> for the IGS where the the Cox PH consistently outperforms the SVM.</p>
+<div id="fig-eval-pecs" class="quarto-float quarto-figure quarto-figure-center anchored" alt="TODO">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-eval-pecs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="Figures/evaluation/pecs.png" class="img-fluid figure-img" alt="TODO">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-eval-pecs-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;10.2: Prediction error curves for the CPH and SVM models from <a href="P2C9_calib.html" class="quarto-xref"><span>Chapter 9</span></a>. x-axis is time and y-axis is the IGS computed at different time-points. The CPH (red) performs better than the SVM (blue) as it scores consistently lower. Trained and tested on randomly simulated data from $.
+</figcaption>
+</figure>
+</div>
+</section>
+<section id="sec-eval-distr-score-base" class="level2" data-number="10.4">
+<h2 data-number="10.4" class="anchored" data-anchor-id="sec-eval-distr-score-base"><span class="header-section-number">10.4</span> Baselines and ERV</h2>
+<p>A common criticism of scoring rules is a lack of interpretability, for example, an IGS of 0.5 or 0.0005 has no meaning by itself, so below we present two methods to help overcome this problem.</p>
+<p>The first method, is to make use of baselines for model comparison, which are models or values that can be utilised to provide a reference for a loss, they provide a universal method to judge all models of the same class by <span class="citation" data-cites="Gressmann2018">(<a href="P5C26_references.html#ref-Gressmann2018" role="doc-biblioref">Gressmann et al. 2018</a>)</span>. In classification, it is possible to derive analytical baseline values, for example a Brier score is considered ‘good’ if it is below 0.25 or a log loss if it is below 0.693 (<a href="#fig-eval-brierlog" class="quarto-xref">Figure&nbsp;<span>10.1</span></a>), this is because these are the values obtained if you always predicted probabilties as <span class="math inline">\(0.5\)</span>, which is a reasonable basline guess in a binary classificaiton problem. In survival analysis, simple analytical expressions are not possible as losses are dependent on the unknown distributions of both the survival and censoring time. Therefore all experiments in survival analysis must include a baseline model that can produce a reference value in order to derive meaningful results. A suitable baseline model is the Kaplan-Meier estimator <span class="citation" data-cites="Graf1995 Lawless2010 Royston2013">(<a href="P5C26_references.html#ref-Graf1995" role="doc-biblioref">Graf and Schumacher 1995</a>; <a href="P5C26_references.html#ref-Lawless2010" role="doc-biblioref">Lawless and Yuan 2010</a>; <a href="P5C26_references.html#ref-Royston2013" role="doc-biblioref">Royston and Altman 2013</a>)</span>, which is the simplest model that can consistently estimate the true survival function.</p>
+<p>As well as directly comparing losses from a ‘sophisticated’ model to a baseline, one can also compute the percentage increase in performance between the sophisicated and baseline models, which produces a measure of explained residual variation (ERV) <span class="citation" data-cites="Korn1990 Korn1991">(<a href="P5C26_references.html#ref-Korn1990" role="doc-biblioref">Edward L. Korn and Simon 1990</a>; <a href="P5C26_references.html#ref-Korn1991" role="doc-biblioref">Edward L. Korn and Simon 1991</a>)</span>. For any survival loss <span class="math inline">\(L\)</span>, the ERV is,</p>
+<p><span class="math display">\[
+R_L(S, B) = 1 - \frac{L|S}{L|B}
+\]</span></p>
+<p>where <span class="math inline">\(L|S\)</span> and <span class="math inline">\(L|B\)</span> is the loss computed with respect to predictions from the sophisticated and baseline models respectively.</p>
+<p>The ERV interpretation makes reporting of scoring rules easier within and between experiments. For example, say in experiment A we have <span class="math inline">\(L|S = 0.004\)</span> and <span class="math inline">\(L|B = 0.006\)</span>, and in experiment B we have <span class="math inline">\(L|S = 4\)</span> and <span class="math inline">\(L|B = 6\)</span>. The sophisticated model may appear worse at first glance in experiment A (as the losses are very close) but when considering the ERV we see that the performance increase is identical (both <span class="math inline">\(R_L = 33\%\)</span>), thus providing a clearer way to compare models.</p>
+</section>
+<section id="conclusion" class="level2" data-number="10.5">
+<h2 data-number="10.5" class="anchored" data-anchor-id="conclusion"><span class="header-section-number">10.5</span> Conclusion</h2>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Key takeaways
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Scoring rules are a useful tool for measuring a model’s overall predictive ability, taking into account calibration and discrimination.</li>
+<li>Strictly proper scoring rules allow models to be compared to one another, which is important when choosing models in a benchmark experiment.</li>
+<li>Many scoring rules for censored data are <em>not</em> strictly proper, however experiments suggest that improper rules still provide useful and trustworthy results <span class="citation" data-cites="Sonabend2022b">(<a href="P5C26_references.html#ref-Sonabend2022b" role="doc-biblioref">Sonabend et al. 2024</a>)</span></li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Limitations
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Scoring rules can be difficult to interpret but ERV representations can be a helpful way to overcome this.</li>
+<li>There is no consensus about which scoring rule to use and when so in practice multiple scoring rules may have to be reported in experiments to ensure transparency and fairness of results.</li>
+<li>For non- and semi-parametric survival models that return distribution predictions, estimates of <span class="math inline">\(f(t)\)</span> are not readily available and require approximations <span class="citation" data-cites="Rindt2022">(<a href="P5C26_references.html#ref-Rindt2022" role="doc-biblioref">Rindt et al. 2022</a>)</span>, hence measures such as RCLL and SDLL can often not be directly used in practice.</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+Further reading
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><span class="citation" data-cites="Dawid2014">A. Philip Dawid and Musio (<a href="P5C26_references.html#ref-Dawid2014" role="doc-biblioref">2014</a>)</span> and <span class="citation" data-cites="Gneiting2007">Gneiting and Raftery (<a href="P5C26_references.html#ref-Gneiting2007" role="doc-biblioref">2007</a>)</span> provide a comprehensive summary of scoring rules in regression and classification settings.</li>
+<li><span class="citation" data-cites="Rindt2022">Rindt et al. (<a href="P5C26_references.html#ref-Rindt2022" role="doc-biblioref">2022</a>)</span> and <span class="citation" data-cites="Sonabend2022b">Sonabend et al. (<a href="P5C26_references.html#ref-Sonabend2022b" role="doc-biblioref">2024</a>)</span> review survival scoring rules.</li>
+<li><span class="citation" data-cites="Rahman2017">Rahman et al. (<a href="P5C26_references.html#ref-Rahman2017" role="doc-biblioref">2017</a>)</span> compare measures for external validation including some scoring rules.</li>
+</ul>
+</div>
+</div>
+
+
+<div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list" style="display: none">
+<div id="ref-Avati2020" class="csl-entry" role="listitem">
+Avati, Anand, Tony Duan, Sharon Zhou, Kenneth Jung, Nigam H. Shah, and Andrew Ng. 2020. <span>“<span class="nocase">Countdown Regression: Sharp and Calibrated Survival Predictions</span>.”</span> In <em>Proceedings of Machine Learning Research</em>, 145–55. <a href="https://proceedings.mlr.press/v115/avati20a.html http://arxiv.org/abs/1806.08324">https://proceedings.mlr.press/v115/avati20a.html http://arxiv.org/abs/1806.08324</a>.
+</div>
+<div id="ref-Brier1950" class="csl-entry" role="listitem">
+Brier, Glenn. 1950. <span>“<span class="nocase">Verification of forecasts expressed in terms of probability</span>.”</span> <em>Monthly Weather Review</em> 78 (1): 1–3.
+</div>
+<div id="ref-Dawid1984" class="csl-entry" role="listitem">
+Dawid, A P. 1984. <span>“<span class="nocase">Present Position and Potential Developments: Some Personal Views: Statistical Theory: The Prequential Approach</span>.”</span> <em>Journal of the Royal Statistical Society. Series A (General)</em> 147 (2): 278–92. <a href="https://doi.org/10.2307/2981683">https://doi.org/10.2307/2981683</a>.
+</div>
+<div id="ref-Dawid1986" class="csl-entry" role="listitem">
+Dawid, A Philip. 1986. <span>“<span>Probability Forecasting</span>.”</span> <em>Encyclopedia of Statistical Sciences</em> 7: 210–18.
+</div>
+<div id="ref-Dawid2014" class="csl-entry" role="listitem">
+Dawid, A Philip, and Monica Musio. 2014. <span>“<span class="nocase">Theory and Applications of Proper Scoring Rules</span>.”</span> <em>Metron</em> 72 (2): 169–83. <a href="https://arxiv.org/abs/arXiv:1401.0398v1">https://arxiv.org/abs/arXiv:1401.0398v1</a>.
+</div>
+<div id="ref-Gerds2006" class="csl-entry" role="listitem">
+Gerds, Thomas A, and Martin Schumacher. 2006. <span>“<span class="nocase">Consistent Estimation of the Expected Brier Score in General Survival Models with Right-Censored Event Times</span>.”</span> <em>Biometrical Journal</em> 48 (6): 1029–40. <a href="https://doi.org/10.1002/bimj.200610301">https://doi.org/10.1002/bimj.200610301</a>.
+</div>
+<div id="ref-Gneiting2007" class="csl-entry" role="listitem">
+Gneiting, Tilmann, and Adrian E Raftery. 2007. <span>“<span class="nocase">Strictly Proper Scoring Rules, Prediction, and Estimation</span>.”</span> <em>Journal of the American Statistical Association</em> 102 (477): 359–78. <a href="https://doi.org/10.1198/016214506000001437">https://doi.org/10.1198/016214506000001437</a>.
+</div>
+<div id="ref-Good1952" class="csl-entry" role="listitem">
+Good, I J. 1952. <span>“<span>Rational Decisions</span>.”</span> <em>Journal of the Royal Statistical Society. Series B (Methodological)</em> 14 (1): 107–14. <a href="http://www.jstor.org/stable/2984087">http://www.jstor.org/stable/2984087</a>.
+</div>
+<div id="ref-Graf1999" class="csl-entry" role="listitem">
+Graf, Erika, Claudia Schmoor, Willi Sauerbrei, and Martin Schumacher. 1999. <span>“<span class="nocase">Assessment and comparison of prognostic classification schemes for survival data</span>.”</span> <em>Statistics in Medicine</em> 18 (17-18): 2529–45. <a href="https://doi.org/10.1002/(SICI)1097-0258(19990915/30)18:17/18<2529::AID-SIM274>3.0.CO;2-5">https://doi.org/10.1002/(SICI)1097-0258(19990915/30)18:17/18&lt;2529::AID-SIM274&gt;3.0.CO;2-5</a>.
+</div>
+<div id="ref-Graf1995" class="csl-entry" role="listitem">
+Graf, Erika, and Martin Schumacher. 1995. <span>“<span class="nocase">An Investigation on Measures of Explained Variation in Survival Analysis</span>.”</span> <em>Journal of the Royal Statistical Society. Series D (The Statistician)</em> 44 (4): 497–507. <a href="https://doi.org/10.2307/2348898">https://doi.org/10.2307/2348898</a>.
+</div>
+<div id="ref-Gressmann2018" class="csl-entry" role="listitem">
+Gressmann, Frithjof, Franz J. Király, Bilal Mateen, and Harald Oberhauser. 2018. <span>“<span class="nocase">Probabilistic supervised learning</span>.”</span> <a href="https://doi.org/10.1002/iub.552">https://doi.org/10.1002/iub.552</a>.
+</div>
+<div id="ref-Korn1990" class="csl-entry" role="listitem">
+Korn, Edward L., and Richard Simon. 1990. <span>“<span class="nocase">Measures of explained variation for survival data</span>.”</span> <em>Statistics in Medicine</em> 9 (5): 487–503. <a href="https://doi.org/10.1002/sim.4780090503">https://doi.org/10.1002/sim.4780090503</a>.
+</div>
+<div id="ref-Korn1991" class="csl-entry" role="listitem">
+Korn, Edward L, and Richard Simon. 1991. <span>“<span class="nocase">Explained Residual Variation, Explained Risk, and Goodness of Fit</span>.”</span> <em>The American Statistician</em> 45 (3): 201–6. <a href="https://doi.org/10.2307/2684290">https://doi.org/10.2307/2684290</a>.
+</div>
+<div id="ref-Lawless2010" class="csl-entry" role="listitem">
+Lawless, Jerald F, and Yan Yuan. 2010. <span>“<span class="nocase">Estimation of prediction error for survival models</span>.”</span> <em>Statistics in Medicine</em> 29 (2): 262–74. <a href="https://doi.org/10.1002/sim.3758">https://doi.org/10.1002/sim.3758</a>.
+</div>
+<div id="ref-Murphy1973" class="csl-entry" role="listitem">
+Murphy, Allan H. 1973. <span>“<span class="nocase">A New Vector Partition of the Probability Score</span>.”</span> <em>Journal of Applied Meteorology and Climatology</em> 12 (4): 595–600. <a href="https://doi.org/10.1175/1520-0450(1973)012<0595:ANVPOT>2.0.CO;2">https://doi.org/10.1175/1520-0450(1973)012&lt;0595:ANVPOT&gt;2.0.CO;2</a>.
+</div>
+<div id="ref-Rahman2017" class="csl-entry" role="listitem">
+Rahman, M. Shafiqur, Gareth Ambler, Babak Choodari-Oskooei, and Rumana Z. Omar. 2017. <span>“<span class="nocase">Review and evaluation of performance measures for survival prediction models in external validation settings</span>.”</span> <em>BMC Medical Research Methodology</em> 17 (1): 1–15. <a href="https://doi.org/10.1186/s12874-017-0336-2">https://doi.org/10.1186/s12874-017-0336-2</a>.
+</div>
+<div id="ref-Rindt2022" class="csl-entry" role="listitem">
+Rindt, David, Robert Hu, David Steinsaltz, and Dino Sejdinovic. 2022. <span>“<span class="nocase">Survival Regression with Proper Scoring Rules and Monotonic Neural Networks</span>,”</span> March. <a href="http://arxiv.org/abs/2103.14755">http://arxiv.org/abs/2103.14755</a>.
+</div>
+<div id="ref-Royston2013" class="csl-entry" role="listitem">
+Royston, Patrick, and Douglas G. Altman. 2013. <span>“<span class="nocase">External validation of a Cox prognostic model: Principles and methods</span>.”</span> <em>BMC Medical Research Methodology</em> 13 (1). <a href="https://doi.org/10.1186/1471-2288-13-33">https://doi.org/10.1186/1471-2288-13-33</a>.
+</div>
+<div id="ref-Schemper2000" class="csl-entry" role="listitem">
+Schemper, Michael, and Robin Henderson. 2000. <span>“<span class="nocase">Predictive Accuracy and Explained Variation in Cox Regression</span>.”</span> <em>Biometrics</em> 56: 249–55. <a href="https://doi.org/10.1002/sim.1486">https://doi.org/10.1002/sim.1486</a>.
+</div>
+<div id="ref-Schmid2011" class="csl-entry" role="listitem">
+Schmid, Matthias, Thomas Hielscher, Thomas Augustin, and Olaf Gefeller. 2011. <span>“<span class="nocase">A Robust Alternative to the Schemper-Henderson Estimator of Prediction Error</span>.”</span> <em>Biometrics</em> 67 (2): 524–35. <a href="https://doi.org/10.1111/j.1541-0420.2010.01459.x">https://doi.org/10.1111/j.1541-0420.2010.01459.x</a>.
+</div>
+<div id="ref-Sonabend2022b" class="csl-entry" role="listitem">
+Sonabend, Raphael, John Zobolas, Philipp Kopper, Lukas Burk, and Andreas Bender. 2024. <span>“<span class="nocase">Examining properness in the external validation of survival models with squared and logarithmic losses</span>,”</span> December. <a href="http://arxiv.org/abs/2212.05260">http://arxiv.org/abs/2212.05260</a>.
+</div>
+</div>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./P2C9_calib.html" class="pagination-link" aria-label="Calibration Measures">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Calibration Measures</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="./P2C11_time.html" class="pagination-link" aria-label="Evaluating Survival Time">
+        <span class="nav-page-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Evaluating Survival Time</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>All content licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> <br> © Raphael Sonabend, Andreas Bender.</p>
+</div>   
+    <div class="nav-footer-center">
+<p><a href="https://www.mlsabook.com">Website</a> | <a href="https://github.com/mlsa-book/MLSA">GitHub</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/mlsa-book/MLSA/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li><li><a href="https://github.com/mlsa-book/MLSA/edit/main/book/P2C10_rules.qmd" class="toc-action"><i class="bi empty"></i>Edit this page</a></li><li><a href="https://github.com/mlsa-book/MLSA/blob/main/book/P2C10_rules.qmd" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+    <div class="nav-footer-right">
+<p>Built with <a href="https://quarto.org/">Quarto</a>.</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
