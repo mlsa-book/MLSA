@@ -1,0 +1,121 @@
+---
+abstract: TODO (150-200 WORDS)
+---
+
+{{< include _setup.qmd >}}
+
+# Connections to Regression and Imputation {#sec-redux-regr}
+
+{{< include _wip.qmd >}}
+
+___
+
+TODO
+
+* I think all these sections should have examples in implemented models, e.g., here we can point to SVM models and some neural nets
+* We can also point to neural nets that use reduction to essentially just predict the linear predictor via regression or to use pseudovalues
+* Add pseudovalues
+* Add prediction of the observed outcome (not survival) time
+
+___
+
+<!-- \begin{figure}[H]
+\centering
+\begin{tikzpicture}[framed]
+\node(t0)[objnode]{$\calD_S$};
+\node(t1)[funnode,right=of t0]{$I(x|\theta)$};
+\node(t2)[funnode,above=of t1]{$D(x|\phi)$};
+\node(t3)[objnode,right=of t1]{$\calD_R$};
+
+\path[->]
+   (t0) edge [dashed]  (t1)
+   (t0) edge [dashed]  (t2)
+   (t1) edge  (t3)
+   (t2) edge  (t3);
+
+\end{tikzpicture}
+\caption[Survival to regression data composition]{Survival ($\calD_S$) to regression ($\calD_R$) data composition. Dashed lines represent a choice in the workflow. Parameters: $I$ -- Imputation method (@sec-redux-regr-imp); $\theta$ -- Hyper-parameters of $I$; $D$ -- Deletion method (@sec-redux-regr-del); $\phi$ -- Hyper-parameters of $D$.}
+\label{fig:car_comp_survreg}
+\end{figure} -->
+
+This is a data-level SOC that transforms survival data to regression data by either removing censored observations or 'imputing' survival times. This composition is frequently incorrectly utilised (@sec-car-reduxstrats-mistakes) and therefore more detail is provided here than previous compositions. Note that the previous compositions were prediction-level transformations that occur after a survival model makes a prediction, whereas this composition is on a data-level and can take place before model training or predicting.
+
+In Statistics, there are only two methods for removing 'missing' values: deletion and imputation; both of these have been attempted for censoring.
+
+Censoring can be beneficial, harmful, or neutral; each will affect the data differently if deleted or imputed. Harmful censoring occurs if the reason for censoring is negative, for example drop-out due to disease progression. Harmful censoring indicates that the true survival time is likely soon after the censoring time. Beneficial censoring occurs if censoring is positive, for example drop-out due to recovery. This indicates that the true survival time is likely far from the censoring time. Finally neutral censoring occurs when no information can be gained about the true survival time from the censoring time. Whilst the first two of these can be considered to be dependent on the outcome, neutral censoring is often the case when censoring is independent of the outcome conditional on the data, which is a standard assumption for the majority of survival models and measures.
+
+#### Deletion #{sec-redux-regr-del}
+
+Deletion is the process of removing observations from a dataset. This is usually seen in 'complete case analysis' in which observations with 'missingness', covariates with missing values, are removed from the dataset. In survival analysis this method is somewhat riskier as the subjects to delete depend on the outcome and not the features. Three methods are considered, the first two are a more brute-force approach whereas the third allows for some flexibility and tuning.
+
+#### Complete Deletion {.unnumbered .unlisted}
+Deleting all censored observations is simple to implement with no computational overhead. Complete deletion results in a smaller regression dataset, which may be significantly smaller if the proportion of censoring is high. If censoring is uninformative, the dataset is suitably large and the proportion of censoring suitably low, then this method can be applied without further consideration. However if censoring is informative then deletion will add bias to the dataset, although the 'direction' of bias cannot be known in advance. If censoring is harmful then censored observations will likely have a similar profile to those that died, thus removing censoring will artificially inflate the proportion of those who survive. Conversely if censoring is beneficial then censored observations may be more similar to those who survive, thus removal will artificially inflate the proportion of those who die.
+
+#### Omission {.unnumbered .unlisted}
+Omission is the process of omitting the censoring indicator from the dataset, thus resulting in a regression dataset that assumes all observations experienced the event. Complete deletion results in a smaller dataset of dead patients, omission results in no sample size reduction but the outcome may be incorrect. This reduction strategy is likely only justified for harmful censoring. In this case the true survival time is likely close to the censoring time and therefore treating censored observations as dead may be a fair assumption.
+
+#### IPCW {.unnumbered .unlisted}
+If censoring is conditionally-outcome independent then deletion of censored events is possible by using Inverse Probability of Censoring Weights (IPCW). This method has been seen several times throughout this book in the context of models and measures. It has been formalised as a composition technique by Vock $\etal$ (2016)  [@Vock2016] although their method is limited to binary classification. Their method weights the survival time of uncensored observations by $w_i = 1/\KMG(T_i)$ and deletes censored observations, where $\KMG$ is the Kaplan-Meier estimate of the censoring distribution fit on training data. As previously discussed, one could instead consider the Akritas (or any other) estimator for $\KMG$.
+
+Whilst this method does provide a 'safer' way to delete censored observations, there is not a necessity to do so. Instead consider the following weights
+$$
+w_i = \frac{\Delta_i + \alpha(1 - \Delta_i)}{\KMG(T_i)}
+$$ {#eq-car-ipcw-weights}
+where $\alpha \in [0, 1]$ is a hyper-parameter to tune. Setting $\alpha = 1$ equally weights censored and uncensored observations and setting $\alpha = 0$ recovers the setting in which censored observations are deleted. It is assumed $\KMG$ is set to some very small $\epsilon$ when $\KMG(T_i) = 0$. When $\alpha \neq 0$ this becomes an imputation method, other imputation methods are now discussed.
+
+<!-- % @fig-car-ipcw-tune demonstrates the results of tuning the $\alpha$ parameter. On the y-axis is the log loss (@eq-density-logloss), the x-axis is different values of the $\alpha$ parameter. For each value of the $\alpha$ parameter, survival data is split intro training and testing, a Kaplan-Meier is fit on the censoring distributions and weights are defined as in @eq-car-ipcw-weights, a deterministic random forest model is fit to this 'probabilistic regression' data with a composition to probabilistic predictions with the Normal distribution compositor (@sec-car-reduxstrats-probregr). The results demonstrate that the logloss is minimised by values between $[0, 1]$, though results are very poor in all cases. Also note that $\alpha = 0$ -- deletion of censoring -- and $\alpha = 1$ -- equal weighting for censored and dead -- are both close to the minimal attained logloss. -->
+
+<!-- %\begin{figure}
+%\centering
+%\includegraphics[width = 14cm, height = 8cm]{c5_car/ipcw_tune}
+%\caption[Tuning the alpha parameter for IPCW survival reduction]{Tuning the alpha parameter for IPCW survival reduction.}\label{fig:car_ipcw_tune}
+%\end{figure} -->
+
+#### Imputation {#sec-redux-regr-imp}
+
+Imputation methods estimate the values of missing data conditional on non-missing data and other covariates. Whilst the true value of the missing data can never be known, by carefully conditioning on the 'correct' covariates, good estimates for the missing value can be obtained to help prevent a loss of data. Imputing outcome data is more difficult than imputing covariate data as models are then trained on 'fake' data. However a poor imputation should still be clear when evaluating a model as testing data remains un-imputed. By imputing censoring times with estimated survival times, the censoring indicator can be removed and the dataset becomes a regression dataset.
+
+#### Gamma Imputation {.unnumbered .unlisted}
+Gamma imputation  [@Jackson2014] incorporates information about whether censoring is harmful, beneficial, or neutral. The method imputes survival times by generating times from a shifted proportional hazards model
+
+$$
+h(\tau) = h_0(\tau)\exp(\eta + \gamma)
+$$
+
+where $\eta$ is the usual linear predictor and $\gamma \in \Reals$ is a hyper-parameter determining the 'type' of censoring such that $\gamma > 0$ indicates harmful censoring, $\gamma < 0$ indicates beneficial censoring, and $\gamma = 0$ is neutral censoring. This imputation method has the benefit of being tunable as $\gamma$ is a hyper-parameter and there is a choice of variables to condition the imputation. No independent experiments exist studying how well this method performs, nor discussing the theoretical properties of the method.
+
+#### MRL {.unnumbered .unlisted}
+The Mean Residual Lifetime (MRL) estimator has been previously discussed in the context of SVMs (@sec-surv-ml-models-svm-surv). Here the estimator is extended to serve as an imputation method. Recall the MRL function, $MRL(\tau|\hatS) = \int^\infty_\tau \hat{S}(u) \ du/\hat{S}(\tau)$, where $\hatS$ is an estimate of the survival function of the underlying survival distribution (e.g. $\KMS$). The MRL is interpreted as the expected remaining survival time after the time-point $\tau$. This serves as a natural imputation strategy where given the survival outcome $(T_i, \Delta_i)$, the new imputed time $T'_i$ is given by
+$$
+T'_i = T_i + (1 - \Delta_i)MRL(T_i|\hatS)
+$$
+where $\hatS$ would be fit on the training data and could be an unconditional estimator, such as Kaplan-Meier, or conditional, such as Akritas. The resulting survival times are interpreted as the true times for those who died and the expected survival times for those who were censored.
+
+#### Buckley-James {.unnumbered .unlisted}
+Buckley-James  [@Buckley1979] is another imputation method discussed earlier (@sec-surv-ml-models-boost). The Buckley-James method uses an iterative procedure to impute censored survival times by the conditional expectation given censoring times and covariates  [@Wang2010]. Given the survival tuple for an outcome $(T_i, \Delta_i)$, the new imputed time $T'_i$ is
+$$
+T'_i =
+\begin{cases}
+T_i, & \Delta_i = 1 \\
+X_i\hat{\beta} + \frac{1}{\KMS(e_i)} \sum_{e_i < e_k} \hat{p}_{KM}(e_k) e_k & \Delta_i = 0
+\end{cases}
+$$
+where $\KMS$ is the Kaplan-Meier estimator of the survival distribution estimated on training data and with associated pmf $\hat{p}_{KM}$ and $e_i = T_i - X_i\hat{\beta}$ where $\hat{\beta}$ are estimated coefficients of a linear regression model fit on $(X_i, T_i)$. Given the least squares approach, more parametric assumptions are made than other imputation methods and it is more complex to separate model fitting from imputation. Hence, this imputation may only be appropriate on a limited number of data types.
+
+#### Alternative Methods {.unnumbered .unlisted}
+Other methods have been proposed for 'imputing' censored survival times though with either less clear discussion or to no benefit. Multiple imputation by chained equations (MICE) has been demonstrated to perform well with covariate data and even outcome data (in a non-survival setting). However no adaptations have been developed to incorporate censoring times into the imputation and therefore is less informative than Gamma imputation.
+
+Re-calibration of censored survival times  [@Vinzamuri2017] uses an iterative update procedure to 're-calibrate' censoring times however the motivation behind the method is not sufficiently clear to be of interest in general survival modelling tasks outside of the authors' specific pipelines.
+
+Finally parametric imputation is defined by making random draws from truncated probability distributions and adding these to the censoring time [@Royston2001; @Royston2008]. Whilst this method is arguably the simplest method and will lead to a sufficiently random sample, i.e. not one skewed by the imputation process, in practice the randomness leads to unrealistic results, with some imputed times being very far from the original censoring times and some being very close.
+
+#### The Decision to Impute or Delete {#sec-redux-regr-dec}
+
+Deletion methods are simple to implement and fast to compute however they can lead to biasing the data or a significant sample reduction if used incorrectly. Imputation methods can incorporate tuning and have more relaxed assumptions about the censoring mechanism, though they may lead to over-confidence in the resulting outcome and therefore add bias into the dataset. In some cases, the decision to impute or delete is straightforward, for example if censoring is uninformative and only few observations are censored then complete deletion is appropriate. If it is unknown if censoring is informative then this can crudely be estimated by a benchmark experiment. Classification models can be fit on $\{(X_1, \Delta_1),...,(X_n,\Delta_n)\}$ where $(X_i, \Delta_i) \in \dtrain$. Whilst not an exact test, if any model significantly outperforms a baseline, then this may indicate censoring is informative. This is demonstrated in @tab-car-predcens, in which a logistic regression outperforms a featureless baseline in correctly predicting if an observation is censored when censoring is informative, but is no better than the baseline when censoring is uninformative.
+
+| Data | Baseline | Logistic Regression |
+| --- | ------- | ---- |
+| `Sim1` | 0.20 (0.14, 0.26) | 0.02 (0.01, 0.03) |
+| `Sim7` | 0.19 (0.14, 0.24) | 0.16 (0.13, 0.19) |
+
+: Estimating censoring dependence by prediction. `Sim1` is informative censoring and `Sim7` is uninformative. Logistic regression is compared to a featureless baseline with the Brier score with standard errors. Censoring can be significantly predicted to 95% confidence when informative (`Sim1`) but not when uninformative (`Sim7`). {#tbl-car-predcens}
