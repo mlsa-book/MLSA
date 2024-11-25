@@ -1,0 +1,128 @@
+---
+abstract: "This chapter introduces the different survival problems and formalises them as survival tasks. There are four prediction types in survival analysis: relative risks - predicting the risk of an event, survival times - predicting the time until an event happens, prognostic index - predicting a linear predictor to assess outcomes based on risk factors, and survival distributions - predicting the probability of an event taking place over time. These reduce to three formal survival tasks: deterministic (survival time), ranking (risks and prognostic index), and probabilistic (distribution). This separation of tasks helps create a taxonomy of survival models and losses that is used throughout the book." 
+---
+
+::: {.content-visible when-format="html"}
+{{< include _macros.tex >}}
+:::
+
+# Survival Task {#sec-survtsk}
+
+{{< include _wip_minor.qmd >}}
+
+This final section of this part of the book, brings everything together and considers the different prediction types that might be of interest in the survival analysis context and introduces the notion of a survival task more formally.
+Throughout this chapter let $\calX \subseteq \Reals^{n \times p}$ be the feature space.
+
+A general survival prediction problem is one in which (@sec-ml-basics):
+
+* a survival dataset, $\calD$, is split for training, $\dtrain$, and testing, $\dtest$;
+* a survival model is fit on $\dtrain$; and
+* the model predicts a representation of the unknown true survival time, $Y$, given $\dtest$.
+
+The process of fitting is model-dependent, and can range from non-parametric methods and maximum likelihood estimation of model parameters to machine learning approaches.
+The model fitting process is discussed on a high-level in @sec-ml-basics and concrete algorithms are discussed in Part III of this book.
+The different survival problems are separated by *prediction types* or *prediction problems*, which can also be thought of as predictions of different representations of $Y$.
+We consider 4 commonly used prediction types:
+
+1. The *relative risk* of an individual experiencing an event: A single continuous ranking.
+2. The *time until an event* occurs: A single continuous value.
+3. The *prognostic index* for a model: A single continuous value.
+4. The *survival distribution*: A probability distribution.
+
+The first three of these are referred to as *deterministic* as they predict a single value whereas the fourth is *probabilistic* and returns a full survival distribution.
+Definitions of these are expanded on below but first note that survival predictions differ from other fields in two respects:
+
+* The observed data used for model training (observed times $T$, status indicator $\Delta$) is different from the outcome of interest (event times $Y$).
+This differs from, say, standard regression in which the same object (a single continuous variable) is used for fitting and predicting.
+* With the exception of the time-to-event prediction, all other prediction types do not predict the expectation $\EE(Y)$, which is often of interest, but some other (related) quantity.
+
+Survival prediction problems must be clearly separated as they are inherently incompatible.
+For example, it is not meaningful to compare a relative risk prediction from one model to a survival distribution prediction of another.
+Whilst these prediction types are separated above, they can be viewed as special cases of each other. Both (1.) and (2.) may be viewed as variants of (3.); and (1.), (2.), and (3.) can all be derived from (4.); this is elaborated on below and discussed fully in @sec-car.
+
+## Predicting Risks {#sec-survtsk-risk}
+
+This is a common survival problem and is defined as predicting a continuous rank for an individual's relative risk of experiencing the event.
+For example, given three subjects, $\{i,j,k\}$, a relative risk prediction may predict the risk of event as $\{0.1, 0.5, 10\}$ respectively.
+From these predictions, the following types of conclusions can be drawn:
+
+* Conclusions comparing subjects. For example, $i$ is at the least risk; the risk of $j$ is only slightly higher than that of $i$ but the risk of $k$ is considerably higher than $j$; the corresponding ranks for $i,j,k,$ are $1,2,3$;
+* Conclusions comparing risk groups. For example, thresholding the risks at $1.0$ means that $i$ and $j$ are in a low-risk group whilst $k$ is in a high-risk group.
+
+Whilst many important conclusions can be drawn from these predictions, the values themselves have no meaning when not compared to other individuals.
+Interpretation of these rankings depends on the model class (for example, PH and AFT models have opposite interpretations, @sec-models-classical) and its parametrization or implementation in specific software.
+For some higher ranking implies higher risk whereas others may assume that higher ranking implies lower risk.
+In this book, a higher ranking will always imply a higher risk of event (as in the example above).
+
+Predicting rankings is the primary form of the *survival ranking task*, defined by predicting a continuous value, $g: \calX \rightarrow \calR$ where $\calR \subseteq \Reals$.
+
+## Predicting Survival Times {#sec-survtsk-time}
+
+Predicting a time to event is the problem of predicting the expectation $\hat{y}=\EE(Y|\xx)$.
+A time-to-event prediction is a special case of a ranking prediction as an individual with a longer survival time will have a lower overall risk: if $\hat{y}_i,\hat{y}_j$ and $\hat{r}_i,\hat{r}_j$ are survival time and ranking predictions for subjects $i$ and $j$ respectively, then $\hat{y}_i > \hat{y}_j \Rightarrow \hat{r}_i < \hat{r}_j$.
+
+For practical purposes, the expected time-to-event would be the ideal prediction type as it is easy to interpret and communicate.
+However, this type of prediction is rare for multiple reasons. For one, an usuall loss based on $f(y_i)$ or some difference of true and predicted value, $y_i-\hat{y}_i$ is not, suitable for censored data, as $y_i$ is not observed for some observations, so direct estimation/prediction of $\hat{y}_i = E(Y|\xx_i)$ requires some imputation of censored observations (and evaluation on new data can also only be done on observed or imputed values).
+
+Alternatively, one could derive the expectation by predicting the survival distribution while taking into account the censoring and obtain a time-to-event prediction by calculating expected values, but this brings its own challenges and pitfalls (see "Survival Distribution" below for details).
+
+Predicting survival times is the *deterministic survival task*, defined by predicting a continuous value in the positive Reals and is specified by $g: \calX \rightarrow \NNReals$.
+See @sec-conclusions-faq for practical discussion around predicting in $\NNReals$ vs. $\PReals$ and continuous vs discrete time representations.
+Formally, whilst this is a special case of the ranking task with $\calR \subseteq \NNReals$, the distinction is important as a 'deterministic' prediction specifically refers to forecasting a single determined outcome with a meaningful interpretation, whereas the 'ranking' task is not a deterministic forecast of an event.
+
+<!-- FIXME add example -->
+
+## Prognostic Index Predictions {#sec-survtsk-PI}
+
+In medical terminology (which is often used in survival analysis), a prognostic index is a tool that predicts outcomes based on risk factors.
+Given covariates, $\XX \in \Reals^{n \times p}$, and coefficients, $\bsbeta \in \Reals^p$, the *linear predictor* is defined as $\bseta := \XX\bsbeta$.
+Applying some function $g$, which could simply be the identity function $g(x) = x$, yields a *prognostic index*, $g(\bseta)$.
+A prognostic index can serve several purposes, including:
+
+1. Scaling or normalization -- simple functions to scale the linear predictor can better support interpretation and visualisation;
+2. Capturing non-linear effects -- for example the Cox PH model (@sec-models-classical) applies the transformation $g(\bseta) = \exp(\bseta)$ to capture more complex relationships between features and outcomes;
+3. Aiding in interpretability -- in some cases this could simply be $g(\bseta) = -\bseta$ to ensure the 'higher value implies higher risk' interpretation.
+
+A prognostic index is a special case of the survival ranking task, assuming that there is a one-to-one mapping between the prediction and expected survival times.
+Once again, it is assumed in this book that a higher value for the prognostic index implies higher risk of event.
+
+<!-- FIXME example needed -->
+
+## Predicting Distributions {#sec-survtsk-dist}
+
+Predicting a survival distribution refers specifically to predicting the distribution of a subject's survival time, i.e., modelling the distribution of the event occurring over $\NNReals$.
+Therefore, this is seen as the probabilistic analogue to the deterministic time-to-event prediction.
+
+Distributional prediction can, in theory, target any of the quantities introduced in @sec-distributions, but predicting $S(t)$ and/or $h(t)$ is most common.
+Hazard based approaches are particularly relevant for non- and semi-parametric estimation of the distribution, where no (or few) assumptions are made about the underlying distribution of event times.
+
+As mentioned above, all prediction types can theoretically be derived from a survival distribution prediction.
+For example, a time-to-event prediction can be obtained via $E(Y|\xx) = \int_0^\infty \hat{S}(t)$.
+However, for non-parametric methods the estimated cdf is often improper in the presense of censoring and thus integration requires extrapolation of the cdf [@Sonabend2022].
+For parametric models, the distribution of event times is fully specified once the paramers of the assumed distribution have been estimated, however, if the parameters were estimated based on only a small subset of the possible domain of $Y$, this essentially still constitutes extrapolation and will in most cases yield implausible predictions.
+A popular alternative is therefore to estimate the *restricted mean survival time* (RMST; @han.restricted.2022; @andersen.regression.2004).
+
+Predicting survival distributions is a type of *probabilistic survival task*, defined by predicting a conditional distribution over the positive Reals, $g: \calX \rightarrow \calS$ where $\calS \subseteq \Distr(\NNReals)$ is a convex set of distributions on $\NNReals$.
+
+<!-- FIXME: Example + Illustration -->
+
+## Conclusion
+
+:::: {.callout-warning icon=false}
+
+## Key takeaways
+
+* There are three survival tasks: probabilistic, deterministic, and ranking;
+* Probabilistic tasks predict a survival distribution, which is the probability of an event occurring over time;
+* Deterministic tasks predict a survival time, which is a useful value but hard to estimate and evaluate in practice;
+* Ranking tasks predict ranks that can be compared within cohorts to identify relative risks. Predicting a prognostic index is a special case of a ranking prediction.
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* 
+
+::::
