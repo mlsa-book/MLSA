@@ -2,7 +2,9 @@
 abstract: TODO (150-200 WORDS)
 ---
 
-{{< include _setup.qmd >}}
+::: {.content-visible when-format="html"}
+{{< include _macros.tex >}}
+:::
 
 # Neural Networks
 
@@ -178,7 +180,7 @@ which is smoothed with cubic splines  [@Efron1988] that require tuning.
 
 A cross-entropy error function is used for training
 $$
-L(\hath, \theta|\dtrain, a) = - \sum^M_{m = 1} \Big[\hat{h}_m \log \Big(\frac{h_l(X_i, a_l)}{\hat{h}_m}\Big) + (1 - \hat{h}_m) \log \Big(\frac{1 - h_l(X_i, a_l)}{1 - \hat{h}_m}\Big)\Big]n_m
+L(\hat{h}, \theta|\dtrain, a) = - \sum^M_{m = 1} \Big[\hat{h}_m \log \Big(\frac{h_l(X_i, a_l)}{\hat{h}_m}\Big) + (1 - \hat{h}_m) \log \Big(\frac{1 - h_l(X_i, a_l)}{1 - \hat{h}_m}\Big)\Big]n_m
 $$
 where $h_l(X_i, a_l)$ is the discrete hazard $h_l$ with smoothing at mid-points $a_l$.  Weight decay can be applied and the authors suggest $\lambda \approx 0.01-0.1$  [@Biganzoli1998], though they make use of an AIC type criterion instead of cross-validation.
 
@@ -187,10 +189,10 @@ This model makes smoothed hazard predictions at a given time-point, $\tau$, by i
 No formal comparison is made to simpler model classes. The authors recommend ANNs primarily for exploration, feature selection, and understanding underlying patterns in the data  [@Biganzoli2009].
 
 **Nnet-survival** {#mod-nnetsurvival}\\
-Aspects of the PLANN algorithm have been generalised into discrete-time survival algorithms in several papers  [@Gensheimer2019; @Kvamme2019; @Mani1999; @Street1998]. Various estimates have been derived for transforming the input data to a discrete hazard or survival function. Though only one is considered here as it is the most modern and has a natural interpretation as the 'usual' Kaplan-Meier estimator for the survival function. Others by Street (1998)  [@Street1998] and Mani (1999)  [@Mani1999] are acknowledged. The discrete hazard estimator (@eq-surv-dischaz), $\hath$, is estimated and these values are used as the targets for the ANN. For the error function, the mean negative log-likelihood for discrete time  [@Kvamme2019] is minimised to estimate $\hat{h}$,
+Aspects of the PLANN algorithm have been generalised into discrete-time survival algorithms in several papers  [@Gensheimer2019; @Kvamme2019; @Mani1999; @Street1998]. Various estimates have been derived for transforming the input data to a discrete hazard or survival function. Though only one is considered here as it is the most modern and has a natural interpretation as the 'usual' Kaplan-Meier estimator for the survival function. Others by Street (1998)  [@Street1998] and Mani (1999)  [@Mani1999] are acknowledged. The discrete hazard estimator (@eq-surv-dischaz), $\hat{h}$, is estimated and these values are used as the targets for the ANN. For the error function, the mean negative log-likelihood for discrete time  [@Kvamme2019] is minimised to estimate $\hat{h}$,
 $$
 \begin{split}
-L(\hath, \theta|\dtrain) = -\frac{1}{n} \sum^n_{i=1}\sum^{k(T_i)}_{j=1} (\II(T_i = \tau_j, \Delta_i = 1) \log[\hat{h}_i(\tau_j)] \ + \\
+L(\hat{h}, \theta|\dtrain) = -\frac{1}{n} \sum^n_{i=1}\sum^{k(T_i)}_{j=1} (\II(T_i = \tau_j, \Delta_i = 1) \log[\hat{h}_i(\tau_j)] \ + \\
  (1-\II(T_i = \tau_j, \Delta_i = 1))\log(1 - \hat{h}_i(\tau_j)))
 \end{split}
 $$
@@ -267,7 +269,7 @@ L_1(\hatT, \theta|\dtrain) = \frac{1}{n} \sum_{\{i: I(i) = 1\}} (\hat{T}_i - T_i
 \quad I(i) =
 \begin{cases}
 1, & \Delta_i = 1 \cup (\Delta_i = 0 \cap \hat{T}_i \leq T_i) \\
-0, & \otherw
+0, & \text{otherwise}
 \end{cases}
 $$
 $$
@@ -276,7 +278,7 @@ L_2(\hatT, \theta|\dtrain) = \frac{1}{n}\sum^n_{\{i,j : I(i,j) = 1\}} [(T_j - T_
 I(i,j) =
 \begin{cases}
 1, & T_j - T_i > \hat{T}_j - \hat{T}_i \\
-0, & \otherw
+0, & \text{otherwise}
 \end{cases}
 $$
 where $\hat{T}_i$ is the predicted survival time for observation $i$. A clear contrast can be made between these loss functions and the constraints used in SSVM-Hybrid  [@VanBelle2011b] (@sec-surv-ml-models-svm-surv). $L_1$ is the squared second constraint in \ref{eq:surv_ssvmvb2} and $L_2$ is the squared first constraint in \ref{eq:surv_ssvmvb2}. However $L_1$ in RankDeepSurv discards the squared error difference for all censored observations when the prediction is lower than the observed survival time; which is problematic as if someone is censored at time $T_i$ then it is guaranteed that their true survival time is greater than $T_i$ (this constraint may be more sensible if the inequality were reversed). An advantage to this loss is, like the SSVM-Hybrid, it enables a survival time interpretation for a ranking optimised model; however these 'survival times' should be interpreted with care.

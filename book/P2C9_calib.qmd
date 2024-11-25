@@ -2,7 +2,9 @@
 abstract: TODO (150-200 WORDS)
 ---
 
-{{< include _setup.qmd >}}
+::: {.content-visible when-format="html"}
+{{< include _macros.tex >}}
+:::
 
 # Calibration Measures {#sec-eval-distr-calib}
 
@@ -21,49 +23,43 @@ A point-calibration measure will evaluate a function of the predicted distributi
 Point calibration measures can be further divided into metrics that evaluate calibration at a single time-point (by reduction) and measures that evaluate an entire distribution by only considering the event time.
 The difference may sound subtle but it affects conclusions that can be drawn.
 In the first case, a calibration measure can only draw conclusions at that one time-point, whereas the second case can draw conclusions about the calibration of the entire distribution.
-This is the same caveat as using prediction error curves for scoring rules.
-
-```{r echo=FALSE}
-learn("sec-pecs", "prediction error curves")
-```
+This is the same caveat as using prediction error curves for scoring rules (@sec-pecs).
 
 ### Calibration by Reduction
 
-Point calibration measures are implicitly reduction methods as they use classification methods to evaluate a full distribution based on a single point only.
+Point calibration measures are implicitly reduction methods as they use classification methods to evaluate a full distribution based on a single point only (@sec-car).
 For example, given a predicted survival function $\hatS$, one could calculate the survival function at a single time point, $\hatS{\tau}$ and then use probabilistic classification calibration measures.
 Using this approach one may employ common calibration methods such as the Hosmer–Lemeshow test [@Hosmer1980].
 Measuring calibration in this way can have significant drawbacks as a model may be well-calibrated at one time-point but poorly calibrated at all others [@Haider2020].
 To mitigate this, one could perform the Hosmer–Lemeshow test (or other applicable tests) multiple times with multiple testing correction at many (or all possible) time points, however this would be less efficient and more difficult to interpret than other measures discussed in this chapter.
 
-```{r echo=FALSE}
-learn("sec-car", "reduction")
-```
-
 ### Houwelingen's $\alpha$ {#sec-alpha}
 
 As opposed to evaluating distributions at one or more arbitrary time points, one could instead evaluate distribution predictions at meaningful times.
 van Houwelingen proposed several measures [@VanHouwelingen2000] for calibration but only one generalises to all probabilistic survival models, termed here 'Houwelingen's $\alpha$'.
-The measure assesses if the model correctly estimates the theoretical 'true' cumulative hazard function of the underlying data generating process, $H = \hatH$.
+The measure assesses if the model correctly estimates the theoretical 'true' cumulative hazard function of the underlying data generating process, $H = \hat{H}$.
 
 The statistic is derived by noting the closely related nature of survival analysis and counting processes, and exploiting the fact that the sum of the cumulative hazard function is an estimate for the number of events in a given time-period [@dataapplied].
 As this result may seem surprising, below is a short experiment using $\Rstats$ that demonstrates how the sum of the cumulative hazard estimated by a Kaplan-Meier estimator is identical to the number of randomly simulated deaths in a dataset:
-```{r}
-#| collapse: true
-#| results: 'markup'
-#| comment: '#>'
-set.seed(42)
-library(survival)
 
-event = rbinom(100, 1, 0.7)
-times = runif(100)
-H = survfit(Surv(times, event) ~ 1)$cumhaz
-c("Num deaths" = sum(event), "Sum H" = sum(H))
+<!-- actual experiment in _experiments.R -->
+```
+    set.seed(42)
+    library(survival)
+
+    event = rbinom(100, 1, 0.7)
+    times = runif(100)
+    H = survfit(Surv(times, event) ~ 1)$cumhaz
+    c("Deaths" = sum(event), "Sum H" = sum(H))
+
+    #> Deaths      Sum H 
+    #>     66         66
 ```
 
 Houwelingen's $\alpha$ is then defined by substituting $H$ for the observed total number of deaths and summing over all predictions:
 
 $$
-H_\alpha(\dd, \hatHH, \tt) = \frac{\sum_i \delta_i}{\sum_i \hatHH_i(t_i)}
+H_\alpha(\bsdelta, \hat{\mathbf{H}}, \tt) = \frac{\sum_i \delta_i}{\sum_i \hat{H}_i(t_i)}
 $$
 
 with standard error $SE(H_\alpha) = \exp(1/\sqrt{\sum_i \delta_i})$.
@@ -117,10 +113,10 @@ The observed number of events in $b_i$ is then the number of observations in tha
 The D-Calibration measure, or $\chi^2$ statistic, is now defined by,
 
 $$
-D_{\chi^2}(\hatSS, \tt) :=  \frac{\sum^B_{i = 1} (O_i - \frac{m}{B})^2}{m/B}
+D_{\chi^2}(\hat{\mathbf{S}}, \tt) :=  \frac{\sum^B_{i = 1} (O_i - \frac{m}{B})^2}{m/B}
 $$
 
-where $\hatSS = (\hat{S}_1 \ \hat{S}_2 \cdots \hat{S}_m)^\trans$ and $\tt = (t_1 \ t_2 \cdots t_m)^\trans$.
+where $\hat{\mathbf{S}} = (\hat{S}_1 \ \hat{S}_2 \cdots \hat{S}_m)^\trans$ and $\tt = (t_1 \ t_2 \cdots t_m)^\trans$.
 
 This measure has several useful properties.
 Firstly, one can test the null hypothesis that a model is 'D-calibrated' by deriving a $p$-value from comparison to $\chi^2_{B-1}$.
