@@ -53,7 +53,7 @@ As well as the Brier score, which was defined above, another widely used loss is
 
 $$
 L_{logloss}(\hatp_i, y_i) = -\log \hat{p}_i(y_i)
-$$
+$$ {#eq-logloss}
 
 These losses are visualised in @fig-eval-brierlog, which highlights that both losses are strictly proper [@Dawid2014] as they are minimized when the true prediction is made, and converge to the minimum as predictions are increasingly improved.
 
@@ -67,8 +67,9 @@ The loss is *strictly proper* if, in addition, $p = p_Y$ uniquely minimizes the 
 
 With these definitions, the rest of this chapter lists common scoring rules in survival analysis and discusses some of their properties.
 As with other chapters, this list is likely not exhaustive but will cover commonly used losses.
+The losses are grouped into squared losses, absolute losses, and logarithmic losses, which respectively estimate the mean squared error, mean absolute error, and logloss in uncensored settings.
 
-### Integrated Graf Score
+### Squared Losses
 
 The Integrated Graf Score (IGS) was introduced by Graf [@Graf1995; @Graf1999] as an analogue to the integrated brier score (IBS) in regression.
 It is likely the commonly used scoring rule in survival analysis, possibly due to its intuitive interpretation.
@@ -147,57 +148,53 @@ In practice, the difference between these weights appears to be minimal [@Sonabe
 <!-- FIXME: CITAITON ABOVE TO PROPERNESS PAPER -->
 
 
-### Integrated Survival Log Loss
+### Logarithmic losses
 
-<!-- FIXME - SHOULD WE JUST DELETE? -->
-
-The integrated survival log loss (ISLL) was also proposed by @Graf1999.
-
-$$
-L_{ISLL}(\hatS_i,t_i,\delta_i|\KMG) = -\int^{\tau^*}_0  \frac{\log[\hatF_i(\tau)] \II(t_i \leq \tau, \delta_i=1)}{\KMG(t_i)} + \frac{\log[\hatS_i(\tau)] \II(t_i > \tau)}{\KMG(\tau)} \ d\tau
-$$
-
-where $\tau^* \in \PReals$ is an upper threshold to compute the loss up to.
-
-Similarly to the IGS, there are three ways to contribute to the loss depending on whether an observation is censored, experienced the event, or alive, at $\tau$.
-Whilst the IGS is routinely used in practice, there is no evidence that ISLL is used, and moreover there are no proofs (or claims) that it is proper.
-
-The reweighted ISLL (RISLL) follows similarly to the RIGS and is also outcome-independent strictly proper [@Sonabend2022b].
+The development of logarithmic losses follows from adapting the negative likelihood for censored datasets.
+Consider the usual negative likelihood in a regression setting, which is a standard measure for evaluating a model's performance:
 
 $$
-L_{RISLL}(\hatS_i, t_i, \delta_i|\KMG) = -\delta_i\II(t_i \leq \tau^*) \int^{\tau^*}_0 \frac{\II(t_i \leq \tau)\log[\hatF_i(\tau)] + \II(t_i > \tau)\log[\hatS_i(\tau)] \ d\tau}{\KMG(t_i)}
+L_{NLL}(\hatf_i, y_i) = -\log[\hatf(y_i)]
 $$
 
+for a predicted density function $\hatf_i$ and true outcome $y_i$.
+Note this is analagous to the classification log loss in @eq-logloss with the probably mass function replaced with the density function.
 
-### Survival density log loss
-
-Another outcome-independent strictly proper scoring rule is the survival density log loss (SDLL) [@Sonabend2022b], which is given by
+Now recall @eq-objective-function from @sec-surv-obj, which gives the contribution from a single observation as
 
 $$
-L_{SDLL}(\hatf_i, t_i, \delta_i|\KMG) = - \frac{\delta_i \log[\hatf_i(t_i)]}{\KMG(t_i)}
+\mathcal{L}(t_i) \propto
+\begin{dcases}
+f(t_i), & \text{ if $i$ is uncensored } \\
+S(t_i), & \text{ if $i$ is right-censored } \\
+F(t_i), & \text{ if $i$ is left-censored } \\
+S(l_i)-S(r_i), & \text{ if $i$ is interval-censored } \\
+\end{dcases}
 $$
+where $r_i, l_i$ are the boundaries on interval-censoring.
 
-where $\hatf_i$ is the predicted probability density function.
-This loss is essentially the classification log loss ($-\log(\hatp_i(t_i))$) with added IPCW.
-Whilst the classification log loss has beneficial properties such as being differentiable, this is more complex for the SDLL and it is not widely used in practice.
-A useful alternative to the SDLL which can be readily used in automated procedures is the right-censored log loss.
+These values are inflated as necessary if truncation is present in the data (@sec-surv-obj).
 
-### Right-censored log loss
-
-The right-censored log loss (RCLL) is an outcome-independent strictly proper scoring rule [@Avati2020] that benefits from not depending on IPCW in its construction.
-The RCLL is defined by
+The log-loss can then be constructed depending on what type of censoring or truncation is present in the data.
+For example, if only right-censoring is present then the right-censored logloss (RCLL) is defined as:
 
 $$
 L_{RCLL}(\hatS_i, t_i, \delta_i) = -\log[\delta_i\hatf_i(t_i) + (1-\delta_i)\hatS_i(t_i)]
 $$
 
-This loss is interpretable when we break it down into its two halves:
+This is an outcome-independent strictly proper scoring rule [@Avati2020] that is clearly derived from the results above and is highly interpretable as a measure of predictive performance when broken down into its two halves:
 
-1. If an observation is censored at $t_i$ then all the information we have is that they did not experience the event at the time, so they must be 'alive', hence the optimal value is $\hatS_i(t_i) = 1$ (which becomes $-log(1) = 0$).
-2. If an observation experiences the event then the 'best' prediction is for the probability of the event at that time to be maximised, as pdfs are not upper-bounded this means $\hatf_i(t_i) = \infty$ (and $-log(t_i) \rightarrow \infty$ as $t_i \rightarrow \infty$).
+1. If an observation is censored at $t_i$ then all the information we have is that they did not experience the event at the time, so they must be 'alive', hence the optimal value is $\hatS_i(t_i) = 1$ (which becomes $-\log(1) = 0$).
+2. If an observation experiences the event then the 'best' prediction is for the probability of the event at that time to be maximised, as pdfs are not upper-bounded this means $\hatf_i(t_i) = \infty$ (and $-\log(t_i) \rightarrow \infty$ as $t_i \rightarrow \infty$).
 
-### Absolute Survival Loss
+Analagous losses follow when left- and/or interval-censoring is present.
 
+Other logarithmic losses have also been proposed, such as the integrated survival log loss (ISLL) in @Graf1999.
+However, there is no evidence that this is used in practice nor that it yields any benefit over other, more common, losses.
+
+### Absolute Losses
+
+The final class of losses considered estimate the mean absolute error in an uncensored setting.
 The absolute survival loss, developed over time by @Schemper2000 and @Schmid2011, is based on the mean absolute error is very similar to the IGS but removes the squared term:
 
 $$
@@ -235,14 +232,47 @@ As well as directly comparing losses from a 'sophisticated' model to a baseline,
 For any survival loss $L$, the ERV is,
 
 $$
-R_L(S, B) = 1 - \frac{L|S}{L|B}
+R_L(S, B) = 1 - \frac{L_{|S}}{L_{|B}}
 $$
 
-where $L|S$ and $L|B$ is the loss computed with respect to predictions from the sophisticated and baseline models respectively.
+where $L_{|S}$ and $L_{|B}$ is the loss computed with respect to predictions from the sophisticated and baseline models respectively.
 
 The ERV interpretation makes reporting of scoring rules easier within and between experiments.
-For example, say in experiment A we have $L|S = 0.004$ and $L|B = 0.006$, and in experiment B we have $L|S = 4$ and $L|B = 6$.
+For example, say in experiment A we have $L_{|S} = 0.004$ and $L_{|B} = 0.006$, and in experiment B we have $L_{|S} = 4$ and $L_{|B} = 6$.
 The sophisticated model may appear worse at first glance in experiment A (as the losses are very close) but when considering the ERV we see that the performance increase is identical (both $R_L = 33\%$), thus providing a clearer way to compare models.
+
+## Beyond single-event
+<!-- FIXME: ARE THESE BEST REFERENCES? WOULD LIKE ACCESS TO SCHOOP 2011 -->
+The most common methods to extend these measures to competing risks is by summing the cause-specific probabilities [@vanGeloven2022, @Lee2018a].
+To recap, given $k$ possible events then the cause-specific hazard for an event is defined as $h_{e}$:
+
+$$
+h_{e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}, \; e = 1, \dots, k.
+$$
+
+where $Y$ is the random variable representing the time-to-event and $E\in \{1,\ldots,k\}$ is the random variable with realisations $e$, which denotes one of $k$ competing events that can occur at event time $Y$.
+Given the cause-specific hazard $h_e$, one can then derive the cause-specific survival, $S_e$, density, $f_e$, and cumulative distribution function, $F_e$; from which all above measures can be computed.
+For example, the right-censored log-loss for event $e$ is defined as
+
+$$
+L^e_{RCLL;i}(\hatS_{i;e}, t_i, \delta_i) = -\log[\delta_i\hatf_{i;e}(t_i) + (1-\delta_i)\hatS_{i;e}(t_i)]
+$$
+
+A measure of overall predictive performance can then be defined as
+
+$$
+L^A_{RCLL} = \sum^k_{e=1} \frac{1}{n} \sum^n_{i=1} L^e_{RCLL;i}(\hatS_{i;e}, t_i, \delta_i)
+$$ {#eq-surv-rcll-cr}
+
+This 'all-cause' loss could then be minimized in an automated procedure and/or used for model comparison.
+This assumes that better/worse performance should be treated the same for all causes.
+However, if this is not the case then either a weighted sum needs to be applied, or multi-objective optimization methods must be used [@Morales-Hernandez2023].
+
+Note that dividing @eq-surv-rcll-cr by $k$ to find the average performance is not useful in practice.
+As already stated, the numerical value of a loss rule does not have any inherent meaning beyond comparison to another model's performance within the same experiment, hence dividing all losses by the same constant (i.e., $k$) does not change the interpretation.
+
+
+
 
 ## Conclusion
 
@@ -262,7 +292,7 @@ The sophisticated model may appear worse at first glance in experiment A (as the
 
 * Scoring rules can be difficult to interpret but ERV representations can be a helpful way to overcome this.
 * There is no consensus about which scoring rule to use and when so in practice multiple scoring rules may have to be reported in experiments to ensure transparency and fairness of results.
-* For non- and semi-parametric survival models that return distribution predictions, estimates of $f(t)$ are not readily available and require approximations [@Rindt2022], hence measures such as RCLL and SDLL can often not be directly used in practice.
+* For non- and semi-parametric survival models that return distribution predictions, estimates of $f(t)$ are not readily available and require approximations [@Rindt2022], hence logarithmic losses such as RCLL can often not be directly used in practice.
 
 ::::
 
