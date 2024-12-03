@@ -6,15 +6,91 @@ abstract: TODO (150-200 WORDS)
 {{< include _macros.tex >}}
 :::
 
-# Choosing Measures {#sec-eval-choose}
+# Practical Considerations {#sec-eval-choose}
 
 {{< include _wip_minor.qmd >}}
 
 After reading this part of the book, evaluating survival analysis models may appear more daunting than regression and classification settings, which, in contrast, have fewer (common) measures to choose from.
 In regression problems, the RMSE and MAE are common choices for evaluating how far predictions are from the truth.
 In classification, the Brier score or logloss may be used to evaluate probabilistic predictions and the accuracy score or TPR/TNR/FPR/FNR are common for deterministic predictions.
-In contrast, there are many more measures in survival analysis which are necessarily more complex, due to the need to handle censoring with many possible methods for doing so.
-Therefore, this final chapter aims to provide some simple to follow guidelines for selecting measures for different types of experiments.
+In contrast, there are many more measures in survival analysis which are necessarily more complex, due to the need to handle censoring.
+Moreover, this Part of the book has only considered the single-event setting thus far.
+
+Therefore, this final chapter aims to provide some simple practical guidelines for selecting measures for different types of experiments and for extending measures to competing risk settings.
+
+## Competing risks
+
+Following the same measure grouping as in the rest of this Part of the book, we now examine how measures can be extended to the competing risks setting.
+Discrimination measures and scoring rules are grouped together as their competing risk extensions are the same.
+
+### Discrimination measures and scoring rules
+
+Discrimination measures and scoring rules are usually extended to the competing risk setting by either evaluating cause-specific probabilities individually [@vanGeloven2022; @Lee2018a] and then potentially summing or averaging over cause-specific evaluations.
+
+To recap, given $k$ possible events then the cause-specific hazard for an event is defined as $h_{e}$:
+
+$$
+h_{e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}, \; e = 1, \dots, k.
+$$
+
+where $Y$ is the random variable representing the time-to-event and $E\in \{1,\ldots,k\}$ is the random variable with realizations $e$, which denotes one of $k$ competing events that can occur at event time $Y$.
+Given the cause-specific hazard $h_e$, one can then derive the cause-specific survival, $S_e$, density, $f_e$, and cumulative distribution function, $F_e$; from which all above measures can be computed.
+For example, the right-censored log-loss for event $e$ is defined as
+
+$$
+L^e_{RCLL;i}(\hatS_{i;e}, t_i, \delta_i) = -\log[\delta_i\hatf_{i;e}(t_i) + (1-\delta_i)\hatS_{i;e}(t_i)]
+$$
+
+A measure of overall predictive performance can then be defined as
+
+$$
+L^A_{RCLL} = \sum^k_{e=1} \frac{1}{n} \sum^n_{i=1} L^e_{RCLL;i}(\hatS_{i;e}, t_i, \delta_i)
+$$ {#eq-surv-rcll-cr}
+
+This 'all-cause' loss could then be minimized in an automated procedure and/or used for model comparison.
+This assumes that better/worse performance should be treated the same for all causes.
+However, if this is not the case then either a weighted sum needs to be applied, or multi-objective optimization methods must be used [@Morales-Hernandez2023].
+Note that dividing @eq-surv-rcll-cr by $k$ to find the average performance is not useful in practice.
+As already stated, the numerical value of a loss rule does not have any inherent meaning beyond comparison to another model's performance within the same experiment, hence dividing all losses by the same constant (i.e., $k$) does not change the interpretation.
+
+In a discrimination context, analogous results have been proposed.
+In a single-event setting, a pair of observations, $(i,j)$, with outcomes $\{(t_i,\delta_i),(t_j,\delta_j)\}$, and predicted risk predictions, $r_i,r_j \in \Reals$, are called comparable if $t_i < t_j$ and $\delta_i = 1$; and concordant if also $r_i > r_j$.
+In a competing risks setting, for an event of interest $e$, the observations are [@vanGeloven2022]:
+
+* *Comparable* if $t_i < t_j$ and $\delta_{ie} = 1$; and
+* *Concordant* if $r_i > r_j$
+
+Where $\delta_{ie} = 1$ is equivalent to $\II(Y_i \leq C_i \wedge E_i = e)$.
+
+The usual definition of concordance measures then follow given this additional conditioning on the event of interest $e$.
+In practice, given that competing risk models estimate cause-specific hazard functions, it is Antolini's time-dependent concordance measure that suits the competing risks setting best.
+Hence for an event $e$, the measure is given by:
+
+$$
+C(\hat{\mathbf{h}}_e, \tt, \bsdelta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, \hat{h}_{e_i}(t_i) > \hat{h}_{e_j}(t_i), t_i < \tau)\delta_{ie}}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_{ie}}
+$$
+
+where $\dvec{\hat{h}_e}{m}$ are cause specific hazards for individual observations risk of event $e$.
+
+In contrast to scoring rules, the average performance over all causes when using concordance measures could be more meaningful than just the sum.
+
+### Calibration measures
+
+Numerical methods have been proposed for calibration in a competing risk setting, including using pseudo-measures [@Schoop2011] and overall calibration ratios [@vanGeloven2022].
+However, these are complex to implement and interpret and therefore graphical methods are more often used in practice [@Monterrubio2024].
+
+Recall the single-event setting where predictions of the survival function are plotted against the 'true' survival distribution, i.e., the Kaplan-Meier estimator fit on the testing data.
+In the competing risks setting, an analogous process is followed but in this case by plotting the predicted vs 'true' cumulative incidence function [@Austin2022; @Wolbers2009].
+
+As discussed in @sec-eval-distr-calib, interpreting and using calibration measures is complex enough in the single event setting.
+In the competing risks setting, it is even harder to understand exactly what is being calibrated and how by looking at multiple plots.
+Moreover, considering that these plots are often computed at multiple time-points and then for multiple events of interest, it is easy to imagine having to decipher 10s or even 100s of plots.
+Using scoring rules to capture calibration performance in the competing risks setting is likely to be more straightforward.
+
+### Survival time predictions
+
+In a competing risks setting, there is no obvious metric to evaluate survival time predictions, primarily because there is no meaningful interpretation for an 'all-cause survival time' or a 'cause-specific survival time'.
+If an observation could realistically experience one of multiple, mutually-exclusive events, then predicting the time to one particular event has no inherent meaning without first attaching a probability of the event taking place (i.e., the CIF), hence evaluating this probability is a more sensible approach for evaluating a competing risks model's predictive performance.
 
 ## Defining the experiment
 
