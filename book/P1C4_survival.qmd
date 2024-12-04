@@ -28,6 +28,18 @@ Hence, it is of utmost importance for machine learning practitioners to be able 
 
 This section introduces functions that can be used to fully characteristise a probability distribution, particular focus is given to functions that are important in survival analysis.
 
+Note that we can generally distinguish between event taking place in discrete time or continuous time.
+For example, consider the time a politician serves in parliament.
+If we consider the number of election cycles they stay in parliament, it would constitute discrete time, as time can only take values, $1, 2, 3, \ldots$, that is $T\in \mathbb{N}_{>0}$.
+On the other hand, the time an individual stays in hospital is usually determined as the difference between the admission date-time and discharge date-time, which would constitute a continous time $T\in \mathbb{R}_{\geq 0}$.
+
+In practice the differences are often blurred as time-measurement will naturally be discretized at some level and precision beyond some resolution is often not of interest (hospital length of stay might be interesting up to days or hours, but not minutes and seconds).
+Also discrete-time methods are often applied to continuous time data and vice versa.
+It is nevertheless important to make the distinction as it informs mathematical treatment and definition of the different quantities introduced below.
+
+
+### Continuos Time {#sec-distributions-continuous}
+
 For now, assume a continuous, positive, random variable $Y$ taking values in (t.v.i.) $\NNReals$.
 A standard representation of the distribution of $Y$ is given by the probability density function (pdf), $f_Y: \NNReals \rightarrow \NNReals$, and cumulative distribution function (cdf), $F_Y: \NNReals \rightarrow [0,1]; (\tau) \mapsto P(Y \leq \tau)$.
 
@@ -39,10 +51,10 @@ which is the probability that an event has not occurred by $\tau \geq 0$ and thu
 
 The hazard function is given by
 $$
-h_Y(\tau) = \lim_{\Delta \searrow 0}\frac{P(\tau \leq Y < \tau + \Delta|Y \geq \tau)}{\Delta} = \frac{f_Y(\tau)}{S_Y(\tau)}.
+h_Y(\tau) = \lim_{\triangle \searrow 0}\frac{P(\tau \leq Y < \tau + \triangle|Y \geq \tau)}{\triangle} = \frac{f_Y(\tau)}{S_Y(\tau)},
 $${#eq-continuous-hazard}
 
-and is interpreted as the instantaneous risk of observing an event at $\tau$, given that the event has not been observed before $\tau$.
+where $\triangle$ denotes a time-interval. The hazard rate is often interpreted as the instantaneous risk of observing an event at $\tau$, given that the event has not been observed before $\tau$.
 This is not a probability and $h_Y$ can be greater than one.
 
 The cumulative hazard function (chf) can be derived from the hazard function by
@@ -62,6 +74,54 @@ $$S_Y(\tau) = \exp(-H_Y(\tau)) = \exp\left(-\int_0^\tau h_Y(u)\ du\right).$${#eq
 Unless necessary to avoid confusion, subscripts are dropped from $S_Y, h_Y$ etc. going forward and instead these functions are referred to as $S$, $h$ (and so on).
 
 Usual regression techniques cannot be used to estimate these quantities as $Y$ is only partially observed, due to different types of censoring and truncation, which are now described.
+
+
+
+### Discrete Time {#sec-distributions-discrete}
+
+Now consider a discrete, positive random variable $\tilde{Y}$ taking value in $\mathbb{N}_{>0}$ and $\tau\in \mathbb{N}_{>0}$ some timepoint in discrete time.
+
+The discrete-time hazard rate
+
+$$
+h^d_{\tilde{Y}}(\tau) = P(\tilde{Y}=\tau|\tilde{Y} \geq \tau).
+$$ {#eq-discrete-hazard}
+
+Note that in contrast to the continuous time hazard @eq-continuous-hazard, the discrete time hazard is a conditional probability, rather than a rate and therefore might be easier to interpret.
+
+The cumulative discrete time hazard is given by
+
+$$
+H^d_{\tilde{Y}}(\tau) = \sum_{k=1}^{\tau}h^d_{\tilde{Y}}(k)
+$$ {#eq-discrete-cumu-hazard}
+
+We then define the inverse probability
+$$
+s^d_{\tilde{Y}}(\tau) := 1 - h^d_{\tilde{Y}}(\tau) = P(\tilde{Y}> \tau|\tilde{Y} \geq \tau).
+$$
+
+It then follows that the probability to survive beyond time point $\tau$ is given by
+
+
+$$
+S^d_{\tilde{Y}} = P(\tilde{Y} > \tau) = \prod_{k\leq\tau} s^d_{\tilde{Y}}(\tau) = \prod_{k\leq\tau}(1-h^d_{\tilde{Y}}(\tau))
+$$ {#eq-discrete-surv-prob}
+
+
+When applied to continuous time $Y$, the follow-up is devided in $J$ disjunct intervals $(a_0,a_{1}],\ldots,(a_{j-1},a_j]\ldots, (a_{J-1},a_{J}],j=1,\ldots,J$ such that
+
+$$Y \in (a_{j-1}, a_j]\Leftrightarrow \tilde{Y} = j .$$
+Thus,
+
+$$h^d_{\tilde{Y}}(j) = P(Y \in (a_{j-1},a_j]|Y > a_{j-1}),$$
+
+and
+$$S^d_{\tilde{Y}}(j) = P(Y > a_{j}) = S_Y(a_{j})$$
+
+
+For more details on discrete time-to-event analysis consider [@Tutz2016].
+
+
 
 ## Single-event, right-censored data {#sec-data-rc}
 
@@ -228,13 +288,13 @@ The fourth case is an example of interval-censoring, as we know the event occure
 
 
 Interval- and left-censoring also often occurs in medical contexts.
-For example, some guidelines suggest annual screenings for skin cancer.
+For example, some guidelines suggest annual screenings for skin cancer (starting from a certain age).
 However, the initial age at which individuals do screenings and regularity of check ups varies widely.
 If cancer was detected between two screenings, the observation is interval-censored.
 If cancer is detected at first screening, the observation is left-censored (unless the 'age' of the cancer can be narrowed down based on size and other characteristics, in which case it would become interval-censored).
 
 
-## Censoring Notation {.unnumbered .unlisted}
+### Censoring Notation {.unnumbered .unlisted}
 
 In the presense of left-or interval-censoring the usual representation of survival outcomes as $(t_i, \delta_i)$ is not sufficient to denote the different types of observations in the data set.
 Instead, we represent the data as intervals in which the event occurs.
@@ -371,7 +431,11 @@ In contrast, when we take left-truncation into account, subjects only enter the 
 * $n_{t_{(1)}} = 6$
 * $S(t_{(1)}) = 1 - \frac{1}{6} \approx 0.8$
 
-Thus, the definition of the KM estimator in @eq-km can still be used in case of left-truncation using the more general risk set definition $\calR_\tau = \{i: t_i^L \ \geq \tau \wedge t_i \geq \tau\}$
+Thus, the definition of the KM estimator in @eq-km can still be used in case of left-truncation using the more general risk set definition
+
+$$
+\calR_\tau = \{i: t_i^L \ \geq \tau \wedge t_i \geq \tau\}
+$$ {#eq-calR-general}
 
 
 
@@ -399,16 +463,16 @@ Overall this leads to a bias towards shorter incubation times and potentially fe
 
 
 As for left-truncation, ingoring right-truncation will lead to biased estimations.
-While for left-truncated data simple adjustments of the risk-set work for non- and semi-parametric methods like the Kaplan-Meier and Cox-type estimators, this is not the case for right-truncated data.
+While for left-truncated data simple adjustments of the risk set work for non- and semi-parametric methods like the Kaplan-Meier and Cox-type estimators, this is not the case for right-truncated data.
 However, parametric methods can be employed (see @sec-surv-obj) and generalised product limit estimators for right-truncated data exist [@akritasGeneralizedProductlimitEstimator2005].
 
 
-## Estimation  {#sec-surv-obj}
+## Estimation  {#sec-surv-estimation}
 
-While details about estimation will be given later, when different models are introduced in Part III of the book, it is worthwile discussing some general concepts here, namely parametric and non-parametric approaches.
+While details about estimation will be given later, when different models are introduced in Part III and Part IV of the book, it is worthwile discussing some general concepts here, namely parametric and non-parametric approaches.
 
 
-### Parametric estimation
+### Parametric estimation {#sec-surv-estimation-param}
 Consider for now uncensored data $(t_i, \delta_i=1), i=1,\ldots,n$.
 A standard approach would be to assume a suitable distribution for the event times $t_i \stackrel{iid}{\sim} F_Y(\boldsymbol{\theta}), \bstheta=(\theta_1,\theta_2,\ldots)^\top$, and define the likelihood of the data as
 <!--  -->
@@ -471,6 +535,36 @@ In case of truncation, the adjustments are made to all observations, as we have 
 
 
 Note that in in practice, data sets will often not contain all types of censoring or truncation, in which case @eq-objective-function will contain only a subset of the product terms. This has been illustrated in @eq-right-censoring-likelihood under absence of truncation and $\mathcal{LC}=\mathcal{IC}=\emptyset$.
+
+
+### Non-parametric estimation
+
+As the name suggests, non-parametric estimation (and semi-parametric estimation) techniques do not make (strong) assumptions about the underlying distribution of event times.
+
+A common principle for such techniques is to partition the follow into intervals or to define specific time-points during the follow-up and to estimate the continuous or discrete time hazards for each interval/time-point.
+Then based on the relationship between the hazard and other quantities (@sec-distributions) to derive the respective estimates, for example for the survival probability.
+
+The Kaplan-Meier estimator introduced earlier (@sec-surv-km) is an example for this principle.
+There, time-points $t_{(k)},\ k=1,\ldots,m$ are used to calculate the discrete time hazards $h^d(t_{(k)}) = P(Y\in (t_{(k-1)},t_{(k)}])=\frac{d_{t_{(k)}}}{n_{t_{(k)}}}$ (@eq-discrete-hazard).
+The survival probability and the definition of the Kaplan-Meier estimator (@eq-km) then follow from @eq-discrete-surv-prob.
+
+Similarly, the Nelson-Aalen estimator (@Nelson1972,@Aalen1978) for the discrete cumulative hazard (@eq-discrete-cumu-hazard) is defined as
+
+
+$$
+H_{NA}(\tau) = \sum_{t_{(k)}\leq \tau} \frac{d_{t_{(k)}}}{n_{t_{(k)}}}.
+$$ {#eq-nelson-aalen}
+
+
+Similar to the Kaplan-Meier estimator, $H_{NA}$ can deal with left-truncated data based on the general risk-set definition @eq-calR-general.
+
+
+Based on @eq-nelson-aalen Breslow (@Breslow1972) suggested a survival probability estimate using the relationship in @eq-surv-haz as
+
+$$
+S_{Breslow}(\tau) = \exp(-H_{NA}(\tau))
+$$ {#eq-breslow}
+
 
 
 
