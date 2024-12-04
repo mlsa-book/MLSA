@@ -41,7 +41,9 @@ Other sources may instead assume that higher values imply lower risk of event an
 
 Concordance measures then estimate the probability of a pair being concordant, given that they are comparable:
 
-$$P(r_i > r_j | t_i < t_j \cap \delta_i)$$
+$$
+P(r_i > r_j | t_i < t_j \cap \delta_i)
+$$ {#eq-cindex-prob}
 
 These measures are referred to as time *independent* when $r_i,r_j$ is not a function of time as once the observations are organised into comparable pairs, the observed survival times can be ignored.
 The time-dependent case is covered in @sec-eval-antolini.
@@ -245,3 +247,37 @@ Blanche $\etal$ (2013) [@Blanche2013] published a survey of C/D AUC measures wit
 Reviews of AUC measures have produced (sometimes markedly) different results [@Blanche2012; @Li2018; @Kamarudin2017] with no clear consensus on how and when these measures should be used.
 The primary advantage of these measures is to extend discrimination metrics to be time-dependent.
 However, it is unclear how to interpret a threshold of a linear predictor and moreover if this is even the 'correct' quantity to threshold, especially when survival distribution predictions are the more natural object to evaluate over time.
+
+## Beyond right-censoring
+
+### Truncation
+
+As one of the most prevalent types of measures in survival analysis, there has been more research into extensions for left-censoring and truncation.
+
+When only right-censoring is present, the objective of concordance measures is to estimate the probability that the ranking of two observations' risk is correctly specified (@eq-cindex-prob).
+The naive method to deal with left-truncation is to simply ignore it and use @eq-cindex as usual.
+Doing so yields an estimator, $C_N$, that converges in probability to
+
+$$
+P(r_i > r_j | \delta_i, t_i < t_j, t_i \geq t^L_i, t_j \geq t^L_j)
+$$ {#eq-cindex-lt-naive}
+
+where $t^L_i, t^L_j$ are the left-truncation times for $i$ and $j$ respectively (which are $0$ if the observation is not left-truncated).
+This is considered a 'naive' estimator as it may introduce bias [@Hartman2022], to see why this is the case consider that the right-hand-side of @eq-cindex-lt-naive is true in one of two cases (ignoring ties):
+
+1. $t_i < t_j^L < t_j$;
+2. $t_j^L < t_i < t_j$.
+
+In the first case, $j$ enters the study after $i$ has experienced the outcome and the observations never overlap in the data at the same time 
+@Hartman2022 demonstrate that evaluating discrimination in the presence of these 'nonoverlapping intervals' creates bias if truncation is dependent on the predictors.
+Therefore, the data should be further restricted to overlapping intervals, yielding the estimator
+
+$$
+C_{LT}(\hatrr, \tt, \bsdelta, \tt^L|\tau) = \frac{\sum_{i\neq j} \II(t_i < t_j, \hatr_i > \hatr_j, t_i < \tau, t_i \geq t^L_j)\delta_i}{\sum_{i\neq j}\II(t_i < t_j, t_i < \tau, t_i \geq t^L_j)\delta_i}
+$$
+
+In contrast to @eq-cindex, no generic weighting term is included, which is due to the complexity of estimating IPC weights in the context of left-truncation [@Therneau2020].
+Interestingly, experiments have shown that naively applying Harrell's C (@eq-cindex with $W=1$) may be a better estimator than $C_{LT}$ with lower bias [@Hartman2022].
+Whilst more complex IPC measures have been proposed, they do not seem to be in common usage anywhere whereas $C_N$ and $C_{LT}$ are both used in published research and software [@McGough2021; @pkgsurvival].
+As has been seen throughout this book, left-truncation research is still nascent.
+No evidence of methods for right-truncation could be found.
