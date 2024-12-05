@@ -2,10 +2,12 @@ remotes::install_github("mlr-org/mlr3proba", ref = 'v0.5.7', upgrade = "never")
 remotes::install_github("mlr-org/mlr3", ref = 'v0.16.1', upgrade = "never")
 remotes::install_github("mlr-org/paradox", ref = 'v0.11.1', upgrade = "never")
 
+library(ggplot2)
+theme_set(theme_bw())
+
 ## Ranking
 rm(list = ls())
 library(dplyr)
-library(ggplot2)
 library(mlr3)
 library(mlr3proba)
 
@@ -234,3 +236,96 @@ g = p1 + p2 + p3 + p4 &
 
 ggsave("book/Figures/forests/bootstrap.png", g, height = 6, units = "in",
   dpi = 600)
+
+## Kaplan Meier
+library(survival)
+data("tumor", package = "pammtools")
+tumor <- cbind(id = seq_len(nrow(tumor)), tumor)
+tumor_duplicated = tumor |>
+  filter(days %in% days[duplicated(days)]) |>
+  arrange(days)
+
+## Table for illustration of right-censored data
+tab_surv_tumor = tumor_duplicated |>
+  filter(id %in% c(13, 62, 185, 230, 431, 719)) |>
+  select(id, age, sex, complications, days, status) |>
+  arrange(id)
+knitr::kable(tab_surv_tumor)
+
+km = survfit(Surv(days, status)~1, data = tumor)
+bkm = broom::tidy(km)
+
+df_med = data.frame(
+  x = c(0, median(km)), # Starting x-coordinates
+  y = c(0.5, 0),        # Starting y-coordinates
+  xend = c(median(km), median(km)),    # Ending x-coordinates
+  yend = c(0.5, 0.5)       # Ending y-coordinates
+)
+
+p_km = ggplot(bkm, aes(x = time, y = estimate)) +
+  geom_step() +
+  geom_segment(data=df_med, aes(x=x, xend=xend, y=y, yend=yend), lty = 3)+
+  ylim(c(0, 1)) +
+  ylab("S(t)") +
+  xlab("time")
+p_km
+ggsave("book/Figures/survival/km-tumor.png", p_km, height=3, units="in", dpi=600)
+
+# stratified KM wrt complications
+tumor = tumor |>
+  mutate(age_bin = factor(age < 50, levels = c(TRUE, FALSE), labels = c("age < 50", "age >= 50")))
+km_age_bin = survfit(Surv(days, status)~age_bin, data = tumor)
+bkm_age_bin = broom::tidy(km_age_bin)
+med_km_age_bin = as.numeric(median(km_age_bin))
+df_age_bin = data.frame(
+  x = c(0, med_km_age_bin[2]), # Starting x-coordinates
+  y = c(0.5, 0),        # Starting y-coordinates
+  xend = c(med_km_age_bin[2], med_km_age_bin[2]),    # Ending x-coordinates
+  yend = c(0.5, 0.5)       # Ending y-coordinates
+)
+
+p_km_age_bin = ggplot(bkm_age_bin, aes(x = time, y = estimate)) +
+  geom_step(aes(col = strata)) +
+  geom_segment(data=df_age_bin, aes(x=x, xend=xend, y=y, yend=yend), lty = 3)+
+  geom_hline(yintercept =  .5, lty = 3) +
+  ylim(c(0, 1)) +
+  ylab("S(t)") +
+  xlab("time")
+p_km_age_bin
+ggsave("book/Figures/survival/km-age-bin-tumor.png", p_km_age_bin, height=3, units="in", dpi=600)
+
+
+## Left-truncation
+data("infants", package = "eha")
+
+# KM for infants with dead/alive mothers
+km_infants = survfit(Surv(exit, event)~mother, data = infants)
+bkm_infants = broom::tidy(km_infants)
+
+p_km_infants = ggplot(bkm_infants, aes(x = time, y = estimate)) +
+  geom_step(aes(col = strata)) +
+  ylim(c(0, 1)) +
+  ylab("S(t)") +
+  xlab("time")
+# adjusted for left-truncation
+km_infants_lt = survfit(Surv(enter, exit, event)~mother, data = infants)
+bkm_infants_lt = broom::tidy(km_infants_lt)
+
+p_km_infants_lt = ggplot(bkm_infants_lt, aes(x = time, y = estimate)) +
+  geom_step(aes(col = strata)) +
+  ylim(c(0, 1)) +
+  ylab("S(t)") +
+  xlab("time")
+library(patchwork)
+
+p_km_infants_joined = p_km_infants + p_km_infants_lt + plot_layout(guides =  "collect")
+ggsave("book/Figures/survival/km-infants.png", p_km_infants_joined, height=3, width=7, units="in", dpi=600)
+
+
+## table infant data
+
+inf_sub = infants |>
+  filter(stratum %in% c(1, 2, 4)) |>
+  select(stratum, enter, exit, event, mother)
+
+inf_sub |> knitr::kable()
