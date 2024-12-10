@@ -322,8 +322,7 @@ p_km_infants_joined = p_km_infants + p_km_infants_lt + plot_layout(guides =  "co
 ggsave("book/Figures/survival/km-infants.png", p_km_infants_joined, height=3, width=7, units="in", dpi=600)
 
 
-## table infant data
-
+## table infant data)
 inf_sub = infants |>
   filter(stratum %in% c(1, 2, 4)) |>
   select(stratum, enter, exit, event, mother)
@@ -332,6 +331,9 @@ inf_sub |> knitr::kable()
 
 
 ## competing risks
+library(mvna)
+library(etm)
+library(cmprsk)
 set.seed(241206)
 ### table
 data(sir.adm, package = "mvna")
@@ -360,8 +362,8 @@ cif = cuminc(
 cif_sir_b = purrr::imap_dfr(cif[1:4], function(.x, .y) {
   as.data.frame(.x) |>
     cbind(
-      pneumonia = str_sub(.y, 1, 1),
-      transition = str_sub(.y, 3, 3)
+      pneumonia = stringr::str_sub(.y, 1, 1),
+      transition = stringr::str_sub(.y, 3, 3)
     )
 }) |>
   mutate(
@@ -402,6 +404,39 @@ p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
 ggsave("book/Figures/survival/cif-sir.png", p_sir_cifs, height=3, width=6, dpi=300)
 
 
+### Independent censoring vs. Competing Risks
+
+cox_sir = purrr::map_dfr(
+  .x = 1:2,
+  .f = function(.x) {
+
+    tmp = sir.adm
+    tmp$status = 1L*(tmp$status == .x)
+    m = coxph(Surv(time, status)~strata(pneu), data = tmp)
+    bm = basehaz(m) |>
+      rename(pneumonia = strata) |>
+      mutate(
+        cif = 1 - exp(-hazard),
+        pneumonia = case_when(
+          pneumonia == "pneu=0" ~ "no",
+          pneumonia == "pneu=1" ~ "yes"
+        ),
+        transition = ifelse(.x==1, "discharge", "death")
+      )
+  }
+)
+
+p_cens_vs_cr = ggplot(filter(cox_sir, transition == "death"), aes(x = time, y = cif)) +
+  geom_step(aes(col = pneumonia, lty="independent censoring")) +
+  geom_step(data = filter(cif_sir_b, transition == "death"), aes(col=pneumonia, lty="competing risks")) +
+  coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
+  geom_vline(xintercept = 120, lty = 3) +
+  labs(
+    y = expression(P(Y <= \tau))
+  )
+
+
+ggsave("book/Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
 
 ### pamm
 cut <- unique(sir.adm$time[sir.adm$status != 0])
