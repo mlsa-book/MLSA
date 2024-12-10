@@ -329,3 +329,148 @@ inf_sub = infants |>
   select(stratum, enter, exit, event, mother)
 
 inf_sub |> knitr::kable()
+
+
+## competing risks
+set.seed(241206)
+### table
+data(sir.adm, package = "mvna")
+tab_sir = sir.adm |> group_by(status) |> sample_n(2) |>
+  select(id, time, status, pneu)
+tab_sir |> knitr::kable()
+
+
+### AJ CIF estimates
+
+sir_data_cif = sir.adm |>
+  mutate(
+    from = 0,
+    to = case_when(
+      status == 0 ~ "cens",
+      .default = as.character(status)))
+
+sir_data_cif |> pull(status) |> table()
+
+cif = cuminc(
+  sir_data_cif$time,
+  sir_data_cif$to,
+  group = sir_data_cif$pneu,
+  cencode="cens")
+
+cif_sir_b = purrr::imap_dfr(cif[1:4], function(.x, .y) {
+  as.data.frame(.x) |>
+    cbind(
+      pneumonia = str_sub(.y, 1, 1),
+      transition = str_sub(.y, 3, 3)
+    )
+}) |>
+  mutate(
+    method = "Aalen-Johansen",
+    assumption = "competing risks censoring"
+  ) |>
+  rename(cif = est) |>
+  mutate(
+    pneumonia = factor(pneumonia, labels = c("no", "yes")),
+    transition = factor(transition, labels = c("discharge", "death")))
+
+
+km_sir_b = broom::tidy(survfit(Surv(time, status!=0)~pneu, data = sir.adm)) |>
+  rename(pneumonia = strata) |>
+  mutate(pneumonia= case_when(
+    pneumonia == "pneu=0" ~ "no",
+    pneumonia == "pneu=1" ~ "yes"
+  )) |>
+  mutate(
+    method = "KM",
+    assumption="independent right-censoring",
+    transition = factor("death", levels=c("discharge", "death")),
+    cif = 1-estimate
+  )
+
+
+p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
+  geom_step(aes(col = pneumonia)) +
+  facet_wrap(~transition) +
+  geom_vline(xintercept = 120, lty = 3) +
+  # geom_step(data=km_sir_b, aes(col = pneumonia), lty = 2) +
+  labs(
+    y = expression(P(Y <= tau~ "," ~ E == e))
+  ) +
+  coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
+
+
+ggsave("book/Figures/survival/cif-sir.png", p_sir_cifs, height=3, width=6, dpi=300)
+
+
+
+### pamm
+cut <- unique(sir.adm$time[sir.adm$status != 0])
+ped_list <- as_ped(sir.adm, Surv(time, status)~., combine = FALSE, cut = cut)
+pam_list <- map(ped_list, ~pamm(ped_status ~ s(tend) + pneu, data = .x))
+# combined = TRUE is the default
+ped <- as_ped(sir.adm, Surv(time, status)~., combine = TRUE) %>%
+  mutate(cause = as.factor(cause))
+
+# Fit the model
+pam <- pamm(ped_status ~ s(tend, by = cause) + cause*pneu, data = ped)
+# what would it mean if we fit
+# pamm(ped_status ~ s(tend) + cause* pneu, data = ped)
+summary(pam)
+round(cbind(Discharge = exp(coef(pam)[3]), Death = exp(sum(coef(pam)[3:4]) )), 2)
+
+
+ndf <- ped %>% make_newdata(
+  tend  = unique(tend),
+  pneu  = unique(pneu),
+  cause = unique(cause))
+ndf %>% group_by(cause) %>% slice(1:3)
+ndf <- ndf %>%
+  group_by(cause, pneu) %>% # important!
+  add_cif(pam) %>%
+  ungroup() %>%
+  mutate(
+    cause = factor(cause, labels = c("Discharge", "Death")),
+    pneu  = factor(pneu, labels = c("No", "Yes"))
+  )
+# assuming random censoring for discharge
+ndf2 <- ped_list[[2]] |>
+  make_newdata(tend = unique(tend), pneu = unique(pneu)) |>
+  group_by(pneu) |>
+  add_surv_prob(pam_list[[2]]) |>
+  ungroup() |>
+  mutate(
+    cif = 1-surv_prob,
+    cif_lower = 1-surv_lower,
+    cif_upper = 1-surv_upper,
+    cause = factor("Death", levels = c("Discharge", "Death")),
+    pneu  = factor(pneu, labels = c("No", "Yes"))
+  )
+# visualization
+
+p_cr_cens <- ggplot(data = ndf2, aes(x = tend, y = cif)) +
+  geom_ribbon(aes(ymin = cif_lower, ymax = cif_upper, fill = pneu), alpha = .3) +
+  geom_line(aes(col = pneu)) +
+  labs(
+    y     = expression(P(Y <= tau ~ "|" ~ bold(x))),
+    x     = "time",
+    color = "Pneumonia",
+    fill  = "Pneumonia"
+  ) +
+  ylim(c(0, 1)) +
+  scale_color_manual(aesthetics = c("colour", "fill"), values = Set1[c(9, 1)])
+p_cr_cens
+ggsave("figures/cr-censoring.png", width = 5, height = 3, p_cr_cens)
+
+p_cr <- ggplot(filter(ndf, cause=="Death"), aes(x = tend, y = cif)) +
+  geom_line(aes(col = pneu)) +
+  geom_ribbon(aes(ymin = cif_lower, ymax = cif_upper, fill = pneu), alpha = .3) +
+  labs(
+    y     = expression(P(Y <= tau ~ "|" ~ bold(x))),
+    x     = "time",
+    color = "Pneumonia",
+    fill  = "Pneumonia"
+  ) +
+  ylim(c(0, 1)) +
+  scale_color_manual(aesthetics = c("colour", "fill"), values = Set1[c(9, 1)])
+p_cr
+ggsave("figures/p-cr.png", p_cr, width = 5, height = 3)
