@@ -42,7 +42,7 @@ Lower-left: Recurrent events setting with multiple occurences of the same event.
 
 In constrast to single-event survival analysis, competing risks are concerned with the time to the first of multiple, mutually exclusive events.
 Mutually exclusive here means that once one of the events occurs, we can not observe the others (at the same time).
-As in the single event case, the events may not necessarily be terminal (such as death), instead they just signify the end of the period of interest for a given observation.
+As in the single event case, the events may not necessarily be terminal (such as death), instead they just signify the end of the period of observation.
 In contrast to the single event case, even if only one of the outcomes is of interest, the others can not be treated as independent censoring events.
 
 @tbl-surv-data-sir.adm. shows an excerpt of the `sir.adm` data [@pkgmvna] of patients on the ICU.
@@ -62,13 +62,13 @@ The interest was in how pneumonia status at admission to the ICU (`pneumonia`) a
 Rows are individual observations (`id`), `time` is time under observation, `status` indicates the outcome observed (0=censored at the end of the study, 1=discharged alive from the ICU, 2: death in the ICU). {#tbl-surv-data-sir.adm}
 
 Here, discharge from the hospital must not be considered independent right-censoring as was the case in the `tumor` data example in @sec-surv-km.
-There, patients were followed even after hospital discharge, thus loss to follow-up could be considered truly independent of the event of interest.
+There, patients were followed even after hospital discharge, thus loss to follow-up could be considered truly random and therefore independent of the event of interest.
 In this study on the other hand, follow-up stopped once patients were discharged and it is unrealistic to assume that subjects would continue to be exposed to the same risk of dying after discharge compared to subject still in the ICU.
 Analysis of this data and how the different assumptions (independent censoring vs. competing risks) affects the estimates is given in @sec-aalen-johanson.
 
 First, let's introduce the competing risks setting more formally. Let $Y$ be the time-to-event as before.
 In the competing risks setting, there is now an additional random variable $E\in \{1,\ldots,q\}$ with realisations $e$, which denotes one of $q$ competing events that can occur at event time $Y$.
-The survival outcome notation, $(T, \Delta)$ has to be extended to accomodate for the possibility of competing risks.
+The survival outcome notation, $(Y, \Delta)$, thus has to be extended to accomodate for the possibility of competing risks.
 Previously, we defined the status indicator $\Delta \in \{0,1\}$ for right-censored data.
 In the competing risks setting we have $\Delta = I(Y_i \leq C_i) \wedge E_i = e$, such that
 $\Delta \in \{0, 1, \ldots, q\}$ where $\Delta = 0$ indicates censoring as before (that is subject remained in state 0 until end of follow up) and $\Delta = e$ means the $e$th event occurred.
@@ -107,8 +107,7 @@ S(\tau) = P(Y > \tau) = \exp(-H(\tau))
 $$ {#eq-all-cause-surv-prob}
 <!--  -->
 gives the probability that *none* of the events occurred before $\tau$.
-It is usually not estimated directly but calculated from the cause specific hazards instead via @eq-all-cause-cumu-hazard and @eq-all-cause-surv-prob. Thus, estimation of the cause-specific hazards (@eq-cause-specific-hazard) fully determines the joint distribution of $Y$ and $E$.
-
+It is usually not estimated directly but calculated from the cause specific hazards instead via @eq-all-cause-cumu-hazard and @eq-all-cause-surv-prob.
 
 In applications, next to the cause-specific (cumulative) hazards, one is often interested in the *Cumulative Incidence Function* (CIF), which denotes the probability of experiencing an event $e$ before time $\tau$
 <!--  -->
@@ -123,13 +122,17 @@ where
 
 $F_e(\tau)$ can be interpreted as the proportion of subjects who experienced event of type $e$ until time $\tau$.
 Because the events are mutually exclusive, it holds that $F(\tau) = P(Y\leq\tau) = \sum_{e=1}^q F_e(\tau) = 1 - S(\tau)$.
+As all terms of @eq-cif can be calculated from the cause-specific hazards (@eq-cause-specific-hazard), their estimation fully determines the joint distribution of $Y$ and $E$.
+
+
 
 
 ### Aalen-Johanson estimator {#sec-aalen-johanson}
 
-As for the single-event case (@sec-surv-estimation-non-param), one can define a simple non-parametric estimator for the cause-specific cumulative hazard (@eq-cause-specific-cumu-hazard) based on a generalization of the Nelson-Aalen estimator (@eq-nelson-aalen) and the Aalen-Johanson estimator (@aalenEmpiricalTransitionMatrix1978) for the CIf (@eq-cif).
+As for the single-event case (@sec-surv-estimation-non-param), one can define a simple non-parametric estimator for the cause-specific cumulative hazard (@eq-cause-specific-cumu-hazard) based on a generalization of the Nelson-Aalen estimator (@eq-nelson-aalen) and the Aalen-Johanson estimator (@aalenEmpiricalTransitionMatrix1978) for the CIF (@eq-cif).
 
-Recall from the definitions of the unique ordered event times $t_{(k)}, k=1\ldots,m$, risk-set at time $t_{(k)}$, $\calR_{t_{(k)}}$, number of events $d_{t_{(k)}}$ and number at risk $n_{t_{(k)}}$ from @sec-data-rc. Assume partitioning of the follow-up into $m$ disjunct intervals $(t_{(k-1)}, t_{(k)}],k=1,\ldots,m$, such that $Y\in (t_{(k-1)}, t_{(k)}] \Leftrightarrow \tilde{Y}=t_{(k)}$.
+Recall from the definitions of the unique ordered event times $t_{(k)}, k=1\ldots,m$, risk-set at time $t_{(k)}$, $\calR_{t_{(k)}}$, number of events, $d_{t_{(k)}}$, and number at risk $n_{t_{(k)}}$ from @sec-data-rc.
+Assume partitioning of the follow-up into $m$ disjunct intervals $(t_{(k-1)}, t_{(k)}],k=1,\ldots,m$, such that $Y\in (t_{(k-1)}, t_{(k)}] \Leftrightarrow \tilde{Y}=t_{(k)}$.
 
 The *cause-specific* discrete time hazard (@eq-discrete-hazard) is defined by changing the numerator $d_{t_{(k)}}$ to $d_{e,t_{(k)}}$ (the number of events of type $e$ at time $t_{(k)}$)
 <!--  -->
@@ -167,7 +170,7 @@ Note that this will yield different sets of unique event times in each groups, t
 
 @fig-cif-sir shows the AJ estimates of the CIFs for each event (discharge/death) separately for patients with and without pneumonia. Examplary, the proportion of subjects with pneumonia being discharged until $\tau=120\text{ days}$ is approximately 75% ($\hat{F}_{\text{discharge}}(120) = P(Y\leq 120, E=\text{"discharge"})\approx 0.75$), while approximately 25% died in the ICU ($\hat{F}_{\text{death}}(120) = P(Y\leq 120, E=\text{"death"}))\approx 0.25$.
 For patients without pneumonia we have $\hat{F}_{\text{discharge}}(120) \approx 0.91$ and $\hat{F}_{\text{death}} \approx 0.09$.
-In this example, $\hat{F}_{\text{discharge}} + \hat{F}_{\text{death}} \approx 1$ for both pneumonia groups, as only 14 of 747 patients were censored at the end of the follow-up.
+In this example, $\hat{F}_{\text{discharge}} + \hat{F}_{\text{death}} \approx 1$ for both pneumonia groups, as only 14 of 747 patients were censored (no discharge nor death) at the end of the follow-up.
 
 ![Aalen-Johanson estimator for the `sir.adm` data [@pkgmvna], stratified by pneumonia status at admission to the ICU. Left panel: Proportion of subjects discharged alive from the ICU. Right panel: Proportion of subjects who died in the ICU.](Figures/survival/cif-sir.png){#fig-cif-sir fig-alt="Illustration of the Aalen-Johanson estimator for the cumulative incidence function, stratified by pneumonia status at admission to the ICU."}
 
@@ -176,7 +179,7 @@ In this example, $\hat{F}_{\text{discharge}} + \hat{F}_{\text{death}} \approx 1$
 ### Independent Censoring vs. Competing Risks {#sec-cens-vs-comp}
 
 It is worth spending some time to consider the difference between independent right-censoring and competing risks.
-Note that for the estimation of the hazard @eq-cs-discrete-hazard, occurences of competing events are implicitly assumed righ-censored (as $d_e,t_{(k)})$ only counts events of type $e$ and $n_{t_(k)}$ contains the same subjects that would remain if events of type $\tilde{e}\neq e$ were considered censored before $t_{(k)}$.
+Note that for the estimation of the hazard @eq-cs-discrete-hazard, occurences of competing events are implicitly assumed righ-censored (as $d_{e,t_{(k)}})$ only counts events of type $e$ and $n_{t_(k)}$ contains the same subjects that would remain if events of type $\tilde{e}\neq e$ were considered censored before $t_{(k)}$.
 Nevertheless, competing risks are taken into account in the definition of the AJ estimator @eq-aalen-johanson, as the all-cause survival probability @eq-all-cause-surv-prob depends on all cause-specific hazards.
 
 In contrast, assume that in our analysis of the `sir.adm` data we would consider time of discharge as independent right-censoring.
@@ -185,7 +188,7 @@ The probability of death before some time-point $\tau$ could thus be obtained vi
 
 
 @fig-cens-vs-cr shows the estimates obtained under the two assumptions. Solid lines are indical to the right-hand side of @fig-cif-sir and indicate the probabilities under the competing risks assumption.
-Dashed lines are obtained under the independent right-censoring assumption. Clearly, the probabilities of dying at time $\tau=120$ are overestimated when independent censoring is assumed.($\approx$ 75% vs. 25% in the pneumonia group and $\approx$ 62% vs. 13% in the no pneumonia group).
+Dashed lines are obtained under the independent right-censoring assumption. Clearly, the probabilities of dying at time $\tau=120$ are overestimated when independent censoring is assumed.($\approx$ 75% vs. \approx 25% in the pneumonia group and $\approx$ 62% vs. \approx 13% in the no pneumonia group).
 
 
 ![Estimation of the probability of dying in the ICU conditional on pneumonia status at admission. Dashed lines give the probabilities under assumption of right-censoring. Solid lines give the probabilities when taking into account discharge as competing risk.](Figures/survival/cens-vs-cr.png){#fig-cens-vs-cr fig-alt=""}
