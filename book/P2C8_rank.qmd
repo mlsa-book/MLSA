@@ -144,14 +144,6 @@ Antolini's C provides an intuitive method to evaluate the discrimination of a mo
 
 ### Area Under the Curve
 
-:::{.callout-warning}
-
-We are still discussing how to structure and write this section so the contents are all subject to change.
-The text below is 'correct' but we want to add more detail about estimation of AUC so the book can be more practical, otherwise we may remove the section completely, let us know your thoughts about what you'd like to see here!
-
-:::
-
-
 AUC, or AUROC, measures calculate the Area Under the Receiver Operating Characteristic (ROC) Curve, which is a plot of the *sensitivity* (or true positive rate (TPR)) against $1 - \textit{specificity}$ (or true negative rate (TNR)) at varying thresholds (described below) for the predicted probability (or risk) of event.
 @fig-eval-rocs visualises ROC curves for two classification models.
 The blue line is a featureless baseline that has no discrimination.
@@ -212,19 +204,22 @@ An observation is a *case* at a given time-point if they are dead, otherwise the
 The TNR for dynamic cases is defined as
 
 $$
-TNR_D(\hatrr, N | \alpha, \tau) = P(\hatr_i \leq \alpha | N_i(\tau) = 0)
+TNR_D(\hatrr, N | \alpha, \tau) = P(\hatr_i \leq \alpha | t_i > \tau)
 $$
-where $\dvec{\hatr}{n}$ is some deterministic prediction and $N(\tau)$ is a count of the number of events in $[0,\tau)$. Heagerty and Zheng further specify $y$ to be the predicted linear predictor $\hat{\eta}$.  Cumulative/dynamic and incident/dynamic measures are available in software packages 'off-shelf', these are respectively defined by
+where $\dvec{\hatr}{n}$ is some prediction, which is usually deterministic, often the linear predictor $\hat{\eta}$, however could be a predicted survival probability -- though in the latter case there is not necessarily an advantage over Antolini's C.
+Cumulative and incident versions of the TPR are respectively defined by
 
 $$
-TPR_C(\hatrr, N | \alpha, \tau) = P(\hatr_i > \alpha | N_i(\tau) = 1)
+TPR_C(\hatrr, N | \alpha, \tau) = P(\hatr_i > \alpha | t_i \leq \tau)
 $$
 and
 
 $$
-TPR_I(\hatrr, N | \alpha, \tau) = P(\hatr_i > \alpha | dN_i(\tau) = 1)
+TPR_I(\hatrr, N | \alpha, \tau) = P(\hatr_i > \alpha | t_i = \tau)
 $$
-where $dN_i(\tau) = N_i(\tau) - N_i(\tau-)$. Practical estimation of these quantities is not discussed here.
+
+A 'true negative' occurs when the risk is below a certain threshold and the event has yet to occur, in contrast a 'true positive' occurs when the event has already occurred and therefore the risk is expected to be above the threshold.
+Estimation of these quantities depends on non-parametric estimators, such as the Kaplan-Meier and Akritas estimator (@sec-surv-models-uncond), further details are not provided here.
 
 The choice between the incident/dynamic (I/D) and cumulative/dynamic (C/D) measures primarily relates to the use-case. The C/D measures are preferred if a specific time-point is of interest [@Heagerty2005] and is implemented in several applications for this purpose [@Kamarudin2017]. The I/D measures are preferred when the true survival time is known and discrimination is desired at the given event time [@Heagerty2005].
 
@@ -273,6 +268,23 @@ Of these, only case (1) and (4) can be used in a standard concordance index as t
 For all other cases, conditional probabilities have to be substituted or imputation used to estimate when in an interval the event takes place [@Tsouprou2015; @Wu2023].
 After such estimation, interpretation of any metric is difficult, as it's unclear if the original prediction is being evaluated or the guesswork that went into the evaluation measure.
 In this case it is likely better to use more straightforward methods that do not require these extra steps.
+
+When it comes to time-dependent AUC measures, the TNR and TPR can be extended to accommodate interval-censoring, by updating the equations to only include contributions from observations when the event is guaranteed to have occurred ($r_i \leq \tau$) or not ($l_i > \tau$) [@Li2011]:
+
+$$
+TNR_D(\hatrr, N | \alpha, \tau) = P(\hatr_i \leq \alpha | l_i > \tau)
+$$
+
+and
+
+$$
+TPR_C(\hatrr, N | \alpha, \tau) = P(\hatr_i > \alpha | r_i \leq \tau)
+$$
+
+In the presence of interval censoring, estimation depends on more complex estimators such as the nonparametric maximum likelihood estimator.
+As a more simplistic (yet sometimes realistic on average) alternative, one could impute the outcome time as the midpoint between the interval margins, $t_i = (l_i + r_i)/2$ [@Gadda2016].
+As left-censoring is a specialised case of interval-censoring (with $l_i = 0$) the above formulae can be used to handle left-censored data as well.
+As a simpl
 
 ### Truncation
 
