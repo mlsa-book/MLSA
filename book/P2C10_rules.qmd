@@ -6,7 +6,7 @@ abstract: TODO (150-200 WORDS)
 {{< include _macros.tex >}}
 :::
 
-# Evaluating Distributions by Scoring Rules {#sec-eval-distr}
+# Scoring Rules {#sec-eval-distr}
 
 {{< include _wip_minor.qmd >}}
 
@@ -78,43 +78,44 @@ The loss is defined by
 
 $$
 \begin{split}
-L_{IGS}(\hat{S}_i, t_i, \delta_i|\KMG) = \int^{\tau^*}_0  \frac{\hatS_i^2(\tau) \II(t_i \leq \tau, \delta_i=1)}{\KMG(t_i)} + \frac{\hatF_i^2(\tau) \II(t_i > \tau)}{\KMG(\tau)} \ d\tau
+L_{IGS}(\tau, \hat{S}_i, t_i, \delta_i|\KMG) = \int^{\tau^*}_0  \frac{\hatS_i^2(\tau) \II(t_i \leq \tau, \delta_i=1)}{\KMG(t_i)} + \frac{\hatF_i^2(\tau) \II(t_i > \tau)}{\KMG(\tau)} \ d\tau
 \end{split}
 $$ {#eq-igs}
 where  $\hatS_i^2(\tau) = (\hatS_i(\tau))^2$ and $\hatF_i^2(\tau) = (1 - \hatS_i(\tau))^2$, and $\tau^* \in \NNReals$ is an upper threshold to compute the loss up to, and $\KMG$ is the Kaplan-Meier trained on the censoring distribution for IPCW (@sec-eval-crank-disc-conc).
 
 At first glance this might seem intimidating but it is worth taking the time to understand the intuition behind the loss.
-Recall the classification Brier score, $L(\hatp_i, y_i) = (y_i - \hatp_i(y))^2$, this provides a method to compare and evaluate a probability mass function at one time-point.
-The *integrated Brier score* (IBS), also known as the *CRPS*, is the integral of the Brier score for all real-valued thresholds [@Gneiting2007] and hence allows predictions to be evaluated over multiple points as $L(\hatF_i, y_i) = \int (\hatF_i(y_i) - \II(y_i \geq x))^2 dy$ where $\hatF_i$ is the predicted cumulative distribution function and $x$ is some meaningful threshold.
-In survival analysis, $\hatF_i(\tau)$ represents the probability of an observation having experienced the event at or before $\tau$, and the ground truth to compare to is therefore whether the observation has actually experienced the event at $\tau$, which is the case when $t_i \leq \tau$.
-Hence the IBS becomes $L(\hatF_i, t_i) = \int (\hatF_i(\tau) - \II(t_i \leq \tau))^2 d\tau$.
-Now for a given time $\tau$:
+Recall the classification Brier score, $L(\hatp_i, y_i) = (y_i - \hatp_i(y))^2$, this provides a method to evaluate a probability mass function at one point.
+In a regression setting, the *integrated Brier score* (IBS), also known as the *CRPS*, is the integral of the Brier score for all real-valued thresholds [@Gneiting2007] and hence allows predictions to be evaluated over multiple points as
 
 $$
-L(\hatF_i, t) =
+L(\hatF_i, y_i) = \int (\II(y_i \leq \tau) - \hatF_i(\tau))^2 \ d\tau
+$$ {#eq-crps}
+
+where $\hatF_i$ is the predicted cumulative distribution function and $\tau$ is some meaningful threshold.
+As the left-hand indicator can only take one of two values @eq-crps can be represented as two distinct cases, now using $t$ instead of $y$ to represent time:
+
+$$
+L(\hatF_i, t_i) =
 \begin{cases}
-(\hatF_i(\tau) - 1)^2 = (1 - \hatF_i(\tau)^2) = \hatS_i^2(\tau), & \text{ if } t_i \leq \tau \\
-(\hatF_i(\tau) - 0)^2 = \hatF_i^2(\tau), & \text{ if } t_i > \tau
+(1 - \hatF_i(\tau))^2 = \int \hatS_i^2(\tau) \ d\tau, & \text{ if } t_i \leq \tau \\
+(0 - \hatF_i(\tau))^2 = \int \hatF_i^2(\tau) \ d\tau, & \text{ if } t_i > \tau
 \end{cases}
 $$ {#eq-graf-cases}
 
-In words, if an observation has not yet experienced an outcome ($t_i > \tau$) then the loss is minimized when the cumulative distribution function (the probability of having already died) is $0$, which is intuitive as the optimal prediction is correctly identifying the observation has yet to experience the event.
-In contrast, if the observation has experienced the outcome ($t_i \leq \tau$) then the loss is minimized when the survival function (the probability of surviving until $\tau$) is $0$, which follows from similar logic.
+In the first case, the observation experienced the event before $\tau$, hence the optimal prediction for $\hatF(\tau)$ (the probability of experiencing the event before $\tau$) is $1$, and therefore the optimal $\hatS(\tau)$ is $0$.
+Conversely, in the second case has not experienced the event yet, the optimal $\hatF(\tau)$ is $0$.
+The loss therefore meaningfully represents the ideal predictions in the two possible real-world scenarios.
 
-The final component of the Graf score is accommodating for censoring.
+The final component of the loss is accommodating for censoring.
 At $\tau$ an observation will either have:
 
-1. Not experienced the event --- $\II(t_i > \tau)$;
-2. Experienced the event --- $\II(t_i \leq \tau, \delta_i = 1)$; or
-3. Been censored --- $\II(t_i \leq \tau, \delta_i = 0)$
+1. Not experienced any outcome --- $t_i > \tau$;
+2. Experienced the event --- $t_i \leq \tau \wedge \delta_i = 1$; or
+3. Been censored --- $t_i \leq \tau \wedge \delta_i = 0$
 
-In the Graf score, censored observations are discarded.
-If they were not then @eq-graf-cases would imply their contribution would be treated the same as those who had experienced the event.
-However this assumption would be entirely wrong as a censored observation is guaranteed not to have experienced the event, hence an ideal prediction for a censored observation is a high survival probability up until the point of censoring, at which time, comparison to ground truth is unknown as this is no longer observed.
-
-The act of discarding censored observations means that the sample size decreases over time.
-To compensate for this, IPCW is used to increasingly weight predictions as $\tau$ increases.
-Hence, IPCW weights, $W_i$ are defined such that
+Censored observations are discarded after the censoring time as evaluating predictions after this time is impossible as the ground truth is unknown.
+To compensate for removing observations, IPCW (@sec-eval-crank-conc) is again used to increasingly weight predictions as $\tau$ increases.
+IPC weights, $W_i$ are defined such that observations are either weighted by $G(\tau)$ when they have not yet experienced the event or by their final observed time, $G(t_i)$, otherwise.
 
 $$
 W_i =
@@ -125,29 +126,10 @@ W_i =
 $$
 
 The weights total $1$ when divided over all samples and summed [@Graf1999].
-They are also intuitive as observations are either weighted by $G(\tau)$ when they are still alive and therefore still part of the sample, or by $G(t_i)$ otherwise.
 
-As well as being intuitive, when censoring is uninformative, the Graf score consistently estimates the mean square error $L(t, S|\tau^*) = \int^{\tau^*}_0 [\II(t > \tau) - S(\tau)]^2 d\tau$, where $S$ is the correctly specified survival function [@Gerds2006].
-However, despite these promising properties, the IGS is improper and must therefore be used with care [@Rindt2022; @Sonabend2022b].
-In practice, experiments have shown that the effect of improperness is minimal and therefore this loss should be avoided for automated routines such as model tuning, however it can still be used for model evaluation.
-<!-- CITE OUR PROPERNESS PAPER HERE -->
-In addition, a small adaptation of the loss results in a strictly proper scoring rule simply by altering the weights such that $W_i = \KMG^{-1}(t_i)$ for all uncensored observations and $0$ otherwise [@Sonabend2022b], resulting in the reweighted Graf score:
-<!-- CITE OUR PROPERNESS PAPER HERE -->
-
-$$
-L_{RGS}(\hatS_i, t_i, \delta_i|\KMG) = \delta_i \int^{\tau^*}_0 \frac{(\II(t_i \leq \tau) - \hatF_i(\tau))^2}{\KMG(t_i)} \ d\tau
-$$
-
-<!-- TODO: DISCUSS PARA BELOW -->
-<!-- The addition of $\II(t_i \leq \tau^*)$ completely removes observations that experience the event after the cutoff time, $\tau^*$, this ensures there are no cases where the $G(t_i)$ weighting is calculated on time after the cutoff.
-Including an upper threshold (i.e, $\tau^* < \infty$) effects properness and generalization statements.
-For example, by evaluating a model using the RGS with a $\tau^*$ threshold, then the model may be said to only perform well up until $\tau^*$ with its performance unknown after this time. -->
-
-The change of weighting slightly alters the interpretation of the contributions at different time-points.
-By example, let $(t_i = 4, t_j = 5)$ be two observed survival times, then at $\tau = 3$, the Graf score weighting would be $\KMG^{-1}(4)$ for both observations, whereas the RGS weights would be $(KMG^{-1}(4), KMG^{-1}(5))$ respectively, hence there is always more 'importance' placed on observations that take longer to experience the event.
-In practice, the difference between these weights appears to be minimal [@Sonabend2022b] but as RGS is strictly proper, it is more suitable for automated experiments.
-<!-- FIXME: CITAITON ABOVE TO PROPERNESS PAPER -->
-
+As well as being intuitive, when censoring is uninformative, the Graf score consistently estimates the mean square error [@Gerds2006].
+However, despite these promising properties, the IGS is improper and must therefore be used with care [@Rindt2022].
+Adaptations to the loss, such as the reweighted Graf score [@Sonabend2022b] could be used instead, however the IGS is now deeply embedded in the literature and experiments have demonstrated that the effect of improperness is minimal -- therefore this loss should be avoided for automated routines such as model tuning, however it can still be used for model evaluation.
 
 ### Logarithmic losses
 
