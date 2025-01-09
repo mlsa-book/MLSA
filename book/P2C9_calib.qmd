@@ -6,7 +6,7 @@ abstract: TODO (150-200 WORDS)
 {{< include _macros.tex >}}
 :::
 
-# Calibration Measures {#sec-eval-distr-calib}
+# Calibration {#sec-eval-distr-calib}
 
 {{< include _wip_minor.qmd >}}
 
@@ -67,12 +67,12 @@ A model is well-calibrated with respect to $H_\alpha$ if $H_\alpha = 1$.
 
 The next metrics we look at evaluate models across a spectrum of points to assess calibration over time.
 
-## Probabilistic Calibration {#sec-eval-distr-calib-prob}
+## Probabilistic Calibration {#sec-calib-prob}
 
 Calibration over a range of time points may be assessed quantitatively or qualitatively, with graphical methods often favoured.
 Graphical methods compare the average predicted distribution to the expected distribution, which can be estimated with the Kaplan-Meier curve, discussed next.
 
-### Kaplan-Meier Comparison
+### Kaplan-Meier Comparison {#sec-calib-km}
 
 The simplest graphical comparison compares the average predicted survival curve to the Kaplan-Meier curve estimated on the testing data.
 Let $\hatS_1,...,\hatS_m$ be predicted survival functions, then the average predicted survival function is the mixture: $\bar{\hatS} = \mean[m]{\hatS_i(\tau)}$.
@@ -86,7 +86,7 @@ Hence it is possible to say that the Cox and forests models are better calibrate
 ![Comparing the calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the Kaplan-Meier estimate of the survival function calculated on a test set. The calibration of RRT notably decreases over time whereas RF and CPH are closer to the Kaplan-Meier curve.](Figures/evaluation/calibKM.png){#fig-eval-calib fig-alt="x-axis is labelled 'T' and ranges from 20 to 100. y-axis is labelled 'S(T)' and rages from 0.8 to 1. Four lines are plotted: CPH (red), KM (green), RF (blue), RRT (purple). The RRT line is quite flat across y=1. The other lines overlap multiple times from (20, 1) to (100, 0.8)."}
 
 This method is useful for making broad statements such as "model X is clearly better calibrated than model Y" or "model X appears to make average predictions close to the Kaplan-Meier estimate", but that is the limit in terms of useful conclusions.
-One could refine this method for more fine-grained information by instead using relative risk predictions to create 'risk groups' that can be plotted against a stratified Kaplan-Meier, however this method is harder to interpret and adds even more subjectivity around how many risk groups to create and how to create them [@Royston2013].
+One could refine this method for more fine-grained information by instead using predictions to create 'risk groups' that can be plotted against a stratified Kaplan-Meier [@Austin2020], however this method is harder to interpret and adds even more subjectivity around how many risk groups to create and how to create them [@Royston2013; @Austin2020].
 The next measure we consider includes a graphical method as well as a quantitative interpretation.
 
 ### D-Calibration
@@ -100,7 +100,7 @@ $$
 
 where $O_1,...,O_n$ is the observed number of events  in $n$ groups and $E_1,...,E_n$ is the expected number of events.
 
-To utilise this test, the $[0,1]$ codomain of $S_i$ is cut into $B$ disjoint contiguous intervals ('bins') over the full range $[0,1]$.
+To utilize this test, the $[0,1]$ codomain of $S_i$ is cut into $B$ disjoint contiguous intervals ('bins') over the full range $[0,1]$.
 Let $m$ be the total number of observations, then assuming a discrete uniform distribution as the theoretical distribution, the expected number of events in each bin is $E_i = m/B$ (as the probability of an observation falling into each bin is equal).
 
 The observations in the $i$th bin, $b_i$, are defined by the set:
@@ -131,7 +131,7 @@ where $p$ is some value in $[0,1]$, $\hatF_i^{-1}$ is the $i$th predicted invers
 In words, the number of events occurring at or before each quantile should be equal to the quantile itself, for example 50% of events should occur before their predicted median survival time.
 Therefore, one can plot $p$ on the x-axis and the right hand side of the above equation on the y-axis.
 A D-calibrated model should result in a straight line on $x = y$.
-This is visualised in @fig-eval-dcalib for the same models as in @fig-eval-calib.
+This is visualized in @fig-eval-dcalib for the same models as in @fig-eval-calib.
 This figure supports the previous findings that the relative risk tree is poorly calibrated in contrast to the Cox model and random forest but again no direct comparison between the latter models is possible.
 
 ![Comparing the D-calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the expected distribution on y=x. As with @fig-eval-calib, the relative risk tree is clearly not D-calibrated (as supported by the figures in the bottom-right). The CPH and RF are closer to the y=x however neither follow it perfectly.](Figures/evaluation/calibD.png){#fig-eval-dcalib fig-alt="x-axis is labelled 'True (p)' and the y-axis is labelled 'Predicted', both range from 0 to 1. A box in the bottom right says 'DCal (p-values): CPH = 8.2 (0.51); RF = 10 (0.33); RRT = 170 (7e-32). There are four lines on the plot: a blue line (RRT) quickly ascends from (0,0) to (0.1,1) and then is flat; the red (CPH) and green (RF) lines are overlapping and run parallel but not on y=x. Finally a gray dashed line marks the y=x line."}
@@ -141,3 +141,15 @@ For the models in @fig-eval-dcalib, it is clear that the relative risk tree is n
 Whilst the D-calibration for the Cox model is smaller than that of the random forest, the difference is unlikely to be significant, as is seen in the overlapping curves in the figure.
 
 The next chapter will look at scoring rules, which provides a more concrete method to analytically compare the predicted distributions from survival models.
+
+## Beyond right-censoring
+
+Using graphical plots is simplest for measuring calibration when left-censoring, interval-censoring, and/or truncation are involved.
+In these contexts, predicted survival functions can be compared to the 'true' survival probability estimated with the Kaplan-Meier (@sec-calib-km) by using definitions of the Kaplan-Meier estimator that incorporate other censoring and truncation types as required.
+
+For left- and interval-censoring, the Kaplan-Meier estimator is substituted with the nonparametric maximum likelihood estimator (NPMLE) [@Zhigang2010], which is the method to estimate the likelihood function under the assumption of left- or interval-censoring data as in @sec-surv-estimation-param.
+The most common algorithm to do so is the Turnbull algorithm [@Turnbull1974], which is not discussed in detail here but is widely available in software implementations.
+
+In the presence of left-truncation, the Kaplan-Meier is calculated using the left-truncated risk-set definition [@McGough2021], which removes observations from being 'at risk' if their left-truncation time has yet to occur (@eq-risk-lt).
+The number of outcomes at risk at $\tau$ (the denominator in the Kaplan-Meier estimator), is then $n_\tau = \sum_i \II(t_i^L \leq \tau \leq t_i)$ where $t_i, t_i^L$ are the outcome time and the left truncation time of observation $i$ respectively.
+
