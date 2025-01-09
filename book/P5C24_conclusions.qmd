@@ -35,8 +35,56 @@ Therefore it is recommended to use available software implementations, even when
 * Which time points to make predictions for?
 *
 
-### Choosing models and measures
+### Choosing measures and models  {#sec-conclusions-choosing}
 
-* How do you choose what ML models to use?
+#### Choosing evaluation measures {.unnumbered .unlisted}
+
+Choosing measures to evaluate survival models may appear more daunting than regression and classification settings, which, in contrast, have fewer (common) measures to choose from.
+In general, measures should be selected based on the experiment at hand, which could be making predictions for new data, comparing the performance of multiple models ('benchmark experiments'), investigating patterns in observed data, or some combination of these.
+
+In the real world, predictive experiments are most common.
+These are now daily occurrences as machine learning models are routinely deployed on servers to make ongoing predictions.
+In these cases, the exact task (@sec-survtsk) must be precisely stated before any model is deployed and evaluated.
+When predicting rankings, discrimination measures are most useful.
+While some papers have shown flaws in Harrell's C [@Gonen2005; @Uno2007], others have demonstrated that common alternatives yield very similar results [@Rahman2017; @Therneau2020] and alternatives may even be harder to interpret due to high variance [@Schmid2012].
+To avoid C-hacking (@sec-eval-crank-choose), the most important consideration is to simply choose one measure and establish a pre-defined threshold to determine if the deployed model is optimal, a natural threshold would be 0.5 as anything above this is better than a baseline model.
+Whilst measures can yield similar results, Harrell's C is increasingly over-optimistic with additional censoring [@Rahman2017] and therefore Uno's C may be a more sensible choice in automated procedures.
+If the task of interest is to predict survival distributions over time, then the choice of measure is limited to scoring rules.
+Research in this area remains nascent and whilst the log-loss skills are highly useful as they can be used for any censoring and truncation, calculation of these losses is often not possible as they require estimation of a probability density function, which is usually unavailable as many survival models return discrete probability mass function predictions.
+Therefore using the Graf score may be more sensible using the ERV representation that standardizes the score with respect to a Kaplan-Meier baseline to establish if the model is better than a random guess.
+However, in production, one may actually consider standardizing with respect to the Cox PH.
+
+When conducting benchmark experiments, it is advisable to use a spread of measures so that results can be compared across various properties.
+In this case, models should be tested against discrimination, calibration, and overall predictive ability (i.e., with scoring rules).
+As models make different types of predictions, results from these experiments should be limited to metrics that are directly comparable, in other words, two models should only be compared based on the *same* metric.
+In benchmark experiments, models are compared across the same data and same resampling strategy, hence measure assumptions become less important as they are equally valid or flawed for all models.
+This book recommends using Harrell's C and Uno's C for concordance, D-calibration for assessing a model's calibration, and both RCLL and Graf score for overall performance.
+For any automated tuning, using a scoring rule makes the most sense as they assess calibration and discrimination simultaneously.
+
+Finally, if using a model for investing patterns in data [@Molnar2019], then the recommendation is to perform a benchmark experiment of multiple models on the same data (ideally with some automated tuning) and then select the best model from this experiment and refit it on the full data [@Becker2024].
+Survival measures can be used fairly simply with standard routines for assessing algorithmic fairness [@Sonabend2022a].
+
+Note that this book has not discussed survival adaptations to the well-known AIC [@Liang2008] and BIC [@VolinskyRaftery2000] as these generally do not apply to machine learning models and are therefore out of scope.
+
+#### Choosing survival models {.unnumbered .unlisted}
+
+In contrast to measure selection, selecting models is more straightforward and the same heuristics from regression and classification largely apply to survival analysis.
+Firstly, for low-dimensional data, many experiments have demonstrated that machine learning may not improve upon more standard statistical methods [@Christodoulou2019] and the same holds for survival analysis [@Burk2024].
+Therefore the cost that comes with using machine learning -- lower interpretability, longer training time -- is unlikely to provide any performance benefits when a dataset has relatively few covariates.
+In settings where machine learning is more useful, then the choice largely falls into the four model classes discussed in this book: random forests, support vector machines, boosting, and neural networks (deep learning).
+If you have access to sufficient computational resources, then it is always worthwhile including at least one model from each class in a benchmark experiment, as models perform differently depending on the data type.
+However, without significant resources, the rules-of-thumb below can provide a starting point for smaller experiments.
+
+Random survival forests and boosting methods are both good all-purpose methods that can handle different censoring types and competing risks settings. In single-event settings both have been shown to perform well on high-dimensional data, outperforming other model classes [@Spooner2020].
+Forests require less tuning than boosting methods and the choice of hyperparameters if often more intuitive.
+Therefore, we generally recommend forests as the first choice for high-dimensional data.
+Given more resources, boosting methods such as *xgboost* are powerful methods to improve the predictive performance of classical measures.
+Survival support vector machines do not appear to work well in practice and to-date we have not seen any real-world use of SSVMs, therefore we generally do not recommend use of SVMs without robust training and testing first.
+
+Neural networks are incredibly data-dependent.
+Moreover, given a huge increase in research into this area [@Wiegrebe2024], there are no clear heuristics for recommending when to use neural networks and then which particular algorithms to use.
+With enough fine-tuning we have found that neural networks can work well but still without outperforming other methods.
+Where neural networks may shine is going beyond tabular data to incorporate other modalities, but again this area of research for survival analysis is still nascent.
+
 
 ## What's next for MLSA?
