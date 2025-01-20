@@ -329,3 +329,10 @@ inf_sub = infants |>
   select(stratum, enter, exit, event, mother)
 
 inf_sub |> knitr::kable()
+
+# Chapter 13 - Classical models
+set.seed(2029)
+library(survival)
+library(mlr3proba)
+knitr::kable(tsk("rats")$filter(sample(tsk("rats")$nrow, 5))$data()[, c(3,4,5,1,2)],align = "l")
+

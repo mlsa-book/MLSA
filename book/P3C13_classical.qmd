@@ -6,83 +6,85 @@ abstract: TODO (150-200 WORDS)
 {{< include _macros.tex >}}
 :::
 
-# Classical Models {#sec-models-classical}
+# Classical Statistical Models {#sec-models-classical}
 
 {{< include _wip.qmd >}}
 
-___
-TODO
+Defining if a model is 'machine learning' is surprisingly difficult, with terms such as 'iterative' and 'loss optimization' being frequently used in often clunky definitions.
+This book defines machine learning models as those that require intensive model fitting procedures such as recursion or iteration, that are flexible with hyper-parameters that can be tuned, that require some form of loss optimization, but that are often 'black boxes' that are difficult to interpret.
+In contrast, 'classical statistical' (or 'classical' for short) models, refer here to low-complexity models that are either non-parametric or have parameters that can be fit with maximum likelihood estimation (or an analogous method).
+Further, classical models are assumed to be fast to fit and highly interpretable, though can be inflexible and may make unreasonable assumptions.
 
-* change chapter name (don't use "classical")
-*
+Whilst this book is focused on machine learning, there are three primary reasons to include a chapter on 'classical statistical' models ('classical' for short).
 
-___
+Firstly, the boundary between machine learning and classical models is fuzzy as the latter can be augmented with modern machine learning methods such as feature selection and regularization, to create a model that could be termed as 'machine learning'.
+In addition, classical models can be used within machine learning algorithms, such as boosting and stacking.
 
-## A Review of Classical Survival Models {#sec-surv-models}
+Secondly, the vast majority of machine learning survival algorithms make use of classical models.
+Often by using the Kaplan-Meier estimator, or assuming a proportional hazards form, as a central component to construct an algorithm around.
 
-This chapter provides a brief review of classical survival models before later chapters move on to machine learning models.
-'Classical' models are defined with a very narrow scope in this book: low-complexity models that are either non-parametric or have parameters that can be fit with maximum likelihood estimation (or an equivalent method).
-In contrast, 'machine learning' (ML) models require more intensive model fitting procedures such as recursion or iteration.
-The classical models in this paper are fast to fit and highly interpretable, though can be inflexible and may make unreasonable assumptions.
-Whereas the ML models are more flexible with hyper-parameters however are computationally more intensive (both in terms of speed and storage), require tuning to produce 'good' results, and are often a 'black-box' with difficult interpretation.
+Finally, several papers have demonstrated that augmenting classical survival models with regularization methods, can lead to models that outperform machine learning alternatives even on high-dimensional data [@Zhang2021, @Spooner2020].
+On lower dimensional data, classical algorithms often outperform machine learning models even without further adjustment [@Beaulac2020, @Burk2024].
 
-As classical survival models have been studied extensively for decades, these are only discussed briefly here, primarily these are of interest as many of these models will be seen to influence machine learning extensions.
-The scope of the models discussed in this chapter is limited to the general book scope (@sec-surv-scope), i.e. single event with right-censoring and no competing-risks, though in some cases these are discussed.
+Therefore, a robust understanding of classical models is imperative to fairly construct and evaluate machine learning survival models.
+This chapter begins with a recap of estimators seen in the first part of this book and demonstrating how they can be used as predictive models, with further estimators then introduced.
+Semi-parametric estimators are then introduced, most notably the Cox proportional hazards models.
+Finally, accelerated failure time, proportional odds, and flexible spline models are discussed.
 
-There are several possible taxonomies for categorising statistical models, these include:
+## Non-Parametric Estimators {#sec-surv-models-uncond}
 
-* Parametrisation Type: One of non-, semi-, or fully-parametric. \\ Non-parametric models assume that the data distribution cannot be specified with a finite set of parameters. In contrast, fully-parametric models assume the distribution can be specified with a finite set of parameters. Semi-parametric models are a hybrid of the two and are formed of a finite set of parameters *and* an infinite-dimensional 'nuisance' parameter.
-* Conditionality Type: One of unconditional or conditional. A conditional prediction is one that makes use of covariates in order to condition the prediction on each observation. Unconditional predictors, which are referred to below as 'estimators', ignore covariate data and make the same prediction for all individuals.
-* Prediction Type: One of ranking, survival time, or distribution (@sec-surv-set-types).
+The Kaplan-Meier estimator [@Kaplan1958] was introduced in @sec-surv-km as the step-function
 
-
-@tbl-surv-models summarises the models discussed below into the taxonomies above for reference. Note that the Cox model is listed as predicting a continuous ranking, and not a survival distribution, which may appear inconsistent with other definitions. The reason for this is elaborated upon in @sec-car. Though the predict-type taxonomy is favoured throughout this book, it is clearer to review classical models in increasing complexity, beginning with unconditional estimators before moving onto semi-parametric continuous ranking predictions, and finally conditional distribution predictors. The review is brief with mathematics limited to the model fundamentals but not including methods for parameter estimation. Also the review is limited to the 'basic' model specification and common extensions such as regularization are not discussed though they do exist for many of these models.
-
-All classical models are highly transparent and accessible, with decades of research and many off-shelf implementations. Predictive performance of each model is briefly discussed as part of the review and then again in [@Sonabend2021b].
-
-| Model$^1$ | Parametrisation$^2$ | Prediction$^3$ | Conditionality |
-| -- | -- | --- | -- |
-| Kaplan-Meier | Non | Distr. | Unconditional |
-| Nelson-Aalen | Non | Distr. | Unconditional  |
-| Akritas | Non | Distr. | Conditional  |
-| Cox PH | Semi | Rank | Conditional  |
-| Parametric PH | Fully | Distr. | Conditional |
-| Accelerated Failure Time | Fully | Distr. | Conditional |
-| Proportional Odds | Fully | Distr. | Conditional |
-| Flexible Spline | Fully | Distr. | Conditional |
-
-: Table of models discussed in this literature review, classified by parametrisation, prediction type, and conditionality. {#tbl-surv-models}
-
-<sup>
-* 1. All models are implemented in the $\Rstats$ package $\pkg{survival}$  [@pkgsurvival] with the exception of flexible splines, implemented in $\pkg{flexsurv}$  [@pkgflexsurv], and the Akritas estimator in $\pkg{survivalmodels}$  [@pkgsurvivalmodels].
-* 2. Non = non-parametric, Semi = semi-parametric, Fully = fully-parametric.
-* 3. Distr. = distribution, Rank = ranking.
-</sup>
-
-### Non-Parametric Distribution Estimators {#sec-surv-models-uncond}
-
-#### Unconditional Estimators {.unnumbered .unlisted}
-
-Unconditional non-parametric survival models assume no distribution for survival times and estimate the survival function using simple algorithms based on observed outcomes and no covariate data. The two most common methods are the Kaplan-Meier estimator  [@KaplanMeier1958], which estimates the average survival function of a training dataset, and the Nelson-Aalen estimator  [@Aalen1978; @Nelson1972], which estimates the average cumulative hazard function of a training dataset.
-
-The Kaplan-Meier estimator of the survival function is given by
 $$
-\hatS_{KM}(\tau|\dtrain) = \prod_{t \in \calU_O, t \leq \tau} \Big(1 - \frac{d_t}{n_t}\Big)
-$$ {#eq-km}
-As this estimate is so important in survival models, this book will always use the symbol $\KMS$ to refer to the Kaplan-Meier estimate of the average survival function fit on training data $(T_i, \Delta_i)$. Another valuable function is the Kaplan-Meier estimate of the average survival function of the *censoring* distribution, which is the same as above but estimated on $(T_i, 1 - \Delta_i)$, this will be denoted by $\KMG$.
-
-The Nelson-Aalen estimator for the cumulative hazard function is given by
+\KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{t_{(k)}}}{n_{t_{(k)}}}\right)
 $$
-\hatH(\tau|\dtrain) = \sum_{t \in \calU_O, t \leq \tau} \frac{d_t}{n_t}
-$$ {#eq-na}
 
-The primary advantage of these models is that they rely on heuristics from empirical outcomes only and don't require any assumptions about the form of the data. To train the models they only require $(T_i,\Delta_i)$ and both return a prediction of $\calS \subseteq \Distr(\calT)$ (@box-task-surv). In addition, both simply account for censoring and can be utilised in fitting other models or to estimate unknown censoring distributions. The Kaplan-Meier and Nelson-Aalen estimators are both consistent estimators for the survival and cumulative hazard functions respectively.
+where $t(k)$ are ordered event times, $d_{t_{(k)}}$ and $n_{t_{(k)}}$ are the number of events and observations at risk at $t_{(k)}$ respectively.
+In @sec-surv-km, this was discussed as an estimator for visualizing survival distributions and for descriptive analysis.
+However, now consider how this estimator could be used as a simple predictive method.
+As an unconditional non-parametric method, the estimator assumes no distribution for survival times and ignores any covariate data.
+Say we are given the following dataset of survival outcomes:
 
-Utilising the relationships provided in (@sec-surv-set-types), one could write the Nelson-Aalen estimator in terms of the survival function as $\hatS_{NA} = \exp(-\hatH(\tau|\dtrain))$. It has been demonstrated that $\hatS_{NA}$ and $\KMS$ are asymptotically equivalent, but that $\hatS_{NA}$ will provide larger estimates than $\KMS$ in smaller samples  [@Colosimo2002]. In practice, the Kaplan-Meier is the most widely utilised non-parametric estimator in survival analysis and is the simplest estimator that yields consistent estimation of a survival distribution; it is therefore a natural, and commonly utilised, 'baseline' model  [@Binder2008; @Herrmann2020; @Huang2020; @Wang2017]: estimators that other models should be 'judged' against to ascertain their overall performance (@sec-eval).
+|litter |rx |sex |time |status |
+|:------|:--|:---|:----|:------|
+|6      |0  |m   |62   |0      |
+|57     |0  |f   |55   |1      |
+|60     |1  |m   |104  |0      |
+|85     |1  |f   |92   |1      |
+|97     |0  |f   |91   |0      |
 
-Not only can these estimators be used for analytical comparison, but they also provide intuitive methods for graphical calibration of models (@sec-eval-distr-calib-prob). These models are never stuidied for prognosis directly but as baselines, components of complex models (@sec-car), or graphical tools [@Habibi2018; @Jager2008; @Moghimi-dehkordi2008]. The reason for this is due to them having poor predictive performance as a result of omitting explanatory variables in fitting. Moreover, if the data follows a particular distribution, parametric methods will be more efficient  [@Wang2017].
+: Sample of the $\code{rats}$ dataset from $\Rstats$ package $\pkg{survival}$. {#tbl-rats}
 
-#### Conditional Estimators {.unnumbered .unlisted}
+@tbl-rats-km below demonstrates construction of the Kaplan-Meier estimator at each possible time-point, where the second column is the contribution to the estimator at the given time:
+
+| $\tau$ | $1 - d/n$ | $\KMS(\tau)$ |
+|------| --- | -- |
+| 55 | 0.8 | 0.8 |
+| 62 | 1 | 0.8 |
+| 91 | 1 | 0.8 |
+| 92 | 0.5 | 0.4 |
+| 104 | 1 | 0.4 |
+
+: Kaplan-Meier contributions (second column) and estimation (third column) at each time $\tau$ based on the data from @tbl-rats. {#tbl-rats-km}
+
+Now if @tbl-rats is taken to be training data, then the values in @tbl-rats-km can be used to predict the probability of survival at a given time.
+For example, without needing to know any other information about a new rat that enters the data (for these estimators ignore covariates), there is an $80\%$ chance of survival until $\tau = 60$ is 80\%, which drops to $40\%$ after 92 days.
+
+Estimating the Kaplan-Meier on training data and using those values for predictions of new data, yields a 'baseline' model that can be compared to more sophisticated alternatives to improve interpretability in model evaluation (@sec-eval-distr-score-base).
+In this book, $\KMS$ specifically refers to the Kaplan-Meier estimator fit on some training data.
+Similarly, $\KMG$ specifically refers to the Kaplan-Meier estimator fit on the observed censoring times $(t_i, 1-\delta_i)$ from some training data.
+
+The Nelson-Aalen estimator [@Aalen1978; @Nelson1972], introduced in @sec-nonparametric, can also be used as a baseline predictive model.
+
+$$
+\hatH_{NA}(\tau) = \sum_{t_{(k)}\leq \tau} \frac{d_{t_{(k)}}}{n_{t_{(k)}}}.
+$$
+
+The Kaplan-Meier and Nelson-Aalen estimators are consistent estimators for the survival and cumulative hazard functions respectively; the former is more widely utilized as a baseline estimator [@Herrmann2020; @Huang2020; @Wang2017].
+As well as supporting in interpretability, both methods can be used for graphical calibration of models (@sec-eval-distr-calib-prob), components of complex models (@sec-car), and other diagnostic graphical tools [@Habibi2018; @Jager2008; @Moghimi-dehkordi2008].
+By ignoring covariates, neither estimator is expected to perform well in practice as predictive models.
+
+### Conditional Estimators
 
 The Kaplan-Meier and Nelson-Aalen estimators are simple to compute and provide good estimates for the survival time distribution but in many cases they may be overly-simplistic. Conditional non-parametric estimators include the advantages described above (no assumptions about underlying data distribution) but also allow for conditioning the estimation on the covariates. This is particularly useful when estimating a censoring distribution that may depend on the data (@sec-eval). However predictive performance of conditional non-parametric estimators decreases as the number of covariates increases, and these models are especially poor when censoring is feature-dependent  [@Gerds2006].
 
@@ -99,7 +101,7 @@ If $\lambda = 1$ then $K(\cdot|\lambda) = 1$ and the estimator is identical to t
 
 The non-parametric nature of the model is highlighted in (@eq-akritas), in which both the fitting and predicting stages are combined into a single equation. A new observation, $X^*$, is compared to its nearest neighbours from a training dataset, $\dtrain$, without a separated fitting procedure. One could consider splitting fitting and predicting in order to clearly separate between training and testing data. In this case, the fitting procedure is the estimation of $\hatF_X$ on training data and the prediction is given by (@eq-akritas) with $\hatF_X$ as an argument. This separated fit/predict method is implemented in $\pkg{survivalmodels}$  [@pkgsurvivalmodels]. As with other non-parametric estimators, the Akritas estimator can still be considered transparent and accessible. With respect to predictive performance, the Akritas estimator has more explanatory power than non-parametric estimators due to conditioning on covariates, however this is limited to a very small number of variables and therefore this estimator is still best placed as a conditional baseline.
 
-### Continuous Ranking and Semi-Parametric Models: Cox PH {#sec-surv-models-crank}
+## Semi-Parametric Models: Cox PH {#sec-surv-models-crank}
 
 The Cox Proportional Hazards (CPH)  [@Cox1972], or Cox model, is likely the most widely known semi-parametric model and the most studied survival model [@Habibi2018; @Moghimi-dehkordi2008; @Reid1994; @Wang2017]. The Cox model assumes that the hazard for a subject is proportionally related to their explanatory variables, $X_1,...,X_n$, via some baseline hazard that all subjects in a given dataset share ('the PH assumption'). The hazard function in the Cox PH model is defined by
 $$
@@ -127,9 +129,9 @@ Despite these disadvantages, the model has been demonstrated to have excellent p
 
 The next class of models address some of the Cox model disadvantages by making assumptions about the baseline hazard.
 
-### Conditional Distribution Predictions: Parametric Linear Models{#sec-surv-models-param}
+## Parametric Models{#sec-surv-models-param}
 
-#### Parametric Proportional Hazards {.unnumbered .unlisted}
+### Parametric Proportional Hazards
 
 The CPH model can be extended to a fully parametric PH model by substituting the unknown baseline hazard, $h_0$, for a particular parameterisation. Common choices for distributions are Exponential, Weibull and Gompertz  [@Kalbfleisch2011; @Wang2017]; their hazard functions are summarised in (@tab-survivaldists) along with the respective parametric PH model. Whilst an Exponential assumption leads to the simplest hazard function, which is constant over time, this is often not realistic in real-world applications. As such the Weibull or Gompertz distributions are often preferred. Moreover, when the shape parameter, $\gamma$, is $1$ in the Weibull distribution or $0$ in the Gompertz distribution, their hazards reduce to a constant risk ((@fig-survhazards)). As this model is fully parametric, the model parameters can be fit with maximum likelihood estimation, with the likelihood dependent on the chosen distribution.
 
@@ -153,7 +155,7 @@ In the literature, the Weibull distribution tends to be favoured as the initial 
 
 Whilst misspecification of the distribution tends not to affect predictions too greatly, PH models will generally perform worse when the PH assumption is not valid. PH models can be extended to include time-varying coefficients or model stratification  [@Cox1972] but even with these adaptations the model may not reflect reality. For example, the predicted hazard in a PH model will be either monotonically increasing or decreasing but there are many scenarios where this is not realistic, such as when recovering from a major operation where risks tends to increase in the short-term before decreasing. Accelerated failure time models overcome this disadvantage and allow more flexible modelling, discussed next.
 
-#### Accelerated Failure Time {.unnumbered .unlisted}
+### Accelerated Failure Time
 In contrast to the PH assumption, where a unit increase in a covariate is a multiplicative increase in the hazard rate, the Accelerated Failure Time (AFT) assumption means that a unit increase in a covariate results in an acceleration or deceleration towards death (expanded on below). The hazard representation of an AFT model demonstrates how the interpretation of covariates differs from PH models,
 $$
 h(\tau|X_i)= h_0(\exp(-X_i\beta)\tau)\exp(-X_i\beta)
@@ -168,7 +170,7 @@ Specifying a particular distribution for $\epsilon_i$ yields a fully-parametric 
 
 ![Log-logistic hazard curves with a fixed scale parameter of 1 and a changing shape parameter. x-axis is time and y-axis is the log-logistic hazard as a function of time.](Figures/classical/llog_hazard.png){#fig-litreview-logloghaz fig-alt="TODO"}
 
-#### Proportional Odds {.unnumbered .unlisted}
+### Proportional Odds
 
 Proportional odds (PO) models  [@Bennett1983] fit a proportional relationship between covariates and the odds of survival beyond a time $\tau$,
 $$
@@ -182,7 +184,7 @@ Perhaps the most useful feature of the model is convergence of hazard functions 
 
 In practice, the PO model is harder to fit and is less flexible than PH and AFT models, both of which can also produce odds ratios. This may be a reason for the lack of popularity of the PO model, in addition there is limited off-shelf implementations  [@Collett2014]. Despite PO models not being commonly utilised, they have formed useful components of neural networks (@sec-surv-ml-models-nn) and flexible parametric models (below).
 
-#### Flexible Parametric Models -- Splines {.unnumbered .unlisted}
+### Flexible Parametric Models
 
 Royston-Parmar flexible parametric models  [@RoystonParmar2002] extend PH and PO models by estimating the baseline hazard with natural cubic splines. The model was designed to keep the form of the PH or PO methods but without the semi-parametric problem of estimating a baseline hazard that does not reflect reality (see above), or the parametric problem of misspecifying the survival distribution.
 
