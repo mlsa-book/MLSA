@@ -37,7 +37,7 @@ The Kaplan-Meier estimator [@Kaplan1958] was introduced in @sec-surv-km as the s
 
 $$
 \KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{t_{(k)}}}{n_{t_{(k)}}}\right)
-$$
+$$ {#eq-km-ml}
 
 where $t(k)$ are ordered event times, $d_{t_{(k)}}$ and $n_{t_{(k)}}$ are the number of events and observations at risk at $t_{(k)}$ respectively.
 In @sec-surv-km, this was discussed as an estimator for visualizing survival distributions and for descriptive analysis.
@@ -82,24 +82,22 @@ $$
 
 The Kaplan-Meier and Nelson-Aalen estimators are consistent estimators for the survival and cumulative hazard functions respectively; the former is more widely utilized as a baseline estimator [@Herrmann2020; @Huang2020; @Wang2017].
 As well as supporting in interpretability, both methods can be used for graphical calibration of models (@sec-eval-distr-calib-prob), components of complex models (@sec-car), and other diagnostic graphical tools [@Habibi2018; @Jager2008; @Moghimi-dehkordi2008].
+
 By ignoring covariates, neither estimator is expected to perform well in practice as predictive models.
-
-### Conditional Estimators
-
-The Kaplan-Meier and Nelson-Aalen estimators are simple to compute and provide good estimates for the survival time distribution but in many cases they may be overly-simplistic. Conditional non-parametric estimators include the advantages described above (no assumptions about underlying data distribution) but also allow for conditioning the estimation on the covariates. This is particularly useful when estimating a censoring distribution that may depend on the data (@sec-eval). However predictive performance of conditional non-parametric estimators decreases as the number of covariates increases, and these models are especially poor when censoring is feature-dependent  [@Gerds2006].
-
-The most widely used conditional non-parametric estimator for survival analysis is the Akritas estimator  [@Akritas1994] defined by\footnote{Arguments and parameters are separated in function signatures by a pipe, `$|$', where variables to the left are parameters (free variables) and those to the right are arguments (fixed). In this equation, $\tau$ is a parameter to be set by the user, and $X^*, \dtrain, \lambda$ are fixed arguments. This could therefore be simplified to $\hatS(\tau)$ to only include free variables.}
-$$
-\hatS(\tau|X^*, \dtrain, \lambda) = \prod_{j:T_j \leq \tau, \Delta_j = 1} \Big(1 - \frac{K(X^*, X_j|\lambda)}{\sum_{l = 1}^n K(X^*, X_l|\lambda)\II(T_l \geq T_j)}\Big)
-$$
-where $K$ is a kernel function, usually $K(x,y|\lambda) = \II(\lvert \hat{F}_X(x) - \hat{F}_X(y)\rvert < \lambda), \lambda \in (0, 1]$, $\hat{F}_X$ is the empirical distribution function of the training data, $X_1,...,X_n$, and $\lambda$ is a hyper-parameter. The estimator can be interpreted as a conditional Kaplan-Meier estimator which is computed on a neighbourhood of subjects closest to $X^*$  [@Blanche2013]. To account for tied survival times, the following adaptation of the estimator is utilised  [@Blanche2013]
+Moreover, the assumption of uninformative censoring rarely holds true.
+One alternative is to consider a conditional non-parametric estimator that can take into account covariates.
+The Akritas estimator [@Akritas1994] is usually defined by [@Blanche2013]:
 
 $$
-\hatS(\tau|X^*, \dtrain, \lambda) = \prod_{t \in \calU_O, t \leq \tau} \Big(1 - \frac{\sum^n_{j=1} K(X^*,X_j|\lambda)\II(T_j = t, \Delta_j = 1)}{\sum^n_{j=1} K(X^*,X_j|\lambda)\II(T_j \geq t)}\Big)
+\hatS(\tau|\xx^*, \lambda) = \prod_{k:t(k)\leq \tau} \Big(1 - \frac{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i = t(k), \delta_i = 1)}{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i \geq t(k))}\Big)
 $$ {#eq-akritas}
-If $\lambda = 1$ then $K(\cdot|\lambda) = 1$ and the estimator is identical to the Kaplan-Meier estimator.
 
-The non-parametric nature of the model is highlighted in (@eq-akritas), in which both the fitting and predicting stages are combined into a single equation. A new observation, $X^*$, is compared to its nearest neighbours from a training dataset, $\dtrain$, without a separated fitting procedure. One could consider splitting fitting and predicting in order to clearly separate between training and testing data. In this case, the fitting procedure is the estimation of $\hatF_X$ on training data and the prediction is given by (@eq-akritas) with $\hatF_X$ as an argument. This separated fit/predict method is implemented in $\pkg{survivalmodels}$  [@pkgsurvivalmodels]. As with other non-parametric estimators, the Akritas estimator can still be considered transparent and accessible. With respect to predictive performance, the Akritas estimator has more explanatory power than non-parametric estimators due to conditioning on covariates, however this is limited to a very small number of variables and therefore this estimator is still best placed as a conditional baseline.
+where $K$ is a kernel function, usually $K(x,y|\lambda) = \II(\lvert \hat{F}_X(x) - \hat{F}_X(y)\rvert < \lambda), \lambda \in (0, 1]$, $\hat{F}_X$ is the empirical distribution function of the data, and $\lambda$ is a hyper-parameter.
+The estimator can be interpreted as a conditional Kaplan-Meier estimator which is computed on a neighbourhood of subjects closest to $\xx^*$.
+In fact, if $\lambda = 1$ then $K(\cdot|\lambda) = 1$ and @eq-akritas is identical to @eq-km-ml.
+
+The formulation in (@eq-akritas) includes fitting and predicting in one step as the usual application of the model is as a non-parametric estimator.
+By first estimating $\hatF_X$ on separate training data, the estimator can be used as a baseline predictive model.
 
 ## Semi-Parametric Models: Cox PH {#sec-surv-models-crank}
 
