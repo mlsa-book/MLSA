@@ -433,79 +433,76 @@ p_cens_vs_cr = ggplot(filter(cox_sir, transition == "death"), aes(x = time, y = 
   geom_vline(xintercept = 120, lty = 3) +
   labs(
     y = expression(P(Y <= \tau))
+    linetype = "assumption"
   )
 
 
 ggsave("book/Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
 
-### pamm
-cut <- unique(sir.adm$time[sir.adm$status != 0])
-ped_list <- as_ped(sir.adm, Surv(time, status)~., combine = FALSE, cut = cut)
-pam_list <- map(ped_list, ~pamm(ped_status ~ s(tend) + pneu, data = .x))
-# combined = TRUE is the default
-ped <- as_ped(sir.adm, Surv(time, status)~., combine = TRUE) %>%
-  mutate(cause = as.factor(cause))
-
-# Fit the model
-pam <- pamm(ped_status ~ s(tend, by = cause) + cause*pneu, data = ped)
-# what would it mean if we fit
-# pamm(ped_status ~ s(tend) + cause* pneu, data = ped)
-summary(pam)
-round(cbind(Discharge = exp(coef(pam)[3]), Death = exp(sum(coef(pam)[3:4]) )), 2)
 
 
-ndf <- ped %>% make_newdata(
-  tend  = unique(tend),
-  pneu  = unique(pneu),
-  cause = unique(cause))
-ndf %>% group_by(cause) %>% slice(1:3)
-ndf <- ndf %>%
-  group_by(cause, pneu) %>% # important!
-  add_cif(pam) %>%
-  ungroup() %>%
-  mutate(
-    cause = factor(cause, labels = c("Discharge", "Death")),
-    pneu  = factor(pneu, labels = c("No", "Yes"))
-  )
-# assuming random censoring for discharge
-ndf2 <- ped_list[[2]] |>
-  make_newdata(tend = unique(tend), pneu = unique(pneu)) |>
-  group_by(pneu) |>
-  add_surv_prob(pam_list[[2]]) |>
-  ungroup() |>
-  mutate(
-    cif = 1-surv_prob,
-    cif_lower = 1-surv_lower,
-    cif_upper = 1-surv_upper,
-    cause = factor("Death", levels = c("Discharge", "Death")),
-    pneu  = factor(pneu, labels = c("No", "Yes"))
-  )
-# visualization
+### multi-state example
 
-p_cr_cens <- ggplot(data = ndf2, aes(x = tend, y = cif)) +
-  geom_ribbon(aes(ymin = cif_lower, ymax = cif_upper, fill = pneu), alpha = .3) +
-  geom_line(aes(col = pneu)) +
-  labs(
-    y     = expression(P(Y <= tau ~ "|" ~ bold(x))),
-    x     = "time",
-    color = "Pneumonia",
-    fill  = "Pneumonia"
-  ) +
-  ylim(c(0, 1)) +
-  scale_color_manual(aesthetics = c("colour", "fill"), values = Set1[c(9, 1)])
-p_cr_cens
-ggsave("figures/cr-censoring.png", width = 5, height = 3, p_cr_cens)
+library(mstate) #prothr dataset
+data(prothr, package = "mstate")
+prothr |>
+  filter(id %in% c(1, 8, 46)) |>
+  mutate(from = from -1, to = to -1) |>
+  knitr::kable()
 
-p_cr <- ggplot(filter(ndf, cause=="Death"), aes(x = tend, y = cif)) +
-  geom_line(aes(col = pneu)) +
-  geom_ribbon(aes(ymin = cif_lower, ymax = cif_upper, fill = pneu), alpha = .3) +
-  labs(
-    y     = expression(P(Y <= tau ~ "|" ~ bold(x))),
-    x     = "time",
-    color = "Pneumonia",
-    fill  = "Pneumonia"
-  ) +
-  ylim(c(0, 1)) +
-  scale_color_manual(aesthetics = c("colour", "fill"), values = Set1[c(9, 1)])
-p_cr
-ggsave("figures/p-cr.png", p_cr, width = 5, height = 3)
+my.prothr <- prothr |>
+  mutate(transition = as.factor(paste0(from, "->", to))) |>
+  filter(Tstart != Tstop) # filter instantaneous transitions
+
+#' We use cox estimation without covariates because this is essentially `Nelson-Aalen`!!!!!)
+tmat = matrix(NA, nrow = 3, ncol = 3)
+tmat[1,2] <- 1
+tmat[1,3] <- 2
+tmat[2,1] <- 3
+tmat[2,3] <- 4
+tmat
+# placebo
+cox.bm.placebo = coxph(
+  Surv(Tstart,Tstop,status) ~ strata(trans),
+  data = my.prothr |> dplyr::filter(treat == "Placebo"),
+  method = "breslow")
+#' `msfit` has `newdata` arg => patient-specific transition hazards
+haz.bm.placebo = msfit(cox.bm.placebo, trans = tmat) # cumhaz
+tp.placebo = probtrans(haz.bm.placebo, predt=0, direction = "forward")
+# prednisone
+cox.bm.prednisone = coxph(
+  Surv(Tstart,Tstop,status) ~ strata(trans),
+  data = my.prothr |> dplyr::filter(treat == "Prednisone"),
+  method = "breslow")
+#' `msfit` has `newdata` arg => patient-specific transition hazards
+haz.bm.prednisone = msfit(cox.bm.prednisone, trans = tmat) # cumhaz
+tp.prednisone = probtrans(haz.bm.prednisone, predt=0, direction = "forward")
+
+time.placebo = tp.placebo[[1]]$time
+time.prednisone = tp.prednisone[[1]]$time
+placebo.df = data.frame(
+  time = rep(c(time.placebo), 4),
+  transition = rep(c("0->1", "0->2", "1->0", "1->2"), each = length(time.placebo)),
+  Treatment = factor("Placebo", levels = c("Placebo", "Prednisone"))
+)
+placebo.df$trans_prob = c(tp.placebo[[1]]$pstate2, tp.placebo[[1]]$pstate3, tp.placebo[[2]]$pstate1, tp.placebo[[2]]$pstate3)
+prednisone.df = data.frame(
+  time = rep(c(time.prednisone), 4),
+  transition = rep(c("0->1", "0->2", "1->0", "1->2"), each = length(time.prednisone)),
+  Treatment = factor("Prednisone", levels = c("Placebo", "Prednisone"))
+)
+prednisone.df$trans_prob = c(tp.prednisone[[1]]$pstate2, tp.prednisone[[1]]$pstate3, tp.prednisone[[2]]$pstate1, tp.prednisone[[2]]$pstate3)
+
+overall_df = rbind(placebo.df, prednisone.df)
+
+p_trans_prob_prothr = ggplot(overall_df, aes(x = time, y = trans_prob)) +
+  facet_wrap(~transition) +
+  geom_step(aes(col = Treatment)) +
+  scale_color_manual(values = c("steelblue", "firebrick4")) +
+  coord_cartesian(xlim = c(0, 4000), ylim = c(0, 1)) +
+  theme(legend.position = "bottom") +
+  labs(x = "Time", y = "Transition probability")
+
+ggsave("Figures/survival/multi-state-prothr.png",
+  p_trans_prob_prothr, width=5, height=5.2)
+
