@@ -347,11 +347,11 @@ tab_sir |> knitr::kable()
 sir_data_cif = sir.adm |>
   mutate(
     from = 0,
-    to = case_when(
+    to = dplyr::case_when(
       status == 0 ~ "cens",
       .default = as.character(status)))
 
-sir_data_cif |> pull(status) |> table()
+sir_data_cif |> dplyr::pull(status) |> table()
 
 cif = cuminc(
   sir_data_cif$time,
@@ -378,7 +378,7 @@ cif_sir_b = purrr::imap_dfr(cif[1:4], function(.x, .y) {
 
 km_sir_b = broom::tidy(survfit(Surv(time, status!=0)~pneu, data = sir.adm)) |>
   rename(pneumonia = strata) |>
-  mutate(pneumonia= case_when(
+  mutate(pneumonia= dplyr::case_when(
     pneumonia == "pneu=0" ~ "no",
     pneumonia == "pneu=1" ~ "yes"
   )) |>
@@ -401,7 +401,8 @@ p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
   coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
 
 
-ggsave("book/Figures/survival/cif-sir.png", p_sir_cifs, height=3, width=6, dpi=300)
+ggsave("Figures/survival/cif-sir.png", p_sir_cifs,
+  height=3, width=6, dpi=300)
 
 
 ### Independent censoring vs. Competing Risks
@@ -417,7 +418,7 @@ cox_sir = purrr::map_dfr(
       rename(pneumonia = strata) |>
       mutate(
         cif = 1 - exp(-hazard),
-        pneumonia = case_when(
+        pneumonia = dplyr::case_when(
           pneumonia == "pneu=0" ~ "no",
           pneumonia == "pneu=1" ~ "yes"
         ),
@@ -426,18 +427,23 @@ cox_sir = purrr::map_dfr(
   }
 )
 
-p_cens_vs_cr = ggplot(filter(cox_sir, transition == "death"), aes(x = time, y = cif)) +
-  geom_step(aes(col = pneumonia, lty="independent censoring")) +
-  geom_step(data = filter(cif_sir_b, transition == "death"), aes(col=pneumonia, lty="competing risks")) +
-  coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
-  geom_vline(xintercept = 120, lty = 3) +
-  labs(
-    y = expression(P(Y <= \tau))
-    linetype = "assumption"
-  )
+p_cens_vs_cr = ggplot(
+  filter(cox_sir, transition == "death"),
+  aes(x = time, y = cif)) +
+    geom_step(aes(col = pneumonia, lty="independent censoring")) +
+    geom_step(
+      data = filter(cif_sir_b, transition == "death"),
+      aes(col=pneumonia, lty="competing risks")
+    ) +
+    coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
+    geom_vline(xintercept = 120, lty = 3) +
+    labs(
+      y = expression(P(Y <= tau)),
+      linetype = "assumption"
+    )
 
 
-ggsave("book/Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
+ggsave("Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
 
 
 
