@@ -322,13 +322,12 @@ p_km_infants_joined = p_km_infants + p_km_infants_lt + plot_layout(guides =  "co
 ggsave("book/Figures/survival/km-infants.png", p_km_infants_joined, height=3, width=7, units="in", dpi=600)
 
 
-## table infant data)
+## table infant data
 inf_sub = infants |>
   filter(stratum %in% c(1, 2, 4)) |>
   select(stratum, enter, exit, event, mother)
 
 inf_sub |> knitr::kable()
-
 
 ## competing risks
 library(mvna)
