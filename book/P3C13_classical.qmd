@@ -259,49 +259,58 @@ In contrast to the semi-parametric Cox model, fully parametric PH models can pre
 Fine and Gray [@Fine1999] proposed a semi-parametric PH model in the competing risks setting based on modelling the subdistribution hazard function.
 Cause-specific hazards (@eq-cause-specific-hazard) represent the instantaneous risk of an individual experiencing the cause of interest, given that they have not yet experienced *any* event.
 In contrast, subdistribution hazards model the risk of an individual experiencing the cause of interest, given they have not yet experienced the event of interest, but may have experienced a competing event.
-In practice, the difference comes from the definition of the risk set.
+As will be shown below, the benefit of the subdistribution model is the ability to directly predict the cumulative incidence function under a PH model.
+In this framework, the subdistribution hazard provides a relationship between covariates and the CIF for an event of interest [@Austin2016].
+Mathematically, the difference between cause-specific and subdistribution hazards comes from the definition of the risk set.
 The cause-specific risk set for cause $e$ is defined in the usual way as:
 
 $$
 \calR_{e;\tau} := \{i: t_i \geq \tau\}
 $$
 
-Which is identical to @eq-risk
-
+Which is independent of $e$ and therefore identical to (@eq-riskset).
 Whereas the subdistribution risk set is defined as:
 
 $$
-\calR_{e;\tau} := \{i: t_i \geq \tau \cup (t_i \leq \tau \cap e_i \neq e)\}
-$$
+\calR_{e;\tau} := \{i: t_i \geq \tau \cup e_i \neq e\}
+$$ {#eq-riskset-sd}
 
-
-Recall from  the hazard for some event $e$ is defined by:
-
-$$
-h_{e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}
-$$
-
-Substituting the cause-specific hazard into the semi-parametric PH form (@eq-cox) yields the Fine and Gray model for the subhazard function of the $e$th cause:
+Using this latter definition of the risk set gives rise to the subdistribution hazard function for cause $e$:
 
 $$
-h_{FG,e}(\tau|\xx_i)= h_{e_0}(\tau)\exp(\eta_i) 
+h^{SD}_{e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau \cup E \neq e)}{\Delta \tau}
+$$ {#eq-hazard-sd}
+
+Subsituting (@eq-hazard-sd) into the baseline hazard of the Cox model (@eq-cox) yields the subhazard model for the $e$th cause:
+
+$$
+h_{FG,e}(\tau|\xx_i)= h^{SD}_{e_0}(\tau)\exp(\eta_i) 
 $$
 
 This model form assumes that the subdistribution hazards are all proportional.
-Estimating the $\beta$ coefficients follows from a weighted, cause-specific adaptation of the partial likelihood (@eq-partial).
+Estimating the $\beta$ coefficients follows from a weighted, subdistribution adaptation of the partial likelihood (@eq-partial) which depends on the subdistribution risk set definition given in (@eq-riskset-sd).
 For the $e$th cause, the partial likelihood is
 
 $$
-\calL_e(\beta) = \prod_{k:t_{e;(k)}} \Bigg(\frac{\exp(\eta_k)}{\sum_{j \in \calR_{t_{e;(k)}}} \exp(\eta_j)}\Bigg)
+\calL_e(\beta) = \prod_{k:t_{e;(k)}} \Bigg(\frac{\exp(\eta_k)}{\sum_{j \in \calR_{t_{e;(k)}}} w_{kj}\exp(\eta_j)}\Bigg)
 $$
 
-<!-- FIXME: ANDI ARE YOU HAPPY WITH THIS NOTATION? IF SO SHOULD WE ADD TO EHA CHAPTER? -->
 Where $t_{e;(k)}$ is the ordered event times for observations that experience event $e$.
-A quirk of the competing risk setting is that the risk set includes observations that experienced a competing event
+To account for the updated risk set definition in (@eq-riskset-sd), Fine and Gray defined the weights
 
 $$
-\calR_{e;\tau} := \{i: t_i \geq \tau \cup (t_i \leq \tau \cap e_i \neq e)\}
+w_{kj} := \frac{\KMG(t_{e;(k)})}{\KMG(\min\{t_{e;(k)}, t_j\})}
 $$
+
+Where $\KMG$ is the Kaplan-Meier estimator fit on the censoring distribution (@sec-surv-km).
+The Fine and Gray model therefore uses inverse probability of censoring weighting (as in many measures @sec-eval-crank-conc) in order to compensate for the effect of competing events.
+Because of the way the risk set is defined, the denominator effectively does one of two things:
+
+1. If $t_{e;(k)} \leq t_j$ then $w_{kj} = 1$. Thus, observations who have not experienced any event contribute the most to the likelihood.
+2. If $t_{e;(k)} > t_j$ then $w_{kj} < 1$ as $\KMG$ is a monotonically decreasing function.
+On the other hand as $\KMG$ is a mdecreasing function, contributions in the demoniator from observations that have experienced competing events ()
+
+ $t_j > t_{e;(k)}$ contributions from observations that have experienced competing events diminish over time as $t_j$ increases.
 
 Estimation of the cause-specific baseline hazard, $h_{e_0}$ 
 
