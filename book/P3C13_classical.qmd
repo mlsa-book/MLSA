@@ -266,9 +266,9 @@ The cause-specific risk set for cause $e$ is defined in the usual way as:
 
 $$
 \calR_{e;\tau} := \{i: t_i \geq \tau\}
-$$
+$$ {#eq-riskset-standard}
 
-Which is independent of $e$ and therefore identical to (@eq-riskset).
+Which is independent of $e$ and therefore identical to the usual risk set definition in (@eq-riskset).
 Whereas the subdistribution risk set is defined as:
 
 $$
@@ -285,15 +285,15 @@ Subsituting (@eq-hazard-sd) into the baseline hazard of the Cox model (@eq-cox) 
 
 $$
 h_{FG,e}(\tau|\xx_i)= h^{SD}_{e_0}(\tau)\exp(\eta_i) 
-$$
+$$ {#eq-cox-sd}
 
 This model form assumes that the subdistribution hazards are all proportional.
 Estimating the $\beta$ coefficients follows from a weighted, subdistribution adaptation of the partial likelihood (@eq-partial) which depends on the subdistribution risk set definition given in (@eq-riskset-sd).
 For the $e$th cause, the partial likelihood is
 
 $$
-\calL_e(\beta) = \prod_{k:t_{e;(k)}} \Bigg(\frac{\exp(\eta_k)}{\sum_{j \in \calR_{t_{e;(k)}}} w_{kj}\exp(\eta_j)}\Bigg)
-$$
+\calL_e(\beta) = \prod_{k:t_{e;(k)}} \Bigg(\frac{\exp(\eta_k)}{\sum_{j \in \calR_{e;t_{e;(k)}}} w_{kj}\exp(\eta_j)}\Bigg)
+$$ {#eq-fg-likelihood}
 
 Where $t_{e;(k)}$ is the ordered event times for observations that experience event $e$.
 To account for the updated risk set definition in (@eq-riskset-sd), Fine and Gray defined the weights
@@ -303,16 +303,51 @@ w_{kj} := \frac{\KMG(t_{e;(k)})}{\KMG(\min\{t_{e;(k)}, t_j\})}
 $$
 
 Where $\KMG$ is the Kaplan-Meier estimator fit on the censoring distribution (@sec-surv-km).
-The Fine and Gray model therefore uses inverse probability of censoring weighting (as in many measures @sec-eval-crank-conc) in order to compensate for the effect of competing events.
-Because of the way the risk set is defined, the denominator effectively does one of two things:
+The Fine-Gray model therefore uses inverse probability of censoring weighting (as in many measures @sec-eval-crank-conc) in order to compensate for the effect of competing events.
+Because of the way the subdistribution risk set is defined in (@eq-riskset-sd), the denominator of (@eq-fg-likelihood) is a sum over individuals, $j \in \calR_{e;t_{e;(k)}}$,  at time $t_{e;(k)}$ who have either yet to experience the event ($t_j \geq t_{e;(k)}$) or experienced a different event (implying $t_j < t_{e;(k)}$ as they would not be in the dataset if $t_j < t_{e;(k)} \cap e_j = e$).
+The weighting function handles these cases as follows:
 
-1. If $t_{e;(k)} \leq t_j$ then $w_{kj} = 1$. Thus, observations who have not experienced any event contribute the most to the likelihood.
-2. If $t_{e;(k)} > t_j$ then $w_{kj} < 1$ as $\KMG$ is a monotonically decreasing function.
-On the other hand as $\KMG$ is a mdecreasing function, contributions in the demoniator from observations that have experienced competing events ()
+1. If $t_j \geq t_{e;(k)}$ then $w_{kj} = 1$ and thus observations who have not experienced any event contribute the most to the likelihood.
+2. If $t_j < t_{e;(k)}$ then $w_{kj} < 1$ as $\KMG$ is a monotonically decreasing function with $w_{kj}$ continuing to decrease as the distance between $t_j$ and $t_{e;(k)}$ increases. Thus the contribution from events that have experienced competing events reduces over time.
 
- $t_j > t_{e;(k)}$ contributions from observations that have experienced competing events diminish over time as $t_j$ increases.
+Whilst modelling the subdistribution can seem unintuitive note that if there is only one event of interest then $w_{kj} = 1$ for all $k$ and $j$ and further $e_i \neq e$ must always be false, meaning (@eq-riskset-sd) reduces to (@eq-riskset-standard) as only the left condition can ever be true and by the same logic the subdistribution hazard reduces to the usual hazard definition.
+Therefore the standard Cox PH for single events is perfectly recovered.
 
-Estimation of the cause-specific baseline hazard, $h_{e_0}$ 
+Instead of interpreting the subdistribution hazards directly, @Austin2017b recommend interpreting the fitted coefficients via the cause-specific CIF and cumulative hazard forms of (@eq-cox-sd), which can be obtained in the 'usual' way by first integrating to obtain the cumulative hazard form:
+
+$$
+H_{FG,e}(\tau|\xx_i)= H^{SD}_{e_0}(\tau)\exp(\eta_i) 
+$$ {#eq-fg-cum}
+
+where $H^{SD}_{e_0}$ is the cause-specific baseline cumulative hazard for cause $e$.
+Then using (@eq-surv-haz) to relate the survival and hazard functions and representing this in terms of the CIF:
+
+$$
+F_{FG,e}(\tau|\xx_i) = 1 - \exp(-H^{SD}_{e_0}(\tau))^{\exp(\eta_i)}
+$$ {#eq-fg-cif-long}
+
+Or more simply:
+
+$$
+F_{FG,e}(\tau|\xx_i) = 1 - (1 - F^{SD}_{e_0}(\tau))^{\exp(\eta_i)}
+$$ {#eq-fg-cif}
+
+where $F^{SD}_{e_0}$ is the cause-specific baseline cumulative incidence function for cause $e$.
+The model in (@eq-fg-cif) is fit by estimating the baseline cumulative hazard function and substituting into (@eq-fg-cif-long).
+Similarly to how the subdistribution hazard was created, estimation of $\hat{H}^{SD}$ follows by updating (@eq-breslow) to use the subdistribution risk set definition and applying the same weighting to compensate for multiple events: 
+
+$$
+\hat{H}^{SD}_{Bres}(\tau) = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{e;\tbk}} w_{kj}\exp(\hat{\eta}_j)}
+$$ {#eq-fg-breslow}
+
+Use of the Fine-Gray model has to be carefully considered before model fitting.
+The subdistribution risk set definition, which includes competing events, implicitly implies that competing events are 'curable', meaning an observation can move from one event to another (as in the multi-state setting in @sec-multi-state).
+In practice this is often not the case, especially in medical models where death is often a competing risk.
+Moreover, combining subdistribution CIF estimates across causes can result in probabilities that exceed $1$, which should be impossible as events are mutually exclusive and exhaustive [@Austin2022].
+In these above cases, estimating and summing cause-specific hazard functions is preferred [@Austin2022].
+
+The Fine-Gray model is most appropriate when only concerned with a single event of interest and all-cause estimates are not of interest.
+Interpreting coefficient changes via (@eq-fg-cif) is slightly more intuitive as making inferences about the magnitude of effects of covariates on the incidence is more standard in clinical settings [@Austin2017b].
 
 ## Accelerated Failure Time {#sec-surv-models-param}
 
