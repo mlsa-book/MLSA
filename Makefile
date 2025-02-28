@@ -1,34 +1,16 @@
 # Copied from mlr-org/mlr3book
-all: install serve
+all: serve
 
 .PHONY : help
 help :
-	@echo "install : Install book and dependencies."
-	@echo "bookinstall : Install book without dependencies."
-	@echo "serve   : Start a http server to serve the book."
-	@echo "serverefresh   : Clear cache and start a http server to serve the book."
-	@echo "render     : Render all formats."
-	@echo "pdf     : Render book as pdf."
-	@echo "html    : Render book as html."
+	@echo "serve   : Clear cache and serve book on http server."
+	@echo "render     : Clear cache and render all formats."
+	@echo "pdf     : Clear cache and render pdf."
 	@echo "clean   : Remove auto-generated files."
 	@echo "bibtex  : Reformats the bibtex file."
 
-install:
-	Rscript -e 'if (length(find.package("devtools", quiet = TRUE)) == 0) install.packages("devtools")' \
-	        -e 'devtools::install_dev_deps(upgrade = "always")' \
-			-e 'devtools::update_packages(upgrade = "always")' \
-	        -e 'devtools::document()' \
-			-e 'devtools::install()'
-
-bookinstall:
-	Rscript -e 'devtools::document()' \
-			-e 'devtools::install()'
-
 serve:
 	quarto preview book/
-
-serveref:
-	quarto preview book/ --cache-refresh
 
 clean:
 	$(RM) -r book/_book book/.quarto book/site_libs;\
@@ -38,18 +20,11 @@ clean:
 	find . -type d -name "*_cache" -exec rm -rf {} \;
 
 render:
-	quarto render book/
-
-html:
-	quarto render book/ --to html
+	quarto render book/ --cache-refresh
 
 pdf:
-	quarto render book/ --to pdf
-
-pdfref:
 	quarto render book/ --to pdf --cache-refresh
 
-
 bibtex:
-	biber --tool --output-align --output-indent=2 --output-fieldcase=lower book/book.bib -O book/book.bib
-	rm book/book.bib.blg
+	biber --tool --output-align --output-indent=2 --output-fieldcase=lower book/library.bib -O book/library.bib
+	rm book/library.bib.blg
