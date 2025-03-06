@@ -492,10 +492,6 @@ The PH and AFT models are both very transparent and accessible, though require s
 
 ## Improving classical models {#sec-classical-improving}
 
-* Non-linear effects: splines/additive models
-* Dimension reduction: Regularization, feature selection and filters
-* Ensembles: Bagging, boosting (mboost) and stacking
-
 A number of model-agnostic algorithms have been created to improve a model's predictive ability.
 When applied to classical algorithms, these methods can be used to create powerful models that outperform other machine learning.
 As each could be the subject of a whole book, this section remains brief and just covers the general overview.
@@ -507,6 +503,8 @@ These are split into methods for:
 
 ### Non-linear effects
 
+TODO: splines/additive models
+
 ### Dimension reduction and feature selection
 
 In a predictive modelling problem, only a small subset of variables in datasets tend to be relevant for correctly predicting the outcome.
@@ -516,6 +514,7 @@ In these cases, using all variables for modelling results in worse interpretabil
 To improve model performance, one can therefore 'help' models by applying feature selection methods to reduce the number of variables in the dataset.
 Feature selection is often grouped into three categories: 1) filters; 2) wrappers; and 3) embedded methods.
 Wrappers fit multiple models on subsets of variables and select the best performing subsets, this is often computationally infeasible in the context of very large datasets, and as such have less relevance in survival analysis which often tackles very high-dimensional datasets such as genomic datasets and detailed time-series economic data.
+This section only looks at methods specific to survival analysis and does not consider general algorithms such as PCA, see further reading below for suggested additional reading that covers these areas.
 
 #### Embedded methods {.unlisted .unnumbered}
 Embedded methods refers to those that are incorporated during model fitting.
@@ -539,7 +538,7 @@ $$
 
 Ridge and lasso are both shrinkage methods, which are used to reduce model variance and overfitting, especially in the context of multi-collinearity.
 However, the $\call^1$ norm in Lasso regression can also shrink coefficients to zero and thus performs variable selection as well.
-It is therefore possible to incorporate a feature selection method first and then pass the results to a Ridge-Cox model.
+It is therefore possible to incorporate a feature selection method first and then pass the results to a Ridge-Cox model -- though experiments have shown Ridge-Cox on its own is already a powerful tool [@Spooner2020].
 Alternatively, as with many machine learning algorithms, deciding between lasso and ridge can be performed in empirical benchmark experiments by using elastic net [@Simon2011;@Zou2005], which is a convex combination of $\call^1$ and $\call^2$ penalties such that $\bsbeta$ is estimated as
 
 $$
@@ -551,10 +550,54 @@ where $\alpha$ is a hyper-parameter to be tuned.
 #### Filter methods {.unlisted .unnumbered}
 Filter methods are a two-step process that score features according to some metric and then select either a given number of top-performing features (i.e., have the best score) or those where the score exceeds some threshold.
 Once again determining the number of features to select, or the threshold to exceed, can be performed via hyperparameter optimisation.
-@Bommert2021
+@Bommert2021 compared 14 filter methods for high-dimensional survival data by extending existing methods, making use of tools seen throughout this book including non-parametric estimators, martingale residuals, and inverse probability of censoring weighting.
+However, the authors found that the method that outperformed all others was a simple variance filter:
+
+$$
+S(\xx_{;j}) = \text{Var}(\xx_{;j})
+$$
+
+where $\xx_{;j}$ is the $j$th variable in the data and $S$ is the resulting score.
+The filter measures the amount of variance in the feature and removes features that have little variation, as these do not significantly impact the outcome.
+
+Another common filter method is to train another model and make use of its embedded feature selection and pass these results to a simpler classical model.
+This allows a classical model to be trained on relevant features without loss to interpretability or performance.
+Common choices for models to use in the first step of th pipeline include random forests (@sec-ranfor) and gradient boosting machines (@sec-boost).
+One could also use a Cox model by fitting the model then significance testing the features and removing those that are not significant.
+However this does not appear to be an improvement over using an embedded regularization method [@Spooner2020].
 
 ### Ensemble methods
 
+Ensemble methods fit multiple models and combine the result into a single prediction.
+Common ensemble methods include boosting, bagging, and stacking.
+These are briefly explained below and can be applied to any model, whether machine learning or a simple linear model.
+Note that nested cross-validation should be used when fitting any of the models below in order to ensure no data is 'leaked' between training and predictions (@sec-ml-opt).
+
+#### Bagging and averaging {.unlisted .unnumbered}
+
+The simplest ensemble method is to fit multiple models on the same data and make predictions by taking an average over the individual model predictions.
+The average over predictions could be uniform, weighted with weights selected through expert knowledge, or weighted with weights optimised as hyper-parameters.
+Ensemble methods perform best when there is high variance between each model as each then captures unique information about the underlying data.
+Therefore ensemble averaging is more common after first subsetting the training data and training each model on a different subset.
+
+Whilst increasing variance is beneficial, too much variance may result in worse predictions.
+Hence, bagging (Bootstrap AGGregatING) is a common approach to increase variance without losing predictive accuracy.
+Bootstrapping is the process of sampling data with replacement, meaning the rows may be duplicated in each subset -- this is discussed further in @sec-ranfor.
+After sampling the process is the same with predictions made and averaged.
+
+#### Model-based boosting {.unlisted .unnumbered}
+
+Model-based boosting iteratively fits models such that the first model is trained and tested as usual then subsequent models are fit on the same training data but with the purpose of predicting the residuals (i.e., losses) from the previous model.
+The result is a gradual and iterative increase in improvement as each model captures patterns missed previously.
+In a survival analysis context, suitable residuals include any of the losses discussed in @sec-eval, with the choice largely dependent on the task of interest.
+In contrast to the boosting methods discussed in @sec-boost, model-based boosting is a generic process for fitting iterative models, however it is unlikely a generic boosting pipeline will outperform the specific algorithms introduced in @sec-boost.
+
+#### Stacking {.unlisted .unnumbered}
+
+When stacking is used, multiple models are fit on the same training data, and their predictions are used as training data to a meta-model.
+The meta-model uses the model predictions to predict the target from the original training data.
+Fitting a meta-model, often a simple linear model, results in fitted coefficients that weight the input models according to how close or far they were from the truth.
+Effectively this results in a weighted average of predictions when a linear meta-model is used, where the weights are determined by model accuracy.
 
 ## Conclusion
 
