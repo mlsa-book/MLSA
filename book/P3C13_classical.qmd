@@ -509,14 +509,49 @@ These are split into methods for:
 
 ### Dimension reduction and feature selection
 
-Many classical models work well for a small number of features (there is no heuristic for what 'small' means but often less than 10) but perform poorly with more variables.
-To handle this, dimension reduction or filter selection methods can be used to reduce the number of variables in the dataset or selectively pick variables based on some rules.
-In the context of classical models, regularization is a common dimension reduction method, split into L1 regularization, known as 'lasso', and L2 regularization, 'ridge regression'.
-Given a generic learning algorithm, L1 and L2 regularization respectively constrain the model coefficients subject to the $\cal{l}^1$-norm and $\cal{l}^2$-norm respectively.
-Concretely, the lasso-Cox model is defined by
+In a predictive modelling problem, only a small subset of variables in datasets tend to be relevant for correctly predicting the outcome.
+Other variables are either redundant -- they provide no more information than their counterparts -- or irrelevant -- they do not influence the outcome.
+In these cases, using all variables for modelling results in worse interpretability, increased computational complexity, and often inferior model performance as model's tend to overfit the training data and generalise poorly to new data.
 
-<!-- CITE TIBSHIRANI - THE LASSO METHOD FOR VARIABLE SELECTION IN THE COX MODEL -->
+To improve model performance, one can therefore 'help' models by applying feature selection methods to reduce the number of variables in the dataset.
+Feature selection is often grouped into three categories: 1) filters; 2) wrappers; and 3) embedded methods.
+Wrappers fit multiple models on subsets of variables and select the best performing subsets, this is often computationally infeasible in the context of very large datasets, and as such have less relevance in survival analysis which often tackles very high-dimensional datasets such as genomic datasets and detailed time-series economic data.
 
+#### Embedded methods {.unlisted .unnumbered}
+Embedded methods refers to those that are incorporated during model fitting.
+The vast majority of machine learning models incorporate embedded methods and thus reduce a dataset's size as part of the training process.
+In contrast, classical models do not apply any form of feature selection and therefore can perform poorly when there is a large number of variables in a dataset.
+One model that straddles the line of 'classic' and 'machine learning' methodology is the elastic Cox model, which incorporates the 'lasso' and 'ridge' regularization methods.
+Given a generic learning algorithm, lasso and ridge regularization respectively constrain the model coefficients subject to the $\cal{l}^1$-norm and $\cal{l}^2$-norm respectively.
+In survival analysis, the Lasso-Cox [@Tibshirani1997] model fits the usual Cox model in (@eq-cox) by estimating $\bsbeta$ as
+
+$$
+\hat{\bsbeta} = \argmax \calL(\bsbeta); \text{ subject to } \sum |\beta_j| \leq \gamma
+$$
+
+where $\calL$ is the likelihood defined in (@eq-partial) and $\gamma > 0$ is a hyper-parameter.
+
+In contrast, the Ridge-Cox model estimates $\bsbeta$ as 
+
+$$
+\hat{\bsbeta} = \argmax \calL(\bsbeta); \text{ subject to } \sum \beta_j^2 \leq \gamma
+$$
+
+Ridge and lasso are both shrinkage methods, which are used to reduce model variance and overfitting, especially in the context of multi-collinearity.
+However, the $\call^1$ norm in Lasso regression can also shrink coefficients to zero and thus performs variable selection as well.
+It is therefore possible to incorporate a feature selection method first and then pass the results to a Ridge-Cox model.
+Alternatively, as with many machine learning algorithms, deciding between lasso and ridge can be performed in empirical benchmark experiments by using elastic net [@Simon2011;@Zou2005], which is a convex combination of $\call^1$ and $\call^2$ penalties such that $\bsbeta$ is estimated as
+
+$$
+\hat{\bsbeta} = \argmax \calL(\bsbeta); \text{ subject to } \alpha \sum \beta_j + (1-\alpha) \sum \beta_j^2 \leq \gamma
+$$
+
+where $\alpha$ is a hyper-parameter to be tuned.
+
+#### Filter methods {.unlisted .unnumbered}
+Filter methods are a two-step process that score features according to some metric and then select either a given number of top-performing features (i.e., have the best score) or those where the score exceeds some threshold.
+Once again determining the number of features to select, or the threshold to exceed, can be performed via hyperparameter optimisation.
+@Bommert2021
 
 ### Ensemble methods
 
@@ -538,5 +573,6 @@ Concretely, the lasso-Cox model is defined by
 * TODO: Proportional odds
 * To learn more about hazard ratios from Cox models and complexities in interpretation, we recommend @Sashegyi2017 and @Spruance2004.
 * @Collett2014 and @KalbfleischPrentice1973 both provide comprehensive reading for classical statistical models. The former is slightly less technical and covers extensions to multiple settings.
+* For more abstract feature selection algorithms that can be applied to any data (survival or otherwise), see @Chandrashekar2014 and @Guyon2003.
 
 ::::
