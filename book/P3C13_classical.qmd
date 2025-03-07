@@ -8,15 +8,7 @@ abstract: TODO (150-200 WORDS)
 
 # Classical Statistical Models {#sec-models-classical}
 
----
-
-TODO
-
-* Move PO into flexible
-
----
-
-{{< include _wip.qmd >}}
+{{< include _wip_minor.qmd >}}
 
 Defining if a model is 'machine learning' is surprisingly difficult, with terms such as 'iterative' and 'loss optimization' being frequently used in often clunky definitions.
 This book defines machine learning models as those that:
@@ -217,7 +209,7 @@ Taking these to be the baseline hazard and survival functions respectively, they
 
 $$
 h_{WeibullPH}(\tau|\xx_i)= (\lambda\gamma \tau^{\gamma-1}) \exp(\eta_i)
-$$
+$$ {#eq-ph-weibull}
 
 or equivalently
 
@@ -251,7 +243,7 @@ When considering which probability distributions to model in predictive experime
 Gompertz [@Gompertz1825] is commonly used in medical domains, especially when describing adult lifespans.
 In a machine learning context, one can select the optimal distribution for future predictive performance by running a benchmark experiment.
 Moreover, it transpires that model inference and predictions are largely insensitive to the choice of distribution  [@Collett2014; @Reid1994].
-In contrast to the semi-parametric Cox model, fully parametric PH models can predict absolutely continuous survival distributions, they do not treat the baseline hazard as a nuisance, and in general will result in more precise and interpretable predictions if the distribution is correctly specified  [@Reid1994; @RoystonParmar2002].
+In contrast to the semi-parametric Cox model, fully parametric PH models can predict absolutely continuous survival distributions, they do not treat the baseline hazard as a nuisance, and in general will result in more precise and interpretable predictions if the distribution is correctly specified  [@Reid1994; @Royston2002].
 
 ### Competing risks
 
@@ -517,13 +509,59 @@ There is no simple closed form expression for the partial likelihood of a semi-p
 
 ## Flexible Parametric Models
 
-Royston-Parmar flexible parametric models  [@RoystonParmar2002] extend PH and PO models by estimating the baseline hazard with natural cubic splines. The model was designed to keep the form of the PH or PO methods but without the semi-parametric problem of estimating a baseline hazard that does not reflect reality (see above), or the parametric problem of misspecifying the survival distribution.
+Royston-Parmar flexible parametric models  [@Royston2002] extend PH and PO models by estimating the baseline hazard with natural cubic splines.
+The model was designed to keep the form of the PH or PO methods but without being forced to estimate a misleading baseline hazard (for semi-parametric models) or missspecifying the survival distribution (for fully-parametric models).
+This is achieved by fitting natural cubic splines in place of the baseline hazard.
 
-To provide an interpretable, informative and smooth hazard, natural cubic splines are fit in place of the baseline hazard. The crux of the method is to use splines to model time on a log-scale and to either estimate the log cumulative Hazard for PH models, $\log H(\tau|X_i) = \log H_0(\tau) + X_i\beta$, or the log Odds for PO models, $\log O(\tau|X_i) = \log O_0(\tau) + X_i\beta$, where $\beta$ are model coefficients to fit, $H_0$ is the baseline cumulative hazard function and $O_0$ is the baseline odds function. For the flexible PH model, a Weibull distribution is the basis for the baseline distribution and a Log-logistic distribution for the baseline odds in the flexible PO model. $\log H_0(\tau)$ and $\log O_0(\tau)$ are estimated by natural cubic splines with coefficients fit by maximum likelihood estimation. The standard full likelihood is optimised, full details are not provided here. Between one and three internal knots are recommended for the splines and the placement of knots does not greatly impact upon the fitted model  [@RoystonParmar2002].
+The crux of the method is to use splines to model time on a log-scale and to either estimate the log cumulative Hazard for PH models,or the log Odds for PO models.
+The flexible PH model assumes a Weibull For the flexible PH model, a Weibull distribution is the basis for the baseline distribution and a Log-logistic distribution for the baseline odds in the flexible PO model.
+The exact derivation of the model requires a lot of mathematical exposition which is not included here, a very good summary of the model is given in @Collett2014. 
+Instead, below is the model in its full form with an explanation of the variables and figures that demonstrate cubic splines.
 
-Advantages of the model include being: interpretable, flexible, can be fit with time-dependent covariates, and it returns a continuous function. Moreover many of the parameters, including the number and position of knots, are tunable, although Royston and Parmar advised against tuning and suggest often only one internal knot is required  [@RoystonParmar2002]. A recent simulation study demonstrated that even with an increased number of knots (up to seven degrees of freedom), there was little bias in estimation of the survival and hazard functions  [@Bower2019]. Despite its advantages, a 2018 review  [@Ng2018] found only twelve instances of published flexible parametric models since Royston and Parmar's 2002 paper, perhaps because it is more complex to train, has a less intuitive fitting procedure than alternatives, and has limited off-shelf implementations; i.e. is less transparent and accessible than parametric alternatives.
+The flexible parametric Royston-Parmar (RP) proportional hazards and proportional odds model are respectively defined by
 
-The PH and AFT models are both very transparent and accessible, though require slightly more expert knowledge than the CPH in order to specify the 'correct' underlying probability distribution. Interestingly whilst there are many papers comparing PH and AFT models to one another using in-sample metrics (@sec-eval-insample) such as AIC [@Georgousopoulou2015; @Habibi2018; @Moghimi-dehkordi2008; @Zare2015], no benchmark experiments could be found for out-of-sample performance. PO and spline models are less transparent than PH and AFT models and are even less accessible, with very few implementations of either. No conclusions can be drawn about the predictive performance of PO or spline models due to a lack of suitable benchmark experiments.
+$$
+\log{H}_{RP}(\tau|\xx_i) = s(\tau|\bsgamma,\boldsymbol{k}) + \eta_i
+$$ {#eq-rp-hazard}
+
+$$
+\log{O}_{RP}(\tau|\xx_i) = s(\tau|\bsgamma,\boldsymbol{k}) + \eta_i
+$$ {#eq-rp-odds}
+
+where $\bsgamma$ are spline coefficients to be estimated by maximum likelihood estimation, $\boldsymbol{k}$ are the positions of $K$ knots, and $s$ is the restricted cubic spline function in log time defined by
+
+$$
+s(\tau|\bsgamma,\boldsymbol{k}) = \gamma_0 + \gamma_1\log(\tau) + \gamma_2\nu_1(\log(\tau)) + ... + \gamma_{K-1}\nu_K(\log(\tau))
+$$
+
+$\nu_j$ is the basis function at knot $k_j$ defined by
+
+$$
+\nu_j(x) = (x - k_j)^3_+ - \lambda_j(x - k_{min})^3_+ - (1 - \lambda_j)(x - k_{max})^3_+
+$$
+
+where
+$$
+\lambda_j = \frac{k_{max} - k_j}{k_{max} - k_{min}}
+$$
+
+and $(x - y)_+ = \max\{0, (x - y)\}$ for any $x, y$, and where $k_{min}$ and $k_{max}$ are the boundaries of the cubic spline, meaning the curve is linear when $\log(t) < k_{min}$ or $\log(t) > k_{max}$.
+
+To see how the proportional hazards RP model relates to the Weibull distribution, first we integrate and take logs of the Weibull-PH hazard function from equation (@eq-ph-weibull):
+
+$$
+\log(H_{WeibullPH}(\tau|\xx_i)) = \log\big((\lambda \tau^\gamma) \exp(\eta_i)\big) = \log(\lambda) + \gamma\log(\tau) + \eta_i
+$$ 
+
+Setting $\gamma_0 = \log(\lambda)$ and $\gamma_1 = \gamma$ yields (@eq-rp-hazard) when there are no knots.
+Analogous results can be shown between (@eq-rp-odds) and the Log-logistic distribution.
+
+
+To fit the model, the number and position of knots are theoretically tunable, although Royston and Parmar advised against tuning and suggest often only one internal knot is required and the placement of the knot does not make a significant difference to performance [@Royston2002].
+Increasing knots can increase model overfitting however @Bower2019 showed up to seven knots does not significantly increase model bias.
+The model's primary advantage is it's flexibility to model non-linear effects and can also be extended to time-dependent covariates.
+Moreover, the model can be fit via maximum likelihood estimation and thus many standard off-shelf routines for estimating a smooth survival time function.
+Despite advantages, the model appears to be limited in common use which makes it difficult to verify the model's utility across different contexts [@Ng2018].
 
 ## Improving classical models {#sec-classical-improving}
 
