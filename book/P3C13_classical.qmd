@@ -12,7 +12,6 @@ abstract: TODO (150-200 WORDS)
 
 TODO
 
-* Objective functions
 * Move PO into flexible
 
 ---
@@ -466,21 +465,57 @@ $$
 Likelihoods can also be derived using the log-linear form in (@eq-aft-log) however these are beyond the scope of this book.
 As before, extensions to other censoring types and truncation follows by specifying the correct likelihood form from @sec-surv-estimation-param.
 
-### Proportional Odds
+## Proportional Odds
 
-Proportional odds (PO) models  [@Bennett1983] fit a proportional relationship between covariates and the odds of survival beyond a time $\tau$,
+Proportional odds models [@Bennett1983] are the final of the three major linear model classes in survival analysis.
+In contrast to the PH and AFT models just discussed, proportional models are rarely, if ever, used on their own to make inferences about underlying data or as predictive models.
+Instead they are more commonly found as components within neural networks (@sec-nnet) or in flexible parametric models (discussed next).
+Therefore this section very briefly describes the motivation for the model and its key properties.
+
+As the name may suggest, the proportional odds model is analogous to the proportional hazards model except with the goal of modelling odds instead of hazards.
+For a given time $\tau$, the odds of an event happening at **at** $\tau$ are 
+
 $$
-O_i(\tau) = \frac{S_i(\tau)}{F_i(\tau)} = O_0(\tau)\exp(X_i\beta)
+O(\tau) = \frac{p(\tau)}{1 - p(\tau)}
 $$
+
+Of course as has been seen throughout this book the general interest is centered around the survival probability and therefore a more relevant quantity is the odds of the event not happening **before** $\tau$:
+
+$$
+O(\tau) = \frac{S(\tau)}{1-S(\tau)} = \frac{S(\tau)}{F(\tau)}
+$$
+
+By considering the same functional form as in the proportional hazards model, the proportional odds model follows analogously, subsituting odds in place of the hazards:
+
+$$
+O_{PO}(\tau|\xx_i) =  O_0(\tau)\exp(\eta_i)
+$$
+
 where $O_0$ is the baseline odds.
 
-In this model, a unit increase in a covariate is a multiplicative increase in the odds of survival after a given time and the model can be interpreted as estimating the log-odds ratio. There is no simple closed form expression for the partial likelihood of the PO model and hence in practice a Log-logistic distribution is usually assumed for the baseline odds and the model is fit by maximum likelihood estimation on the full likelihood  [@Bennett1983].
+Clearly by the same logic as in the proportional hazads model, this model assumes $O(\tau|\xx_i) \propto \eta_i$ and that a unit increase in a covariate is a multiplicative increase in the odds of survival after a given time.
+Perhaps the most useful feature of the model is convergence of hazard functions, which states $h_i(\tau)/h_0(\tau) \rightarrow 1$ as $\tau \rightarrow \infty$ [@Kirmani2001].
+To see this note that the PO model can be represented in terms of the hazard function via [@Collett2014]
 
-Perhaps the most useful feature of the model is convergence of hazard functions  [@Kirmani2001], which states $h_i(\tau)/h_0(\tau) \rightarrow 1$ as $\tau \rightarrow \infty$. This property accurately reflects real-world scenarios, for example if comparing chemotherapy treatment on advanced cancer survival rates, then it is expected that after a long period (say 10 years) the difference in risk between groups is likely to be negligible. This is in contrast to the PH model that assumes the hazard ratios are constant over time, which is rarely a reflection of reality.
+$$
+h_{PO}(\tau|\xx_i) =  h_0(\tau)\Bigg(1 - \frac{S_0(\tau)}{(\exp(\eta_i) - 1)^{-1} + S_0(\tau)} \Bigg)
+$$
 
-In practice, the PO model is harder to fit and is less flexible than PH and AFT models, both of which can also produce odds ratios. This may be a reason for the lack of popularity of the PO model, in addition there is limited off-shelf implementations  [@Collett2014]. Despite PO models not being commonly utilised, they have formed useful components of neural networks (@sec-nnet) and flexible parametric models (below).
+Dividing by the baseline hazard yields
 
-### Flexible Parametric Models
+$$
+\frac{h_{PO}(\tau|\xx_i)}{h_0(\tau)} =  \Bigg(1 - \frac{S_0(\tau)}{(\exp(\eta_i) - 1)^{-1} + S_0(\tau)} \Bigg) =  \frac{(\exp(\eta_i) - 1)^{-1} }{(\exp(\eta_i) - 1)^{-1} + S_0(\tau)}
+$$
+
+Simplifying gives $(1 + S_0(\tau)(\exp(\eta_i) - 1))^{-1}$.
+As $S_0(\tau) \rightarrow 0$ as $\tau \rightarrow \infty$ it follows that the hazard ratio tends to $1$ as $\tau$ increases.
+In practice, this means that for any individual, their risk converges to the average risk over a long period of time.
+Put differently, any two groups compared over the time will have the same risk of event after enough time has passed.
+This is clearly an accurate assumption in several contexts, most commonly any medical context in which death is the event of interest.
+
+There is no simple closed form expression for the partial likelihood of a semi-parametric proportional odds model and hence in practice a Log-logistic distribution is usually assumed for the baseline odds and the model is fit by maximum likelihood estimation on the full likelihood [@Bennett1983], discussed further in the next section.
+
+## Flexible Parametric Models
 
 Royston-Parmar flexible parametric models  [@RoystonParmar2002] extend PH and PO models by estimating the baseline hazard with natural cubic splines. The model was designed to keep the form of the PH or PO methods but without the semi-parametric problem of estimating a baseline hazard that does not reflect reality (see above), or the parametric problem of misspecifying the survival distribution.
 
