@@ -20,7 +20,7 @@ Before delving into these measures, we will first describe scoring rules in the 
 Scoring rules are pointwise losses, which means a loss is calculated for all observations and the sample mean is taken as the final score.
 To simplify notation, we only discuss scoring rules in the context of a single observation where $L_i(\hatS_i, t_i, \delta_i)$ would be the loss calculated for some observation $i$ where $\hatS_i$ is the predicted survival function (from which other distribution functions can be derived), and $(t_i, \delta_i)$ is the observed survival outcome.
 
-Note that unlike other chapters, there is not a separate section for 'beyond right-censoring' here as the primary results all fit within @sec-logloss.
+Note that unlike other chapters, there is not a separate section for 'beyond right-censoring' here as the main results all fit within @sec-logloss.
 
 ## Classification Losses
 
@@ -43,12 +43,8 @@ Proper losses provide a method of model comparison as, by definition, prediction
 
 Another important property is *strict* properness.
 A loss is *strictly proper* if the loss is uniquely minimized by the 'correct' prediction.
-Consider now the loss $L_0(\hatp_i, y_i) = 0$.
-Not only is this a strictly proper scoring rule but it is also proper.
-The loss can only take the value $0$ and is therefore guaranteed to be minimized by the correct prediction.
-It is clear however that this loss is useless.
-In contrast, the Brier score is minimized by only one value, which is the optimal prediction ([@fig-eval-brierlog]).
-Strictly proper losses are particular important for automated model optimisation, as minimization of the loss will result in the 'optimum score estimator based on the scoring rule' [@Gneiting2007].
+For example, the Brier score is minimized by only one value, which is the optimal prediction ([@fig-eval-brierlog]).
+Strictly proper losses are particular important for automated model optimization, as minimization of the loss will result in the 'optimum score estimator based on the scoring rule' [@Gneiting2007].
 
 Mathematically, a classification loss  $L: \calP \times \calY \rightarrow \ExtReals$ is *proper* if for any distributions $p_Y,p$ in $\calP$ and for any random variables $Y \sim p_Y$, it holds that $\EE[L(p_Y, Y)] \leq \EE[L(p, Y)]$.
 The loss is *strictly proper* if, in addition, $p = p_Y$ uniquely minimizes the loss.
@@ -60,8 +56,11 @@ L_{logloss}(\hatp_i, y_i) = -\log \hat{p}_i(y_i)
 $$ {#eq-logloss}
 
 These losses are visualised in @fig-eval-brierlog, which highlights that both losses are strictly proper [@Dawid2014] as they are minimized when the true prediction is made, and converge to the minimum as predictions are increasingly improved.
+It can also be seen from the scale of the plots that the log-loss penalizes wrong predictions stronger than the Brier score, which may be beneficial or not depending on the given use-case.
 
 ![Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in $[0,1]$, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimized when $\hatp_i(y_i) = y_i$.](Figures/evaluation/brier_logloss.png){#fig-eval-brierlog fig-alt="TODO"}
+
+<!-- TODO: REMOVE THE HORIZONTAL DASHED LINES FROM ABOVE PLOTS -->
 
 ## Survival Losses {#sec-eval-distr-commonsurv}
 
@@ -76,20 +75,21 @@ The losses are grouped into squared losses, absolute losses, and logarithmic los
 ### Squared Losses
 
 The Integrated Graf Score (IGS) was introduced by Graf [@Graf1995; @Graf1999] as an analogue to the integrated brier score (IBS) in regression.
-It is likely the commonly used scoring rule in survival analysis, possibly due to its intuitive interpretation.
+It is likely the most commonly used scoring rule in survival analysis, possibly due to its intuitive interpretation.
 
 The loss is defined by
 
 $$
 \begin{split}
-L_{IGS}(\tau, \hat{S}_i, t_i, \delta_i|\KMG) = \int^{\tau^*}_0  \frac{\hatS_i^2(\tau) \II(t_i \leq \tau, \delta_i=1)}{\KMG(t_i)} + \frac{\hatF_i^2(\tau) \II(t_i > \tau)}{\KMG(\tau)} \ d\tau
+L_{IGS}(\tau^*, \hat{S}_i, t_i, \delta_i|\KMG) = \int^{\tau^*}_0  \frac{\hatS_i^2(\tau) \II(t_i \leq \tau, \delta_i=1)}{\KMG(t_i)} + \frac{\hatF_i^2(\tau) \II(t_i > \tau)}{\KMG(\tau)} \ d\tau
 \end{split}
 $$ {#eq-igs}
+
 where  $\hatS_i^2(\tau) = (\hatS_i(\tau))^2$ and $\hatF_i^2(\tau) = (1 - \hatS_i(\tau))^2$, and $\tau^* \in \NNReals$ is an upper threshold to compute the loss up to, and $\KMG$ is the Kaplan-Meier trained on the censoring distribution for IPCW (@sec-eval-crank-disc-conc).
 
 At first glance this might seem intimidating but it is worth taking the time to understand the intuition behind the loss.
 Recall the classification Brier score, $L(\hatp_i, y_i) = (y_i - \hatp_i(y))^2$, this provides a method to evaluate a probability mass function at one point.
-In a regression setting, the *integrated Brier score* (IBS), also known as the *CRPS*, is the integral of the Brier score for all real-valued thresholds [@Gneiting2007] and hence allows predictions to be evaluated over multiple points as
+In a regression setting, the *integrated Brier score* (IBS), also known as the continuous ranked probability score, is the integral of the Brier score for all real-valued thresholds [@Gneiting2007] and hence allows predictions to be evaluated over multiple points as
 
 $$
 L(\hatF_i, y_i) = \int (\II(y_i \leq \tau) - \hatF_i(\tau))^2 \ d\tau
@@ -101,8 +101,8 @@ As the left-hand indicator can only take one of two values @eq-crps can be repre
 $$
 L(\hatF_i, t_i) =
 \begin{cases}
-(1 - \hatF_i(\tau))^2 = \int \hatS_i^2(\tau) \ d\tau, & \text{ if } t_i \leq \tau \\
-(0 - \hatF_i(\tau))^2 = \int \hatF_i^2(\tau) \ d\tau, & \text{ if } t_i > \tau
+(1 - \hatF_i(\tau))^2 = \hatS_i^2(\tau), & \text{ if } t_i \leq \tau \\
+(0 - \hatF_i(\tau))^2 = \hatF_i^2(\tau), & \text{ if } t_i > \tau
 \end{cases}
 $$ {#eq-graf-cases}
 
@@ -113,27 +113,31 @@ The loss therefore meaningfully represents the ideal predictions in the two poss
 The final component of the loss is accommodating for censoring.
 At $\tau$ an observation will either have:
 
-1. Not experienced any outcome --- $t_i > \tau$;
-2. Experienced the event --- $t_i \leq \tau \wedge \delta_i = 1$; or
-3. Been censored --- $t_i \leq \tau \wedge \delta_i = 0$
+1. Not experienced any outcome: $t_i > \tau$;
+2. Experienced the event: $t_i \leq \tau \wedge \delta_i = 1$; or
+3. Been censored: $t_i \leq \tau \wedge \delta_i = 0$
 
 Censored observations are discarded after the censoring time as evaluating predictions after this time is impossible as the ground truth is unknown.
-To compensate for removing observations, IPCW (@sec-eval-crank-conc) is again used to increasingly weight predictions as $\tau$ increases.
-IPC weights, $W_i$ are defined such that observations are either weighted by $G(\tau)$ when they have not yet experienced the event or by their final observed time, $G(t_i)$, otherwise.
+To compensate for removing observations, IPCW (@sec-eval-crank-conc) is again used to upweight predictions as $\tau$ increases.
+IPC weights, $W_i$ are defined such that observations are either weighted by $\KMG(\tau)$ when they have not yet experienced the event or by their final observed time, $\KMG(t_i)$, otherwise.
+
+| $W_i := W(t_i, \delta_i)$ | $t_i > \tau$ | $t_i \leq \tau$ |
+| - | - | - |
+| $\delta_i = 1$ | $\KMG^{-1}(\tau)$ | $\KMG^{-1}(t_i)$ |
+| $\delta_i = 0$ | $\KMG^{-1}(\tau)$ | $0$ |
 
 $$
 W_i =
 \begin{cases}
 \KMG^{-1}(t_i), & \text{ if } \II(t_i \leq \tau, \delta_i = 1) \\
-\KMG^{-1}(\tau), & \text{ if } \II(t_i > \tau)
+\KMG^{-1}(\tau), & \text{ if } \II(t_i > \tau) \\
+0, & \text{ otherwise }
 \end{cases}
 $$
 
-The weights total $1$ when divided over all samples and summed [@Graf1999].
-
-As well as being intuitive, when censoring is uninformative, the Graf score consistently estimates the mean square error [@Gerds2006].
-However, despite these promising properties, the IGS is improper and must therefore be used with care [@Rindt2022].
-Adaptations to the loss, such as the reweighted Graf score [@Sonabend2022b] could be used instead, however the IGS is now deeply embedded in the literature and experiments have demonstrated that the effect of improperness is minimal -- therefore this loss should be avoided for automated routines such as model tuning, however it can still be used for model evaluation.
+When censoring is uninformative, the Graf score consistently estimates the mean square error [@Gerds2006].
+Despite this, the score is not strictly proper and even its properness is in doubt (in doubt not proven due to their being open debate in the literature about how to define properness in a survival context) [@Rindt2022].
+Fortunately, as the score is deeply embedded in the literature, experiments have demonstrated that scores generated from using the IGS only differ very slightly to a strictly proper alternative [@Sonabend2022b].
 
 ### Logarithmic losses {#sec-logloss}
 
@@ -145,9 +149,9 @@ L_{NLL}(\hatf_i, y_i) = -\log[\hatf(y_i)]
 $$
 
 for a predicted density function $\hatf_i$ and true outcome $y_i$.
-Note this is analagous to the classification log loss in @eq-logloss with the probably mass function replaced with the density function.
+Note this is analagous to the classification log loss in (@eq-logloss) with the probably mass function replaced with the density function.
 
-Now recall @eq-objective-function from @sec-surv-obj, which gives the contribution from a single observation as
+Now recall (@eq-objective-function) from @sec-surv-estimation-param, which gives the contribution from a single observation as
 
 $$
 \mathcal{L}(t_i) \propto
@@ -158,62 +162,63 @@ F(t_i), & \text{ if $i$ is left-censored } \\
 S(l_i)-S(r_i), & \text{ if $i$ is interval-censored } \\
 \end{dcases}
 $$
-where $r_i, l_i$ are the boundaries on interval-censoring With these values being inflated using the equations in (@sec-surv-obj) if truncation is present.
+
+where $r_i, l_i$ are the boundaries of the censoring interval (adaptations in the presence of left-truncation as described in @sec-surv-estimation-param may also be applied).
 
 The log-loss can then be constructed depending on what type of censoring or truncation is present in the data.
 For example, if only right-censoring is present then the right-censored logloss (RCLL) is defined as:
 
 $$
-L_{RCLL}(\hatS_i, t_i, \delta_i) = -\log[\delta_i\hatf_i(t_i) + (1-\delta_i)\hatS_i(t_i)]
-$$
+L_{RCLL}(\hatS_i, t_i, \delta_i) = -\log\big(\delta_i\hatf_i(t_i) + (1-\delta_i)\hatS_i(t_i)\big)
+$$ {#eq-rcll}
 
-This is an outcome-independent strictly proper scoring rule [@Avati2020] that is clearly derived from the results above and is highly interpretable as a measure of predictive performance when broken down into its two halves:
+If censoring is independent of the event (@sec-types-of-censoring) then this scoring rule is strictly proper [@Avati2020].
+The loss is also highly interpretable as a measure of predictive performance when broken down into its two halves:
 
-1. If an observation is censored at $t_i$ then all the information we have is that they did not experience the event at the time, so they must be 'alive', hence the optimal value is $\hatS_i(t_i) = 1$ (which becomes $-\log(1) = 0$).
-2. If an observation experiences the event then the 'best' prediction is for the probability of the event at that time to be maximised, as pdfs are not upper-bounded this means $\hatf_i(t_i) = \infty$ (and $-\log(t_i) \rightarrow \infty$ as $t_i \rightarrow \infty$).
+1. If an observation is censored at $t_i$ then they are guaranteed not to have experienced the event up until that time, hence $S(t_i) = 1$; correspondingly (@eq-rcll) becomes $-\log(1) = 0$.
+2. If an observation experiences the event at $t_i$ then the likelihood of the event is certain at that time and as such $f(t_i) = \infty$ or $p(t_i) = 1$ in the discrete case; therefore (@eq-rcll) equals $-\infty$ or $0$ for continuous and discrete time respectively.
 
 Analagous losses follow when left- and/or interval-censoring is present.
 
 Other logarithmic losses have also been proposed, such as the integrated survival log loss (ISLL) in @Graf1999.
-However, there is no evidence that this is used in practice nor that it yields any benefit over other, more common, losses.
+However, to our knowledge it does not appear used in practice and nor is there a practical benefit over other losses.
 
 ### Absolute Losses
 
-The final class of losses considered estimate the mean absolute error in an uncensored setting.
-The absolute survival loss, developed over time by @Schemper2000 and @Schmid2011, is based on the mean absolute error is very similar to the IGS but removes the squared term:
+The final class of losses considered here can be viewed as analogs of the mean absolute error in an uncensored setting.
+The absolute survival loss, developed over time by @Schemper2000 and @Schmid2011 is similar to the IGS but removes the squared term:
 
 $$
 L_{ASL}(\hatS_i, t_i, \delta_i|\KMG) = \int^{\tau^*}_0 \frac{\hatS_i(\tau)\II(t_i \leq \tau, \delta_i = 1)}{\KMG(t_i)} + \frac{\hatF_i(\tau)\II(t_i > \tau)}{\KMG(\tau)} \ d\tau
 $$
 where $\KMG$ and $\tau^*$ are as defined above.
-Analogously to the IGS, the ASL score consistently estimates the mean absolute error when censoring is uninformative [@Schmid2011] but there are also no proofs or claims of properness.
-The ASL and IGS tend to yield similar results [@Schmid2011] but in practice there is no evidence of the ASL being widely used.
+Analogously to the IGS, the absolute survival loss consistently estimates the mean absolute error when censoring is uninformative [@Schmid2011] but there are also no proofs or claims of properness.
+The absolute survival loss and IGS tend to yield similar results [@Schmid2011] but in practice the former does not appear to be widely used.
 
 <!-- FIXME - ADD FURTHER SCORING RULES HERE -->
 
 ## Prediction Error Curves {#sec-pecs}
 
 <!-- FIXME - UNCHANGED FROM THESIS. I THINK FINE FOR NOW BUT NEEDS TO BE REWRITTEN IN THE FUTURE (MAINLY TO AVOID SELF PLAGIARISM) -->
-As well as evaluating probabilistic outcomes with integrated scoring rules, non-integrated scoring rules can be utilised for evaluating distributions at a single point.
-For example, instead of evaluating a probabilistic prediction with the IGS over $\NNReals$, instead one could compute the IGS at a single time-point, $\tau \in \NNReals$, only.
-Plotting these for varying values of $\tau$ results in 'prediction error curves' (PECs), which provide a simple visualisation for how predictions vary over the outcome.
-PECs are especially useful for survival predictions as they can visualise the prediction 'over time'.
-PECs are mostly used as a graphical guide when comparing few models, rather than as a formal tool for model comparison.
-An example for PECs is provided in @fig-eval-pecs for the IGS where the the Cox PH consistently outperforms the SVM.
+As well as evaluating probabilistic outcomes with integrated scoring rules, non-integrated scoring rules can be utilized for evaluating distributions at a single point.
+For example, instead of evaluating a probabilistic prediction with the IGS over $\NNReals$, one could compute the Brier score at a single time-point, $\tau \in \NNReals$, only.
+Plotting these for varying values of $\tau$ results in *prediction error curves*, which provide a simple visualization for how predictions vary over time.
+Prediction error curves are mostly used as a graphical guide when comparing few models, rather than as a formal tool for model comparison.
+Example prediction error curves are provided in @fig-eval-pecs for the IGS where the the Cox PH consistently outperforms the SVM.
 
-![Prediction error curves for the CPH and SVM models from @sec-eval-distr-calib. x-axis is time and y-axis is the IGS computed at different time-points. The CPH (red) performs better than the SVM (blue) as it scores consistently lower. Trained and tested on randomly simulated data from $\pkg{mlr3proba}.](Figures/evaluation/pecs.png){#fig-eval-pecs fig-alt="TODO"}
+![Prediction error curves for the CPH and SVM models from @sec-eval-distr-calib. x-axis is time and y-axis is the IGS computed at different time-points. The CPH (red) performs better than the SVM (blue) as it scores consistently lower. Trained and tested on randomly simulated data from $\pkg{mlr3proba}$.](Figures/evaluation/pecs.png){#fig-eval-pecs fig-alt="TODO"}
 
 ## Baselines and ERV {#sec-eval-distr-score-base}
 
 A common criticism of scoring rules is a lack of interpretability, for example, an IGS of 0.5 or 0.0005 has no meaning by itself, so below we present two methods to help overcome this problem.
 
-The first method, is to make use of baselines for model comparison, which are models or values that can be utilised to provide a reference for a loss, they provide a universal method to judge all models of the same class by [@Gressmann2018].
-In classification, it is possible to derive analytical baseline values, for example a Brier score is considered 'good' if it is below 0.25 or a log loss if it is below 0.693 (@fig-eval-brierlog), this is because these are the values obtained if you always predicted probabilties as $0.5$, which is a reasonable basline guess in a binary classificaiton problem.
+The first method is to make use of baselines for model comparison, which are models or values that can be utilized to provide a reference for a loss and provide a universal method to judge all models of the same class [@Gressmann2018].
+In classification, it is possible to derive analytical baseline values, for example a Brier score is considered 'bad' if it is above 0.25 or a log loss if it is above 0.693 (@fig-eval-brierlog), this is because these are the values obtained if you always predicted probabilities as $0.5$, which is the best uninformed (i.e., data independent) baseline in a binary classification problem.
 In survival analysis, simple analytical expressions are not possible as losses are dependent on the unknown distributions of both the survival and censoring time.
 Therefore all experiments in survival analysis must include a baseline model that can produce a reference value in order to derive meaningful results.
 A suitable baseline model is the Kaplan-Meier estimator [@Graf1995; @Lawless2010; @Royston2013], which is the simplest model that can consistently estimate the true survival function.
 
-As well as directly comparing losses from a 'sophisticated' model to a baseline, one can also compute the percentage increase in performance between the sophisicated and baseline models, which produces a measure of explained residual variation (ERV) [@Korn1990; @Korn1991].
+As well as directly comparing losses from a 'sophisticated' model to a baseline, one can also compute the percentage increase in performance between the sophisticated and baseline models, which produces a measure of explained residual variation (ERV) [@Korn1990; @Korn1991].
 For any survival loss $L$, the ERV is,
 
 $$
