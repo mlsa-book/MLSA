@@ -6,11 +6,11 @@ abstract: TODO (150-200 WORDS)
 {{< include _macros.tex >}}
 :::
 
-# Discrimination {#sec-eval-crank}
+# Discrimination Measures {#sec-eval-crank}
 
 {{< include _wip_minor.qmd >}}
 
-The next measures discused are 'discrimination measures', which evaluate how well models separate observations into different risk groups.
+This chapter discusses 'discrimination measures', which evaluate how well models separate observations into different risk groups.
 A model is said to have good discrimination if it correctly predicts that one observation is at higher risk of the event of interest than another, where the prediction is 'correct' if the observation predicted to be at higher risk does indeed experience the event sooner.
 
 In the survival setting, the 'risk' is taken to be the continuous ranking prediction.
@@ -45,7 +45,7 @@ $$
 P(r_i > r_j | t_i < t_j \cap \delta_i)
 $$ {#eq-cindex-prob}
 
-These measures are referred to as time *independent* when $r_i,r_j$ is not a function of time as once the observations are organised into comparable pairs, the observed survival times can be ignored.
+These measures are referred to as time *independent* when $r_i,r_j$ is not a function of time as once the observations are organized into comparable pairs, the observed survival times can be ignored.
 The time-dependent case is covered in @sec-eval-antolini.
 
 While various definitions of a 'Concordance index' (C-index) exist (discussed in the next section), they all represent a weighted proportion of the number of concordant pairs over the number of comparable pairs.
@@ -61,7 +61,7 @@ Representing measures as a percentage over a baseline is a common method to impr
 
 Common concordance indices in survival analysis can be expressed as a general measure:
 
-Let $\dvec{\hatr}{m}$ be predicted risks, $(\tt, \bsdelta) = ((t_1, \delta_1) \ (t_2, \delta_2) \cdots (t_m, \delta_m))^\trans$ be observed outcomes, let $W$ be some weighting function, and let $\tau$ be a cut-off time.
+Let $\dvec{\hatr}{n}$ be predicted risks, $(\tt, \bsdelta) = ((t_1, \delta_1) \ (t_2, \delta_2) \cdots (t_n, \delta_n))^\trans$ be observed outcomes, let $W$ be some weighting function, and let $\tau$ be a cut-off time.
 Then, the time-independent ('ind') *survival concordance index* is defined by,
 
 $$
@@ -81,15 +81,14 @@ This is visualised in @fig-ipcw where $\KMG$, $\KMG^{-2}$, and $\KMS$ are comput
 
 ![Weighting functions obtained on the `whas` dataset. x-axis is follow-up time. y-axis is outputs from one of three weighting functions: $\KMG$, survival function based on the censoring distribution of the `whas` dataset (red), and $\KMG^{-2}$ (green), $\KMS$, marginal survival function based on original `whas` dataset (blue), . The vertical gray line at $t = \tau=1267$ represents the point at which $\hat{G}(t)<0.6$.](Figures/evaluation/weights.png){#fig-ipcw fig-alt="Line graph with three lines in green, red, and blue. x-axis is labelled 't' and ranges from 0 to 6000. y-axis is labelled 'W(t)' and ranges from 0 to 5. Legend for lines is titled 'W' with entries 'KMG' for the red line, 'KMG^-2' for the green line, and 'KMS' for the blue line. The blue line starts at (0,1), moves to around (1000, 0.5) then is relatively flat. The red line roughly linearly decreases from (0,1) to (6000,0). The green line sharply increases between (1, 1000) to (5, 3500). A vertical gray line passes through (0, 1267)."}
 
-The following weights have been proposed for the concordance index:
+The following are just some of weights that have been proposed for the concordance index:
 
 * $W(t_i) = 1$:  Harrell's concordance index, $C_H$ [@Harrell1984; @Harrell1982], which is widely accepted to be the most common survival measure and imposes no weighting on the definition of concordance. The original measure given by Harrell has no cut-off, $\tau = \infty$, however applying a cut-off is now more widely accepted in practice.
 * $W(t_i) = [\KMG(t_i)]^{-2}$: Uno's C, $C_U$ [@Uno2011].
-* $W(t_i) = [\KMG(t_i)]^{-1}$
-* $W(t_i) = \KMS(t_i)$
-* $W(t_i) = \KMS(t_i)/\KMG(t_i)$
+* $W(t_i) = \KMS(t_i)$ [@Therneau2020]
+* $W(t_i) = \KMS(t_i)/\KMG(t_i)$ [@Schemper2009]
 
-All methods assume that censoring is conditionally-independent of the event given the features (@sec-surv-set-cens), otherwise weighting by $\KMS$ or $\KMG$ would not be applicable. It is assumed here that $\KMS$ and $\KMG$ are estimated on the training data and not the testing data (though the latter may be seen in some implementations, e.g. @pkgsurvival).
+All methods assume that censoring is conditionally-independent of the event given the features (@sec-types-of-censoring), otherwise weighting by $\KMS$ or $\KMG$ would not be applicable. It is assumed here that $\KMS$ and $\KMG$ are estimated on the training data and not the testing data (though the latter may be seen in some implementations, e.g. @pkgsurvival).
 
 ### Choosing a C-index {#sec-eval-crank-choose}
 
@@ -140,7 +139,7 @@ $$
 C_{dep}(\hat{\mathbf{S}}, \tt, \bsdelta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, \hatS_i(t_i) < \hatS_j(t_i), t_i < \tau)\delta_i}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_i}
 $$
 
-where $\dvec{\hatS}{m}$.
+where $\dvec{\hatS}{n}$.
 
 Antolini's C provides an intuitive method to evaluate the discrimination of a model based on distribution predictions without depending on compositions to ranking predictions.
 
@@ -157,7 +156,6 @@ In a classification setting with no censoring, the AUC has the same interpretati
 AUC measures for survival analysis were developed to provide a time-dependent measure of discriminatory ability [@Heagerty2000].
 In a survival setting it can reasonably be expected for a model to perform differently over time and therefore time-dependent measures are advantageous.
 Computation of AUC estimators is complex and as such there are limited accessible metrics available off-shelf.
-There is limited evidence of these estimators used in the literature, hence discussion of these measures is kept brief.
 
 The AUC, TPR, and TNR are derived from the *confusion matrix* in a binary classification setting.
 Let $b_i,\hatb_i \in \{0, 1\}$ be the true and predicted binary outcomes respectively for some observation $i$.
@@ -188,7 +186,7 @@ Weighting the linear predictor was proposed by Uno $\etal$ (2007) [@Uno2007] and
 
 $$
 \begin{split}
-&TPR_U(\hat{\bseta}, \tt, \bsdelta | \tau, \alpha) =  \frac{\sum^m_{i=1} \delta_i \II(k(\hat{\eta}_i) > \alpha, t_i \leq \tau)[\KMG(t_i)]^{-1}}{\sum^m_{i=1}\delta_i\II(t_i \leq \tau)[\KMG(t_i)]^{-1}}
+&TPR_U(\hat{\bseta}, \tt, \bsdelta | \tau, \alpha) =  \frac{\sum^n_{i=1} \delta_i \II(k(\hat{\eta}_i) > \alpha, t_i \leq \tau)[\KMG(t_i)]^{-1}}{\sum^n_{i=1}\delta_i\II(t_i \leq \tau)[\KMG(t_i)]^{-1}}
 \end{split}
 $$
 
@@ -196,10 +194,11 @@ and
 
 $$
 \begin{split}
-&TNR_U(\hat{\bseta}, \tt | \tau, \alpha) \mapsto \frac{\sum^m_{i=1} \II(k(\hat{\eta}_i) \leq \alpha, t_i > \tau)}{\sum^m_{i=1}\II(t_i > \tau)}
+&TNR_U(\hat{\bseta}, \tt | \tau, \alpha) \mapsto \frac{\sum^n_{i=1} \II(k(\hat{\eta}_i) \leq \alpha, t_i > \tau)}{\sum^n_{i=1}\II(t_i > \tau)}
 \end{split}
 $$
-where $\dvec{\hat{\eta}}{m}$ is a vector of predicted linear predictors, $\tau$ is the time at which to evaluate the measure, $\alpha$ is a cut-off for the linear predictor, and $k$ is a known, strictly increasing, differentiable function. $k$ is chosen depending on the model choice, for example if the fitted model is PH then $k(x) = 1 - \exp(-\exp(x))$ [@Uno2007]. Similarities can be drawn between these equations and Uno's concordance index, in particular the use of IPCW. Censoring is again assumed to be at least random once conditioned on features. Plotting $TPR_U$ against $1 - TNR_U$ for varying values of $\alpha$ provides the ROC.
+
+where $\dvec{\hat{\eta}}{n}$ is a vector of predicted linear predictors, $\tau$ is the time at which to evaluate the measure, $\alpha$ is a cut-off for the linear predictor, and $k$ is a known, strictly increasing, differentiable function. $k$ is chosen depending on the model choice, for example if the fitted model is PH then $k(x) = 1 - \exp(-\exp(x))$ [@Uno2007]. Similarities can be drawn between these equations and Uno's concordance index, in particular the use of IPCW. Censoring is again assumed to be at least random once conditioned on features. Plotting $TPR_U$ against $1 - TNR_U$ for varying values of $\alpha$ provides the ROC.
 
 The second method, which appears to be more prominent in the literature, is derived from Heagerty and Zheng (2005) [@Heagerty2005]. They define four distinct classes, in which observations are split into controls and cases.
 
@@ -289,11 +288,8 @@ In the presence of interval censoring, estimation depends on more complex estima
 As a more simplistic (yet sometimes realistic on average) alternative, one could impute the outcome time as the midpoint between the interval margins, $t_i = (l_i + r_i)/2$ [@Gadda2016].
 
 As left-censoring is a specialised case of interval-censoring (with $l_i = 0$) the above formulae can be used to handle left-censored data as well.
-As a simpl
 
 ### Truncation
-
-As one of the most prevalent types of measures in survival analysis, there has been more research into extensions for truncation.
 
 When only right-censoring is present, the objective of concordance measures is to estimate the probability that the ranking of two observations' risk is correctly specified (@eq-cindex-prob).
 The naive method to deal with left-truncation is to simply ignore it and use @eq-cindex as usual.
