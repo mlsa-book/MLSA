@@ -39,31 +39,33 @@ As opposed to evaluating distributions at one or more arbitrary time points, one
 van Houwelingen proposed several measures [@VanHouwelingen2000] for calibration but only one generalises to all probabilistic survival models, termed here 'Houwelingen's $\alpha$'.
 The measure assesses if the model correctly estimates the theoretical 'true' cumulative hazard function of the underlying data generating process, $H = \hatH$.
 
-The statistic is derived by noting the closely related nature of survival analysis and counting processes, and exploiting the fact that the sum of the cumulative hazard function is an estimate for the number of events in a given time-period [@dataapplied].
-As this result may seem surprising, below is a short experiment using $\Rstats$ that demonstrates how the sum of the cumulative hazard estimated by a Kaplan-Meier estimator is identical to the number of randomly simulated deaths in a dataset:
-
-<!-- actual experiment in _experiments.R -->
-```
-    set.seed(42)
-    library(survival)
-
-    event = rbinom(100, 1, 0.7)
-    times = runif(100)
-    H = survfit(Surv(times, event) ~ 1)$cumhaz
-    c("Deaths" = sum(event), "Sum H" = sum(H))
-
-    #> Deaths      Sum H 
-    #>     66         66
-```
-
-Houwelingen's $\alpha$ is then defined by substituting $H$ for the observed total number of deaths and summing over all predictions:
+The statistic is derived by noting the closely related nature of survival analysis and counting processes.
+<!-- FIXME: Reference discrete/counting process chapter if we add it and (re)move below. -->
+In brief, for an observation $i$ one could define the counting process $N_i(\tau) = \II(T_i \leq \tau, \Delta_i = 1)$, which represents the number of events $i$ has experienced at $t$.
+Clearly in single-event survival analysis this will be $0$ before the event has been experienced or $1$ at or after the event.
+An important quantity in counting process is the 'intensity process', which is the instantaneous rate at which events occur *given* past information.
+This is related to, but distinct from the hazard rate.
+The core difference is that the intensity process incorporates real-world information via the individual risk indicator, $R_i(\tau) = \II(T_i \geq \tau)$.
+Hence the hazard and intensity are related via $\lambda_i(\tau) = R_i(\tau) h(\tau|\xx_i)$.
+The intensity process can itself be thought of as the expected number of events at $t$, which is $0$ if the event has already occurred at $R_i(\tau) = 0$ or equal to $h(\tau|\xx_i)$ otherwise [@dataapplied].
+Therefore the expected number of events between $[0, \tau]$ can be obtained by the cumulative intensity process 
 
 $$
-H_\alpha(\bsdelta, \hat{\mathbf{H}}, \tt) = \frac{\sum_i \delta_i}{\sum_i \hatH_i(t_i)}
+\Lambda_i(\tau) = \int^\tau_0 \lambda_i(s) \ ds = \int^\tau_0 R_i(s) \ h(s|\xx_i) \ ds = \int_0^{\min\{\tau, t_i\}} h(s|\xx_i) \ ds = H(\min\{\tau, t_i\}, \xx_i)
+$$ {#eq-intensity}
+
+A particularly useful quantity is the expected number of events for individual $i$ in $[0, t_i]$, which can be seen from (@eq-intensity) reduces to $H(t_i|\xx_i)$.
+In a perfect model one would expect $\hat{H}(t_i|\xx_i) = 1$ if $\delta_i = 1$ and $0$ otherwise.
+Hence summing over all observations, $\sum \hat{H}(t_i|\xx_i)$ gives the total number of expected events in the dataset.
+Houwelingen's $\alpha$ exploits this result to provide a simple method for assessing calibration by comparing the actual and expected number of events:
+
+$$
+H_\alpha(\bsdelta, \hat{\mathbf{H}}, \tt) = \frac{\sum_i \delta_i}{\sum_i \hatH(t_i|\xx_i)}
 $$
 
-with standard error $SE(H_\alpha) = \exp(1/\sqrt{\sum_i \delta_i})$.
-A model is well-calibrated with respect to $H_\alpha$ if $H_\alpha = 1$.
+with standard error $SE(H_\alpha) = \exp(1/\sqrt{\sum_i \delta_i})$ [@VanHouwelingen2000].
+A slightly more useful metric is given by $H_\alpha(\bsdelta, \hat{\mathbf{H}}, \tt) - 1$ which is lower-bounded at $0$ and can therefore be minimized in automated tuning processes.
+A model is then well-calibrated if $H_\alpha = 0$.
 
 The next metrics we look at evaluate models across a spectrum of points to assess calibration over time.
 
@@ -155,3 +157,10 @@ The most common algorithm to do so is the Turnbull algorithm [@Turnbull1974], wh
 In the presence of left-truncation, the Kaplan-Meier is calculated using the left-truncated risk-set definition [@McGough2021], which removes observations from being 'at risk' if their left-truncation time has yet to occur (@eq-risk-lt).
 The number of outcomes at risk at $\tau$ (the denominator in the Kaplan-Meier estimator), is then $n_\tau = \sum_i \II(t_i^L \leq \tau \leq t_i)$ where $t_i, t_i^L$ are the outcome time and the left truncation time of observation $i$ respectively.
 
+:::: {.callout-note icon=false}
+
+## Exercises
+
+* Using real or simulated data, show that the sum of the cumulative hazard of a Kaplan-Meier estimator equals the number of events in the dataset.
+
+::::
