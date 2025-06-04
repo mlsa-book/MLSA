@@ -69,7 +69,7 @@ C_{ind}(\hatrr, \tt, \bsdelta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, 
 $$ {#eq-cindex}
 
 The choice of $W$ specifies a particular variation of the c-index (see below).
-The use of the cut-off $\tau$ mitigates against decreased sample size (and therefore high variance) over time due to the removal of censored observations (see @fig-ipcw)).
+The use of the cut-off $\tau$ mitigates against decreased sample size (and therefore high variance) over time due to the removal of censored observations (see @fig-ipcw).
 For $\tau$ to be comparable across datasets, a common choice would be to set $\tau$ as the time at which 80\%, or perhaps 90\% of the data have been censored or experienced the event.
 
 There are multiple methods for dealing with tied predictions and times.
@@ -246,9 +246,43 @@ Reviews of AUC measures have produced (sometimes markedly) different results [@B
 The primary advantage of these measures is to extend discrimination metrics to be time-dependent.
 However, it is unclear how to interpret a threshold of a linear predictor and moreover if this is even the 'correct' quantity to threshold, especially when survival distribution predictions are the more natural object to evaluate over time.
 
-## Beyond right-censoring
+## Extensions {#sec-rank-ext}
 
-### Left- and interval-censoring
+### Competing risks
+
+Discrimination measures are usually extended to the competing risk setting by evaluating cause-specific probabilities individually and then potentially summing or averaging over cause-specific measures [@vanGeloven2022; @Lee2018a; @Bender2021; @Alberge2025].
+
+To recap, given $q$ possible events then the cause-specific hazard for an event is defined as $h_{e}$:
+
+$$
+h_{e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}, \; e = 1, \dots, q.
+$$
+
+where $Y$ is the random variable representing the time-to-event and $E\in \{1,\ldots,k\}$ is the random variable with realizations $e$, which denotes one of $k$ competing events that can occur at event time $Y$.
+
+In a single-event setting, a pair of observations, $(i,j)$, with outcomes $\{(t_i,\delta_i),(t_j,\delta_j)\}$, and predicted risk predictions, $r_i,r_j \in \Reals$, are called comparable if $t_i < t_j$ and $\delta_i = 1$; and concordant if also $r_i > r_j$.
+In a competing risks setting, for an event of interest $e$, the observations are [@vanGeloven2022]:
+
+* *Comparable* if $t_i < t_j$ and $\delta_{ie} = 1$; and
+* *Concordant* if $r_i > r_j$
+
+Where $\delta_{ie} = 1$ is equivalent to $\II(Y_i \leq C_i \wedge E_i = e)$.
+
+The usual definition of concordance measures then follow given this additional conditioning on the event of interest $e$.
+In practice, given that competing risk models estimate cause-specific hazard functions, it is a variation of Antolini's time-dependent concordance measure that suits the competing risks setting best.
+Hence for an event $e$, the measure is given by:
+
+$$
+C(\hat{\mathbf{h}}_e, \tt, \bsdelta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, \hat{h}_{e_i}(t_i) > \hat{h}_{e_j}(t_i), t_i < \tau)\delta_{ie}}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_{ie}}
+$$
+
+where $\hat{\hh}_e = (\hath_{e_1} \ \hath_{e_2} \cdots \hath_{e_m})^\trans$ are cause specific hazards for individual observations risk of event $e$.
+
+In contrast to scoring rules, the average performance over all causes when using concordance measures could be more meaningful than just the sum.
+
+
+
+### Other censoring and truncation types
 
 <!-- TODO:
 1. https://pmc.ncbi.nlm.nih.gov/articles/PMC7806230/
@@ -284,7 +318,8 @@ $$
 TPR_C(\hatrr, N | \alpha, \tau) = P(\hatr_i > \alpha | r_i \leq \tau)
 $$
 
-In the presence of interval censoring, estimation depends on more complex estimators such as the nonparametric maximum likelihood estimator.
+In the presence of interval censoring, estimation depends on more complex estimators such as the nonparametric maximum likelihood estimator, which can be challenging to fit and splines could be used instead [@Wu2020].
+However, splines themselves require modelling and any metric that requires modelling to estimate introduces significant difficulties in its interpretation.
 As a more simplistic (yet sometimes realistic on average) alternative, one could impute the outcome time as the midpoint between the interval margins, $t_i = (l_i + r_i)/2$ [@Gadda2016].
 
 As left-censoring is a specialised case of interval-censoring (with $l_i = 0$) the above formulae can be used to handle left-censored data as well.
