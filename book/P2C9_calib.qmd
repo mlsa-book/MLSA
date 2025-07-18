@@ -44,7 +44,7 @@ The measure assesses if the model correctly estimates the theoretical 'true' cum
 
 The statistic is derived by noting the closely related nature of survival analysis and counting processes.
 <!-- FIXME: Reference discrete/counting process chapter if we add it and (re)move below. -->
-In brief, for an observation $i$ one could define the counting process $N_i(\tau) = \II(T_i \leq \tau, \Delta_i = 1)$, which represents the number of events $i$ has experienced at $t$.
+In brief, for an observation $i$ one could define the counting process $N_i(\tau) = \II(T_i \leq \tau, \Delta_i = 1)$, which represents the number of events $i$ has experienced at $\tau$.
 Clearly in single-event survival analysis this will be $0$ before the event has been experienced or $1$ at or after the event.
 An important quantity in counting process is the 'intensity process', which is the instantaneous rate at which events occur *given* past information.
 This is related to, but distinct from the hazard rate.
@@ -80,7 +80,7 @@ Graphical methods compare the average predicted distribution to the expected dis
 ### Kaplan-Meier Comparison {#sec-calib-km}
 
 The simplest graphical comparison compares the average predicted survival curve to the Kaplan-Meier curve estimated on the testing data.
-Let $\hatS_1,...,\hatS_m$ be predicted survival functions, then the average predicted survival function is the mixture: $\bar{\hatS} = \mean[m]{\hatS_i(\tau)}$.
+Let $\hatS_1,...,\hatS_n$ be predicted survival functions, then the average predicted survival function is the mixture: $\bar{\hatS} = \mean[n]{\hatS_i(\tau)}$.
 This estimate can be plotted next to the Kaplan-Meier estimate of the survival distribution in a test dataset (i.e., the true data for model evaluation), allowing for visual comparison of how closely these curves align.
 An example is given in @fig-eval-calib, a Cox model (CPH), random survival forest, and relative risk tree, are all compared to the Kaplan-Meier estimator.
 This figure highlights the advantages and disadvantages of this method.
@@ -103,8 +103,7 @@ In survival analysis, calibration is extended by examining if predicted survival
 This is motivated by a well-known result: for any continuous random variable $X$, it holds that $S_X(X) \SU$ [@Angus1994].
 This means that, regardless of whether the true outcome times, $T$, follow a Weibull, Gompertz, or any other continuous distribution, the survival probabilities evaluated at those times should be uniformly distributed in a well-calibrated model, $\hatS_i(T) \SU$.
 
-D-Calibration [@Andres2018; @Haider2020] leverages the fact that the event times, $t_i$, are i.i.d. randomly sampled event times from a distribution $T$, which justifies replacing $T$ with $t_i$ in the previous result [Lemma B.2 @Haider2020].
-Hence, a survival model is said to be well-calibrated if the predicted survival probabilities at observed event times follow a standard Uniform distribution: $\hatS_i(t_i) \SU$.
+D-Calibration [@Andres2018; @Haider2020] leverages the fact that the event times, $t_i$, are i.i.d. randomly sampled event times from a distribution $T$, which justifies replacing $T$ with $t_i$ [Lemma B.2 @Haider2020] and so a survival model is considered well-calibrated if the predicted survival probabilities at observed event times follow a standard Uniform distribution: $\hatS_i(t_i) \SU$.
 
 The $\chi^2$ test-statistic is used to test if random variables follow a particular distribution:
 
@@ -116,16 +115,16 @@ where $o_g, e_g$ are respectively the number of observed and expected events in 
 In this case, the $\chi^2$ statistic is testing if there is an even distribution of predicted survival probabilities across the $[0,1]$ range.
 In practice the test is simplified to instead compare if $\hatS_i(t_i) \sim \textrm{DiscreteUniform}(0,1)$.
 To do so the $[0,1]$ range is cut into $G$ equal width bins.
-Now let $m$ be the total number of observations, then, under the null hypothesis, the expected number of events in each bin is equal: $e_i = m/G$.
+Now let $n$ be the total number of observations, then, under the null hypothesis, the expected number of events in each bin is equal: $e_i = n/G$.
 
 To calculate the observed number of events in each bin, first define which observations are in each bin.
 The observations in the $g$th bin are defined by the set:
 
 $$
-\calB_g := \{i = 1,\ldots,m : \lceil \hatS_i(t_i) \times G \rceil = g\}
+\calB_g := \{i = 1,\ldots,n : \lceil \hatS_i(t_i) \times G \rceil = g\}
 $$
 
-where $i = 1,\ldots,m$ are the indices of the observations, $\hatS_i$ are predicted survival functions, $t_i$ are observed outcome times, and $\lceil \cdot \rceil$ is the ceiling function.
+where $i = 1,\ldots,n$ are the indices of the observations, $\hatS_i$ are predicted survival functions, $t_i$ are observed outcome times, and $\lceil \cdot \rceil$ is the ceiling function.
 For example, if there are $5$ bins then the bins are $\{[0, 0.2], (0.2, 0.4], (0.4, 0.6], (0.6, 0.8], (0.8, 1]\}$.
 So observation $i$ would be in the fourth bin if $\hatS_i(t_i) = 0.7$ as $\lceil 0.7 \times 5 \rceil = \lceil 3.5 \rceil = 4$.
 Finally, the observed number of events is the number of observations in the corresponding set: $o_g = |\calB_g|$.
@@ -133,10 +132,10 @@ Finally, the observed number of events is the number of observations in the corr
 The D-Calibration measure, or $\chi^2$ statistic, is then defined by:
 
 $$
-D_{\chi^2}(\hat{\mathbf{S}}, \tt) :=  \frac{\sum^B_{i = 1} (o_i - \frac{m}{G})^2}{m/G}
+D_{\chi^2}(\hat{\mathbf{S}}, \tt) :=  \frac{\sum^B_{i = 1} (o_i - \frac{n}{G})^2}{n/G}
 $$
 
-where $\hat{\mathbf{S}} = (\hat{S}_1 \ \hat{S}_2 \cdots \hat{S}_m)^\trans$ and $\tt = (t_1 \ t_2 \cdots t_m)^\trans$.
+where $\hat{\mathbf{S}} = (\hat{S}_1 \ \hat{S}_2 \cdots \hat{S}_n)^\trans$ and $\tt = (t_1 \ t_2 \cdots t_n)^\trans$.
 
 This measure has several useful properties.
 Firstly, one can test the null hypothesis that a model is 'D-calibrated' by deriving a $p$-value from comparison to $\chi^2_{B-1}$.
@@ -145,10 +144,10 @@ Finally, the theory lends itself to an intuitive graphical calibration method, k
 A D-calibrated model implies:
 
 $$
-p = \frac{\sum_i \II(t_i \leq \hatF_i^{-1}(p))}{m}
+p = \frac{\sum_i \II(t_i \leq \hatF_i^{-1}(p))}{n}
 $$
 
-where $p$ is some value in $[0,1]$, $\hatF_i^{-1}$ is the $i$th predicted inverse cumulative distribution function, and $m$ is again the number of observations.
+where $p$ is some value in $[0,1]$, $\hatF_i^{-1}$ is the $i$th predicted inverse cumulative distribution function, and $n$ is again the number of observations.
 In words, the number of events occurring at or before each quantile should be equal to the quantile itself, for example 50% of events should occur before their predicted median survival time.
 Therefore, one can plot $p$ on the x-axis and the right hand side of the above equation on the y-axis.
 A D-calibrated model should result in a straight line on $x = y$.
@@ -168,7 +167,7 @@ Whilst the D-calibration for the Cox model is smaller than that of the random fo
 Numerical methods have been proposed for calibration in a competing risk setting, including using pseudo-measures [@Schoop2011] and overall calibration ratios [@vanGeloven2022].
 However, these are complex to implement and interpret and therefore graphical methods are more often used in practice [@Monterrubio2024].
 
-Instead of plotting predictions against the Kaplan-Meier (@sec-calib-km), in the competing risks setting one can plot the predicted cumulative incidence function against the 'true' CIF (@sec-aalen-johanson) [@Austin2022; @Wolbers2009].
+As there is not a _single_ survival curve in the competing risks setting, instead one can estimate the 'true' CIF using the Aalen-Joahnson estimator (@sec-aalen-johanson) and plot this against the average prediction in the same way as in @sec-calib-km [@Austin2022; @Wolbers2009].
 
 As discussed earlier in this chapter, interpreting and using calibration measures is complex enough in the single event setting.
 Extending this to multiple plots, one for each event, makes interpretation even more complex.
