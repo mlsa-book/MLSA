@@ -30,43 +30,14 @@ Whilst discrete-time survival analysis exists for this purpose (@sec-discrete), 
 There has not been a lot of research into whether discrete-time methods outperform continuous-time methods when correctly applied to discrete data, however available experiments do not indicate that discrete methods outperform their continuous counterparts [@Suresh2022].
 Therefore it is recommended to use available software implementations, even when data is recorded on a discrete scale.
 
-### Evaluation and prediction
+### Evaluation and prediction {#sec-conclusions-faq-eval}
 
 * Which time points to make predictions for?
 *
 
-### Choosing measures and models  {#sec-conclusions-choosing}
+### Choosing models and measures  {#sec-conclusions-choosing}
 
-#### Choosing evaluation measures {.unnumbered .unlisted}
-
-Choosing measures to evaluate survival models may appear more daunting than regression and classification settings, which, in contrast, have fewer (common) measures to choose from.
-In general, measures should be selected based on the experiment at hand, which could be making predictions for new data, comparing the performance of multiple models ('benchmark experiments'), investigating patterns in observed data, or some combination of these.
-
-In the real world, predictive experiments are most common.
-These are now daily occurrences as machine learning models are routinely deployed on servers to make ongoing predictions.
-In these cases, the exact task (@sec-survtsk) must be precisely stated before any model is deployed and evaluated.
-When predicting rankings, discrimination measures are most useful.
-While some papers have shown flaws in Harrell's C [@Gonen2005; @Uno2007], others have demonstrated that common alternatives yield very similar results [@Rahman2017; @Therneau2020] and alternatives may even be harder to interpret due to high variance [@Schmid2012].
-To avoid C-hacking (@sec-eval-crank-choose), the most important consideration is to simply choose one measure and establish a pre-defined threshold to determine if the deployed model is optimal, a natural threshold would be 0.5 as anything above this is better than a baseline model.
-Whilst measures can yield similar results, Harrell's C is increasingly over-optimistic with additional censoring [@Rahman2017] and therefore Uno's C may be a more sensible choice in automated procedures.
-If the task of interest is to predict survival distributions over time, then the choice of measure is limited to scoring rules.
-Research in this area remains nascent and whilst the log-loss skills are highly useful as they can be used for any censoring and truncation, calculation of these losses is often not possible as they require estimation of a probability density function, which is usually unavailable as many survival models return discrete probability mass function predictions.
-Therefore using the Graf score may be more sensible using the ERV representation that standardizes the score with respect to a Kaplan-Meier baseline to establish if the model is better than a random guess.
-However, in production, one may actually consider standardizing with respect to the Cox PH.
-
-When conducting benchmark experiments, it is advisable to use a spread of measures so that results can be compared across various properties.
-In this case, models should be tested against discrimination, calibration, and overall predictive ability (i.e., with scoring rules).
-As models make different types of predictions, results from these experiments should be limited to metrics that are directly comparable, in other words, two models should only be compared based on the *same* metric.
-In benchmark experiments, models are compared across the same data and same resampling strategy, hence measure assumptions become less important as they are equally valid or flawed for all models.
-This book recommends using Harrell's C and Uno's C for concordance, D-calibration for assessing a model's calibration, and both RCLL and Graf score for overall performance.
-For any automated tuning, using a scoring rule makes the most sense as they assess calibration and discrimination simultaneously.
-
-Finally, if using a model for investing patterns in data [@Molnar2019], then the recommendation is to perform a benchmark experiment of multiple models on the same data (ideally with some automated tuning) and then select the best model from this experiment and refit it on the full data [@Becker2024].
-Survival measures can be used fairly simply with standard routines for assessing algorithmic fairness [@Sonabend2022a].
-
-Note that this book has not discussed survival adaptations to the well-known AIC [@Liang2008] and BIC [@VolinskyRaftery2000] as these generally do not apply to machine learning models and are therefore out of scope.
-
-#### Choosing survival models {.unnumbered .unlisted}
+#### Choosing models {.unnumbered .unlisted}
 
 In contrast to measure selection, selecting models is more straightforward and the same heuristics from regression and classification largely apply to survival analysis.
 Firstly, for low-dimensional data, many experiments have demonstrated that machine learning may not improve upon more standard statistical methods [@Christodoulou2019] and the same holds for survival analysis [@Burk2024].
@@ -86,5 +57,36 @@ Moreover, given a huge increase in research into this area [@Wiegrebe2024], ther
 With enough fine-tuning we have found that neural networks can work well but still without outperforming other methods.
 Where neural networks may shine is going beyond tabular data to incorporate other modalities, but again this area of research for survival analysis is still nascent.
 
+#### Choosing measures {.unnumbered .unlisted}
+
+There are many survival measures to choose from and selecting the right one for the task might seem daunting.
+We have put together a few heuristics to support decision making.
+Evaluation should always be according to the goals of analysis, which means using discrimination measures to evaluate rankings, calibration measures to evaluate average performance, and scoring rules to evaluate overall performance and distribution predictions.
+
+For discrimination measures, we recommend Harrell's and Uno's C.
+Whilst others can assess time-dependent trends, these are also captured in scoring rules.
+In practice the choice of measure matters less than ensuring your reporting is transparent and honest [@Therneau2020; @Sonabend2021].
+
+To assess a single model's calibration, graphical comparisons to the Kaplan-Meier provide a useful and interpretable method to quickly see if a model is a good fit to the data (@sec-calib-km).
+When choosing between models, we recommend D-calibration, which can be meaningful optimized and thus used for comparison.
+
+When picking scoring rules, we recommend using both the ISBS and RCLL.
+If a model outperforms another with respect to both measures then that can be a strong indicator of performance.
+When reporting scoring rules, we recommend the ERV representation which provides a meaningful interpretation as 'performance increase over baseline'.
+
+Given the lack of research, if you are interested in survival time predictions then treat evaluation with caution and check for new developments in the literature.
+
+For automated model optimization, we recommend tuning with a scoring rule, which should capture discrimination and calibration simultaneously [@Rindt2022; @Yanagisawa2023; FIXME ECML].
+Though if you are only ever using a model for ranking, then we recommend tuning with Uno's C.
+Whilst it does have higher variance compared to other concordance measures [@Rahman2017; @Schmid2012], it performs better than Harrell's C as censoring increases [@Rahman2017].
+
+#### Interpreting survival models {.unnumbered .unlisted}
+
+Interpreting models is increasingly important as we rely on more complex 'black-box' models [@Molnar2019].
+Classic methods that test if a model is fit well to data, such as the AIC and BIC, have been extended to survival models however are limited in application to 'classical' models (@sec-models-classical) only [@Liang2008; @VolinskyRaftery2000].
+As a more flexible alternative, any of the calibration measures in @sec-eval-distr-calib can be used to evaluate a model's fit to data.
+To assess algorithmic fairness, the majority of measures discussed in @sec-eval can be used to detect bias in a survival context [@Sonabend2022a].
+Gold-standard interpretability methods such as SHAP and LIME [@Molnar2019] can be extended to survival analysis off-shelf [@Langbein2024], and time-dependent extensions also exist to observe the impact of variables on the survival probability over time [@Krzyziński2023; @Langbein2024].
+<!-- FIXME: UPDATE 'classical' above to whatever term we use for that chapter -->
 
 ## What's next for MLSA?
