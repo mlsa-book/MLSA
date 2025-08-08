@@ -77,14 +77,15 @@ Estimating the Kaplan-Meier on training data and using those values for predicti
 In this book, $\KMS$ specifically refers to the Kaplan-Meier estimator fit on some training data.
 Similarly, $\KMG$ specifically refers to the Kaplan-Meier estimator fit on the observed censoring times $(t_i, 1-\delta_i)$ from some training data.
 
-The Nelson-Aalen estimator [@Aalen1978; @Nelson1972], introduced in @sec-nonparametric, can also be used as a baseline predictive model.
+The Nelson-Aalen estimator [@Aalen1978; @Nelson1972], introduced in @sec-surv-estimation-non-param, can also be used as a baseline predictive model.
 
 $$
 \hatH_{NA}(\tau) = \sum_{t_{(k)}\leq \tau} \frac{d_{t_{(k)}}}{n_{t_{(k)}}}.
 $$
 
 The Kaplan-Meier and Nelson-Aalen estimators are consistent estimators for the survival and cumulative hazard functions respectively; the former is more widely utilized as a baseline estimator [@Herrmann2020; @Huang2020; @Wang2017].
-As well as supporting in interpretability, both methods can be used for graphical calibration of models (@sec-eval-distr-calib-prob), components of complex models (@sec-car), and other diagnostic graphical tools [@Habibi2018; @Jager2008; @Moghimi-dehkordi2008].
+As well as supporting in interpretability, both methods can be used for graphical calibration of models (@sec-calib-km), components of complex models (@sec-car), and other diagnostic graphical tools [@Habibi2018; @Jager2008; @Moghimi-dehkordi2008].
+Extensions to other censoring and truncation types as well as event history analysis more generally follows from using the estimators defined in @sec-surv-estimation-non-param, @sec-aalen-johanson, and @sec-ms-aalen-johanson.
 
 By ignoring covariates, neither estimator is expected to perform well in practice as predictive models.
 Moreover, the assumption of uninformative censoring rarely holds true.
@@ -247,20 +248,40 @@ In contrast to the semi-parametric Cox model, fully parametric PH models can pre
 
 ### Competing risks
 
+There are two common methods to extend the PH model to the competing risks setting.
+The first makes use of the cause-specific hazard to fit a cause-specific model, the second fits a 'subdistribution' hazard.
+In the first case, the baseline hazard function and the coefficients are replaced with cause-specific hazard and coefficients:
+
+$$
+h_{Cox;e}(\tau|\xx_i)= h_{e;0}(\tau)\exp(\eta_{e;i})
+$$ {#eq-cox-cr}
+
+Where $h_{e;0}$ is a cause-specific hazard and $\eta_{e;i}$ is the cause-specific coefficient for observation $i$.
+This model is fit by estimating $\hat{\eta}_{e;i}$ with cause-specific partial likelihood and Breslow estimator:
+
+$$
+\calL(\beta_e) = \prod_{k:\tbke} \Bigg(\frac{\exp(\eta_{e;k})}{\sum_{j \in \calR_{\tbke}} \exp(\eta_{e;j})}\Bigg)
+$$ {#eq-partial-cr}
+
+$$
+\hat{H}_{Bres;e}(\tau) = \sum_{\tbke \leq \tau} \frac{d_{\tbke}}{\sum_{j \in \calR_{\tbke}} \exp(\hat{\eta}_{e;j})}
+$$ {#eq-breslow-cr}
+
+where $\tbke$ is the ordered event times for cause $e$.
+There is no 'cause-specific risk set' definition, this is identical to the single event setting (see @sec-data-rc):
+
+$$
+\calR_{\tau} := \{i: t_i \geq \tau\}
+$$ 
+
 Fine and Gray [@Fine1999] proposed a semi-parametric PH model in the competing risks setting based on modelling the subdistribution hazard function.
 Cause-specific hazards (@eq-cause-specific-hazard) represent the instantaneous risk of an individual experiencing the cause of interest, given that they have not yet experienced *any* event.
 In contrast, subdistribution hazards model the risk of an individual experiencing the cause of interest, given they have not yet experienced the event of interest, but may have experienced a competing event.
 As will be shown below, the benefit of the subdistribution model is the ability to directly predict the cumulative incidence function under a PH model.
 In this framework, the subdistribution hazard provides a relationship between covariates and the CIF for an event of interest [@Austin2016].
 Mathematically, the difference between cause-specific and subdistribution hazards comes from the definition of the risk set.
-The cause-specific risk set for cause $e$ is defined in the usual way as:
-
-$$
-\calR_{e;\tau} := \{i: t_i \geq \tau\}
-$$ {#eq-riskset-standard}
-
-Which is independent of $e$ and therefore identical to the usual risk set definition in (@eq-riskset).
-Whereas the subdistribution risk set is defined as:
+As stated above, there is no cause-specific risk set definition.
+However, the subdistribution risk set is defined as:
 
 $$
 \calR_{e;\tau} := \{i: t_i \geq \tau \cup e_i \neq e\}
