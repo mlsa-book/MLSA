@@ -2,7 +2,7 @@
 {{< include _macros.tex >}}
 :::
 
-# Conclusions {#sec-conclusions}
+# FAQs and Outlook {#sec-conclusions}
 
 {{< include _soon.qmd >}}
 
@@ -30,9 +30,63 @@ Whilst discrete-time survival analysis exists for this purpose (@sec-discrete), 
 There has not been a lot of research into whether discrete-time methods outperform continuous-time methods when correctly applied to discrete data, however available experiments do not indicate that discrete methods outperform their continuous counterparts [@Suresh2022].
 Therefore it is recommended to use available software implementations, even when data is recorded on a discrete scale.
 
-### Evaluation and prediction
+### Evaluation and prediction {#sec-conclusions-faq-eval}
 
 * Which time points to make predictions for?
 *
+
+### Choosing models and measures  {#sec-conclusions-choosing}
+
+#### Choosing models {.unnumbered .unlisted}
+
+In contrast to measure selection, selecting models is more straightforward and the same heuristics from regression and classification largely apply to survival analysis.
+Firstly, for low-dimensional data, many experiments have demonstrated that machine learning may not improve upon more standard statistical methods [@Christodoulou2019] and the same holds for survival analysis [@Burk2024].
+Therefore the cost that comes with using machine learning -- lower interpretability, longer training time -- is unlikely to provide any performance benefits when a dataset has relatively few covariates.
+In settings where machine learning is more useful, then the choice largely falls into the four model classes discussed in this book: random forests, support vector machines, boosting, and neural networks (deep learning).
+If you have access to sufficient computational resources, then it is always worthwhile including at least one model from each class in a benchmark experiment, as models perform differently depending on the data type.
+However, without significant resources, the rules-of-thumb below can provide a starting point for smaller experiments.
+
+Random survival forests and boosting methods are both good all-purpose methods that can handle different censoring types and competing risks settings. In single-event settings both have been shown to perform well on high-dimensional data, outperforming other model classes [@Spooner2020].
+Forests require less tuning than boosting methods and the choice of hyperparameters if often more intuitive.
+Therefore, we generally recommend forests as the first choice for high-dimensional data.
+Given more resources, boosting methods such as *xgboost* are powerful methods to improve the predictive performance of classical measures.
+Survival support vector machines do not appear to work well in practice and to-date we have not seen any real-world use of SSVMs, therefore we generally do not recommend use of SVMs without robust training and testing first.
+
+Neural networks are incredibly data-dependent.
+Moreover, given a huge increase in research into this area [@Wiegrebe2024], there are no clear heuristics for recommending when to use neural networks and then which particular algorithms to use.
+With enough fine-tuning we have found that neural networks can work well but still without outperforming other methods.
+Where neural networks may shine is going beyond tabular data to incorporate other modalities, but again this area of research for survival analysis is still nascent.
+
+#### Choosing measures {.unnumbered .unlisted}
+
+There are many survival measures to choose from and selecting the right one for the task might seem daunting.
+We have put together a few heuristics to support decision making.
+Evaluation should always be according to the goals of analysis, which means using discrimination measures to evaluate rankings, calibration measures to evaluate average performance, and scoring rules to evaluate overall performance and distribution predictions.
+
+For discrimination measures, we recommend Harrell's and Uno's C.
+Whilst others can assess time-dependent trends, these are also captured in scoring rules.
+In practice the choice of measure matters less than ensuring your reporting is transparent and honest [@Therneau2020; @Sonabend2021].
+
+To assess a single model's calibration, graphical comparisons to the Kaplan-Meier provide a useful and interpretable method to quickly see if a model is a good fit to the data (@sec-calib-km).
+When choosing between models, we recommend D-calibration, which can be meaningful optimized and thus used for comparison.
+
+When picking scoring rules, we recommend using both the ISBS and RCLL.
+If a model outperforms another with respect to both measures then that can be a strong indicator of performance.
+When reporting scoring rules, we recommend the ERV representation which provides a meaningful interpretation as 'performance increase over baseline'.
+
+Given the lack of research, if you are interested in survival time predictions then treat evaluation with caution and check for new developments in the literature.
+
+For automated model optimization, we recommend tuning with a scoring rule, which should capture discrimination and calibration simultaneously [@Rindt2022; @Yanagisawa2023; FIXME ECML].
+Though if you are only ever using a model for ranking, then we recommend tuning with Uno's C.
+Whilst it does have higher variance compared to other concordance measures [@Rahman2017; @Schmid2012], it performs better than Harrell's C as censoring increases [@Rahman2017].
+
+#### Interpreting survival models {.unnumbered .unlisted}
+
+Interpreting models is increasingly important as we rely on more complex 'black-box' models [@Molnar2019].
+Classic methods that test if a model is fit well to data, such as the AIC and BIC, have been extended to survival models however are limited in application to 'classical' models (@sec-models-classical) only [@Liang2008; @VolinskyRaftery2000].
+As a more flexible alternative, any of the calibration measures in @sec-eval-distr-calib can be used to evaluate a model's fit to data.
+To assess algorithmic fairness, the majority of measures discussed in @sec-eval can be used to detect bias in a survival context [@Sonabend2022a].
+Gold-standard interpretability methods such as SHAP and LIME [@Molnar2019] can be extended to survival analysis off-shelf [@Langbein2024], and time-dependent extensions also exist to observe the impact of variables on the survival probability over time [@Krzyziński2023; @Langbein2024].
+<!-- FIXME: UPDATE 'classical' above to whatever term we use for that chapter -->
 
 ## What's next for MLSA?

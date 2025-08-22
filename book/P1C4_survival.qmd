@@ -8,7 +8,7 @@ abstract: TODO (150-200 WORDS)
 
 # Survival Analysis {#sec-surv}
 
-{{< include _wip.qmd >}}
+{{< include _wip_minor.qmd >}}
 
 
 *Survival Analysis* is concerned with data where the outcome is the time until an event takes place (a 'time-to-event').
@@ -464,7 +464,7 @@ In contrast, when we take left-truncation into account, subjects only enter the 
 Thus, the definition of the KM estimator in @eq-km can still be used in case of left-truncation using the more general risk set definition
 
 $$
-\calR_\tau = \{i: t_i^L \leq \tau \leq t_i\}
+\calR_\tau = \{i: t_i^L \ \leq \tau \leq t_i \}
 $$ {#eq-risk-lt}
 
 ### Right-truncation {.unnumbered .unlisted}
@@ -568,9 +568,11 @@ Note that in in practice, data sets will often not contain all types of censorin
 
 ### Non-parametric estimation {#sec-surv-estimation-non-param}
 
+<!-- TODO (RS) NOT SURE I UNDERSTAND THIS FIRST PART OF THE SECTION -->
+
 As the name suggests, non-parametric estimation (and semi-parametric estimation) techniques do not make (strong) assumptions about the underlying distribution of event times.
 
-A common principle for such techniques is to partition the follow into intervals or to define specific time-points during the follow-up and to estimate the continuous or discrete time hazards (@eq-discrete-hazard) for each interval/time-point.
+A common principle for such techniques is to partition the follow-up into intervals or to define specific time-points during the follow-up and to estimate the continuous or discrete time hazards (@eq-discrete-hazard) for each interval/time-point.
 Then derive the respective estimates, for example the survival probability, based on the relationship between the hazard and other quantities (@sec-distributions or @sec-distributions-discrete).
 
 The Kaplan-Meier estimator introduced earlier (@sec-surv-km) is an example for this principle.
@@ -592,7 +594,6 @@ Note that we use a continuous time valued $\tau$ for the definition, which impli
 In words: For time points between two unique event times we assume the previous value of the estimate.
 Similar to the Kaplan-Meier estimator, $H_{NA}$ can deal with left-truncated data based on the general risk-set definition @eq-risk-lt.
 
-
 Based on @eq-surv-haz we can also define a survival probability estimator based on the Nelson-Aalen estimator of the cumulative hazard @eq-nelson-aalen as
 <!--  -->
 $$
@@ -601,7 +602,61 @@ $$ {#eq-surv-na}
 <!--  -->
 This relationship is also used by @Breslow1972 to obtain survival probability estimates in the context of the Cox model (@sec-models-classical).
 
-{{< include _wip.qmd >}}
+In the prescence of other censoring types there are a number of alternatives to the Kaplan-Meier estimator.
+
+#### Interval censoring {.unnumbered .unlisted}
+For interval-censoring, the Kaplan-Meier estimator is replaced by the nonparametric maximum likelihood estimator (NPMLE) [@Zhigang2010], which estimates the likelihood function under the assumption of left- or interval-censoring data as in @sec-surv-estimation-param.
+The most common algorithm to compute this is the iterative Turnbull algorithm [@Turnbull1974].
+The intuition behind this algorithm is that an observation, $i$, should only contribute to the estimation at a given time-point, $\tau$, if the event could have happened in the censoring interval, $\tau \in (L_i, R_i]$.
+
+In summary:
+
+Let $\tbi, k = 1,...,m$ be the ordered times at which to evaluate the NPMLE.
+
+1. Make an initial guess for $\hatS^0(\tbi), k = 1,...,m$.
+
+Where $\hatS^0$ is the initial guess and $\hatS^j$ is the estimated survival function at iteration $j$.
+
+2. **While** $\quad \lvert \hatS^j(t_{(k)}) - \hatS^{j-1}(t_{(k)}) \rvert > \epsilon, \forall k = 1,...,m \quad$ **Do:**
+
+a. Compute the probability of an event at each time-point:
+
+$$
+p_{t_{(k)}} = \hatS^{j-1}(t_{(k-1)}) - \hatS^{j-1}(t_{(k)}), \quad k = 1,...,m
+$$
+
+b. Estimate the number of events at each time-point:
+
+$$
+d_{t_{(k)}} = \sum^n_{i=1} \frac{w_{ik}p_{t_{(k)}}}{\sum^m_{l=1} w_{il}p_{t_{(l)}}}, \quad k = 1,...,m
+$$
+
+Where $w_{ik} = 1$ if the interval $(t_{(k-1)}, t_{(k)}]$ is contained within $(L_i, R_i]$, and $w_{ik} = 0$ otherwise; and $L_i, R_i$ are the left- and right-censoring times for observations $i = 1,...,n$.
+
+c. Compute the cumulative number of events at or after $t_{(k)}$:
+
+$$
+n_{t_{(k)}} = \sum^m_{l=k} d_{t_{(l)}}, \quad k = 1,...,m
+$$
+
+This serves a similar role to the usual 'number at risk' formula.n or after $t_{(k)}$.
+
+d. Calculate $\hatS^j$ using the Kaplan-Meier formula (@eq-km), substituting the values in Steps 2b and 2c.
+
+@Giolo2004 suggest using the Kaplan-Meier to find the initial guess in Step 1 and to use $\epsilon = 10^{-3}$.
+A similar algorithm can be used for left-censored data.
+
+#### Left truncation {.unnumbered .unlisted}
+
+In the presence of left-truncation, the Kaplan-Meier is calculated using the left-truncated risk-set definition [@McGough2021], which excludes individuals from the risk set until their left-truncation time has occurred (@eq-risk-lt).
+The number of individuals at risk at $\tau$ is then:
+
+$$
+n^L_\tau = \sum_i \II(t_i^L \leq \tau \leq t_i)
+$$
+
+where $t_i, t_i^L$ are the outcome time and left truncation time of observation $i$ respectively.
+This equation can be substituted into the Kaplan-Meier formula (@eq-km), with $d_{t_{(k)}}$ calculated in the usual manner.
 
 ## Conclusion
 
