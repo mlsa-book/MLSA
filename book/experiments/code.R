@@ -511,3 +511,33 @@ p_trans_prob_prothr = ggplot(overall_df, aes(x = time, y = trans_prob)) +
 ggsave("Figures/survival/multi-state-prothr.png",
   p_trans_prob_prothr, width=5, height=5.2)
 
+
+## Survival task viz
+library(dplyr)
+library(patchwork)
+set.seed(20250822)
+
+sex <- rbinom(10, 1, 0.5)
+x_base <- ceiling(runif(10, ifelse(sex == 1, 20, 1), ifelse(sex == 1, 50, 30)))
+x <- unlist(lapply(x_base, function(val) c(0, val, 50)))
+
+df <- data.frame(x = x, y = c(1, 0, 0), group = as.factor(rep(1:10, each = 3)), sex = rep(as.factor(sex), each  = 3)) %>%
+  mutate(alpha = if_else(group == 10, 1, 0.1))
+
+(df %>% group_by(sex) %>% summarise(x = mean(x)))
+
+g <- ggplot(df, aes(x = x, y = y, group = group))
+g1 <- g + geom_step(linewidth = 1.3, color = "gray")
+g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity()
+g3 <- g1 + geom_smooth(aes(x = x, y = y), data.frame(x = c(0, mean(df$x), 50), y = c(1, 0, 0)),
+    inherit.aes = FALSE, method = "loess", se = FALSE, color = "black", linewidth = 1)
+g4 <- g +
+  geom_step(aes(color = sex), linewidth = 1.3, alpha = 0.5) +
+  geom_smooth(aes(x = x, y = y, group = sex, color = sex),
+  data.frame(x = c(0, 23.3, 50, 0, 40, 50), y = c(1, 0, 0, 1, 0, 0), sex = as.factor(c(1, 1, 1, 0, 0, 0))),
+    inherit.aes = FALSE, method = "loess", se = FALSE, linewidth = 1.5)
+
+g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S(t)") & guides(color  = "none")
+
+ggsave("book/Figures/survtsk/heavisides.png",
+  g_final, height=5, width=7, units="in", dpi=600)

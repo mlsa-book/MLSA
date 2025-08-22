@@ -29,9 +29,10 @@ In general there are four common *prediction types* or *prediction problems* whi
 3. Relative risks;
 4. Prognostic index.
 
-In analogy to classification, the first of these is considered *probabilistic* as it includes uncertainty about the prediction, whereas the second is *deterministic* as the prediction is a single value without associated uncertainty, which may also be known as a point prediction.
-Technically, the last two prediction types may appear deterministic for the same reason as (2), however, both implicitly capture uncertainty as neither is a direct prediction of $Y$, as will be discussed further below.
-Whilst these prediction types can be separated in this way, the distribution prediction is the most general case; relative risks and time-to-event can both be derived from a probabilistic prediction and the prognostic index is often used as an interim step before making a probabilistic prediction.
+The first of these is considered *probabilistic* as it predicts the probability of an event occurring over time.
+The second is *deterministic* as the prediction is a single point prediction.
+The final two do not directly predict the event of interest but instead provide different interpretations that both relate to the risk of the event.
+The relative risks and time-to-event prediction types can both be derived from a survival distribution prediction, and the prognostic index is often used as an interim step before making a probabilistic prediction (see @sec-surv-models-crank); so all of these prediction types are closely related.
 
 It is vital to clearly separate which prediction problem you are working with, as they are not directly compatible with one another.
 For example, it is not meaningful to compare a relative risk prediction from one model to a survival distribution prediction of another.
@@ -43,6 +44,8 @@ Whilst clinicians will usually not present a probability distribution to a patie
 Finally, relative risk predictions are often used for triage and resource allocation, such as assigning patients to particular wards or beds (@fig-survtsk-overview, bottom).
 
 ![Illustration of prediction types. Survival time predictions (top-left) are limited to domains where uncertainty is less important. Survival probabilities (top-right) are shared with patients as 'T-year survival probabilities'. Relative risk predictions (bottom) are used for triage and resource allocation.](Figures/survtsk/overview.png){#fig-survtsk-overview width=60% fig-alt="Cartoon illustration of predictive types. Top left shows a marathon runner with a predicted survival time '4 hours 13 min', top right shows a doctor presenting a graph to a patient representing distribution predictions, bottom shows a clinician looking at a chart that ranks patients."}
+
+<!-- FIXME: FIGURE TO BE UPDATED -->
 
 Whilst one prediction type is necessary to define a model's output, it is often the case that an algorithm might use another prediction type as an interim prediction.
 This chaining of predictions is called 'composition' as two components are composed to create a final prediction, this is commonly the case for distribution predictions.
@@ -77,15 +80,17 @@ In other contexts, such as engineering, survival distributions might be used to 
 For example, one could use a survival model to estimate the reliability of a plane engine over time, a threshold could be set such that the engine will be replaced when $\hatS(t) < 0.6$.
 
 Predicting $\tau$-year survival probabilities is often confused with a classification problem, which make probabilities for one or more events occurring at a fixed point in time.
-However, a classification model would be unable to use any observations that were censored before the time of interest and discarding these observations would bias any results.
+However, a classification model would be unable to use any observations that were censored before the time of interest and discarding these observations would bias any results [@DeRong2025].
 
-Another potential confusion is conflating predicting survival distributions with density estimation.
-Density estimation fits a distribution to the *group*, whereas survival distribution predictions fit distributions to *individuals*.
-In reality, in the single-event setting, it can be difficult to wrap one's head around the notion of an individual survival distribution as events occur exactly once at a fixed point in time.
-In theory, for an observation with event time $t_i$, the perfect model would predict guaranteed survival before $t_i$ followed by guaranteed failure on and after this time, which is the Heaviside function: $\hatS(\tau) = 1$ if $\tau < t_i$ and $\hatS(\tau)=0$ otherwise.
-In practice, this is impossible and would massively overfit the training data and as such all survival models are estimations of this theoretical ideal (@fig-survtsk-heaviside).
+Another potential source of confusion can arise when trying to figure out what it actually means to predict a distribution that represents a single event occurring for a single observation.
+In reality, something either does or does not happen at a point in time, so what does it really mean to predict a distribution around this event?
+To make this clear, @fig-survtsk-heaviside visualizes what the survival task aims to achieve.
+The top-left image shows the real-world distribution when an event occurs, this is a heaviside function where the survival probability drops immediately from $1$ to $0$ when the event occurs; the top-right image highlights this curve for a single event.
+The bottom-left shows what we aim to achieve, which is a survival curve prediction that accurately captures the average survival distribution across all of these events.
+Finally, the bottom-right curve shows the same events split according to a single, binary covariate with one prediction per covariate value.
+In a machine learning task, this is essentially repeated for every possible combination of covariates.
 
-![Comparing the true event time to theoretical and practical estimates of a survival function. The dashed line represents the theoretical ideal Heaviside function, the solid line represents a realistic estimate and the vertical dotted line is when the event actually takes place.](Figures/survtsk/heaviside.png){#fig-survtsk-heaviside width=80% fig-alt="Graph with 'survival probability S(t)' on the y-axis and 'Time' on the x-axis. A vertical red-line at t=5 represents when the event takes place. A dashed line is constant at S(t)=1 until t=5 then is constant at S(t)=0. A solid line smoothly decreases from S(t)=1 to S(t)=0 between t=0 and t=10."}
+![Comparing theoretical real-world events to survival distribution predictions.](Figures/survtsk/heavisides.png){#fig-survtsk-heaviside width=80% fig-alt="Four graphs with 'survival probability S(t)' on the y-axis and 't' on the x-axis. The top left shows 10 random heaviside functions. The top right shows 1 of these highlighted. The bottom left shows a smooth curve superimposed across all of the same lines. The bottom right shows the same 10 lines but split between red and blue with two smooth curves in the same colors superimposed on top."}
 
 ## Predicting Risks {#sec-survtsk-risk}
 
@@ -114,6 +119,8 @@ From these predictions, two primary types of conclusion can be drawn.
 
 Whilst many important conclusions can be drawn from these predictions, the values themselves have no meaning when not compared to other individuals.
 Similarly, the values have no meanings across research, even if observation $k$ is at low-risk according to this sample, it may be high risk compared to another.
+Finally, as with relative risks in other domains, differences in relative risk should be interpreted with care.
+In the example above, $j$'s relative risk is 100 times that of $k$, but if $k$'s overall probability of experiencing the event is $0.0001$, then $j$'s overall probability of experiencing the event is still only $0.01$.
 
 ### Distributions and risks
 
@@ -133,18 +140,21 @@ $$
 and is closely related to the calibration measure defined in @sec-alpha.
 This represents the expected number of events for individuals with similar characteristics to $i$.
 This is a measure of risk as a larger value indicates that among individuals with a similar profile, there is expected to be a larger number of events and therefore have greater risk than those with smaller ensemble mortality.
-For example, say for an individual, $i$, we have: $(t, \hatS_i(t)) = (0, 1), (1, 0.8), (2, 0.4), (3, 0.15)$ then, $(t, \hatH_i(t)) = (0, 0), (1, 0.10), (2, 0.40), (3, 0.82)$ and their relative risk prediction is $\sum_t \hatH_i(t) = 0 + 0.10 + 0.4 + 0.82 = 1.32$.
+For example, say for an individual, $i$, we have: $(t, \hatS_i(t)) = (0, 1), (1, 0.8), (2, 0.4), (3, 0.15)$ then, $(t, \hatH_i(t)) = (0, 0), (1, 0.10), (2, 0.40), (3, 0.82)$, then their relative risk prediction is $\sum_t \hatH_i(t) = 0 + 0.10 + 0.4 + 0.82 = 1.32$.
 
 ## Predicting Survival Times {#sec-survtsk-time}
 
-Predicting a time-to-event is the problem of estimating exactly when an individual will experience an event.
+Predicting a time-to-event is the problem of estimating when an individual will experience an event.
 Mathematically, the problem is the task of estimating $g: \calX \rightarrow \PReals$, that is, predicting a single value over $[0,\infty]$.
 
 For practical purposes, the expected time-to-event would be the ideal prediction type as it is easy to interpret and communicate.
-However, such predictions are uncommon as the training data is never fully observed and hence training models is inherently a probabilistic process, with uncertainty being captured from the moment data is censored.
-In contrast to regression, in which a model could theoretically optimize a performance measure (which can occur when a model is overfit to training data), this is guaranteed not to happen in survival analysis due to the presence of censoring
-In the presence of censoring, deterministic predictions may convey a false sense of certainty, as they do not reflect the underlying uncertainty.
-Hence it is more common to make a probabilistic prediction that can then be reduced to a deterministic one.
+However, evaluation of these predictions is tricky.
+Take the following example.
+Say someone is censored at $\tau=5$, there is no way to know if they would have experienced the event at $\tau=6$ or $\tau=600$, all that can be known is that the model correctly identified they did not experience the event before $\tau=6$.
+Furthermore, if the model had predicted $\tau=3$, metrics such as mean absolute error would be misleading, as an MAE of $5 - 3 = 2$ would make the model seem artificially better than it was, if the event actually occurred at $\tau=600$.
+Therefore, when an observation is censored, the best one can do is evaluate a classification task: did the model predict that the event did not occur before the censoring time.
+As this is not the task of interest, one is left to evaluate uncensored observations only, which can introduce bias to the evaluation.
+Given this complexity, the time-to-event point prediction is rare in practice.
 
 ### Times and risks
 
@@ -168,8 +178,8 @@ $$ {#eq-darth}
 
 However, this rule is rarely usable in practice as censoring results in estimated survival distributions being 'improper'.
 A valid probability distribution for a random variable $Y$ satisfies: $\int f_Y = 1$, $S_Y(0) = 1$ and $S_Y(\infty) = 0$.
-This last condition is often violated in survival distribution predictions, which occurs because many algorithms create predictions using the Kaplan-Meier estimator.
-Recall from @sec-surv-km that the estimator is defined as:
+This last condition is often violated in survival distribution predictions, which often use semi-parametric methodology (@sec-surv-models-crank), resulting in improper distributions.
+Recall from @sec-surv-km that the Kaplan-Meier estimator is defined as:
 
 $$
 \KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{t_{(k)}}}{n_{t_{(k)}}}\right)
@@ -178,10 +188,10 @@ $$
 This only reaches zero if every individual at risk at the last observed time-point experiences the event: $d_{t_{(k)}} = n_{t_{(k)}}$.
 In practice, due to administrative censoring, there will almost always be censoring at the final time-point.
 As a result, $d_{t_{(k)}} < n_{t_{(k)}}$ and $\hatS(\infty) > 0$.
-Heuristics have been proposed to address this including linear extrapolation to zero, or dropping the curve to zero at the final time-point, however these can introduce significant bias in the estimated survival time [@han.restricted.2022, @Sonabend2022].
+Heuristics have been proposed to address this including linear extrapolation to zero, or dropping the curve to zero at the final time-point, however these can introduce significant bias in the estimated survival time [@Han2022; @Sonabend2022].
 Another possibility is to instead report the median survival time, but this is only defined if the survival curves drop below $0.5$ within the observed period, which is not guaranteed [@Haider2020].
 
-One alternative is to estimate the *restricted mean survival time* (RMST) [@han.restricted.2022; @andersen.regression.2004].
+One alternative is to estimate the *restricted mean survival time* (RMST) [@Han2022; @andersen.regression.2004].
 In contrast to @eq-darth, which integrates the survival curve over the entire time axis, the RMST places an upper-bound on the integral:
 
 $$
@@ -195,12 +205,17 @@ The RMST treats all events happening after $\tau$ as if they happened at $\tau$.
 Hence, it is a truncated expectation, estimating: $\EE[\min(Y, \tau)]$
 
 The RMST can have several uses when comparing groups but here its relevant for its ability to give a meaningful lower-bound estimate of $\EE[Y]$ in the presence of censoring.
-For example, say individuals are observed over times $[0,100]$ and administrative censoring is present in the data so that $\hatS(\infty) > 0$ and $\EE[Y]$ cannot be reliably computed.
-However, one can compute $\RMST(100)$ which gives a lower-bound estimate for the expected survival: $\RMST(100) \leq \EE[Y]$.
+For example, say individuals are observed over times $[0,100]$ and administrative censoring is present in the data, then $\hatS(\tau)$ is unknown for $\tau > 100$ and $\EE[Y]$ cannot be reliably computed.
+However, one can compute $\RMST(100)$ which provides a non-parametric, interpretable lower bound for the mean survival time: $\RMST(100) \leq \EE[Y]$.
 This avoids assumptions beyond $\tau=100$ and offers an interpretable prediction: "the average survival time is at least $\RMST(100)$" (@fig-survtsk-rmst).
 The RMST avoids the pitfalls of computing the mean and median by remaining valid even when the predicted distribution is improper, provided that $\tau$ is chosen within the range of observed follow-up times.
 
-As a worked example, say for an individual, $i$, we have: $(t, \hatS_i(t)) = (0, 1), (1, 0.8), (2, 0.4), (3, 0.15)$ then (using a Riemann sum approximation for the integral), $\RMST(4) \approx 1 + 0.8 + 0.4 + 0.15 = 2.35$ whereas $\RMST(3) \approx 1 + 0.8 + 0.4 = 2.2$; the former is a better estimate for $\EE[Y]$.
+As a worked example, say for an individual, $i$, we have: $(t, \hatS_i(t)) = (0, 1), (1, 0.8), (2, 0.4), (3, 0.15).
+Using a Riemann sum approximation, $\RMST(3) \approx 1 + 0.8 + 0.4 = 2.2$ and $\RMST(4) \approx 1 + 0.8 + 0.4 + 0.15 = 2.35$.
+$\RMST(3)$ reflects the expected time without experiencing the event up to $\tau=3$, which means treating all observations as if the event occurred at $\tau=3$ (unless it occurred sooner).
+$\RMST(4)$ incorporates one more unit of follow-up, including the fourth survival probability in this case.
+In this way, the $\RMST(\tau)$ summarizes the average survival experience up until $\tau$, smaller values of $\tau$ emphasize near-term survival whereas larger values approach the full mean survival time (if estimable).
+The actual choice of $\tau$ varies by the use-case.
 
 ![Illustrating the RMST at the final observed time-point. The RMST is the area under the survival curve up to the point of interest. The red vertical line represents the final observed time-point, the survival curve (blue) after that point is unknown.](Figures/survtsk/rmst.png){#fig-survtsk-rmst width=80% fig-alt="Graph with 'survival probability S(t)' on the y-axis and 'Time' on the x-axis. A vertical red-line at x=100 represents the cut-off point. The area under the curve before the cut-off point is highlighted in blue, representing the RMST(100)."}
 
@@ -212,7 +227,7 @@ Applying some function $g$, which could simply be the identity function $g(x) = 
 A prognostic index can serve several purposes, including:
 
 1. Scaling or normalization: simple functions to scale the linear predictor can better support interpretation and visualisation;
-2. Capturing non-linear effects: for example the Cox PH model (@sec-models-classical) applies the transformation $g(\bseta) = \exp(\bseta)$ to capture more complex relationships between features and outcomes;
+2. Ensuring meaningful results: for example the Cox PH model (@sec-models-classical) applies the transformation $g(\bseta) = \exp(\bseta)$, which guarantees positivity of hazards as well as making the covariates multiplicative;
 3. Aiding in interpretability: in some cases this could simply be $g(\bseta) = -\bseta$ to ensure the 'higher value implies higher risk' interpretation.
 
 ### Prognostic index, risks, and times
@@ -232,7 +247,7 @@ The vast majority of survival models are composed from a group-wise survival tim
 This will be seen in detail in future chapters (particularly in @sec-boost and @sec-nn) but in general it is very common for models to assume data follows either proportional hazards or accelerated failure time (@sec-models-classical).
 In this case models are formed of two components:
 
-1. A non-parametric estimator (@sec-surv-km) that estimates the baseline hazard, $\hatbh$, or baseline survival function, $\hatbS$. Discussed further in @sec-models-classical, these are group-wise estimates that apply to the entire sample.
+1. A 'simple' model that can estimate the baseline hazard, $\hatbh$, or baseline survival function, $\hatbS$. Discussed further in @sec-models-classical, these are group-wise estimates that apply to the entire sample.
 2. A sophisticated algorithm that estimates the individual linear prediction, $\hat{\eta}$.
 
 These are composed as either:
@@ -249,11 +264,11 @@ In principle, one could apply the RMSE approach to the all-cause survival functi
 Analogous to the single-event setting, a cause-specific prognostic index can be derived from a cause-specific cumulative incidence function, and vice versa.
 One might also consider transformations based on all-cause risk, but again such approaches are rarely used in applied settings.
 
-In multi-state models, the primary prediction targets are transition probabilities between states over time.
+In multi-state models, the primary prediction targets are transition probabilities between states over time (@sec-multi-state).
 Unlike standard survival settings, there is no single notion of a 'survival time'.
 Instead, one can estimate the sojourn time, which is the expected time spent in a given state, using the estimated transition probabilities.
 This is particularly well-defined in Markov or semi-Markov models, where sojourn times follow from standard stochastic process theory.
-These derivations are beyond the scope of this book; for further detail, see for example [@ibe2013markov].
+These derivations are beyond the scope of this book; for further detail, see for example [@Ibe2013].
 
 ## Conclusion
 
@@ -274,6 +289,6 @@ These derivations are beyond the scope of this book; for further detail, see for
 ## Further reading
 
 * @Sonabend2022 reviews methods to transform distribution and ranking/survival time predictions, advantages and disadvantages of methods is discussed in brief in the appendix of @Haider2020.
-* For more on the RMST see @Uno2014, @han.restricted.2022, and @Royston2011.
+* For more on the RMST see @Uno2014, @Han2022, and @Royston2011.
 
 ::::
