@@ -100,7 +100,7 @@ All survival GBMs make ranking predictions and none are able to directly predict
 However, depending on the underlying model, the predictions may be indirectly composed into a survival distribution, for example algorithms that assume a proportional hazards (PH) or accelerated failure time (AFT) form.
 This section starts with those models with simpler underlying forms, then explores more complex alternatives.
 
-### PH and AFT GBMs
+### Likelihood Boosting
 
 The negative log-likelihood of the semi-parametric PH and fully-parametric AFT models can be derived from the (partial) likelihoods presented in @sec-surv-estimation-param.
 Boosting algorithms use these losses to train the model coefficients, $\bsbeta$, hence at each iteration in the algorithm, $g_m(\xx_i) = \xx_i\bsbeta^{(m)}$, where $\bsbeta^{(m)}$ are the updated coefficients in iteration $m$.
@@ -152,9 +152,63 @@ $\sigma_0$ is commonly initialized as $1$ [@Schmid2008b].
 As well as boosting fully-parametric AFTs, one could also consider boosting semi-parametric AFTs, for example using the Gehan loss [@Johnson2011] or using Buckley-James imputation [@Wang2010].
 However, known problems with semi-parametric AFT models and the Buckey-James procedure [@Wei1992], as well as a lack of off-shelf implementation, mean that these methods are rarely used in practice.
 
-### Discrimination Boosting
+The flexibility of boosting means extensions to other censoring and truncation types follows simply by replacing the likelihood functions above with the corresponding objective functions in @sec-surv-estimation-param.
 
-Instead of optimising models based on a given model form, one could instead estimate $\hat{\eta}$ by optimizing a concordance index, such as Uno's or Harrell's C [@Chen2013;@Mayr2014].
+#### Penalized Boosting {.unnumbered .unlisted}
+
+'CoxBoost' is an alternative method to boost Cox models and has been demonstrated to perform well in experiments.
+This algorithm boosts the Cox PH by optimising the penalized partial-log likelihood; additionally the algorithm allows for mandatory (or 'forced') covariates  [@Binder2008].
+In medical domains the inclusion of mandatory covariates may be essential, either for model interpretability, or due to prior expert knowledge.
+CoxBoost deviates from the algorithm presented above by instead using an offset-based approach for generalized linear models [@Tutz2007].
+
+Let $\calI = \{1,...,p\}$ be the indices of the covariates, let $\calI_{mand}$ be the indices of the mandatory covariates that must be included in all iterations, and let $\calI_{opt} = \calI \setminus \calI_{mand}$ be the indices of the optional covariates that may be included in any iteration.
+In the $m$th iteration, the algorithm fits a weak learner on all mandatory covariates and *one* optional covariate:
+$$
+\calI_m = \calI_{mand} \cup \{x | x \in \calI_{opt}\}
+$$
+
+In addition, a penalty matrix $\mathbf{P} \in \Reals^{p \times p}$ is considered such that $P_{ii} > 0$ implies that covariate $i$ is penalized and $P_{ii} = 0$ means no penalization.
+In practice, this is usually a diagonal matrix  [@Binder2008] and by setting $P_{ii} = 0, i \in I_{mand}$ and $P_{ii} > 0, i \not\in I_{mand}$, only optional (non-mandatory) covariates are penalized.
+The penalty matrix *can* vary with each iteration, which allows for a highly flexible approach.
+However, in implementation a simpler approach is to use the same penalty in each iteration, which could be a single number, so the same penalty is applied to all penalized covariates, or a single matrix, such that the penalty differs between covariates but stays the same in each iteration [@pkgcoxboost].
+
+At the $m$th iteration and the $k$th set of indices to consider ($k = 1,...,p$), the loss to optimize is the penalized partial-log likelihood given by
+$$
+\begin{split}
+&l_{pen}(\gamma_{mk}) = \sum^n_{i=1} \delta_i \Big[\eta_{i,m-1} + \xx_{i,\calI_{mk}}\gamma^\trans_{mk}\Big] - \\
+&\quad\delta_i\log\Big(\sum^n_{j = 1} \II(t_j \leq t_i) \exp(\eta_{i,{m-1}} + \xx_{i, \calI_{mk}}\gamma^\trans_{mk}\Big) - \lambda\gamma_{mk}\mathbf{P}_{mk}\gamma^\trans_{mk}
+\end{split}
+$$ {#eq-coxboost}
+
+where $\eta_{i,m} = \xx_i\beta_m$, $\gamma_{mk}$ are the coefficients corresponding to the covariates in $\calI_{mk}$ which is the possible set of candidates for a subset of total candidates $k = 1,...,p$; $\mathbf{P}_{mk}$ is the penalty matrix; and $\lambda$ is a penalty hyper-parameter to be tuned or selected.\footnote{On notation, note that $\mathbf{P}_{ij}$ refers to the penalty matrix in the $i$th iteration for the $j$th set of indices, whereas $P_{ij}$ is the $(i,j)$th element in the matrix $\mathbf{P}$.}
+
+In each iteration, all potential candidate sets (the union of mandatory covariates and one other covariate) are updated by
+$$
+\hat{\gamma}_{mk} = \mathbf{I}^{-1}_{pen}(\hat{\gamma}_{(m-1)k})U(\hat{\gamma}_{(m-1)k})
+$$
+where $U(\gamma) = \partial l / \partial \gamma (\gamma)$ and $\mathbf{I}^{-1}_{pen} = \partial^2 l/\partial\gamma\partial\gamma^T (\gamma + \lambda\mathbf{P}_{(m-1)k})$ are the first and second derivatives of the unpenalized partial-log-likelihood.
+This is the key difference between CoxBoost and standard gradient boosting as CoxBoost uses updates based on Fisher scoring iterations (including both the first and the second derivatives), whereas the latter only makes use of the gradient (first derivative).
+
+The optimal set is then found as
+$$
+k^* := \argmax_k \ l_{pen}(\hat{\gamma}_{mk})
+$$
+and the estimated coefficients are updated with
+$$
+\hat{\beta}_m = \hat{\beta}_{m-1} + \hat{\gamma}_{mk^*}, \quad k^* \in \calI_{mk}
+$$
+
+This deviates from the standard GBM algorithm by directly optimizing $l_{pen}$ and not its gradient, additionally model coefficients are iteratively updated instead of a more general model form.
+
+CoxBoost is extended to the competing risks setting by boosting a subdistribution PH model [@Binder2009].
+In this setting, @eq-coxboost is replaced by the log-likelihood from the Fine and Gray model (@sec-classical-ph-cr) with an analogous penalty function.
+The rest of the procedure follows the same.
+
+### Loss Boosting
+
+Instead of optimising models based on a given model form, one could instead estimate $\hat{\eta}$ by optimizing a loss (Part II).
+Common loss choices are discrimination measures, such as Uno's or Harrell's C [@Chen2013;@Mayr2014].
+
 Consider Uno's C (@sec-eval-crank-disc-conc):
 $$
 C_U(\hat{g}, \dtrain) = \frac{\sum_{i \neq j}\delta_i\{\KMG(t_i)\}^{-2}\II(t_i < t_j)\II(\hatg(\xx_i) >\hatg(\xx_j))}{\sum_{i \neq j}\delta_i\{\KMG(t_i)\}^{-2}\II(t_i < t_j)}
@@ -162,7 +216,7 @@ $$
 
 where $\KMG$ is again the Kaplan-Meier estimate of the censoring distribution.
 
-The GBM algorithm requires that the chosen loss, here $C_U$, be differentiable with respect to $\hatg(X)$, which is not the case here due to the indicator term, $\II(\hatg(X_i) > \hatg(X_j))$, however this term can be replaced with a sigmoid function to create a differentiable loss [@Ma2006]
+The GBM algorithm requires that the chosen loss, here $C_U$, be differentiable with respect to $\hatg(X)$, which is not the case due to the indicator term, $\II(\hatg(X_i) > \hatg(X_j))$, however this term can be replaced with a sigmoid function to create a differentiable loss [@Ma2006]:
 
 $$
 K(u|\omega) = \frac{1}{1 + \exp(-u/\omega)}
@@ -187,56 +241,11 @@ $$
 r_{im} := - \sum^n_{j = 1} k_{ij} \frac{-\exp(\frac{\hatg_{m-1}(\xx_j) - \hatg_{m-1}(\xx_i)}{\omega})}{\omega(1 + \exp(\frac{\hatg_{m-1}(\xx_j) - \hatg_{m-1}(\xx_i)}{\omega}))}
 $$ {#eq-surv-gbm-cus-grad}
 
-The GBM algorithm is then followed as normal with the above loss and gradient.
+The GBM algorithm is then followed as normal with the above loss (@eq-surv-gbm-cus) and gradient (@eq-surv-gbm-cus-grad).
 This algorithm may be more insensitive to overfitting than others [@Mayr2016], however stability selection  [@Meinshausen2010], which is implemented in off-shelf software packages [@pkgmboost], can be considered for variable selection.
 
-### CoxBoost
-
-Finally, 'CoxBoost' is an alternative method to boost Cox models and has been demonstrated to perform well in experiments.
-This algorithm boosts the Cox PH by optimising the penalized partial-log likelihood; additionally the algorithm allows for mandatory (or 'forced') covariates  [@Binder2008].
-In medical domains the inclusion of mandatory covariates may be essential, either for model interpretability, or due to prior expert knowledge.
-CoxBoost deviates from the algorithm presented above by instead using an offset-based approach for generalized linear models [@Tutz2007].
-
-Let $\calI = \{1,...,p\}$ be the indices of the covariates, let $\calI_{mand}$ be the indices of the mandatory covariates that must be included in all iterations, and let $\calI_{opt} = \calI \setminus \calI_{mand}$ be the indices of the optional covariates that may be included in any iteration.
-In the $m$th iteration, the algorithm fits a weak learner on all mandatory covariates and *one* optional covariate:
-$$
-\calI_m = \calI_{mand} \cup \{x | x \in \calI_{opt}\}
-$$
-
-In addition, a penalty matrix $\mathbf{P} \in \Reals^{p \times p}$ is considered such that $P_{ii} > 0$ implies that covariate $i$ is penalized and $P_{ii} = 0$ means no penalization.
-In practice, this is usually a diagonal matrix  [@Binder2008] and by setting $P_{ii} = 0, i \in I_{mand}$ and $P_{ii} > 0, i \not\in I_{mand}$, only optional (non-mandatory) covariates are penalized.
-The penalty matrix *can* vary with each iteration, which allows for a highly flexible approach.
-However, in implementation a simpler approach is to use the same penalty in each iteration, which could be a single number, so the same penalty is applied to all penalized covariates, or a single matrix, such that the penalty differs between covariates but stays the same in each iteration [@pkgcoxboost].
-
-At the $m$th iteration and the $k$th set of indices to consider ($k = 1,...,p$), the loss to optimize is the penalized partial-log likelihood given by
-$$
-\begin{split}
-&l_{pen}(\gamma_{mk}) = \sum^n_{i=1} \delta_i \Big[\eta_{i,m-1} + \xx_{i,\calI_{mk}}\gamma^\trans_{mk}\Big] - \\
-&\quad\delta_i\log\Big(\sum^n_{j = 1} \II(t_j \leq t_i) \exp(\eta_{i,{m-1}} + \xx_{i, \calI_{mk}}\gamma^\trans_{mk}\Big) - \lambda\gamma_{mk}\mathbf{P}_{mk}\gamma^\trans_{mk}
-\end{split}
-$$
-
-where $\eta_{i,m} = \xx_i\beta_m$, $\gamma_{mk}$ are the coefficients corresponding to the covariates in $\calI_{mk}$ which is the possible set of candidates for a subset of total candidates $k = 1,...,p$; $\mathbf{P}_{mk}$ is the penalty matrix; and $\lambda$ is a penalty hyper-parameter to be tuned or selected.\footnote{On notation, note that $\mathbf{P}_{ij}$ refers to the penalty matrix in the $i$th iteration for the $j$th set of indices, whereas $P_{ij}$ is the $(i,j)$th element in the matrix $\mathbf{P}$.}
-
-In each iteration, all potential candidate sets (the union of mandatory covariates and one other covariate) are updated by
-$$
-\hat{\gamma}_{mk} = \mathbf{I}^{-1}_{pen}(\hat{\gamma}_{(m-1)k})U(\hat{\gamma}_{(m-1)k})
-$$
-where $U(\gamma) = \partial l / \partial \gamma (\gamma)$ and $\mathbf{I}^{-1}_{pen} = \partial^2 l/\partial\gamma\partial\gamma^T (\gamma + \lambda\mathbf{P}_{(m-1)k})$ are the first and second derivatives of the unpenalized partial-log-likelihood.
-This is the key difference between CoxBoost and standard gradient boosting as CoxBoost uses updates based on Fisher scoring iterations (including both the first and the second derivatives), whereas the latter only makes use of the gradient (first derivative).
-
-The optimal set is then found as
-$$
-k^* := \argmax_k \ l_{pen}(\hat{\gamma}_{mk})
-$$
-and the estimated coefficients are updated with
-$$
-\hat{\beta}_m = \hat{\beta}_{m-1} + \hat{\gamma}_{mk^*}, \quad k^* \in \calI_{mk}
-$$
-
-This deviates from the standard GBM algorithm by directly optimizing $l_{pen}$ and not its gradient, additionally model coefficients are iteratively updated instead of a more general model form.
-
-CoxBoost is extended to the competing risks setting by modelling the subdistribution hazards under a Fine and Gray model [@Binder2009].
+Similarly to likelihood boosting, flexibility is again a key advantage here for extensions to other censoring and truncation types and also to competing risks.
+For example, the all-cause logarithmic score introduced in @sec-rules-ext can be used to boost survival models that optimize overall predictive ability [@Alberge2025].
 
 ## Conclusion
 
