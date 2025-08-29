@@ -200,24 +200,25 @@ The log-rank *score* rule  [@Hothorn2003] is a standardized version of the log-r
 Alternative dissimiliarity measures and tests have also been suggested as splitting rules, including modified Kolmogorov-Smirnov test and Gehan-Wilcoxon tests  [@Ciampi1988].
 Simulation studies have demonstrated that both of these may have higher power and produce 'better' results than the log-rank statistic  [@Fleming1980], however neither appears to be commonly used.
 
-In a competing risk setting, Gray's test [@Gray1988] can be used instead of the log-rank test, as it compares cumulative incidence functions rather than all-cause hazards.
-Similarly to the log-rank test, Gray's test also compares survival distributions using hypothesis tests to determine if there are significant differences between the groups, thus making it a suitable option to build competing risk RSFs.
+In a competing risk setting, either the per-cause log-rank test or Gray's test [@Gray1988] can be used.
+The former computes the weighted difference between cause-specific Nelson-Aalen estimates in the two leaves; the latter compares cumulative incidence functions and hence might be preferred as the CIF is often the prediction of interest in competing risks settings [@Ishwaran2014].
 
 #### Alternative Splitting Rules {.unnumbered .unlisted}
 
-A common alternative to the log-rank test is to instead use *likelihood ratio*, or *deviance*, statistics.
-When building RSFs, the likelihood-ratio statistic can be used to test if the model fit is improved or worsened with each split, thus providing a way to partition data.
-However, as discussed in @sec-surv-estimation-param, there are many different likelihoods that can be assumed for survival data, and there is no obvious way to determine if one is more sensible than another.
-Furthermore the choice of likelihood must fit the underlying model assumptions.
-For example, one could assume the data fits the proportional hazards assumption and in each split one could calculate the likelihood-ratio using the Cox PH partial likelihood.
-Alternatively, a parametric form could be assumed and a likelihood proposed by @LeBlanc1992 may be calculated to test model fit.
-While potentially useful, these methods are implemented in very few off-shelf software packages, thus empirical comparisons to other splitting rules are lacking.
-
-Other rules have also been studied including comparison of residuals  [@Therneau1990], scoring rules [@pkgrfsrc], distance metrics [@Gordon1985], and concordance metrics [@Schmid2016].
-Experiments have shown different splitting rules may perform better or worse depending on the underlying data [@Schmid2016], hence one could even consider treating the splitting rule as a hyper-parameter for tuning.
-However, if there is a clear goal in prediction, then the choice of splitting rule can be informed by the prediction type.
-For example, if the goal is to maximise separation, then a log-rank splitting rule to maximise homogeneity in terminal nodes is a natural starting point.
+A splitting rule is simply a way to measure if performance increases after data splitting.
+Therefore, there are many statistics that could be used for this purpose, including many of the metrics referenced in Part II [@pkgrfsrc; @Gordon1985; @Schmid2016].
+Like many other aspects of modelling, experiments have shown that the choice of splitting rules is data dependent [@Schmid2016].
+When using loss-based splitting rules, the most sensible approach is to align the splitting rule with the prediction problem.
+For example, if the goal is to maximize separation, then a log-rank splitting rule to maximize homogeneity in terminal nodes is a natural starting point.
 Whereas if the goal is to accurately rank observations, then a concordance splitting rule may be optimal.
+In the presence of other censoring and truncation types, losses can be selected that accommodate these extended settings.
+
+An alternative to hypothesis testing and loss-based rules is to instead use *likelihood ratio*, or *deviance*, statistics [@LeBlanc1992].
+The likelihood-ratio statistic can be used as a splitting rule to test if the model fit to the data is improved or worsened with each split.
+This approach can be tricky as one must assume a parametric form for the data and select the likelihood (@sec-surv-estimation-param) that best fits this form, including taking into account different forms of censoring and truncation. 
+Theoretically likelihood splitting rules could lead to a model that is a better fit for the data.
+However, the premise of random forests is that they are built on weak learners, so optimizing for a close fit in each individual decision tree may be unnecessary.
+Moreover, likelihood methods are implemented in few off-shelf software packages and there is limited research formally comparing them to other splitting rules.
 
 ### Terminal Node Prediction {#sec-surv-ml-models-ranfor-nodes}
 
@@ -256,7 +257,7 @@ $$
 F(x) = \sum^n_{i=1} w_i F_i(x)
 $$
 
-Subsituting $F = 1 - S$ and noting $\sum w_i = 1$ gives the computation $S(x) = \sum^n_{i=1} w_i S_i(x)$, allowing the bootstrapped survival function to exactly represent the mixture distribution averaged over all trees:
+Substituting $F = 1 - S$ and noting $\sum w_i = 1$ gives the computation $S(x) = \sum^n_{i=1} w_i S_i(x)$, allowing the bootstrapped survival function to exactly represent the mixture distribution averaged over all trees:
 
 $$
 \hat{S}_{Boot}(\tau|\xx^*) = \frac{1}{B} \sum^B_{b=1} w_i\hat{S}_b(\tau|\xx^*)
@@ -274,14 +275,17 @@ $$ {#eq-surv-nelson-boot}
 Another practical consideration to take into account is how to average the survival probabilities over the decision trees as each individual Kaplan-Meier estimate may have been trained on different time points.
 This is overcome by recognising that the Kaplan-Meier estimation results in a piece-wise function that can be linearly interpolated between training data.
 @fig-surv-ranfor-bootstrap demonstrates this process for three decision trees (panel a), where the survival probability is calculated at all possible time points (panels b-c), and the average is computed with linear interpolation added between time-points (panel d).
+In other censoring and truncation settings, the estimator in the final node can be replaced by the nonparametric maximum likelihood estimator or left-truncated risk set (@sec-surv-estimation-non-param).
+
+In the competing risks setting, one predicts the bootstrapped cause-specific cumulative incidence function [@Ishwaran2014]:
+
+$$
+\hat{F}_{e;Boot}(\tau|\xx^*) = \frac{1}{B} \sum^B_{b=1} w_i\hat{F}_{e;b}(\tau|\xx^*) \quad\quad e = 1,...,q
+$$
+
+for $q$ causes. With $\hat{F}_{e;b}$ estimated using the Aalan-Johansen estimator in the terminal nodes (@sec-aalen-johanson).
 
 ![Bootstrapping Kaplan-Meier estimators across three decision trees (red, blue, green). Panel a) shows the individual estimates, b) shows the time points to aggregate the trees over, c) is the predicted survival probability from each tree at the desired time points, and d) is the average survival probabilities connected by a step function.](Figures/forests/bootstrap.png){#fig-surv-ranfor-bootstrap fig-alt="Four panels with 't' on x-axis and 'S(t)' on y-axis. Panel a) shows three survival functions as piece-wise linearly decreasing step functions. Panel (b) shows the same but with vertical dotted lines added at all time-points. Panel (c) shows dots at each of the intersections between the vertical lines and the plotted decision trees. Panel (d) shows a single line with dots which are the average of the points in panel (c)."}
-
-Extensions to competing risks follow naturally using bootstrapped cause-specific cumulative incidence functions.
-
-<!-- FIXME - ANDREAS TO ADD DETAILS ON COMPETING RISKS -->
-
-
 
 #### Deterministic Predictions {.unnumbered .unlisted}
 
@@ -298,16 +302,25 @@ $$
 \phi_{b(h)}(\xx^*) = \sum_{i \in \calU_O} \hatH_{b(h)}(t_i|\xx^*)
 $$
 
-where $\hatH_{b(h)}$ is the terminal node prediction as in @eq-surv-nelson.
+where $\hatH_{b(h)}$ is the terminal node prediction as in (@eq-surv-nelson).
 This is interpreted as the number of expected events in $b(h)$ and the assumption is that a terminal node with more expected events is a higher risk group than a node with less expected events.
 The bootstrapped risk prediction is the sample mean over all trees:
 
 $$
 \phi_{Boot}(\xx^*) = \frac{1}{B} \sum^B_{b=1} \phi_{b(h)}(\xx^*)
-$$
+$$ {#eq-phi-boot}
 
 More complex methods have also been proposed that are based on the likelihood-based splitting rule and assume a PH model form  [@Ishwaran2004; @LeBlanc1992].
 However, these do not appear to be in wide-spread usage.
+
+In the competing risks setting @Ishwaran2014 propose a similar metric using the predicted CIFs:
+
+$$
+\phi_{e;b(h)}(\xx^*) = \int^{\tau^*}_0 \hat{F}_{e;b(h)}(\tau|\xx^*) \ d\tau
+$$
+
+where $\tau^*$ is suggested to be the end of the study period.
+$\phi_{e;Boot}(\xx^*)$ is computed as in (@eq-phi-boot).
 
 ## Conclusion
 
