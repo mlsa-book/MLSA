@@ -26,5 +26,8 @@ pdf:
 	quarto render book/ --to pdf --cache-refresh
 
 bibtex:
-	biber --tool --output-align --output-indent=2 --output-fieldcase=lower book/library.bib -O book/library.bib
+	biber --tool --output-align --output-indent=2 --output-fieldcase=lower  book/library.bib -O book/library.bib
 	rm book/library.bib.blg
+
+bibtek: bibtex
+
