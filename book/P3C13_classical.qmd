@@ -158,22 +158,21 @@ Given these formulas, one can make relative risk predictions (@sec-survtsk) as w
 However, to make a full survival distribution prediction, the baseline hazard must be considered.
 
 The baseline hazard, $h_0$, captures the average (baseline) risk for all observations at a given time-point.
-In complex machine learning algorithms, the Kaplan-Meier estimator is often used to estimate the baseline survival, $S_0$, the hazard then follows from $h_0(\tau) = -S'(\tau)/S(\tau)$.
-However, in the case of the Cox model, the conditional non-parametric Breslow estimator [@Cox1975] is more suitable as it accounts for covariates and is directly related to the partial likelihood function (@eq-partial):
+The Breslow estimator [@Cox1975] provides a way to obtain an estimate of the cumulative baseline hazard based on the covariate effect estimates obtained from the partial likelihood (@eq-partial):
 
 $$
 \hat{H}_{Bres}(\tau) = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} \exp(\hat{\eta}_j)}
 $$ {#eq-breslow}
 
 where $\hat{\eta}_j$ is the estimated linear predictor for observation $j$.
-Note that if the value for all covariates was zero, which one could think of equivalent as there being no covariates, then the Breslow estimator is identical to the Nelson-Aalen estimator:
+Note that if the value for all covariates or their effects was zero, or if there were no covariates, then the Breslow estimator is identical to the Nelson-Aalen estimator:
 
 $$
 \hat{H}_{Bres}(\tau) = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} 1} = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{n_{\tbk}} = \hat{H}_{NA}(\tau)
 $$
 
 With these formulae, the Cox PH can be used as a predictive model by using training data to estimate $\hat{\bsbeta}$ with (@eq-partial).
-These fitted coefficients are then used to predict $\hat{\bseta}$ for new observations and finally the cumulative baseline hazard is computed with (@eq-breslow) to return a predicted distribution.
+These fitted coefficients are then used to predict $\hat{\bseta}$ for new observations and finally the cumulative baseline hazard is computed with (@eq-breslow) to return a predicted distribution, for example the survival probability (@eq-surv-cox) via (@eq-surv-cum) and (@eq-surv-haz).
 
 The Cox model is a powerful tool that is constantly being found to outperform machine learning models [@Gensheimer2018; @Luxhoj1997; @VanBelle2011b].
 Moreover, it is highly interpretable and as such has a long history of usage in clinical prediction modelling and analysis.
@@ -184,22 +183,22 @@ In a predictive setting, it also may not matter if the PH assumption is violated
 
 ### Parametric PH
 
-The baseline hazard is advantageous as it removes any burden to assume a particular underlying probability distribution.
+Semi-parametric approaches (like the Cox model) are popular because they don't make an assumption about the underlying distribution of event times, leaving the baseline hazard unspecified.
 However, there are some cases where modelling a particular distribution may make sense.
-On these occasions, the baseline hazard can be replaced by the hazard function corresponding to a particular probability distribution, with three common choices [@Kalbfleisch2011; @Wang2017] being the Exponential, Gompertz, and Weibull distributions.
+On these occasions, a particular probability distribution of the event times is assumed, with three common choices [@Kalbfleisch2011; @Wang2017] being the Exponential, Gompertz, and Weibull distributions.
 The Weibull distribution is particularly important as it reduces to the Exponential distribution when the shape parameter equals $1$ and moreover it is the only distribution for which both the proportional hazards and accelerated failure time assumptions can hold true.
 
 Assuming a PH model one can plug in the hazard and survival functions from the Weibull distribution into @eq-cox and @eq-cox-surv respectively.
 First recall for a $\Weib(\gamma, \lambda)$ distribution with shape parameter $\gamma$ and scale parameter $\lambda$, the relevant functions can be given by [@KalbfleischPrentice1973]:
 
 $$
-h(x) = \lambda\gamma x^{\gamma-1}
+h(\tau) = \lambda\gamma \tau^{\gamma-1}
 $$
 
 and
 
 $$
-S(x) = \exp(-\lambda x^\gamma)
+S(\tau) = \exp(-\lambda \tau^\gamma)
 $$
 
 Taking these to be the baseline hazard and survival functions respectively, they can be substituted into the Cox model as follows:
@@ -214,7 +213,7 @@ $$
 S_{WeibullPH}(\tau|\xx_i)= (\exp(-\lambda \tau^\gamma))^{\exp(\eta_i)}
 $$
 
-Finally, these formulae can now be used to define the full likelihood (@sec-surv-estimation-param) for the WeibullPH model:
+Finally, these formulae can be used to define the full likelihood (@sec-surv-estimation-param) for the WeibullPH model (here for right-censored data):
 
 $$
 \begin{aligned}
@@ -232,7 +231,7 @@ $$
 \end{aligned}
 $$
 
-These likelihoods can be passed into machine learning models that are constructed around closed-form likelihood expressions to be optimized, for example in boosting (@sec-boost) and neural networks (@sec-nnet).
+These likelihoods can be optimized using any suitable method, for example Newton-Raphson or Fisher-Scoring (which require first and second deriviatives) or machine learning approaches like boosting (@sec-boost) and neural networks (@sec-nnet).
 Parameters can then be fit using maximum likelihood estimation (MLE) with respect to all unknown parameters $\bstheta = \{\bsbeta, \gamma, \lambda\}$.
 Expansion to other censoring types and truncation follows by using other likelihood forms presented in @sec-surv-estimation.
 
@@ -413,7 +412,7 @@ Firstly, $\exp(-\eta_i)$ is modelled instead of $\exp(\eta_i)$, hence in a PH mo
 Secondly, the baseline risk now clearly depends on both time and the linear predictor.
 Thirdly, an increase in a covariate results in a multiplicative increase over *time* compared to the PH model in which the hazard is increased -- this is often seen as more intuitive to understand than hazard ratio, especially to clinicians who may be more interested in survival times and not abstract relative risks.
 
-This third point is visualised in @fig-phaft in which a covariate is increase by $\log(2)$.
+This third point is visualised in @fig-phaft in which a covariate is increased by $\log(2)$.
 The left panel shows that the estimated hazard function from a PH model is double the baseline at all time points -- the multiplicative effect is seen on the y-axis (risk).
 In contrast, the right panel shows how the survival function from an AFT model decreases at double the speed to the baseline -- the multiplicative effects is now on the x-axis (time).
 Another way to demonstrate this effect is through the log-linear form of the accelerated failure time model:
@@ -548,7 +547,7 @@ The model was designed to keep the form of the PH or PO methods but without bein
 This is achieved by fitting natural cubic splines in place of the baseline hazard.
 
 The crux of the method is to use splines to model time on a log-scale and to either estimate the log cumulative Hazard for PH models,or the log Odds for PO models.
-The flexible PH model assumes a Weibull For the flexible PH model, a Weibull distribution is the basis for the baseline distribution and a Log-logistic distribution for the baseline odds in the flexible PO model.
+For the flexible PH model, a Weibull distribution is the basis for the baseline distribution, whereas a Log-logistic distribution is assumed for the baseline odds in the flexible PO model.
 The exact derivation of the model requires a lot of mathematical exposition which is not included here, a very good summary of the model is given in @Collett2014. 
 Instead, below is the model in its full form with an explanation of the variables and figures that demonstrate cubic splines.
 
@@ -611,18 +610,18 @@ These are split into methods for:
 
 ### Non-linear effects
 
-One of the major limitations of traditional statistical models is the assumption of a rigid, linear relationship between covariates and outcomes.
+One of the major limitations of the models discussed so far is the assumption of a linear relationship between covariates and outcomes (on the scale of the predictor).
 At first one might view the Cox model as non-linear due to the presence of the exponential function.
 However, the linearity becomes clear when the model is equivalently expressed as:
 
 $$
-\log\left(\frac{h_i(\tau|\xx_i)}{h_0(\tau)}\right) = x_1\beta_1 + ... x_p\beta_p
+\log\left(\frac{h(\tau|\xx_i)}{h_0(\tau)}\right) = x_1\beta_1 + ... x_p\beta_p
 $$
 
 Consider modelling the time until disease progression with covariates age (continuous) and treatment (binary):
 
 $$
-\log\left(\frac{h_i(\tau|\xx_i)}{h_0(\tau)}\right) = x_{age}\beta_{age} x_{trt}\beta_{trt}
+\log\left(\frac{h(\tau|\xx_i)}{h_0(\tau)}\right) = x_{age_i}\beta_{age} + x_{trt_i}\beta_{trt}
 $$
 
 In this form, increasing age from $1$ to $21$ or $81$ to $101$ has the same effect on the log hazard ratio; this is clearly not realistic.
@@ -649,15 +648,15 @@ In these cases, using all variables for modelling results in worse interpretabil
 To improve model performance, one can therefore 'help' models by applying feature selection methods to reduce the number of variables in the dataset.
 Feature selection is often grouped into three categories: 1) filters; 2) wrappers; and 3) embedded methods.
 Wrappers fit multiple models on subsets of variables and select the best performing subsets, this is often computationally infeasible in the context of very large datasets, and as such have less relevance in survival analysis which often tackles very high-dimensional datasets such as genomic datasets and detailed time-series economic data.
-This section only looks at methods specific to survival analysis and does not consider general algorithms such as PCA, see further reading below for suggested additional reading that covers these areas.
+This section only looks at methods specific to survival analysis and does not consider general algorithms such as PCA, see further reading below for suggested additional material that covers these areas.
 
 #### Embedded methods {.unlisted .unnumbered}
 Embedded methods refers to those that are incorporated during model fitting.
 The vast majority of machine learning models incorporate embedded methods and thus reduce a dataset's size as part of the training process.
-In contrast, classical models do not apply any form of feature selection and therefore can perform poorly when there is a large number of variables in a dataset.
+In contrast, models that do not apply any form of feature selection will perform poorly when there is a large number of variables in a dataset.
 One model that straddles the line of 'classic' and 'machine learning' methodology is the elastic Cox model, which incorporates the 'lasso' and 'ridge' regularization methods.
-Given a generic learning algorithm, lasso and ridge regularization respectively constrain the model coefficients subject to the $\cal{l}^1$-norm and $\cal{l}^2$-norm respectively.
-In survival analysis, the Lasso-Cox [@Tibshirani1997] model fits the usual Cox model in (@eq-cox) by estimating $\bsbeta$ as
+Given a generic learning algorithm, lasso and ridge regularization constrain the model coefficients subject to the $\cal{l}^1$-norm and $\cal{l}^2$-norm respectively.
+The Lasso-Cox [@Tibshirani1997] model fits the Cox model in (@eq-cox) by estimating $\bsbeta$ as
 
 $$
 \hat{\bsbeta} = \argmax \calL(\bsbeta); \text{ subject to } \sum |\beta_j| \leq \gamma
@@ -693,13 +692,11 @@ S(\xx_{;j}) = \text{Var}(\xx_{;j})
 $$
 
 where $\xx_{;j}$ is the $j$th variable in the data and $S$ is the resulting score.
-The filter measures the amount of variance in the feature and removes features that have little variation, as these do not significantly impact the outcome.
+The filter measures the amount of variance in the feature and removes features that have little variation.
 
-Another common filter method is to train another model and make use of its embedded feature selection and pass these results to a simpler classical model.
+Another common filter method is to train another model and make use of its embedded feature selection and pass these results to a simpler model.
 This allows a classical model to be trained on relevant features without loss to interpretability or performance.
 Common choices for models to use in the first step of th pipeline include random forests (@sec-ranfor) and gradient boosting machines (@sec-boost).
-One could also use a Cox model by fitting the model then significance testing the features and removing those that are not significant.
-However this does not appear to be an improvement over using an embedded regularization method [@Spooner2020].
 
 ### Ensemble methods
 
@@ -712,7 +709,7 @@ Note that nested cross-validation should be used when fitting any of the models 
 
 The simplest ensemble method is to fit multiple models on the same data and make predictions by taking an average over the individual model predictions.
 The average over predictions could be uniform, weighted with weights selected through expert knowledge, or weighted with weights optimised as hyper-parameters.
-Ensemble methods perform best when there is high variance between each model as each then captures unique information about the underlying data.
+Ensemble methods perform best when there is high variance between models as each then captures unique information about the underlying data.
 Therefore ensemble averaging is more common after first subsetting the training data and training each model on a different subset.
 
 Whilst increasing variance is beneficial, too much variance may result in worse predictions.
