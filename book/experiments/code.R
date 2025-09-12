@@ -430,13 +430,11 @@ ggsave("book/Figures/classical/compare.png", g, height = 4, units = "in",
 
 ## Humans vs dogs
 ## FIXME - CURVES SHOULD BE SMOOTH
-library(distr6)
+library(extraDistr)
 age = seq.int(1, 100, 1)
-d = dstr("Gompertz", scale = 0.00005, shape = 0.09, decorators = "ExoticStatistics")
-plot(d, "survival")
-surv = round(d$survival(x), 2)
+surv = pgompertz(age, 0.00005, 0.09, FALSE)
 ph_surv = surv^5
-aft_surv = round(d$survival(x * 5), 2)
+aft_surv = round(pgompertz(age*5, 0.00005, 0.09, FALSE), 2)
 df = data.frame(age, survival = c(surv, ph_surv, aft_surv), Species = rep(c("Human", "Dog (PH)", "Dog (AFT)"), each = 100))
 
 g <- ggplot(df, aes(x = age, y = survival, group = Species, color = Species)) + geom_line() + xlim(0, 80) + labs(x = "T", y = "S(T)") +
