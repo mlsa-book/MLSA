@@ -39,10 +39,10 @@ Finally, methods to improve traditional models through machine learning methodol
 The Kaplan-Meier estimator [@Kaplan1958] was introduced in @sec-surv-km as the step-function
 
 $$
-\KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{t_{(k)}}}{n_{t_{(k)}}}\right)
+\KMS(\tau) = \prod_{k:\tbk \leq \tau}\left(1-\frac{d_{\tbk}}{n_{\tbk}}\right)
 $$ {#eq-km-ml}
 
-where $t_{(k)}$ are ordered event times, $d_{t_{(k)}}$ and $n_{t_{(k)}}$ are the number of events and observations at risk at $t_{(k)}$ respectively.
+where $d_{t_{(k)}}$ and $n_{t_{(k)}}$ are the number of events and observations at risk at the $k$th ordered event time, $\tbk$ respectively.
 In @sec-surv-km, this was discussed as an estimator for visualizing survival distributions and for descriptive analysis.
 However, now consider how this estimator could be used as a simple predictive method.
 As an unconditional non-parametric method, the estimator assumes no distribution for survival times and ignores any covariate data.
@@ -142,16 +142,17 @@ $$ {#eq-hazratio-diff}
 Estimation of the $\beta$ terms is possible by ignoring $h_0$ as a 'nuissance parameter' and using the 'partial likelihood' function [@Cox1975]:
 
 $$
-\calL(\beta) = \prod_{k:\tbk} \Bigg(\frac{\exp(\eta_k)}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}\Bigg)
+\calL(\beta) = \prod_{k=1}^m \left(\frac{\exp(\eta_{\tbk})}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}\right)
 $$ {#eq-partial}
 
-with log-likelihood
+where $\eta_{\tbk}$ and $\calR_{\tbk}$ is the linear predictor and risk set (@sec-data-rc) at the $k$th ordered event time, $\tbk$, respectively.
+Note that the product is taken over uncensored observations only but the sum in the denominator is over all observations in the risk set (including if eventually censored).
+
+The log-likelihood is then:
 
 $$
-\call(\beta) = \sum_{k:\tbk} \Bigg(\eta_k - \log \Big(\sum_{j \in \calR_{\tbk}} \exp(\eta_j)\Big)\Bigg)
+\call(\beta) = \sum_{k=1}^m \left(\eta_{\tbk} - \log \left(\sum_{j \in \calR_{\tbk}} \exp(\eta_j)\right)\right)
 $$
-
-where $\calR_\tau := \{i: t_i \geq \tau\}$ is the risk set defined in @sec-data-rc.
 
 Given these formulas, one can make relative risk predictions (@sec-survtsk) as well as analysing patterns in the data by computing hazard ratios, which provide a method for identifying the covariates that have a significant effect on an individual's hazard.
 However, to make a full survival distribution prediction, the baseline hazard must be considered.
@@ -160,19 +161,19 @@ The baseline hazard, $h_0$, captures the average (baseline) risk for all observa
 The Breslow estimator [@Cox1975] provides a way to obtain an estimate of the cumulative baseline hazard based on the covariate effect estimates obtained from the partial likelihood (@eq-partial):
 
 $$
-\hat{H}_{Bres}(\tau) = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} \exp(\hat{\eta}_j)}
+\hat{H}_{Bres}(\tau) = \sum_{k:\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} \exp(\hat{\eta}_j)}
 $$ {#eq-breslow}
 
 where $\hat{\eta}_j$ is the estimated linear predictor for observation $j$.
 Note that if the value for all covariates or their effects was zero, or if there were no covariates, then the Breslow estimator is identical to the Nelson-Aalen estimator:
 
 $$
-\hat{H}_{Bres}(\tau) = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} 1} = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{n_{\tbk}} = \hat{H}_{NA}(\tau)
+\hat{H}_{Bres}(\tau) = \sum_{k:\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} 1} = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{n_{\tbk}} = \hat{H}_{NA}(\tau)
 $$
 
 With these formulae, the Cox PH can be used as a predictive model by using training data to estimate $\hat{\bsbeta}$ with (@eq-partial).
 These fitted coefficients are then used to predict $\hat{\bseta}$ for new observations and finally the cumulative baseline hazard is computed with (@eq-breslow) to return a predicted distribution, for example the survival probability (@eq-surv-cox) via (@eq-surv-cum) and (@eq-surv-haz).
-
+<!-- FIXME -->
 The Cox model is a powerful tool that is constantly being found to outperform machine learning models [@Gensheimer2018; @Luxhoj1997; @VanBelle2011b].
 Moreover, it is highly interpretable and as such has a long history of usage in clinical prediction modelling and analysis.
 However, the proportional hazards assumption is often violated in real life, leaving the model to be a questionable choice when used for data analysis.
@@ -258,14 +259,15 @@ Where $h_{e;0}$ is a cause-specific baseline hazard and $\eta_{e;i}$ is the caus
 The coefficients are fit by estimating $\hat{\eta}_{e;i}$ with the cause-specific partial likelihood:
 
 $$
-\calL(\bsbeta_e) = \prod_{k:\tbke} \Bigg(\frac{\exp(\eta_{e;k})}{\sum_{j \in \calR_{\tbke}} \exp(\eta_{e;j})}\Bigg)
+\calL(\bsbeta_e) = \prod_{k=1}^m \Bigg(\frac{\exp(\eta_{\tbke})}{\sum_{j \in \calR_{\tbke}} \exp(\eta_{e;j})}\Bigg)
 $$ {#eq-partial-cr}
 
 This is identical to the single-event partial likelihood in (@eq-partial), with the only difference being that the product and sum are over the ordered event times for cause $e$.
 The risk-set definition is unaltered such that $\calR_{\tbke}$ is the set of observations that have not experienced *any* cause by $\tbke$, which is the $k$th observed event time for cause $e$.
-Using the same logic, the Breslow estimator follows from (@eq-breslow) by again taking the sums over $\tbke$ instead of $\tbk$:
+Using the same logic, the Breslow estimator follows from (@eq-breslow)
+:
 $$
-\hat{H}_{Bres;e}(\tau) = \sum_{\tbke \leq \tau} \frac{d_{\tbke}}{\sum_{j \in \calR_{\tbke}} \exp(\hat{\eta}_{e;j})}
+\hat{H}_{Bres;e}(\tau) = \sum_{k:\tbke \leq \tau} \frac{d_{\tbke}}{\sum_{j \in \calR_{\tbke}} \exp(\hat{\eta}_{e;j})}
 $$ {#eq-breslow-cr}
 
 Here the baseline hazard is estimated using the Breslow estimator for the Cox semi-parametric cause-specific model.
@@ -313,10 +315,10 @@ This model form assumes that the subdistribution hazards are all proportional.
 Estimating the $\beta$ coefficients follows from a weighted, subdistribution adaptation of the partial likelihood (@eq-partial) which depends on the subdistribution risk set definition given in (@eq-riskset-sd).
 
 $$
-\calL_e(\beta) = \prod_{k:\tbke} \Bigg(\frac{\exp(\eta_k)}{\sum_{j \in \calR_{e;\tbke}} w_{kj}\exp(\eta_j)}\Bigg)
+\calL_e(\beta) = \prod_{k=1}^m \left(\frac{\exp(\eta_{\tbke})}{\sum_{j \in \calR_{e;\tbke}} w_{kj}\exp(\eta_j)}\right)
 $$ {#eq-fg-likelihood}
 
-Where $\tbke$ is the ordered event times for observations that experience event $e$.
+Where $\tbke$ is the same as in the cause-specific case.
 To account for the updated risk set definition in (@eq-riskset-sd), Fine and Gray defined the weights
 
 $$
@@ -324,7 +326,7 @@ w_{kj} := \frac{\KMG(\tbke)}{\KMG(\min\{\tbke, t_j\})}
 $$
 
 Where $\KMG$ is the Kaplan-Meier estimator fit on the censoring distribution (@sec-surv-km).
-The Fine-Gray model therefore uses inverse probability of censoring weighting (as in many measures @sec-eval-crank-conc) in order to compensate for the effect of competing events.
+The Fine-Gray model therefore uses inverse probability of censoring weighting (as in many measures in @sec-eval-crank-conc) to compensate for the effect of competing events.
 Because of the way the subdistribution risk set is defined in (@eq-riskset-sd), the denominator of (@eq-fg-likelihood) is a sum over individuals, $j \in \calR_{e;\tbke}$,  at time $\tbke$ who have either yet to experience an event ($t_j \geq \tbke$) or experienced a different event ($t_j < \tbke \wedge e_i \ne e \wedge \delta_i=1$).
 The weighting function handles these cases as follows:
 
@@ -358,7 +360,7 @@ The model in (@eq-fg-cif) is fit by estimating the baseline cumulative hazard fu
 Similarly to how the subdistribution hazard was created, estimation of $\hat{H}^{SD}$ follows by updating (@eq-breslow) to use the subdistribution risk set definition and applying the same weighting to compensate for multiple events: 
 
 $$
-\hat{H}^{SD}_{Bres;e}(\tau) = \sum_{\tbke \leq \tau} \frac{d_{\tbke}}{\sum_{j \in \calR_{e;\tbke}} w_{kj}\exp(\hat{\eta}_j)}
+\hat{H}^{SD}_{Bres;e}(\tau) = \sum_{k:\tbke \leq \tau} \frac{d_{\tbke}}{\sum_{j \in \calR_{e;\tbke}} w_{kj}\exp(\hat{\eta}_j)}
 $$ {#eq-fg-breslow}
 
 Use of the Fine-Gray model has to be carefully considered before model fitting.
