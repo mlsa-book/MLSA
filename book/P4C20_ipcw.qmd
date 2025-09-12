@@ -1,0 +1,75 @@
+---
+abstract: TODO (150-200 WORDS)
+---
+
+::: {.content-visible when-format="html"}
+{{< include _macros.tex >}}
+:::
+
+# IPCW-weighted classification
+
+The inverse probability of censoring weights (IPCW) based reduction transforms a survival task to a weighted classification task (@Vock2016).
+Conceptually, it is one of the simplest reductions, but also the least general. 
+
+Consider a survial data set $\mathcal{D} = \{(\mathbf{x}_i, y_i, \delta_i)\}_{i=1}^n$ with $\mathbf{x}_i \in \mathbb{R}^p$. 
+Sometimes practitioners are not interested in estimation of the entire event time distribution. 
+Instead, one just wants to know the probability that an event occurs until a precspecified time point $\tau$, that is 
+
+$$
+\pi(\mathbf{x}_i) = P(T \leq \tau|\mathbf{x}_i)
+$$ {#eq-binary-event-prob}
+
+It might be tempting to estimate @eq-binary-prob by defining a binary target variable
+$$
+e_i:= \mathbb{I}(y_i \leq \tau \wedge \delta_i = 1)
+$$ {#eq-binary-target}
+
+that is all observations with event before time $\tau$ are considered events (ones) and all observations non-events (zeros).
+Then one could estimate $\pi(\mathbf{x}_i)$ using any binary classification method that outputs (calibrated) probabilities as 
+$$
+\pi(\mathbf{x}_i) = P(e_i = 1|\mathbf{x}_i)
+$$ {#eq-binary-prob}
+
+This approach would actually work, if there were no censoring in the data.
+In the presence of censoring, however, @eq-binary-target is not a valid target variable, as observations censored before time $\tau$ ($\delta_i = 0 \wedge y_i < \tau$) are neither events nor non-events (as the event possibly occured between $y_i$ and $\tau$). 
+Treating those observations as non-events would introduce bias.
+
+One way to deal with this is to calculate IPC weights for each observation as 
+
+$$
+w_i = \begin{cases}
+0 & \text{if } y_i < \tau \wedge \delta_i = 0\\
+\frac{1}{\hat{G}_{KM}(\min(y_i, \tau))} & \text{else}
+\end{cases}
+$$ {#eq-ipc-weights-w_i}
+
+where $\hat{G}_{KM}$ is the Kaplan-Meier estimator of the censoring distribution.
+This means that observations censored before time $\tau$ are not considered at all, while uncensored observations will be upweighted.
+
+In order to obtain an unbiased estimate of @eq-binary-prob, these weights need to be integrated into the estimation procedure, particularly by optimizing a weighted objective function.
+
+Let $\ell_i(e_i, \pi(\mathbf{x}_i))$ be the point wise loss, then the learner needs to optimize the weighted objective function
+$$
+\mathcal{L}(\pi) = \frac{1}{n} \sum_{i=1}^n w_i \ell_i(e_i, \pi(\mathbf{x}_i))
+$$ {#eq-ipcw-loss-weighted}
+
+This implies that the learner (and its implementation) needs to be able to handle weights (which is the case for most popular machine learning methods).
+How exactly @eq-ipcw-loss-weighted looks like, will depend on the specific method of choice. 
+For example, using the Log loss (binary cross-entropy) $\ell_i(e_i, \pi(\mathbf{x}_i)) = e_i\log(\pi(\mathbf{x}_i)) + (1-e_i)\log(1 - \pi(\mathbf{x}_i))$ as loss function, 
+@eq-ipcw-loss-weighted becomes 
+$$
+\mathcal{L}(\pi) = \frac{1}{n} \sum_{i=1}^n w_i (e_i\log(\pi(\mathbf{x}_i)) + (1-e_i)\log(1 - \pi(\mathbf{x}_i))),
+$$ {#eq-ipcw-loss-weighted-logistic}
+
+which can be optimized by many implemented learners out-of-the-box without further modifications, for example logistic regression, variants of boosting algorithms (like XGBoost), Deep Learning algorithms and others. 
+For some implementations of other popular learners like decision trees or random forests, this might not be the case, however, in most implementations it is also possible to pass weights, for example in order to use the weighted Gini impurity as a splitting criterion (@Vock2016).
+
+Note that by optimizing @eq-ipcw-loss-weighted, we obtain an unbiased estimate of $\pi(\mathbf{x}_i)$. 
+However, when evaluating a specific prediction $\hat{\pi}(\mathbf{x}_i)$ on unseen test data, one cannot use standard evaluation metrics for binary classification, because the test data contains zeros (non-enevents), ones (events), but also censored observations.
+However, since we know the survival probability $\hat{S}(\tau|\mathbf{x}_i) = 1 - \hat{\pi}(\mathbf{x}_i)$ for each observation, we can use evaluation metrics for survival data discussed in part II of the book.
+
+
+
+
+
+
