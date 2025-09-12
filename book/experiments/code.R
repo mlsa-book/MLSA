@@ -318,7 +318,7 @@ inf_sub = infants |>
 
 inf_sub |> knitr::kable()
 
-# Chapter 13 - Classical models
+# Chapter 13 - Traditional models
 set.seed(2029)
 library(survival)
 library(mlr3proba)
