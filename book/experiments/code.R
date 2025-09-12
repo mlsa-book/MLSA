@@ -429,6 +429,8 @@ ggsave("book/Figures/classical/compare.png", g, height = 4, units = "in",
   dpi = 600)
 
 ## Humans vs dogs
+## FIXME - CURVES SHOULD BE SMOOTH
+library(distr6)
 age = seq.int(1, 100, 1)
 d = dstr("Gompertz", scale = 0.00005, shape = 0.09, decorators = "ExoticStatistics")
 plot(d, "survival")

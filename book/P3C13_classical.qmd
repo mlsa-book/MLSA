@@ -154,6 +154,8 @@ $$
 \call(\beta) = \sum_{k:\tbk} \Bigg(\eta_k - \log \Big(\sum_{j \in \calR_{\tbk}} \exp(\eta_j)\Big)\Bigg)
 $$
 
+where $\calR_\tau := \{i: t_i \geq \tau\}$ is the risk set defined in @sec-data-rc.
+
 Given these formulas, one can make relative risk predictions (@sec-survtsk) as well as analysing patterns in the data by computing hazard ratios, which provide a method for identifying the covariates that have a significant effect on an individual's hazard.
 However, to make a full survival distribution prediction, the baseline hazard must be considered.
 
@@ -177,7 +179,7 @@ These fitted coefficients are then used to predict $\hat{\bseta}$ for new observ
 The Cox model is a powerful tool that is constantly being found to outperform machine learning models [@Gensheimer2018; @Luxhoj1997; @VanBelle2011b].
 Moreover, it is highly interpretable and as such has a long history of usage in clinical prediction modelling and analysis.
 However, the proportional hazards assumption is often violated in real life, leaving the model to be a questionable choice when used for data analysis.
-It is possible to extend the model to handle time-varying coefficients and model stratification [@Cox1972], however it is surprisingly difficult to make meaningful and interpretable predictions from a time-varying or stratified model [@Reid1994].
+It is possible to extend the model to handle time-varying coefficients and model stratification [@Cox1972], though it is surprisingly difficult to make meaningful and interpretable predictions from a time-varying model [@Reid1994].
 
 In a predictive setting, it also may not matter if the PH assumption is violated, as long as the model is clearly demonstrated to outperform others (with less stringent assumptions) in an empirical benchmark experiment.
 
@@ -186,7 +188,8 @@ In a predictive setting, it also may not matter if the PH assumption is violated
 Semi-parametric approaches (like the Cox model) are popular because they don't make an assumption about the underlying distribution of event times, leaving the baseline hazard unspecified.
 However, there are some cases where modelling a particular distribution may make sense.
 On these occasions, a particular probability distribution of the event times is assumed, with three common choices [@Kalbfleisch2011; @Wang2017] being the Exponential, Gompertz, and Weibull distributions.
-The Weibull distribution is particularly important as it reduces to the Exponential distribution when the shape parameter equals $1$ and moreover it is the only distribution for which both the proportional hazards and accelerated failure time assumptions can hold true.
+The Weibull distribution is particularly important as it reduces to the Exponential distribution when the shape parameter equals $1$.
+Moreover, it is unique (and Exponential as a special case) in that it has both the PH and AFT property (technically a less known representation of Gompertz also has this property).
 
 Assuming a PH model one can plug in the hazard and survival functions from the Weibull distribution into @eq-cox and @eq-cox-surv respectively.
 First recall for a $\Weib(\gamma, \lambda)$ distribution with shape parameter $\gamma$ and scale parameter $\lambda$, the relevant functions can be given by [@KalbfleischPrentice1973]:
@@ -446,8 +449,7 @@ $$
 
 As stated, in practice AFTs are always fully parametric, which means $S_0$ and $h_0$ are chosen according to some specific distribution.
 Common distribution choices include Weibull, Exponential, Log-logistic, and Log-Normal  [@Kalbfleisch2011; @Wang2017].
-The Weibull distribution (and Exponential as a special case) is unique in that it has both the PH and AFT property (technically a less known representation of Gompertz also has this property).
-Therefore, selecting an alterative distribution, for example log-logistic or log-normal, can be particular useful if the PH assumption does not hold up.
+Therefore, selecting an alternative distribution, for example log-logistic or log-normal, can be particularly useful if the PH assumption does not hold up.
 The hazard function of the log-logistic distribution is plotted in @fig-logloghaz, note the hazard is non-monotonic, allowing non-PH representations to be modelled where the risk of an event may increase before decreasing, or vice versa.
 When distributions are well-specified and the PH assumption is violated, AFTs can outperform PH alternatives [@Patel2006; @Qi2009; @Zare2015].
 
@@ -518,13 +520,13 @@ $$
 
 where $O_0$ is the baseline odds.
 
-Clearly by the same logic as in the proportional hazads model, this model assumes $O(\tau|\xx_i) \propto \eta_i$ and that a unit increase in a covariate is a multiplicative increase in the odds of survival after a given time.
-Perhaps the most useful feature of the model is convergence of hazard functions, which states $h_i(\tau)/h_0(\tau) \rightarrow 1$ as $\tau \rightarrow \infty$ [@Kirmani2001].
+By the same logic as the proportional hazards model, this model assumes $O(\tau|\xx_i) \propto \exp(\eta_i)$ and that a unit increase in a covariate multiplies the odds of surviving past $t$ by $\exp(\eta_i)$.
+A useful implication is the convergence of hazard functions, which states $h_i(\tau)/h_0(\tau) \rightarrow 1$ as $\tau \rightarrow \infty$ [@Kirmani2001].
 To see this note that the PO model can be represented in terms of the hazard function via [@Collett2014]
 
 $$
 h_{PO}(\tau|\xx_i) =  h_0(\tau)\Bigg(1 - \frac{S_0(\tau)}{(\exp(\eta_i) - 1)^{-1} + S_0(\tau)} \Bigg)
-$$
+$$ {#eq-po}
 
 Dividing by the baseline hazard yields
 
@@ -533,10 +535,26 @@ $$
 $$
 
 Simplifying gives $(1 + S_0(\tau)(\exp(\eta_i) - 1))^{-1}$.
-As $S_0(\tau) \rightarrow 0$ as $\tau \rightarrow \infty$ it follows that the hazard ratio tends to $1$ as $\tau$ increases.
-In practice, this means that for any individual, their risk converges to the average risk over a long period of time.
-Put differently, any two groups compared over the time will have the same risk of event after enough time has passed.
-This is clearly an accurate assumption in several contexts, most commonly any medical context in which death is the event of interest.
+As $S_0(\tau) \rightarrow 0$ when $\tau \rightarrow \infty$, it follows that the hazard ratio tends to $1$ as $\tau$ increases.
+
+This means that for any individual, their individual hazard approaches the baseline hazard over a long period of time.
+This assumption holds in several contexts, commonly in medical domains in which death is the event of interest.
+For example, take two patients with a disease, patient $i$ receives treatment and patient $j$ does not.
+Let $\exp(\eta_i) = 4$, $\exp(\eta_j) = 1$, $S_0(0) = 1$, and $S_0(5) = 0.01$.
+Following (@eq-po), we have for patient $i$
+
+$$
+h_{PO}(0|\xx_i) =  0.25h_0(0); \quad\quad h_{PO}(\tau|\xx_i) =  0.97h_0(5)
+$$
+
+and for patient $j$
+
+$$
+h_{PO}(0|\xx_j) = h_0(0); \quad\quad h_{PO}(5|\xx_j) = h_0(5)
+$$
+
+The treatment effect reduces the hazard for observation $i$ at early time-points.
+However, at the later time-point, the hazard is very similar for both observations.
 
 There is no simple closed form expression for the partial likelihood of a semi-parametric proportional odds model and hence in practice a Log-logistic distribution is usually assumed for the baseline odds and the model is fit by maximum likelihood estimation on the full likelihood [@Bennett1983], discussed further in the next section.
 
@@ -688,15 +706,15 @@ Once again determining the number of features to select, or the threshold to exc
 However, the authors found that the method that outperformed all others was a simple variance filter:
 
 $$
-S(\xx_{;j}) = \text{Var}(\xx_{;j})
+V(\xx_{;j}) = \text{Var}(\xx_{;j})
 $$
 
-where $\xx_{;j}$ is the $j$th variable in the data and $S$ is the resulting score.
+where $\xx_{;j}$ is the $j$th variable in the data and $V$ is the resulting score.
 The filter measures the amount of variance in the feature and removes features that have little variation.
 
 Another common filter method is to train another model and make use of its embedded feature selection and pass these results to a simpler model.
 This allows a classical model to be trained on relevant features without loss to interpretability or performance.
-Common choices for models to use in the first step of th pipeline include random forests (@sec-ranfor) and gradient boosting machines (@sec-boost).
+Common choices for models to use in the first step of the pipeline include random forests (@sec-ranfor) and gradient boosting machines (@sec-boost).
 
 ### Ensemble methods
 
@@ -719,17 +737,48 @@ After sampling the process is the same with predictions made and averaged.
 
 #### Model-based boosting {.unlisted .unnumbered}
 
-Model-based boosting iteratively fits models such that the first model is trained and tested as usual then subsequent models are fit on the same training data but with the purpose of predicting the residuals (i.e., losses) from the previous model.
-The result is a gradual and iterative increase in improvement as each model captures patterns missed previously.
-In a survival analysis context, suitable residuals can include many of the losses discussed in Part II, with the choice largely dependent on the task of interest.
-In contrast to the boosting methods discussed in @sec-boost, model-based boosting is a generic process for fitting iterative models, however it is unlikely a generic boosting pipeline will outperform the specific algorithms introduced in @sec-boost.
+Model-based boosting fits a sequence of models that iteratively improve model performance by correcting the previous model's mistakes.
+The initial model is trained as usual on a testing dataset, and subsequent models are fit on the same features but using 'pseudo-residuals' as targets (a regression problem).
+These pseudo-residuals are the negative gradient of a chosen loss from the previous iteration -- this is discussed in detail in @sec-boost.
+The result is a gradual increase in improvement as each model captures patterns missed previously.
+In a survival analysis context, many of the losses discussed in Part II can be used in this pipeline, with the choice of loss dependent on the task of interest.
+Model-based boosting is a generic pipeline which may underperform the purpose-built algorithms discussed in @sec-boost.
 
 #### Stacking {.unlisted .unnumbered}
 
-When stacking is used, multiple models are fit on the same training data, and their predictions are used as training data to a meta-model.
-The meta-model uses the model predictions to predict the target from the original training data.
+Stacking can improve model performance by fitting multiple models and aggregating the predictions using a meta-model.
 Fitting a meta-model, often a simple linear model, results in fitted coefficients that weight the input models according to how close or far they were from the truth.
-Effectively this results in a weighted average of predictions when a linear meta-model is used, where the weights are determined by model accuracy.
+
+Training data is partitioned (once or several times) and the first partition is used to train several independent models, a meta-model is fit using the outputs (predictions) from the base models as features and the targets $(t_i,\delta_i)$ from the second partition as targets.
+
+As an example, take stacking three Cox models with a Cox meta-model.
+Let $\calD = \{(\xx_i, t_i, \delta_i)\}$ be a dataset.
+Partition $\calD$ into two disjoint datasets $\calD_1$ of size $n$ and $\calD_2$ of size $m$.
+Three Cox base models are fit on $\calD_1$ and linear predictors are obtained (predicted) for all $m$ observations in $\calD_2$:
+
+$$
+Z = 
+\begin{bmatrix}
+\hat{\eta}^{(1)}_{1} & \cdots & \hat{\eta}^{(3)}_{1} \\
+\vdots & \ddots & \vdots \\
+\hat{\eta}^{(1)}_{m} & \cdots & \hat{\eta}^{(3)}_{m} \\
+\end{bmatrix}
+$$
+
+where $\hat{\eta}^{(j)}_{i}$ is the linear predictor for the $i$th observation in the validation set from the $j$th base model.
+
+Fit the meta-Cox model on $(Z, (t_i, \delta_i)_{i \in \calD_2})$:
+
+$$
+h_M(\tau|\hat{\bseta}_i) = h^{(M)}_{0}(\tau)\exp(\beta^{(M)}_1\hat{\eta}^{(1)}_{i} + \beta^{(M)}_2\hat{\eta}^{(2)}_{i} + \beta^{(M)}_3\hat{\eta}^{(3)}_{i}), \quad i \in \calD_2
+$$
+
+Finally, the base learners are refit on all $\calD$ but keeping $\hat{\bsbeta}^{(M)}$ and $\hat{h}^{(M)}_0$ from the meta-model fixed.
+
+Predictions for a new observation, $\xx^*$ are made by first predicting $(\hat{\eta}_*^{(1)},\hat{\eta}_*^{(2)},\hat{\eta}_*^{(3)})$ from the trained base models and passing those to $h_M$ using the fitted $\hat{\bsbeta}^{(M)}$ coefficients and $\hat{h}^{(M)}_0$.
+
+In the above example, Cox models are used throughout.
+However, any machine learning models with the same prediction types can be stacked, including combinations of models.
 
 ## Conclusion
 
