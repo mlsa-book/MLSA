@@ -168,34 +168,29 @@ The survival outcome provides a concise mechanism for representing the outcome t
 
 A *survival dataset* is a $n \times p$, real-valued matrix defined by $\calD = ((\xx_1, \ t_1, \ \delta_1) \cdots (\xx_n,t_n,\delta_n))^\trans$, where $(t_i,\delta_i)$ are realizations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i;1} \ x_{i;2} \cdots x_{i;p})^\trans$ of features.
 
+Many equations in the survival literature are limited to uncensored observations and often assume that survival times are ordered from smallest to largest survival time.
+When this is the case, it is common to use notation from order statistics.
+For example, given survival times, $(t_1,t_2,t_3,t_4)= (5,1,10,4)$ then the ordered survival times are $(t_{(1)}, t_{(2)}, t_{(3)}, t_{(4)}) = (1,4,5,10)$.
+Further, in a survival analysis context, the ordering notation always refers to the ordered **unique, event times**,
+
+$$
+\{t_{(k)}:\delta_{(k)}=1\}_{k=1}^{m}, \qquad
+t_{(1)}<\cdots<t_{(m)}, \qquad m\le n.
+$$
+
+A common short-hand in survival analysis is to assume the subscript $(k)$ is an index referring to the observation who experienced the event at time $t_{(k)}$.
+For example, $(\xx_{(k)}, \tbk, \delta_{(k)})$ are the features and outcome for the observation that experienced the event at $\tbk$, the $k$th ordered event time.
+
 Finally, the following quantities are used frequently throughout this book and survival analysis literature more generally.
 Let $(t_i, \delta_i) \iid (T,\Delta), i = 1,...,n$, be observed survival outcomes.
 
-
-The **set of unique outcome times** is the set of time-points in which at least one observation experiences the event or is censored:
-
-$$
-\calU_O \subseteq \{t_i\}_{i \in \{1,...,n\}}
-$$
-
-The **set of unique event times** is the set of time-points in which at least one observation experiences the event (but not censored):
-
-$$
-\calU_D \subseteq \{t_i: \delta_i = 1\}_{i \in \{1,...,n\}}
-$$
-
-The **ordered, unique events times** may also be denoted by
-
-$$
-t_{(k)},\ k=1,\ldots,m \quad t_{(1)} < t_{(2)} < \cdots < t_{(m)}, \quad m \leq n
-$$
 
 The **risk set at $\tau$**, is the index-set of observation units at risk for the event just before $\tau$
 <!--  -->
 $$
 \calR_\tau := \{i: t_i \geq \tau\}
-$${#eq-risk-set}
-<!--  -->
+$$ {#eq-risk-set}
+
 where $i$ is the index of an observation in the data.
 For right-censored data, $\calR_0 = \{1,\ldots,n\}$ and $\calR_{\tau} \subseteq \calR_{\tau'}, \forall \tau > \tau'$.
 Note that in a continuous setting, 'just before' refers to an infinitesimally smaller time than $\tau$, in practice, as this is unobservable the risk set is defined at $\tau$, hence an observation may both be at risk, and experience an event (or be censored) at $\tau$.
@@ -222,8 +217,6 @@ Several non-parametric and semi-parametric methods (@sec-models-classical) like 
 
 In this example, the above quantities would be:
 
-* $\calU_0 = \{268, 397, 519, 1217, 2414\}$: with $1217$ included only once
-* $\calU_D = \{268, 397, 1217\}$: with the inclusion of $1217$ due to the event at $t_1$, not censoring at $t_5$
 * $\calR_{\tau = 1217} = \{1, 3, 5\}$ (these subjects' outcome times are greater or equal to $\tau = 1217$ so they are at risk for the event at this time)
 * $n_{\tau = 1217} = |\calR_{1217}| = 3$
 * $d_{\tau = 1217} = 1$: As only $i = 1$ experienced the event (and not censoring) at this time.
@@ -246,7 +239,7 @@ Three types of censoring are commonly defined in survival analysis: right-censor
 The latter can be viewed as the most general case.
 Multiple types of censoring and/or truncation (@sec-truncation) can occur in any given data set and it is vital to identify which types are present in order to correctly select and specify models and measures for the data.
 
-### Right-censoring {.unnumbered .unlisted}
+### Right-censoring
 
 Right-censoring is the most commonly assumed form of censoring in survival data.
 It occurs when the event of interest was not experienced during the observation period, which may happen because it was no longer observable (for example, due to withdrawal from the study) or because the event did not happen until study end.
@@ -273,7 +266,7 @@ Different types of right-censoring can, and sometimes do, co-occur in any given 
 In practice, these different types of right-censoring are usually handled the same during modeling and evaluation and so this book refers to 'right-censoring' generally, which could occur from a combination of the above types.
 
 
-### Left- and Interval-censoring {.unnumbered .unlisted}
+### Left- and Interval-censoring
 
 Left-censoring occurs when the event is known to have happened at some unknown time before observation time, interval-censoring occurs when the event is known to have happened within some time span, but not the exact time.
 
@@ -289,13 +282,14 @@ The first case represents an exactly observed event time, the second case the fa
 The third case is referred to as left-censoring, we know the event occurred before the interview, but don't know when.
 The fourth case is an example of interval-censoring, as we know the event occurred within some age span, but not the exact age.
 
-
-Interval- and left-censoring also often occurs in medical contexts.
+Interval- and left-censoring often occur in medical contexts.
 For example, some guidelines suggest annual screenings for skin cancer (starting from a certain age).
 However, the initial age at which individuals do screenings and regularity of check ups varies widely.
 If cancer was detected between two screenings, the observation is interval-censored.
 If cancer is detected at first screening, the observation is left-censored (unless the 'age' of the cancer can be narrowed down based on size and other characteristics, in which case it would become interval-censored).
-
+Also of note, particularly in a medical context, is that interval censoring may be safely ignored depending on the time scale being modelled.
+Say a patient is screened in February and March 2025 and cancer is detected in the second screening, then they are technically interval censored as (February 2025, March 2025).
+However, if this data is modelled at an annual scale, then their outcome is known to be [2025] and they are not considered censored.
 
 ### Censoring Notation {.unnumbered .unlisted}
 
@@ -325,7 +319,6 @@ In practice, such data is often stored by creating two variables representing th
 |5 | 18  |0    |18      |
 
 Here, the first subject is right-censored at 13 years ($l_i=t_i = 13, r_i = \infty$), the second subject remembered exactly ($l_i=r_i=15 < t_i = 17$), the third subject remembers that it was after 14, but not exact age ($l_i = 14 < r_i = 16=t_i$), fourth subject remembers use after 13 years and latest at 15 years of age ($l_i = 13 < r_i = 15 < t_i$), and the fifth subject uses a smart phone currently at age 18, but cannot specify further ($l_i = 0 < r_i = 18 = t_i$).
-
 
 From the example above, it is clear, that right- and left-censoring are special cases of interval-censoring.
 However, if only right- or left-censoring is present, the likelihood and estimation simplifies (see @sec-surv-estimation).
@@ -493,14 +486,10 @@ Note that in in practice, data sets will often not contain all types of censorin
 
 ### Non-parametric estimation {#sec-surv-estimation-non-param}
 
-<!-- TODO (RS) NOT SURE I UNDERSTAND THIS FIRST PART OF THE SECTION -->
-
 As the name suggests, non-parametric estimation (and semi-parametric estimation) techniques do not make (strong) assumptions about the underlying distribution of event times.
 
 A common principle for such techniques is to partition the follow-up into intervals (or to define specific time-points during the follow-up) and to estimate the continuous (@eq-continuous-hazard) or discrete time (@eq-discrete-hazard) hazards for each interval/time-point.
 Once the respective hazard estimates are obtained, estimates of other quantities, for example the survival probability, can be derived based on the relationship given in @sec-distributions-continuous or @sec-distributions-discrete.
-
-
 
 #### Kaplan-Meier estimator {#sec-surv-km}
 The Kaplan-Meier estimator [@Kaplan1958], a simple, non-parametric estimator for the survival function (@eq-surv-prob), is an example for this principle.
@@ -508,9 +497,10 @@ While it is usually used for continuous time, its construction can be motivated 
 Recall from XYZ the definition of ordered, unique event time $t_{(k)}, k=1,\ldots,m$. 
 Define $\tilde{Y} = t_{(k)} \Leftrightarrow Y \in (t_{(k-1)},t_{(k)}]$ as discrete time representation of $Y$.
 Using the quantities introduced in @sec-data-rc,the discrete time hazard @eq-discrete-hazard is estimated as the ratio of the number of events occurring at $t_{(k)}$, to the number of subjects at risk at $t_{(k)}$: 
+
 <!--  -->
 $$
-h^d(t_{(k)}) = P\left(Y\in (t_{(k-1)},t_{(k)}]|Y>t_{(k-1)}\right)=\frac{d_{t_{(k)}}}{n_{t_{(k)}}}.
+h^d(\tbk) = P\left(Y\in (t_{(k-1)},\tbk]|Y>t_{(k-1)}\right)=\frac{d_{\tbk}}{n_{\tbk}}.
 $$ {#eq-disc-haz-non-param}
 <!--  -->
 The survival probability and the definition of the Kaplan-Meier estimator (@eq-km) then follow from @eq-discrete-surv-prob:
@@ -519,13 +509,14 @@ $$
 \KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{t_{(k)}}}{n_{t_{(k)}}}\right)
 $$ {#eq-km}
 <!--  -->
+
 which is a step-function at the  observed ordered event times $t_{(k)}, k=1,\ldots,m$ with $\hat{S}_{KM}(\tau) = 1\ \forall \tau < t_{(1)}$. It is usually estimated for all unique event times.
+In this book, $\KMS$ specifically refers to the Kaplan-Meier estimator fit on some training data.
 
 For illustration, we consider the `tumor` data set from @sec-data-rc.
 @fig-km-tumor shows the estimated survival probability obtained by applying the Kaplan-Meier estimator to the full data set, containing observations of $n=776$ subjects.
 By definition, the survival function starts at $S(t)=1$ at $t=0$ and monotonically decreases towards $S(t)=0$ for $t\rightarrow \infty$. 
 However, follow-ups are usually not infinite and in the presence of censoring, the survival function may not reach 0 by the end of the observation period. For the Kaplan-Meier estimator specifically, $\hat{S}_{KM}(t_{(m)}) = 0$ only if the last observed time is an event time and there are no censored observations at the same time.
-
 
 Dotted lines indicate the median survival, defined as the time at which the survival function reaches $S(t) = 0.5$. 
 In this example, the median survival time is approximately 1500 days.
@@ -540,24 +531,26 @@ However, note that the median survival time does not exist for the younger age g
 ![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools] applied to subgroups of subjects of 50 or more years old and less than 50 years old, respectively. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time).](Figures/survival/km-age-bin-tumor.png){#fig-km-tumor-age-bin fig-alt="Illustration of the Kaplan-Meier estimate of the survival probability for the tumor data set, separately for two groups, patients below and above 50 years of age. Median survival time is indicated by dotted lines. Fot the younger age group, the line doesn't intersect with the survival curve."}
 
 
-#### Nelson-Aalen and Breslow estimator {#sec-surv-na}
+#### Nelson-Aalen {#sec-surv-na}
 As the Kaplan-Meier estimator (@sec-surv-km), the Nelson-Aalen estimator (@Nelson1972,@Aalen1978) is based on the discrete time hazards @eq-disc-haz-non-param. 
 Rather than estimating the survival probability, the Nelson-Aalen estimator estimates the discrete time cumulative hazard function @eq-discrete-cumu-hazard and is defined as
-<!--  -->
+
 $$
-H_{NA}(\tau) = \sum_{k:t_{(k)}\leq \tau} h^d(t_{(k)}) = \sum_{k:t_{(k)}\leq \tau} \frac{d_{t_{(k)}}}{n_{t_{(k)}}}.
+H_{NA}(\tau) = \sum_{k:\tbk\leq \tau} h^d(\tbk) = \sum_{k:\tbk\leq \tau} \frac{d_{\tbk}}{n_{\tbk}}.
 $$ {#eq-nelson-aalen}
-<!--  -->
-Note that we use a continuous time valued $\tau$ for the definition, which implies that $H_{NA,e}(\tau) = H_{NA,e}(t_{(k)})\ \forall \tau \in [t_{(k)}, t_{(k+1)})$.
+
+Note that we use a continuous time valued $\tau$ for the definition, which implies that $H_{NA,e}(\tau) = H_{NA,e}(\tbk)\ \forall \tau \in [\tbk, t_{(k+1)})$.
 In words: For time points between two unique event times we assume the previous value of the estimate.
 
 Based on @eq-surv-haz we can also define a survival probability estimator based on the Nelson-Aalen estimator as
-<!--  -->
+
 $$
 S_{NA}(\tau) = \exp(-H_{NA}(\tau)).
 $$ {#eq-surv-na}
-<!--  -->
-This relationship is also used by @Breslow1972 to obtain survival probability estimates in the context of the Cox model (@sec-models-classical).
+
+Kaplan–Meier and Nelson–Aalen are consistent for survival and cumulative hazard respectively under independent right-censoring.
+Both these non-parametric estimators can be used as simple predictive methods (@sec-classical-nonpar), and are often used as informative baseline models, which can be compared to sophisticated alternatives to improve interpretability in model evaluation [@Herrmann2020; @Huang2020; @Wang2017].
+Both methods can also be used for graphical calibration of models (@sec-calib-km), components of complex models (@sec-car), and other diagnostic graphical tools [@Habibi2018; @Jager2008; @Moghimi-dehkordi2008].
 
 #### Left truncation {#sec-non-param-lt}
 
@@ -633,33 +626,33 @@ The intuition behind this algorithm is that an observation, $i$, should only con
 
 In summary [@Giolo2004]:
 
-Let $t_{(k)}, k = 1,...,m$ be the ordered times at which to evaluate the NPMLE.
+Let $\tbk, k = 1,...,m$ be the ordered times at which to evaluate the NPMLE.
 
-1. Make an initial guess for $\hatS^0(t_{(k)}), k = 1,...,m$.
+1. Make an initial guess for $\hatS^0(\tbk), k = 1,...,m$.
 
 Where $\hatS^0$ is the initial guess. 
 Let $\hatS^j$ be the estimated survival function at iteration $j$.
 
-2. **While** $\quad \lvert \hatS^j(t_{(k)}) - \hatS^{j-1}(t_{(k)}) \rvert > \epsilon, \forall k = 1,...,m \quad$ **Do:**
+1. **While** $\quad \lvert \hatS^j(\tbk) - \hatS^{j-1}(\tbk) \rvert > \epsilon, \forall k = 1,...,m \quad$ **Do:**
 
 a. Compute the probability of an event at each time-point:
 
 $$
-p_{t_{(k)}} = \hatS^{j-1}(t_{(k-1)}) - \hatS^{j-1}(t_{(k)}), \quad k = 1,...,m
+p_{\tbk} = \hatS^{j-1}(t_{(k-1)}) - \hatS^{j-1}(\tbk), \quad k = 1,...,m
 $$
 
 b. Estimate the number of events at each time-point:
 
 $$
-d_{t_{(k)}} = \sum^n_{i=1} \frac{w_{ik}p_{t_{(k)}}}{\sum^m_{l=1} w_{il}p_{t_{(l)}}}, \quad k = 1,...,m
+d_{\tbk} = \sum^n_{i=1} \frac{w_{ik}p_{\tbk}}{\sum^m_{l=1} w_{il}p_{t_{(l)}}}, \quad k = 1,...,m
 $$
 
-Where $w_{ik} = 1$ if the interval $(t_{(k-1)}, t_{(k)}]$ is contained within $(L_i, R_i]$, and $w_{ik} = 0$ otherwise; and $L_i, R_i$ are the left- and right-censoring times for observations $i = 1,...,n$.
+Where $w_{ik} = 1$ if the interval $(t_{(k-1)}, \tbk]$ is contained within $(L_i, R_i]$, and $w_{ik} = 0$ otherwise; and $L_i, R_i$ are the left- and right-censoring times for observations $i = 1,...,n$.
 
-c. Compute the cumulative number of events at or after $t_{(k)}$:
+c. Compute the cumulative number of events at or after $\tbk$:
 
 $$
-n_{t_{(k)}} = \sum^m_{l=k} d_{t_{(l)}}, \quad k = 1,...,m
+n_{\tbk} = \sum^m_{l=k} d_{t_{(l)}}, \quad k = 1,...,m
 $$
 
 This serves a similar role to the usual 'number at risk' formula.
@@ -680,18 +673,19 @@ This is often done in order to calculate the inverse probability of censoring we
 
 The Kaplan-Meier estimator can be used to estimate the distribution of censoring times.
 The definition of the risk set (@eq-risk-set) is thus the denominator $n_{\tau}$ in @eq-disc-haz-non-param remains the same, but the numerator $d_{\tau}$ is now the number of censoring events at $\tau$, which we denote as 
-<!--  -->
+
 $$
 d_\tau^C = \sum_i \II(t_i = \tau, \delta_i = 0).
 $$
-<!--  -->
+
 The Kaplan-Meier estimator for the censoring distribution is then given by
-<!--  -->
+
 $$
-G_{KM}(t) = \prod_{\ell=1}^g \left(1-\frac{d^C_{t_{(\ell)}}}{n_{t_{(\ell)}}}\right), 
+\KMG(t) = \prod_{\ell=1}^g \left(1-\frac{d^C_{t_{(\ell)}}}{n_{t_{(\ell)}}}\right), 
 $$ {#eq-km-censoring}
-<!--  -->
+
 where $t_{(\ell)},l=1,\ldots,g$ are the unique, ordered censoring times.
+In this book, $\KMG$ specifically refers to the Kaplan-Meier estimator fit on the observed censoring times $(t_i, 1-\delta_i)$ from some training data.
 
 
 ### Inverse probability of censoring weights (IPCW) {#sec-surv-ipcw}
@@ -707,8 +701,6 @@ When no relationship between the censoring time and the covariates is assumed, t
 $$
 \hat{w}(\tau) = \frac{1}{\hat{G}_{KM}(\tau)}
 $$ {#eq-ipcw-km}
-
-
 
 ## Conclusion
 
