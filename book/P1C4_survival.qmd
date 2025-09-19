@@ -239,7 +239,7 @@ Three types of censoring are commonly defined in survival analysis: right-censor
 The latter can be viewed as the most general case.
 Multiple types of censoring and/or truncation (@sec-truncation) can occur in any given data set and it is vital to identify which types are present in order to correctly select and specify models and measures for the data.
 
-### Right-censoring {.unnumbered .unlisted}
+### Right-censoring
 
 Right-censoring is the most commonly assumed form of censoring in survival data.
 It occurs when the event of interest was not experienced during the observation period, which may happen because it was no longer observable (for example, due to withdrawal from the study) or because the event did not happen until study end.
@@ -266,7 +266,7 @@ Different types of right-censoring can, and sometimes do, co-occur in any given 
 In practice, these different types of right-censoring are usually handled the same during modeling and evaluation and so this book refers to 'right-censoring' generally, which could occur from a combination of the above types.
 
 
-### Left- and Interval-censoring {.unnumbered .unlisted}
+### Left- and Interval-censoring
 
 Left-censoring occurs when the event is known to have happened at some unknown time before observation time, interval-censoring occurs when the event is known to have happened within some time span, but not the exact time.
 
@@ -282,13 +282,14 @@ The first case represents an exactly observed event time, the second case the fa
 The third case is referred to as left-censoring, we know the event occurred before the interview, but don't know when.
 The fourth case is an example of interval-censoring, as we know the event occurred within some age span, but not the exact age.
 
-
-Interval- and left-censoring also often occurs in medical contexts.
+Interval- and left-censoring often occur in medical contexts.
 For example, some guidelines suggest annual screenings for skin cancer (starting from a certain age).
 However, the initial age at which individuals do screenings and regularity of check ups varies widely.
 If cancer was detected between two screenings, the observation is interval-censored.
 If cancer is detected at first screening, the observation is left-censored (unless the 'age' of the cancer can be narrowed down based on size and other characteristics, in which case it would become interval-censored).
-
+Also of note, particularly in a medical context, is that interval censoring may be safely ignored depending on the time scale being modelled.
+Say a patient is screened in February and March 2025 and cancer is detected in the second screening, then they are technically interval censored as (February 2025, March 2025).
+However, if this data is modelled at an annual scale, then their outcome is known to be [2025] and they are not considered censored.
 
 ### Censoring Notation {.unnumbered .unlisted}
 
@@ -318,7 +319,6 @@ In practice, such data is often stored by creating two variables representing th
 |5 | 18  |0    |18      |
 
 Here, the first subject is right-censored at 13 years ($l_i=t_i = 13, r_i = \infty$), the second subject remembered exactly ($l_i=r_i=15 < t_i = 17$), the third subject remembers that it was after 14, but not exact age ($l_i = 14 < r_i = 16=t_i$), fourth subject remembers use after 13 years and latest at 15 years of age ($l_i = 13 < r_i = 15 < t_i$), and the fifth subject uses a smart phone currently at age 18, but cannot specify further ($l_i = 0 < r_i = 18 = t_i$).
-
 
 From the example above, it is clear, that right- and left-censoring are special cases of interval-censoring.
 However, if only right- or left-censoring is present, the likelihood and estimation simplifies (see @sec-surv-estimation).
@@ -486,8 +486,6 @@ Note that in in practice, data sets will often not contain all types of censorin
 
 ### Non-parametric estimation {#sec-surv-estimation-non-param}
 
-<!-- TODO (RS) NOT SURE I UNDERSTAND THIS FIRST PART OF THE SECTION -->
-
 As the name suggests, non-parametric estimation (and semi-parametric estimation) techniques do not make (strong) assumptions about the underlying distribution of event times.
 
 A common principle for such techniques is to partition the follow-up into intervals (or to define specific time-points during the follow-up) and to estimate the continuous (@eq-continuous-hazard) or discrete time (@eq-discrete-hazard) hazards for each interval/time-point.
@@ -511,7 +509,9 @@ $$
 \KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{t_{(k)}}}{n_{t_{(k)}}}\right)
 $$ {#eq-km}
 <!--  -->
+
 which is a step-function at the  observed ordered event times $t_{(k)}, k=1,\ldots,m$ with $\hat{S}_{KM}(\tau) = 1\ \forall \tau < t_{(1)}$. It is usually estimated for all unique event times.
+In this book, $\KMS$ specifically refers to the Kaplan-Meier estimator fit on some training data.
 
 For illustration, we consider the `tumor` data set from @sec-data-rc.
 @fig-km-tumor shows the estimated survival probability obtained by applying the Kaplan-Meier estimator to the full data set, containing observations of $n=776$ subjects.
@@ -531,24 +531,26 @@ However, note that the median survival time does not exist for the younger age g
 ![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools] applied to subgroups of subjects of 50 or more years old and less than 50 years old, respectively. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time).](Figures/survival/km-age-bin-tumor.png){#fig-km-tumor-age-bin fig-alt="Illustration of the Kaplan-Meier estimate of the survival probability for the tumor data set, separately for two groups, patients below and above 50 years of age. Median survival time is indicated by dotted lines. Fot the younger age group, the line doesn't intersect with the survival curve."}
 
 
-#### Nelson-Aalen and Breslow estimator {#sec-surv-na}
+#### Nelson-Aalen {#sec-surv-na}
 As the Kaplan-Meier estimator (@sec-surv-km), the Nelson-Aalen estimator (@Nelson1972,@Aalen1978) is based on the discrete time hazards @eq-disc-haz-non-param. 
 Rather than estimating the survival probability, the Nelson-Aalen estimator estimates the discrete time cumulative hazard function @eq-discrete-cumu-hazard and is defined as
-<!--  -->
+
 $$
 H_{NA}(\tau) = \sum_{k:\tbk\leq \tau} h^d(\tbk) = \sum_{k:\tbk\leq \tau} \frac{d_{\tbk}}{n_{\tbk}}.
 $$ {#eq-nelson-aalen}
-<!--  -->
+
 Note that we use a continuous time valued $\tau$ for the definition, which implies that $H_{NA,e}(\tau) = H_{NA,e}(\tbk)\ \forall \tau \in [\tbk, t_{(k+1)})$.
 In words: For time points between two unique event times we assume the previous value of the estimate.
 
 Based on @eq-surv-haz we can also define a survival probability estimator based on the Nelson-Aalen estimator as
-<!--  -->
+
 $$
 S_{NA}(\tau) = \exp(-H_{NA}(\tau)).
 $$ {#eq-surv-na}
-<!--  -->
-This relationship is also used by @Breslow1972 to obtain survival probability estimates in the context of the Cox model (@sec-models-classical).
+
+Kaplan–Meier and Nelson–Aalen are consistent for survival and cumulative hazard respectively under independent right-censoring.
+Both these non-parametric estimators can be used as simple predictive methods (@sec-classical-nonpar), and are often used as informative baseline models, which can be compared to sophisticated alternatives to improve interpretability in model evaluation [@Herrmann2020; @Huang2020; @Wang2017].
+Both methods can also be used for graphical calibration of models (@sec-calib-km), components of complex models (@sec-car), and other diagnostic graphical tools [@Habibi2018; @Jager2008; @Moghimi-dehkordi2008].
 
 #### Left truncation {#sec-non-param-lt}
 
@@ -671,18 +673,19 @@ This is often done in order to calculate the inverse probability of censoring we
 
 The Kaplan-Meier estimator can be used to estimate the distribution of censoring times.
 The definition of the risk set (@eq-risk-set) is thus the denominator $n_{\tau}$ in @eq-disc-haz-non-param remains the same, but the numerator $d_{\tau}$ is now the number of censoring events at $\tau$, which we denote as 
-<!--  -->
+
 $$
 d_\tau^C = \sum_i \II(t_i = \tau, \delta_i = 0).
 $$
-<!--  -->
+
 The Kaplan-Meier estimator for the censoring distribution is then given by
-<!--  -->
+
 $$
-G_{KM}(t) = \prod_{\ell=1}^g \left(1-\frac{d^C_{t_{(\ell)}}}{n_{t_{(\ell)}}}\right), 
+\KMG(t) = \prod_{\ell=1}^g \left(1-\frac{d^C_{t_{(\ell)}}}{n_{t_{(\ell)}}}\right), 
 $$ {#eq-km-censoring}
-<!--  -->
+
 where $t_{(\ell)},l=1,\ldots,g$ are the unique, ordered censoring times.
+In this book, $\KMG$ specifically refers to the Kaplan-Meier estimator fit on the observed censoring times $(t_i, 1-\delta_i)$ from some training data.
 
 
 ### Inverse probability of censoring weights (IPCW) {#sec-surv-ipcw}

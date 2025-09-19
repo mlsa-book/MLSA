@@ -36,29 +36,26 @@ Finally, methods to improve traditional models through machine learning methodol
 
 ## Non-Parametric Estimators {#sec-classical-nonpar}
 
-The Kaplan-Meier estimator [@Kaplan1958] was introduced in @sec-surv-km as the step-function
+Non-parametric estimators have already been introduced in @sec-surv-estimation-non-param, therefore this section is brief and focuses only on how these estimators can be used as predictive models.
+
+### Unconditional estimators
+
+Recall from @sec-surv-estimation-non-param the Kaplan-Meier and Nelson-Aalen estimators respectively defined by
 
 $$
-\KMS(\tau) = \prod_{k:\tbk \leq \tau}\left(1-\frac{d_{\tbk}}{n_{\tbk}}\right)
-$$ {#eq-km-ml}
+\KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{\tbk}}{\tbk}\right)
+$$ {#eq-km-ml-two}
 
-where $d_{t_{(k)}}$ and $n_{t_{(k)}}$ are the number of events and observations at risk at the $k$th ordered event time, $\tbk$ respectively.
-In @sec-surv-km, this was discussed as an estimator for visualizing survival distributions and for descriptive analysis.
-However, now consider how this estimator could be used as a simple predictive method.
-As an unconditional non-parametric method, the estimator assumes no distribution for survival times and ignores any covariate data.
-Say we are given the following dataset of survival outcomes:
+and
 
-|litter |rx |sex |time |status |
-|:------|:--|:---|:----|:------|
-|6      |0  |m   |62   |0      |
-|57     |0  |f   |55   |1      |
-|60     |1  |m   |104  |0      |
-|85     |1  |f   |92   |1      |
-|97     |0  |f   |91   |0      |
+$$
+H_{NA}(\tau) = \sum_{k:\tbk\leq \tau} \frac{d_{\tbk}}{n_{\tbk}}.
+$$
 
-: Sample of the $\code{rats}$ dataset from $\Rstats$ package $\pkg{survival}$. {#tbl-rats}
-
-@tbl-rats-km below demonstrates construction of the Kaplan-Meier estimator at each possible time-point, where the second column is the contribution to the estimator at the given time:
+where $d_{\tbk}$ and $n_{\tbk}$ are the number of events and observations at risk at the $k$th ordered event time, $\tbk$ respectively.
+For example, @tbl-rats-km shows the Kaplan-Meier estimator fit on the `rats` [@datarats] dataset.
+This can be used as a predictive model for a new rat in the dataset by simply ignoring covariates and taking the prediction to be the time-point of interest.
+For example, to predict the survival probability of a new rat at time $82$, this would simply be $\KMS(82) = 0.8$.
 
 | $\tau$ | $1 - d/n$ | $\KMS(\tau)$ |
 |------| --- | -- |
@@ -68,25 +65,11 @@ Say we are given the following dataset of survival outcomes:
 | 92 | 0.5 | 0.4 |
 | 104 | 1 | 0.4 |
 
-: Kaplan-Meier contributions (second column) and estimation (third column) at each time $\tau$ based on the data from @tbl-rats. {#tbl-rats-km}
+: Kaplan-Meier contributions (second column) and estimation (third column) at each time $\tau$ based on data from [@datarats]. {#tbl-rats-km}
 
-Now if @tbl-rats is taken to be training data, then the values in @tbl-rats-km can be used to predict the probability of survival at a given time.
-For example, without needing to know any other information about a new rat that enters the data (for these estimators ignore covariates), there is an $80\%$ chance of survival until $\tau = 60$, which drops to $40\%$ after 92 days.
+As predictive models, these can also be extended to other censoring and truncation types as well as event history analysis more generally from using the estimators defined in @sec-surv-estimation-non-param, @sec-aalen-johanson, and @sec-ms-aalen-johanson.
 
-Estimating the Kaplan-Meier on training data and using those values for predictions of new data, yields a 'baseline' model that can be compared to more sophisticated alternatives to improve interpretability in model evaluation (@sec-eval-distr-score-base).
-In this book, $\KMS$ specifically refers to the Kaplan-Meier estimator fit on some training data.
-Similarly, $\KMG$ specifically refers to the Kaplan-Meier estimator fit on the observed censoring times $(t_i, 1-\delta_i)$ from some training data.
-
-The Nelson-Aalen estimator [@Aalen1978; @Nelson1972], introduced in @sec-surv-estimation-non-param, can also be used as a baseline predictive model.
-
-$$
-\hatH_{NA}(\tau) = \sum_{t_{(k)}\leq \tau} \frac{d_{t_{(k)}}}{n_{t_{(k)}}}.
-$$
-
-The Kaplan-Meier and Nelson-Aalen estimators are consistent estimators for the survival and cumulative hazard functions respectively; the former is more widely utilized as a baseline estimator [@Herrmann2020; @Huang2020; @Wang2017].
-As well as supporting in interpretability, both methods can be used for graphical calibration of models (@sec-calib-km), components of complex models (@sec-car), and other diagnostic graphical tools [@Habibi2018; @Jager2008; @Moghimi-dehkordi2008].
-
-Extensions to other censoring and truncation types as well as event history analysis more generally follows from using the estimators defined in @sec-surv-estimation-non-param, @sec-aalen-johanson, and @sec-ms-aalen-johanson.
+### Conditional estimators
 
 As well as unconditional estimators, which do not account for covariates, an alternative is the conditional Akritas estimator [@Akritas1994] usually defined by [@Blanche2013]:
 
@@ -96,50 +79,59 @@ $$ {#eq-akritas}
 
 where $K$ is a kernel function, usually $K(x,y|\lambda) = \II(\lvert \hat{F}_X(x) - \hat{F}_X(y)\rvert < \lambda), \lambda \in (0, 1]$, $\hat{F}_X$ is the empirical distribution function of the data, and $\lambda$ is a hyper-parameter.
 The estimator can be interpreted as a conditional Kaplan-Meier estimator which is computed on a neighbourhood of subjects closest to $\xx^*$.
-In fact, if $\lambda = 1$ then $K(\cdot|\lambda) = 1$ and @eq-akritas is identical to @eq-km-ml.
+In fact, if $\lambda = 1$ then $K(\cdot|\lambda) = 1$ and (@eq-akritas) is identical to (@eq-km-ml-two).
 
-The formulation in @eq-akritas includes fitting and predicting in one step as the usual application of the model is as a non-parametric estimator.
+The formulation in (@eq-akritas) includes fitting and predicting in one step as the usual application of the model is as a non-parametric estimator.
 By first estimating $\hatF_X$ on separate training data, the estimator can be used as a baseline predictive model.
 
 ## Proportional Hazards {#sec-classical-cox}
 
-This section begins with an introduction to the proportional hazards concept using the Cox PH model and then moves to fully parametric proportional hazards models, with the Weibull model as a motivating example.
+This section begins with an introduction to the proportional hazards concept, introduces estimation with the Cox PH model, and then moves to fully parametric proportional hazards models, with the Weibull model as a motivating example.
 
-### Semi-Parametric PH
-
-The Cox Proportional Hazards (Cox PH)  [@Cox1972], or Cox model, is likely the most widely known semi-parametric model and the most studied survival model [@Reid1994; @Wang2017].
-Let $\eta_i = \xx_i^\trans\bsbeta$ be the linear predictor for some observation $i$ with covariates $\xx_i$ and model coefficients $\bsbeta \in \Reals^p$, then the Cox model assumes the hazard function for $i$ follows the form:
-
+Let $\eta_i = \xx_i^\trans\bsbeta$ be the linear predictor for some observation $i$ with covariates $\xx_i$ and model coefficients $\bsbeta \in \Reals^p$, then proportional hazards (PH) models assume that the hazard function for $i$ follows the form:
 $$
-h_{Cox}(\tau|\xx_i)= h_0(\tau)\exp(\eta_i)
-$$ {#eq-cox}
+h_{PH}(\tau|\xx_i)= h_0(\tau)\exp(\eta_i)
+$$ {#eq-ph}
 
 or in equivalent forms:
 
 $$
-S_{Cox}(\tau|\xx_i)= S_0(\tau)^{\exp(\eta_i)}
-$$ {#eq-cox-surv}
+S_{PH}(\tau|\xx_i)= S_0(\tau)^{\exp(\eta_i)}
+$$ {#eq-ph-surv}
 
 $$
-H_{Cox}(\tau|\xx_i)= H_0(\tau)\exp(\eta_i)
-$$ {#eq-cox-cum}
+H_{PH}(\tau|\xx_i)= H_0(\tau)\exp(\eta_i)
+$$ {#eq-ph-cum}
 
-Ignoring the $h_0$ term for now, this form encodes the eponymous 'proportional hazards' assumption as the individual's hazard at time $\tau$ is directly proportional to their own covariates: $h(\tau|\xx_i) \propto \exp(\eta_i)$.
+$h_0,S_0,H_0$ are referred to as the baseline hazard, survival, and cumulative hazard function respectively.
+Instead of modelling a separate intercept, the baseline hazard represents the hazard when the linear predictor is zero, hence the term 'baseline'.
+In that case, the PH model is simply $h_{PH}(\tau|\xx_i)= h_0(\tau)$.
+
+It can be seen from (@eq-ph) that time is only incorporated via the baseline hazard (ignoring adaptations to time-varying models).
+Therefore, PH models estimate the baseline risk of an event at a given time, and modulate this risk according to individual covariates.
+This represents the eponymous 'proportional hazards' assumption as the individual's hazard at time $\tau$ is directly proportional to a multiplicative function of their own covariates: $h(\tau|\xx_i) \propto \exp(\eta_i)$.
 In other words, a unit change in a covariate acts multiplicatively on the estimated hazard.
 Further, the hazard ratio, which is a measure of the difference in risk, between two different subjects, depends solely on the value of their linear predictors and not on time.
-Take the special case of a model with one covariate, $x$, and coefficient, $\beta$, see what happens when $x$ is increased by one unit:
+For a single covariate $x$:
 
 $$
-\frac{h_{Cox}(\tau|x+1)}{h_{Cox}(\tau|x)} = \frac{h_0(\tau)\exp((x+1)\beta)}{h_0(\tau)\exp(x\beta)} = \exp(\beta)
-$$ {#eq-hazratio}
+\frac{h_{PH}(\tau|x_i)}{h_{PH}(\tau|x_j)} = \frac{h_0(\tau)\exp(x_i\beta)}{h_0(\tau)\exp(x_j\beta)} = \exp(\beta(x_i -x_j))
+$$
 
-The difference in risk depends only on $\beta$ and is independent of time, specifically
+Equivalently:
 
 $$
-h_{Cox}(\tau|x+1) = \exp(\beta)h_{Cox}(\tau|x)
+h_{PH}(\tau|x_i) = \exp(\beta(x_i - x_j))h_{PH}(\tau|x_j)
 $$ {#eq-hazratio-diff}
 
-Estimation of the $\beta$ terms is possible by ignoring $h_0$ as a 'nuissance parameter' and using the 'partial likelihood' function [@Cox1975]:
+So in the case where the covariate differs between subjects by $1$, the hazard ratio increases by a multiple of $\exp(\beta)$.
+This yields an interpretable model, in which covariate effects (and hazard ratios) are constant over time and don't depend on $\tau$.
+Moving from parameter estimation, we next consider how to actually fit the $\beta$ parameters.
+
+### Semi-Parametric PH
+
+The Cox Proportional Hazards (Cox PH)  [@Cox1972], or Cox model, is likely the most widely known semi-parametric model and the most studied survival model [@Reid1994; @Wang2017].
+The Cox model fits the $\beta$ terms in (@eq-ph) by ignoring the baseline hazard as a 'nuissance parameter' and using the 'partial likelihood' function [@Cox1975]:
 
 $$
 \calL(\beta) = \prod_{k=1}^m \left(\frac{\exp(\eta_{\tbk})}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}\right)
@@ -154,32 +146,30 @@ $$
 \call(\beta) = \sum_{k=1}^m \left(\eta_{\tbk} - \log \left(\sum_{j \in \calR_{\tbk}} \exp(\eta_j)\right)\right)
 $$
 
-Given these formulas, one can make relative risk predictions (@sec-survtsk) as well as analysing patterns in the data by computing hazard ratios, which provide a method for identifying the covariates that have a significant effect on an individual's hazard.
-However, to make a full survival distribution prediction, the baseline hazard must be considered.
-
-The baseline hazard, $h_0$, captures the average (baseline) risk for all observations at a given time-point.
-The Breslow estimator [@Cox1975] provides a way to obtain an estimate of the cumulative baseline hazard based on the covariate effect estimates obtained from the partial likelihood (@eq-partial):
+Given these formulae, one can already make predictions in the form of relative risks (@sec-survtsk).
+To make survival distribution predictions, the baseline hazard must be estimated.
+The Breslow estimator [@Cox1975] provides a way to obtain an estimate of the cumulative baseline hazard, $H_0$, using the covariate effect estimates obtained from the partial likelihood (@eq-partial):
 
 $$
 \hat{H}_{Bres}(\tau) = \sum_{k:\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} \exp(\hat{\eta}_j)}
 $$ {#eq-breslow}
 
 where $\hat{\eta}_j$ is the estimated linear predictor for observation $j$.
-Note that if the value for all covariates or their effects was zero, or if there were no covariates, then the Breslow estimator is identical to the Nelson-Aalen estimator:
+Note that if the value for all covariates or their effects was zero, or if there were no covariates, then the Breslow estimator is identical to the Nelson-Aalen estimator (@sec-surv-na):
 
 $$
 \hat{H}_{Bres}(\tau) = \sum_{k:\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} 1} = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{n_{\tbk}} = \hat{H}_{NA}(\tau)
 $$
 
 With these formulae, the Cox PH can be used as a predictive model by using training data to estimate $\hat{\bsbeta}$ with (@eq-partial).
-These fitted coefficients are then used to predict $\hat{\bseta}$ for new observations and finally the cumulative baseline hazard is computed with (@eq-breslow) to return a predicted distribution, for example the survival probability (@eq-surv-cox) via (@eq-surv-cum) and (@eq-surv-haz).
-<!-- FIXME -->
-The Cox model is a powerful tool that is constantly being found to outperform machine learning models [@Gensheimer2018; @Luxhoj1997; @VanBelle2011b].
-Moreover, it is highly interpretable and as such has a long history of usage in clinical prediction modelling and analysis.
-However, the proportional hazards assumption is often violated in real life, leaving the model to be a questionable choice when used for data analysis.
-It is possible to extend the model to handle time-varying coefficients and model stratification [@Cox1972], though it is surprisingly difficult to make meaningful and interpretable predictions from a time-varying model [@Reid1994].
+These fitted coefficients are used to predict $\hat{\bseta}$ for new observations and finally the cumulative baseline hazard is computed with (@eq-breslow) to return a predicted distribution, for example the survival probability (@eq-ph-surv).
 
-In a predictive setting, it also may not matter if the PH assumption is violated, as long as the model is clearly demonstrated to outperform others (with less stringent assumptions) in an empirical benchmark experiment.
+<!-- FIXME -->
+The Cox model is is highly interpretable and has a long history of usage in clinical prediction modelling and analysis.
+However, the proportional hazards assumption is often violated in real life, leaving the model to be a questionable choice when used for data analysis or inference.
+One method to resolve this is to extend the model to handle time-varying coefficients and model stratification [@Cox1972], though it is surprisingly difficult to make meaningful and interpretable predictions from a time-varying model [@Reid1994].
+Whilst violation of the PH assumption can be a significant problem when interpreting model covariates, the goodness of fit is less important when using the model for predictive purposes.
+In fact, the Cox model often outperforms machine learning alternatives, including those that relax the PH assumption [@Burk2025, @Gensheimer2018; @Luxhoj1997; @VanBelle2011b].
 
 ### Parametric PH
 
@@ -189,7 +179,7 @@ On these occasions, a particular probability distribution of the event times is 
 The Weibull distribution is particularly important as it reduces to the Exponential distribution when the shape parameter equals $1$.
 Moreover, it is unique (and Exponential as a special case) in that it has both the PH and AFT property (technically a less known representation of Gompertz also has this property).
 
-Assuming a PH model one can plug in the hazard and survival functions from the Weibull distribution into @eq-cox and @eq-cox-surv respectively.
+Assuming a PH model one can plug in the hazard and survival functions from the Weibull distribution into (@eq-ph) and (@eq-ph-surv() respectively.
 First recall for a $\Weib(\gamma, \lambda)$ distribution with shape parameter $\gamma$ and scale parameter $\lambda$, the relevant functions can be given by [@KalbfleischPrentice1973]:
 
 $$
@@ -252,7 +242,7 @@ In the first case, the baseline hazard function and the coefficients are replace
 
 $$
 h_{Cox;e}(\tau|\xx_i)= h_{e;0}(\tau)\exp(\eta_{e;i})
-$$ {#eq-cox-cr}
+$$
 
 Where $h_{e;0}$ is a cause-specific baseline hazard and $\eta_{e;i}$ is the cause-specific coefficient for observation $i$.
 
@@ -305,7 +295,7 @@ $$
 h^{SD}_{e}(\tau) = \lim_{\dtau \to 0} \frac{P(\tau \leq Y \leq \tau + \dtau, E = e\ |\ Y \geq \tau \vee (E \neq e \wedge \Delta=1))}{\dtau}
 $$ {#eq-hazard-sd}
 
-Subsituting (@eq-hazard-sd) into the baseline hazard of the Cox model (@eq-cox) yields the Fine-Gray subhazard model for the $e$th cause [@Fine1999]:
+Subsituting (@eq-hazard-sd) into the baseline hazard of the Cox model yields the Fine-Gray subhazard model for the $e$th cause [@Fine1999]:
 
 $$
 h_{FG;e}(\tau|\xx_i)= h^{SD}_{e;0}(\tau)\exp(\eta_i) 
@@ -333,7 +323,7 @@ The weighting function handles these cases as follows:
 1. If $t_j \geq \tbke$ then $w_{kj} = 1$ and thus observations who have not experienced any event contribute the most to the likelihood.
 2. If $t_j < \tbke$ then $w_{kj} < 1$ as $\KMG$ is a monotonically decreasing function with $w_{kj}$ continuing to decrease as the distance between $t_j$ and $\tbke$ increases. Thus the contribution from observations that have experienced competing events reduces over time.
 
-Whilst modelling the subdistribution can seem unintuitive note that if there is only one event of interest then $w_{kj} = 1$ for all $k$ and $j$ and further $e_i \neq e$ must always be false, meaning (@eq-riskset-sd) reduces to the standard risk set definition (@eq-riskset) as only the left condition can ever be true and by the same logic the subdistribution hazard reduces to the usual hazard definition.
+Whilst modelling the subdistribution can seem unintuitive note that if there is only one event of interest then $w_{kj} = 1$ for all $k$ and $j$ and further $e_i \neq e$ must always be false, meaning (@eq-riskset-sd) reduces to the standard risk set definition (@eq-risk-set) as only the left condition can ever be true and by the same logic the subdistribution hazard reduces to the usual hazard definition.
 Therefore the standard Cox PH for single events is perfectly recovered.
 
 Instead of interpreting the subdistribution hazards directly, @Austin2017b recommend interpreting the fitted coefficients via the cause-specific CIF and cumulative hazard forms of (@eq-cox-sd), which can be obtained in the 'usual' way by first integrating to obtain the cumulative hazard form:
@@ -397,7 +387,7 @@ $$
 For example, at age 10, a small dog has the same probability of being alive as a human at age 50.
 The dog's survival curve is _accelerated_ by a factor of 5, as shown in the bottom, red curve in @fig-dogs.
 
-If instead, one assumes a constant hazard ratio then at age $\tau$, the dog's risk is five times the humans (@eq-cox-surv):
+If instead, one assumes a constant hazard ratio then at age $\tau$, the dog's risk is five times the humans (@eq-ph-surv):
 
 $$
 S_{dog}(\tau) = S_{human}(\tau)^5
@@ -684,7 +674,7 @@ The vast majority of machine learning models incorporate embedded methods and th
 In contrast, models that do not apply any form of feature selection will perform poorly when there is a large number of variables in a dataset.
 One model that straddles the line of 'traditional' and 'machine learning' methodology is the elastic Cox model, which incorporates the 'lasso' and 'ridge' regularization methods.
 Given a generic learning algorithm, lasso and ridge regularization constrain the model coefficients subject to the $\cal{l}^1$-norm and $\cal{l}^2$-norm respectively.
-The Lasso-Cox [@Tibshirani1997] model fits the Cox model in (@eq-cox) by estimating $\bsbeta$ as
+The Lasso-Cox [@Tibshirani1997] model fits the Cox model by estimating $\bsbeta$ as
 
 $$
 \hat{\bsbeta} = \argmax \calL(\bsbeta); \text{ subject to } \sum |\beta_j| \leq \gamma
