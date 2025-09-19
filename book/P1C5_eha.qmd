@@ -64,7 +64,7 @@ $${#eq-continuous-hazard-process}
 where $\tau-$ indicates the time point immediately before $\tau$.
 
 
-This notation doesn't yield many advantages in the single-event setting, but will shorten notation later on, particularly in the multi-state setting.
+This notation doesn't yield many advantages in the single-event setting, but will shorten notation later on, particularly in the multi-state setting. While not further pursued here beyond notational convenience, we refer to @aalen2008survivalevent for an excellent treatment of event-history analysis derived from the point of view of stochastic processes.
 
 
 ## Competing Risks {#sec-competing-risks}
@@ -87,28 +87,33 @@ The interest was in how pneumonia status (`pneumonia`) at admission to the ICU a
 Each row represent one subject,`time` is the time under observation, `status` indicates the outcome observed ($0$: censored at the end of the study, $1$: discharged alive from the ICU, $2$: death in the ICU). `pneumonia` indicates whether a subject already had pneumonia at ICU admission. {#tbl-surv-data-sir.adm}
 
 Contrast this data to the `tumor` data example in @sec-surv-km. There, patients were followed even after hospital discharge, thus loss to follow-up could be considered reasonably independent of the event of interest (death).
-In this study follow-up stopped once patients were discharged. As discharged patients are healthier compared to the ones who remain on ICU, assuming independence between the time until discharge and time until death is unrealistic.
+In this study, follow-up stopped once patients were discharged. As discharged patients are healthier compared to the ones who remain on ICU, assuming independence between the time until discharge and time until death is unrealistic.
 Analysis of this data and how the different assumptions (independent censoring vs. competing risks) affects the estimates is discussed in @sec-aalen-johanson and @sec-cens-vs-cr.
 
 ### Notation and Definitions
 
-In the competing risks setting, everyone starts out in the initial state $0$ and can progress to one of the absorbing states $1,\ldots,q$. The goal is to characterize the process $E(\tau) \in \{0,\ldots, q\}$ in terms of transition hazards and probabilities.
+In the competing risks setting, everyone starts out in the initial state $0$ and can progress to one of the absorbing states 
 
+$$
+e \in \{1,\ldots,q\}
+$$ {#eq-absorbing-states}
+
+These absorbing states are also often refered to as *competing events*, *event types*, or *causes* (as in cause that ended the observation).
+State $e = 0$ is the initial state and a subject that remains in state $0$ until the end of the follow up is considered censored.
+
+ The goal is to characterize the process $E(\tau) \in \{0,\ldots, q\}$ in terms of transition hazards and probabilities.
 In extension of @eq-continuous-hazard-process, we define *cause-specific* hazards
 <!--  -->
 $$
 h_{e}(\tau) = \lim_{\dtau \to 0} \frac{P(E(\tau + \dtau) = e\ |E(\tau-)=0)}{\dtau}.
 $$ {#eq-cause-specific-hazard}
 <!--  -->
-
 Analogous to the single-event case, we can also define the cause-specific cumulative hazard
 <!--  -->
-
 $$
 H_{e}(\tau) = \int_{0}^\tau h_e(u)\ du
 $$ {#eq-cause-specific-cumu-hazard}
 <!--  -->
-
 As competing events are mutually exclusive at any time $\tau$, it is possible to define the *all-cause hazard* which is the hazard of any event occurring as the sum of all cause-specific hazards
 <!--  -->
 $$
@@ -116,11 +121,15 @@ h(\tau) = \sum_{e = 1}^{q}h_{e}(\tau),
 $$ {#eq-all-cause-hazard}
 <!--  -->
 as well as the *all-cause cumulative hazard*, which can be obtained either via the integral over the all-cause hazard (@eq-all-cause-hazard) or as sum of cause-specific cumulative  hazards (@eq-cause-specific-cumu-hazard):
-<!--  -->
+
 $$
-H(\tau) = \sum_{e=1}^q H_{e}(\tau) = \sum_{e=1}^{q}\int_{0}^\tau h_{e}(u)\ du =\int_{0}^\tau \sum_{e=1}^{q} h_{e}(u)\ du \int_{0}^\tau h(u)\ du
+\begin{aligned}
+H(\tau) 
+ & = \sum_{e=1}^q H_{e}(\tau) = \sum_{e=1}^{q}\int_{0}^\tau h_{e}(u)\ du\\ 
+ & =\int_{0}^\tau \sum_{e=1}^{q} h_{e}(u)\ du = \int_{0}^\tau h(u)\ du
+\end{aligned}
 $$ {#eq-all-cause-cumu-hazard}
-<!--  -->
+
 The *all-cause survival probability* gives the probability that *none* of the events occurred before $\tau$.
 This is usually not estimated directly but calculated from the cause specific hazards instead via @eq-all-cause-cumu-hazard and @eq-all-cause-surv-prob:
 
@@ -132,7 +141,7 @@ Finally, the probability of experiencing an event $e$ before time $\tau$*, which
 <!--  -->
 $$
 \begin{aligned}
-F_{e}(\tau) &= P(E(\tau) = e)  &\ \\
+F_{e}(\tau) &= P(Y \leq \tau, E(Y) = e)  &\ \\
             & = \int_{0}^\tau f_e(u)\ \mathrm{d}u = \int_{0}^\tau S(u-)h_{e}(u)\ \mathrm{d}u,
 \end{aligned}
 $$ {#eq-cif}
@@ -149,7 +158,7 @@ $F_e(\tau)$ can be interpreted as the proportion of subjects who experienced eve
 Because the events are mutually exclusive, it holds that
 <!--  -->
 $$
-\sum_{e=1}^q F_e(\tau) + S(\tau) = F(\tau) + S(\tau) = 1,
+S(\tau) + \sum_{e=1}^q F_e(\tau) =  S(\tau) + F(\tau)= 1
 $$
 <!--  -->
 where $F(\tau)$ is the probability that an event of any type occurring before $\tau$ and $S(\tau)$ the probability that no event occurs (@eq-all-cause-surv-prob).
@@ -160,10 +169,10 @@ Many estimation procedures for the CIF take this approach, consequently referred
 
 ### Non-parametric estimators {#sec-aalen-johanson}
 
-Non-parametric estimators for the cause-specific (cumulative) hazard (@eq-cause-specific-cumu-hazard) in the competing risks setting are derived analogous to the single event case  (@sec-surv-estimation-non-param). The CIF then follows from @eq-cif.
+Non-parametric estimators for the cause-specific (cumulative) hazard (@eq-cause-specific-cumu-hazard) in the competing risks setting are derived analogously to the single event case  (@sec-surv-estimation-non-param). The non-parametric estimate for the CIF is obtained by plugging in the non-parametric estimates of $S(t)$ and $h(t)$ into (@eq-cif) as follows.
 
 First, recall from @sec-data-rc the definitions of the unique ordered event times $t_{(k)}, k=1\ldots,m$, the risk-set at time $t_{(k)}$, $\calR_{t_{(k)}}$, the number of events, $d_{t_{(k)}}$, and number of observations at risk $n_{t_{(k)}}$.
-Assume partitioning of the follow-up into $m$ disjunct intervals $(t_{(k-1)}, t_{(k)}],k=1,\ldots,m$, such that $Y\in (t_{(k-1)}, t_{(k)}] \Leftrightarrow \tilde{Y}=t_{(k)}$, with $\tilde{Y}$ defined as in @sec-discrete..
+Assume partitioning of the follow-up into $m$ disjoint intervals $(t_{(k-1)}, t_{(k)}],k=1,\ldots,m$, such that $Y\in (t_{(k-1)}, t_{(k)}] \Leftrightarrow \tilde{Y}=t_{(k)}$, with $\tilde{Y}$ defined as in @sec-distributions-discrete.
 
 An estimate for the *cause-specific* hazard is derived by updating the numerator in @eq-disc-haz-non-param to $d_{e,t_{(k)}}$ (the number of events of type $e$ at time $t_{(k)}$):
 <!--  -->
@@ -171,25 +180,12 @@ $$
 h^d_{e}(t_{(k)}) := \frac{d_{e,t_{(k)}}}{n_{t_{(k)}}},\ e \in \{1, \ldots, q\}.
 $$ {#eq-cs-discrete-hazard}
 <!--  -->
-The Nelson-Aalen estimator (@eq-nelson-aalen) for the *cause-specific* cumulative hazard is then given by
-<!--  -->
-$$
-H_{NA,e}(\tau) = \sum_{k:t_{(k)}\leq\tau} h^d_{e}(t_{(k)}) = \sum_{k:t_{(k)} \leq \tau} \frac{d_{e,t_{(k)}}}{n_{t_{(k)}}},
-$$ {#eq-cs-nelson-aalen}
-<!--  -->
-which yields a step function for each $e$, with jumps at time points $t_{(k)}$.
 
 
-The all-cause survival probability follows from @eq-all-cause-cumu-hazard and @eq-all-cause-surv-prob as
+Finally, the Aalen-Johansen (AJ) estimator (@aalenEmpiricalTransitionMatrix1978) for the CIF is obtained by plugging in the Kaplan-Meier estimate (@eq-km) for the all-cause survival probability (probability that none of the competing events occurred) and the cause-specific hazard (@eq-cs-discrete-hazard) for cause $e$into (@eq-cif):
 <!--  -->
 $$
-S_{NA}(\tau) = \exp\left(-\sum_{e=1}^q H_{NA,e}(\tau)\right).
-$$
-<!--  -->
-Finally, the Aalen-Johansen (AJ) estimator (@aalenEmpiricalTransitionMatrix1978) for the CIF follows via @eq-discrete-prob as
-<!--  -->
-$$
-F_{AJ,e}(\tau) = \sum_{k:t_{(k)}\leq \tau} S_{NA}(\tau-)h^d_e(\tau)=  \sum_{k:t_{(k)}\leq \tau} S_{NA}(t_{(k-1)})\frac{d_{e,t_{(k)}}}{n_{t_{(k)}}}
+F_{AJ,e}(\tau) = \sum_{k:t_{(k)}\leq \tau} \hat{S}_{KM}(\tau-)\hat{h}^d_e(\tau)=  \sum_{k:t_{(k)}\leq \tau} \hat{S}_{KM}(t_{(k-1)})\frac{d_{e,t_{(k)}}}{n_{t_{(k)}}}
 $$ {#eq-aalen-johanson}
 <!--  -->
 
@@ -197,16 +193,16 @@ $$ {#eq-aalen-johanson}
 ### Application to mortality of ICU patients
 
 For illustration of the AJ estimator and the interpretation of the CIFs consider the analysis conducted in @beyersmann.competing.2012, based on the data from @tbl-surv-data-sir.adm.
-Recall that one is interested in estimation of the mortality conditional on pneumonia status at admission, while accounting for discharge from the ICU as competing risk ($E \in \{\text{"discharge"}, \text{"death"}\}$).
-While the AJ estimator cannot naturally incorporate feature information, it can be applied to subgroups of the data (here based on the pneumonia status).
+Recall that one is interested in estimation of the mortality conditional on pneumonia status at admission, while accounting for discharge from the ICU as competing risk ($E(\tau) \in \{0,1,2\}$, where $0$ indicates being alive in ICU (the initial state), $1$ indicates discharge from ICU and $2$ indicates death).
+While the AJ estimator cannot naturally incorporate feature information, it can be applied to subgroups of the data (here based on the pneumonia status $x_{\text{pneu}} \in \{0,1\}$).
 Note that this will yield different sets of unique event times in each group, thus the AJ can have jumps at different time-points for the two groups.
 
-TODO: clean up text below
+<!-- TODO: clean up text below -->
 
 @fig-cif-sir shows the AJ estimates of the CIFs for each event type (discharge/death) stratified by pneumonia status.
-Exemplary, the proportion of subjects with pneumonia being discharged until $\tau=120\text{ days}$ is approximately 75% ($\hat{F}_{\text{discharge}}(120) = P(Y\leq 120, E=\text{"discharge"})\approx 0.75$), while approximately 25% died in the ICU ($\hat{F}_{\text{death}}(120) = P(Y\leq 120, E=\text{"death"})\approx 0.25)$.
-For patients without pneumonia we have $\hat{F}_{\text{discharge}}(120) \approx 0.91$ and $\hat{F}_{\text{death}} \approx 0.09$.
-In this example, $\hat{F}_{\text{discharge}} + \hat{F}_{\text{death}} \approx 1$ for both pneumonia groups, as only 14 of 747 patients were censored (neither discharge nor death) at the end of the follow-up.
+For example, the proportion of subjects with pneumonia being discharged until $\tau=120\text{ days}$ is approximately 75% ($\hat{F}_{1}(120|x_{\text{pneu}}=1) = \hat{P}(Y \leq 120, E(Y) = 1|x_{\text{pneu}}=1)\approx 0.75$), while approximately 25% died in the ICU ($\hat{F}_{2}(120|x_{\text{pneu}}=1) = \hat{P}(Y \leq 120, E(Y) = 2|x_{\text{pneu}}=1)\approx 0.25)$.
+For patients without pneumonia we have $\hat{F}_{1}(120|x_{\text{pneu}}=0) \approx 0.91$ and $\hat{F}_{2}(120|x_{\text{pneu}}=0) \approx 0.09$.
+In this example, $\hat{F}_{1} + \hat{F}_{2} \approx 1$ for both pneumonia groups, as only 14 of 747 patients were censored (neither discharge nor death) at the end of the follow-up and thus the all-cause survival probability $\hat{S}(120) \approx 0$.
 
 ![Aalen-Johansen estimator for the `sir.adm` data [@pkgmvna], stratified by pneumonia status at admission to the ICU. Left panel: Proportion of subjects discharged alive from the ICU. Right panel: Proportion of subjects who died in the ICU.](Figures/survival/cif-sir.png){#fig-cif-sir fig-alt="Illustration of the Aalen-Johansen estimator for the cumulative incidence function, stratified by pneumonia status at admission to the ICU."}
 
@@ -216,7 +212,7 @@ In this example, $\hat{F}_{\text{discharge}} + \hat{F}_{\text{death}} \approx 1$
 
 It is worth spending some time to consider the difference between independent right-censoring and competing risks.
 Note that for the estimation of the hazard (@eq-cs-discrete-hazard), occurrences of competing events are implicitly assumed right-censored (as $d_{e,t_{(k)}}$) only counts events of type $e$ and $n_{t_{(k)}}$ contains the same subjects that would remain if events of type $\tilde{e}\neq e$ were considered censored before $t_{(k)}$.
-Nevertheless, competing risks are taken into account in the definition of the AJ estimator (@eq-aalen-johanson), as the all-cause survival probability (@eq-all-cause-surv-prob) depends on all cause-specific hazards.
+Nevertheless, competing risks are taken into account in the definition of the CIFs (@eq-cif) and thus also in the AJ estimator (@eq-aalen-johanson), as the all-cause survival probability (@eq-all-cause-surv-prob) depends on all cause-specific hazards.
 
 In contrast, assume that in our analysis of the `sir.adm` data we would consider time of discharge as independent right-censoring.
 As we only have one other event (death), the data could be treated as single-event, right-censored data as in @sec-surv and therefore analyzed using the Nelson-Aalen estimator (@eq-surv-na).
@@ -285,18 +281,18 @@ The fact that subjects enter the risk sets for different transitions at differen
 
 In the competing risks setting, we characterized the data generating process by
 cause-specific transitions hazards $h_e(\tau)$ (@eq-cause-specific-hazard).
-Implicitly these are transition from starting state $0$ to end state $e$, however, since everyone starts in stats in state $0$ this information is ignored.
+Implicitly these are transitions from starting state $0$ to end state $e$, however, since everyone starts in state $0$ this is ignored notationally.
 In the multi-state setting on the other hand, subjects can be in different states at different time points.
-Transitions between different states are therefore characterized by transition-specific hazards, denoted by $h_{\ell\rightarrow e}(\tau)$ or short $h_{\ell e}(\tau)$, where $\ell$ is the starting state and $e$ the end state, $\ell, e \in \{0,\ldots,q\}$ (ignoring details such as the starting state must be a transient state and not all states are reachable from each starting state).
+Transitions between different states are therefore characterized by transition-specific hazards, denoted by $h_{\ell\rightarrow e}(\tau)$ or short $h_{\ell e}(\tau)$, where $\ell$ is the starting state and $e$ the end state.
 
-Let $E(\tau)\in \{0,\ldots,q\}$ be the state process as before (@eq-state-process).
+Let $E(\tau)\in \{0,\ldots,q\}$ be the state of the process at time $\tau$ as before (@eq-state-process).
 Then, the transition-specific hazard can be defined as
 <!--  -->
 $$
 h_{\ell e}(\tau) = \lim_{\dtau \to 0} \frac{P(E(\tau + \dtau)=e|E(\tau-) = \ell)}{\dtau}
 $$ {#eq-ms-transition-hazards}
 
-Transition hazards @eq-ms-transition-hazards indicate the relative risk to enter state $e$ at time $\tau$ given occupation of state $\ell$  at $\tau-$, which is the instant before $\tau$.
+Transition hazards @eq-ms-transition-hazards indicate the instantaneous risk to enter state $e$ at time $\tau$ given occupation of state $\ell$  at $\tau-$, which is the instant before $\tau$.
 
 Analogous to the competing risks setting, we can define the transition specific cumulative hazards
 
@@ -330,16 +326,10 @@ $$
 $$ {#eq-ms-trans-prob-row-sums}
 <!--  -->
 
-### Instantaneous transition probabilities
-In this section we briefly recap how the transition probabilities can be expressed as the product (integral) of  instantaneous transition probabilities
-<!--  -->
-$$
-p_{\ell e}(\tau) = P\big(E(\tau + \dtau)=e|E(\tau-)=\ell\big)
-$$ {#eq-ms-instantaneous-trans-prob}
-<!--  -->
-which can be recognized as the nominator of @eq-ms-transition-hazards, or intuitively as the transition probability between two subsequent time points.
+### Transition probabilities
+In this section we briefly motivate how transition probabilities between two non-consecutive time points can be expressed as the product (integral) of transition probabilities between intermediate, subsequent time points.
 
-For illustration, consider what is often referred to as an illness-death model depicted in @fig-illness-death (similar to @fig-multi-state-prothr-states, but without back-transition), where subjects can transition from healthy state $0$ to absorbing state death ($2$) either directly or via intermediate state $1$.
+For illustration, consider what is often referred to as an illness-death model depicted in @fig-illness-death (similar to @fig-multi-state-prothr-states, but without back-transition), where subjects can transition from healthy state $0$ to absorbing death state $2$ either directly or via intermediate state $1$.
 
 ![An *illness-death model* where subjects can transition from healthy state ($0$) to death ($2$) directly or via intermediate illness state ($1$)](Figures/survival/illness-death-model.png){#fig-illness-death fig-alt="Graph of the illness-death model."}
 
@@ -364,7 +354,7 @@ This is possible in the three ways depicted in @fig-prothr-ex-graph.
 
 <!-- FIXME: make sure colors are actually the same in graph and text -->
 
-Thus, $P_{02}(4,6) = \textcolor{blue}{p_{00}(5)p_{02}(6)} + \textcolor{green}{p_{01}(6)p_{12}(6)} + \textcolor{orange}{p_{02}(5)}$, where $p_{\ell e}(\tau)=P(E(\tau)=e|E(\tau -1) = \ell)$ are the probabilities for transitions $\ell \rightarrow e$ between two subsequent discrete time points.
+Thus, $P_{02}(4,6) = \textcolor{blue}{p_{00}(5)p_{02}(6)} + \textcolor{green}{p_{01}(5)p_{12}(6)} + \textcolor{orange}{p_{02}(5)}$, where $p_{\ell e}(\tau)=P(E(\tau)=e|E(\tau -1) = \ell)$ are the probabilities for transitions $\ell \rightarrow e$ between two subsequent discrete time points.
 Thus, in discrete time, the matrix of transition probabilities can be represented as a finite matrix product
 
 $$
@@ -419,49 +409,35 @@ Returning to the continuous time setting where transitions can occur at any time
 Imagine dividing the interval $(\zeta, \tau]$ into $J$ intervals such that $\zeta = t_{0} < t_{1} < \cdots < t_{j} < \cdots t_{J} = \tau$, assuming that no events occur between time points $t_{j} \in \mathbb{R}_+, j=1,\ldots, J$.
 Then @eq-ms-trans-prob-ill-death-discrete still holds when replacing $p_{\ell e}(j)$ with $p_{\ell e}(t_j)$.
 
-Increasing the number of intervals to infinity or equivalently, reducing the interval size to infinitesimally small intervals $du$ where only one transition can be observed, leads to a product integral over the instantaneous transition probabilities $p_{\ell e}(u)$ (@eq-ms-instantaneous-trans-prob), such that
-<!--  -->
-$$
-\begin{aligned}
-\mathbf{P}(\zeta, \tau) & = \lim_{\du \rightarrow 0}\prod_{u \in (\zeta, \tau]}
-  \begin{pmatrix}
-    p_{00}(u) & \cdots & p_{0q}(u)\\
-    \vdots                  & \ddots & \vdots\\
-    p_{q0}(u)  & \cdots & p_{qq}(u)\\
-  \end{pmatrix}
-\end{aligned}
-$$ {#eq-ms-prodint}
-<!--  -->
 
+### Transition probabilities and hazards
+Increasing the number of intervals to infinity or equivalently, reducing the interval size to infinitesimally small intervals we can define the transition probability matrix as a product integral over the instantaneous transition probabilities $p_{\ell e}(u)$, expressed in terms of transition-specific (cumulative) hazards. 
 
-### Instantaneous transition probabilities and hazards
-In context of survival analysis we want to express the transition matrix (@eq-ms-prodint) and thus instantaneous transition probabilities $p_{\ell e}(u)$ in terms of (cumulative) hazards.
 To do so, we use, somewhat informally, the following relationships
 
-- From equations @eq-ms-transition-hazards and @eq-ms-cumu-hazard we can equate the instantaneous transition probabilities to increments of the cumulative hazard (that is the increase in the cumulative hazard within a (fixed, infinitesimally) small interval $\du$): $dH_{\ell e}(u) = h_{\ell e}(u)d u = P\big(E(u+du)=e|E(u-) = \ell\big) = p_{\ell e}(u)$,
+- From equations @eq-ms-transition-hazards and @eq-ms-cumu-hazard we can equate the instantaneous transition probabilities to increments of the cumulative hazard (that is the increase in the cumulative hazard within a (fixed, infinitesimally) small interval $\du$): $dH_{\ell e}(u) = P\big(E(u+du)=e|E(u-) = \ell\big) =: p_{\ell e}(u)$,
 - because of relationship @eq-ms-trans-prob-row-sums, diagonal elements (transitions into the same state) are set to $dH_{\ell \ell}(u) := -\sum_{e \neq \ell} dH_{\ell e}(u)$ such that $1 + dH_{\ell\ell}(u) = 1-\sum_{e \neq \ell} dH_{\ell e}(u) = 1 - \sum_{e\neq \ell}p_{\ell e}(u) = p_{\ell\ell}(u)$.
 
-
-Consequently, @eq-ms-prodint can be rewritten as
+Consequently, the transition probability matrix can be written as
 <!--  -->
 $$
 \begin{aligned}
 \mathbf{P}(\zeta, \tau)
-                        &= \lim_{\du \rightarrow 0}\prod_{u \in (\zeta, \tau]}
+                        &= \mathscr{P}_{u \in (\zeta, \tau]}
   \begin{pmatrix}
     p_{00}(u) = 1 + dH_{00}(u) & \cdots & p_{0q}(u) = dH_{0q}(u)\\
     \vdots                  & \ddots & \vdots\\
     p_{q0}(u) =  dH_{q0}(u)     & \cdots & p_{qq}(u) = 1 + dH_{qq}(u)\\
   \end{pmatrix}\nonumber\\
   & \ \\
-  & =  \lim_{\du \rightarrow 0}\prod_{u \in (\zeta, \tau]}(\mathbf{I} + d\mathbf{H}(u)),\nonumber\\
+  & =  \mathscr{P}_{u \in (\zeta, \tau]}(\mathbf{I} + d\mathbf{H}(u)),\nonumber\\
 \end{aligned}
 $$ {#eq-ms-prodint-cumu-hazards}
 <!--  -->
-where $\mathbf{I}$ is a $(q+1) \times (q+1)$ identity matrix and $d\mathbf{H}(u)$ is the matrix of increments of the cumulative hazard within infinitesimally small intervals.
-Thus, similar to the competing risks setting, relationship @eq-ms-prodint implies that knowledge of the transition specific (cumulative) hazards is sufficient to fully specify the multi-state process.
+where $\mathscr{P}$ is the product integral operator, $\mathbf{I}$ is a $(q+1) \times (q+1)$ identity matrix and $d\mathbf{H}(u)$ is the matrix of increments of the cumulative hazard within infinitesimally small intervals.
+Thus, similar to the competing risks setting, relationship @eq-ms-prodint-cumu-hazards implies that knowledge of the transition specific (cumulative) hazards is sufficient to fully specify the multi-state process.
 
-As analytical solutions of @eq-ms-prodint only exist for specific models, in practice, the transition probabilities are often once again approximated numerically via a finite matrix product on a discrete time grid $\zeta = t_0 < t_1 < \cdots < t_{J-1} < t_{J} = \tau$
+As analytical solutions of @eq-ms-prodint-cumu-hazards only exist for specific models, in practice, the transition probabilities are often once again approximated numerically via a finite matrix product on a discrete time grid $\zeta = t_0 < t_1 < \cdots < t_{J-1} < t_{J} = \tau$
 <!--  -->
 $$
 \mathbf{P}(\zeta, \tau) \approx \prod_{j=1}^{J}(\mathbf{I} + \triangle\mathbf{H}_{\ell e}(t_{j})),
@@ -512,3 +488,24 @@ While the probabilities to transition from normal or abnormal state to death ($0
 Although there appears to be a reduction in $0 \rightarrow 2$ transitions  and an increase in $1\rightarrow 0$ transitions  between time points $1000$ and $3000$, this effect doesn't seem to persist until the end of the follow up.
 
 ![Estimated transition probabilities for the different transitions of the prothrombin data example .](Figures/survival/multi-state-prothr.png){#fig-multi-state-prothr fig-alt="Transition probabilities for the prothrombin data example."}
+
+
+## Conclusion
+
+:::: {.callout-warning icon=false}
+
+## Key takeaways
+
+* Defining the state diagram of the data generating process can be helpful to understand the dynamics in the data and to select an appropriate framework (and model) for the analysis.
+* Non-parmetric estimators like the Aalen-Johanson estimator can be used as first step in the analysis of competing risks and multi-state settings.
+* The empirical transition matrix provides a general procedure to obtain estimates of transition probabilties based on any learner that can estimate transition-specific hazards.
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+* @aalen2008survivalevent introduces different approaches for event-history analysis motivated from the point of view of the counting process.
+* @beyersmann.competing.2012 provide an accessible overview of important concepts for competing risks and multi-state modelling, particularly non-parametric estimation.
+
+
+::::

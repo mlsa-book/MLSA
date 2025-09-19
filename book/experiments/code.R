@@ -384,12 +384,12 @@ p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
   geom_vline(xintercept = 120, lty = 3) +
   # geom_step(data=km_sir_b, aes(col = pneumonia), lty = 2) +
   labs(
-    y = expression(P(Y <= tau~ "," ~ E == e))
+    y = expression(P(Y <= tau~ "," ~ E(Y) == e))
   ) +
   coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
 
 
-ggsave("Figures/survival/cif-sir.png", p_sir_cifs,
+ggsave("book/Figures/survival/cif-sir.png", p_sir_cifs,
   height=3, width=6, dpi=300)
 
 
@@ -426,12 +426,12 @@ p_cens_vs_cr = ggplot(
     coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
     geom_vline(xintercept = 120, lty = 3) +
     labs(
-      y = expression(P(Y <= tau)),
+      y = expression(P(Y <= tau~ "," ~ E(Y) == 2)),
       linetype = "assumption"
     )
 
 
-ggsave("Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
+ggsave("book/Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
 
 
 
@@ -500,3 +500,33 @@ p_trans_prob_prothr = ggplot(overall_df, aes(x = time, y = trans_prob)) +
 ggsave("Figures/survival/multi-state-prothr.png",
   p_trans_prob_prothr, width=5, height=5.2)
 
+
+## Survival task viz
+library(dplyr)
+library(patchwork)
+set.seed(20250822)
+
+sex <- rbinom(10, 1, 0.5)
+x_base <- ceiling(runif(10, ifelse(sex == 1, 20, 1), ifelse(sex == 1, 50, 30)))
+x <- unlist(lapply(x_base, function(val) c(0, val, 50)))
+
+df <- data.frame(x = x, y = c(1, 0, 0), group = as.factor(rep(1:10, each = 3)), sex = rep(as.factor(sex), each  = 3)) %>%
+  mutate(alpha = if_else(group == 10, 1, 0.1))
+
+(df %>% group_by(sex) %>% summarise(x = mean(x)))
+
+g <- ggplot(df, aes(x = x, y = y, group = group))
+g1 <- g + geom_step(linewidth = 1.3, color = "gray")
+g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity()
+g3 <- g1 + geom_smooth(aes(x = x, y = y), data.frame(x = c(0, mean(df$x), 50), y = c(1, 0, 0)),
+    inherit.aes = FALSE, method = "loess", se = FALSE, color = "black", linewidth = 1)
+g4 <- g +
+  geom_step(aes(color = sex), linewidth = 1.3, alpha = 0.5) +
+  geom_smooth(aes(x = x, y = y, group = sex, color = sex),
+  data.frame(x = c(0, 23.3, 50, 0, 40, 50), y = c(1, 0, 0, 1, 0, 0), sex = as.factor(c(1, 1, 1, 0, 0, 0))),
+    inherit.aes = FALSE, method = "loess", se = FALSE, linewidth = 1.5)
+
+g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S(t)") & guides(color  = "none")
+
+ggsave("book/Figures/survtsk/heavisides.png",
+  g_final, height=5, width=7, units="in", dpi=600)
