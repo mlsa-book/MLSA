@@ -16,8 +16,8 @@ Because the collection of such data takes place in the temporal domain (it takes
 In survival analysis terminology this is referred to as *censoring*.
 
 This chapter defines basic terminology and mathematical definitions in survival analysis, which are used throughout this book.
-Building upon this chapter, @sec-eha introduces event-history analysis, which is a generalisation to settings with multiple, potentially competing or recurrent events, including multi-state outcomes.
-Concluding this part of the book, @sec-survtsk defines different prediction tasks in survival analysis that are used by models and measures to implement machine learning methods.
+Building upon this chapter, @sec-eha introduces event-history analysis, which is a generalization to settings with multiple, potentially competing or recurrent events, including multi-state outcomes.
+Concluding this part of the book, @sec-survtsk defines different prediction tasks in survival analysis.
 
 While these definitions and concepts are not new to survival analysis, it is imperative they are understood to build successful models.
 Evaluation functions (Part II) can identify if one model is better suited than another to minimize a given objective function, however they cannot identify if the objective function itself was specified correctly, which depends on the assumptions about the data generating process.
@@ -26,9 +26,9 @@ Hence, it is of utmost importance for machine learning practitioners to be able 
 
 ## Quantifying the Distribution of Event Times {#sec-distributions}
 
-This section introduces functions that can be used to fully characterise a probability distribution, particular focus is given to functions that are important in survival analysis.
+This section introduces functions that can be used to fully characterize a probability distribution, particular focus is given to functions that are important in survival analysis.
 
-Note that we can generally distinguish between event taking place in discrete time or continuous time.
+Note that we can generally distinguish between events taking place in discrete time or continuous time.
 For example, consider the time a politician serves in parliament.
 If we consider the number of election cycles they stay in parliament, it would constitute discrete time, as time can only take values, $1, 2, 3, \ldots$, that is $Y\in \mathbb{N}_{>0}$.
 On the other hand, the time an individual stays in hospital is usually determined as the difference between the admission date-time and discharge date-time, which would constitute a continuous time $Y\in \mathbb{R}_{\geq 0}$.
@@ -42,7 +42,7 @@ It is nevertheless important to make the distinction as it informs mathematical 
 For now, assume a continuous, positive, random variable $Y$ taking values in (t.v.i.) $\NNReals$.
 A standard representation of the distribution of $Y$ is given by the probability density function (pdf), $f_Y: \NNReals \rightarrow \NNReals$, and cumulative distribution function (cdf), $F_Y: \NNReals \rightarrow [0,1]; (\tau) \mapsto P(Y \leq \tau)$.
 
-In survival analysis, it is most common to describe the distribution of event times $Y$ via the *survival function* and *hazard function* (or *hazard rate*) rather than the pdf or cdf. The survival function is defined as
+In survival analysis, it is more common to describe the distribution of event times $Y$ via the *survival function* and *hazard function* (or *hazard rate*) rather than the pdf or cdf. The survival function is defined as
 $$
 S_Y(\tau) = P(Y > \tau) = \int^\infty_\tau f_Y(u) \ \du,
 $$ {#eq-surv-prob}
@@ -69,7 +69,10 @@ $$ {#eq-cumu-hazard}
 and relates to the survival function via
 
 $$
-H_Y(\tau) = \int^\tau_0 h_Y(u) \ \du = \int^\tau_0 \frac{f_Y(u)}{S_Y(u)} \ \du = \int^\tau_0 -\frac{S'_Y(u)}{S_Y(u)} \ \du = -\log(S_Y(\tau))
+\begin{aligned}
+H_Y(\tau) & = \int^\tau_0 h_Y(u) \ \du = \int^\tau_0 \frac{f_Y(u)}{S_Y(u)} \ \du\\
+          & = \int^\tau_0 -\frac{S'_Y(u)}{S_Y(u)} \ \du = -\log(S_Y(\tau))
+\end{aligned}
 $$
 
 These last relationships are particularly important, as many methods estimate the hazard rate, which is then used to calculate the cumulative hazard and survival probability
@@ -79,15 +82,15 @@ $$ {#eq-surv-haz}
 
 Unless necessary to avoid confusion, subscripts are dropped from $S_Y, h_Y$ etc. going forward and instead these functions are referred to as $S$, $h$ (and so on).
 
-Usual regression techniques cannot be used to estimate these quantities as $Y$ is only partially observed, due to different types of censoring and truncation, which are now described.
+Usual regression techniques cannot be used to estimate these quantities as $Y$ is only partially observed, due to different types of censoring and truncation (see @sec-data-rc, @sec-types-of-censoring, @sec-truncation).
 
 
 
 ### Discrete Time {#sec-distributions-discrete}
 
-Now consider a discrete, positive random variable $\tilde{Y}$ taking value in $\mathbb{N}_{>0}$ and $\tau\in \mathbb{N}_{>0}$ some time point in discrete time.
+Now let $\tilde{Y}$ be a discrete, positive random variable that represents discrete or discretized time, taking values in $\mathbb{N}_{>0}$; and $\tau\in \mathbb{N}_{>0}$ some time point in discrete time.
 
-The discrete-time hazard rate
+The discrete-time hazard rate is defined as
 
 $$
 h^d_{\tilde{Y}}(\tau) = P(\tilde{Y}=\tau|\tilde{Y} \geq \tau).
@@ -101,12 +104,12 @@ $$
 H^d_{\tilde{Y}}(\tau) = \sum_{k=1}^{\tau}h^d_{\tilde{Y}}(k)
 $$ {#eq-discrete-cumu-hazard}
 
-We then define the inverse probability
+We also define the complement of @eq-discrete-hazard, the probability to survive beyond $\tau$ given survival until $\tau$, as
 $$
 s^d_{\tilde{Y}}(\tau) := 1 - h^d_{\tilde{Y}}(\tau) = P(\tilde{Y}> \tau|\tilde{Y} \geq \tau).
 $$
 
-It follows that the probability to survive beyond time point $\tau$ is given by
+It follows that the unconditional probability to survive beyond time point $\tau$ is given by
 
 <!--  -->
 $$
@@ -144,7 +147,8 @@ For more details on discrete time-to-event analysis consider [@Tutz2016].
 
 ## Single-event, right-censored data {#sec-data-rc}
 
-The complexity of Survival Analysis compared to other fields arises from the fact that the outcome of interest is often only observed partially. In particular, the time-to-event is often unknown at the end of the observation period, as the event has not occurred yet.
+The complexity of Survival Analysis compared to other fields arises from the fact that the outcome of interest is often only observed partially. 
+In particular, the time-to-event is often unknown at the end of the observation period, as the event has not occurred yet.
 
 
 Let,
@@ -156,13 +160,13 @@ Let,
 In the presence of censoring $C$, it is impossible to fully observe the true outcome of interest, $Y$.
 Instead, the observable variables are defined by
 
-* $T := \min\{Y,C\}$, the *outcome time* (realisations are referred to as the *observed outcome time*); and
+* $T := \min\{Y,C\}$, the *outcome time* (realizations are referred to as the *observed outcome time*); and
 * $\Delta := \II(Y = T) = \II(Y \leq C)$, the *event indicator* (also known as the *censoring* or *status* indicator).
 
 Together $(T,\Delta)$ is referred to as the *survival outcome* or *survival tuple* and they form the dependent variables.
 The survival outcome provides a concise mechanism for representing the outcome time and indicating which outcome (event or censoring) took place.
 
-A *survival dataset* is a $n \times p$, real-valued matrix defined by $\calD = ((\xx_1, \ t_1, \ \delta_1) \cdots (\xx_n,t_n,\delta_n))^\trans$, where $(t_i,\delta_i)$ are realisations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i;1} \ x_{i;2} \cdots x_{i;p})^\trans$ of features.
+A *survival dataset* is a $n \times p$, real-valued matrix defined by $\calD = ((\xx_1, \ t_1, \ \delta_1) \cdots (\xx_n,t_n,\delta_n))^\trans$, where $(t_i,\delta_i)$ are realizations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i;1} \ x_{i;2} \cdots x_{i;p})^\trans$ of features.
 
 Many equations in the survival literature are limited to uncensored observations and often assume that survival times are ordered from smallest to largest survival time.
 When this is the case, it is common to use notation from order statistics.
@@ -179,31 +183,31 @@ For example, $(\xx_{(k)}, \tbk, \delta_{(k)})$ are the features and outcome for 
 
 Finally, the following quantities are used frequently throughout this book and survival analysis literature more generally.
 Let $(t_i, \delta_i) \iid (T,\Delta), i = 1,...,n$, be observed survival outcomes.
-Then,
+
 
 The **risk set at $\tau$**, is the index-set of observation units at risk for the event just before $\tau$
-
+<!--  -->
 $$
 \calR_\tau := \{i: t_i \geq \tau\}
-$$  {#eq-riskset}
+$$ {#eq-risk-set}
 
 where $i$ is the index of an observation in the data.
 For right-censored data, $\calR_0 = \{1,\ldots,n\}$ and $\calR_{\tau} \subseteq \calR_{\tau'}, \forall \tau > \tau'$.
-Note that in a continuous setting, 'just before' refers to an infinitesimally smaller time than $\tau$, in practice as this is unobservable the risk set is defined at $\tau$, hence an observation may both be at risk, and experience an event (or be censored) at $\tau$.
+Note that in a continuous setting, 'just before' refers to an infinitesimally smaller time than $\tau$, in practice, as this is unobservable the risk set is defined at $\tau$, hence an observation may both be at risk, and experience an event (or be censored) at $\tau$.
 
 The **number of observations at risk at $\tau$** is the cardinality of the risk set at $\tau$,
-
+<!--  -->
 $$
 n_\tau := \sum_i \II(t_i \geq \tau) = |\calR_\tau|
 $$
-
+<!--  -->
 Finally, the **number of events at $\tau$** is defined by,
-
+<!--  -->
 $$
 d_\tau := \sum_i \II(t_i = \tau, \delta_i = 1)
 $$
-
-For truly continuous variables, one might expect only one event to occur at each observed event time: $d_{t_i} = 1,\forall i$.
+<!--  -->
+For truly continuous variables, one might expect only one event to occur at each observed event time: $d_{t_{(k)}} = 1,\forall k$.
 In practice, ties are often observed due to finite measurement precision, such that $d_{\tau} > 1$ occurs frequently in real-world datasets.
 
 The quantities $\calR_\tau$, $n_\tau$, and $d_\tau$ underlie many models and measures in survival analysis.
@@ -228,39 +232,6 @@ In this example, the above quantities would be:
 
 : Subset of the `tumor`  [@pkgpammtools] time-to-event dataset.
 Rows are individual observations (ID), $\xx_{;j}$ columns are features, $t$ is observed time-to-event, $\delta$ is the event indicator. {#tbl-surv-data-tumor}
-
-
-## Kaplan-Meier estimator {#sec-surv-km}
-Before we go further, we introduce a simple, non-parametric estimator for the survival function (@eq-surv-prob), the Kaplan-Meier estimator [@Kaplan1958].
-The estimator is useful for visualising survival data and is a popular baseline model to compare to the predictive performance of more complex methods.
-In machine learning terms it can be viewed as a "featureless" learner for survival analysis.
-
-Using the quantities introduced in @sec-data-rc, the estimator is defined by:
-
-$$
-\KMS(\tau) = \prod_{k:\tbk \leq \tau}\left(1-\frac{d_{\tbk}}{n_{\tbk}}\right)
-$$ {#eq-km}
-
-which is a step-function at the  observed ordered event times $\tbk, k=1,\ldots,m$ with $\hat{S}_{KM}(\tau) = 1\ \forall \tau < t_{(1)}$. It is usually estimated for all unique event times.
-
-For illustration, @fig-km-tumor shows the estimated survival probability obtained by applying the Kaplan-Meier estimator to the full `tumor` data, containing observations of $n=776$ subjects.
-By definition, the survival function starts at $S(t)=1$ at $t=0$ and monotonically decreases towards $S(t)=0$ for $t\rightarrow \infty$. 
-Dotted lines indicated the median survival, defined as the time at which the survival function reaches $S(t) = 0.5$. In this example, the median survival time is approximately 1500 days, as indicated by the dashed lines.
-This means that 50% of the subjects are expected die within 1500 days after operation.
-
-![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools]. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time).](Figures/survival/km-tumor.png){#fig-km-tumor fig-alt="Illustration of the Kaplan-Meier estimate of the survival probability for the tumor data set. Median survival time is indicated by dotted lines."}
-
-While the Kaplan-Meier estimator does not directly support estimation of covariate effects on the estimated survival probabilities, it is often used for descriptive analysis by applying the estimator to different subgroups (referred to as stratification in survival analysis).
-For example, @fig-km-tumor-age-bin shows $\hat{S}_{KM}$ separately for subjects aged 50 years or older and subjects younger than 50 years, respectively. Dashed lines again illustrate median survival times.
-However, note that the median survival time does not exist for the younger age group, as their estimated survival function does not cross $0.5$.
-
-![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools] applied to subgroups of subjects of 50 or more years old and less than 50 years old, respectively. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time).](Figures/survival/km-age-bin-tumor.png){#fig-km-tumor-age-bin fig-alt="Illustration of the Kaplan-Meier estimate of the survival probability for the tumor data set, separately for two groups, patients below and above 50 years of age. Median survival time is indicated by dotted lines. Fot the younger age group, the line doesn't intersect with the survival curve."}
-
-
-Sometimes the KM Estimator is also used to estimate the distribution of censoring times, for example to calculate inverse probability of censoring weights (@sec-eval-crank-conc).
-Throughout this book, we denote the Kaplan-Meier estimator applied to the observed censoring times $(t_i, 1-\delta_i)$ as $\hat{G}_{KM}$.
-
-
 
 ## Types of Censoring {#sec-types-of-censoring}
 
@@ -323,7 +294,7 @@ If cancer is detected at first screening, the observation is left-censored (unle
 
 In the presence of left- or interval-censoring the usual representation of survival outcomes as $(t_i, \delta_i)$ is not sufficient to denote the different types of observations in the data set.
 Instead, we represent the data as intervals in which the event occurs.
-Formally, let $Y_i$ the random variable for time until the event of interest and $L_i, R_i$ random variables that define an interval $(L_i,R_i]$ with realisations $l_i, r_i$.
+Formally, let $Y_i$ the random variable for time until the event of interest and $L_i, R_i$ random variables that define an interval $(L_i,R_i]$ with realizations $l_i, r_i$.
 Let further $t_i$ the time of observation (for example age at interview in the phone use example) or last-follow up time for subject $i$.
 Then the event time of subject $i$ is
 
@@ -388,7 +359,7 @@ While censored observations have incomplete information about the time-to-event,
 Whereas truncation leads to observations not entering the data set (at least not at time 0).
 This will usually introduce bias that needs to be accounted for.
 
-### Left-truncation {.unnumbered .unlisted}
+### Left-truncation {#sec-left-truncation}
 
 Left-truncation often occurs when inclusion into a study is conditional on the occurrence of another event.
 Left-truncation plays an important role when modeling recurrent events or multi-state data (@sec-eha), thus the concept will be introduced in more detail.
@@ -411,56 +382,10 @@ Finally, say Infant 3 enters the study at $t_3^L$ and is censored at 365 days wh
 
 ![Illustration of left-truncation data. Subjects 2 and 3 enter the data set as the study entry condition (mother's death) occurs before the event of interest occurs after the left-truncation time (left-truncation time shorter than event time). Subject 1 on the other hand never enters the data as the event occurs before the study entry condition (left-truncation time longer than event time).](Figures/survival/left-truncation.png){#fig-left-truncation fig-alt="Schematic illustration of left-truncation."}
 
-In this example, left-truncation biases the sample towards healthier or more robust infants, as frail infants on die earlier and thus on average before their mothers. This would bias the estimates if not properly taken into account.
-
-Continuing the above example, @fig-infants-lt shows the difference between estimated survival probabilities when left-truncation is ignored (left panel) and taken into account (right panel), respectively.
-It is clear that the survival probabilities were underestimated in both groups, but more so in the group of infants whose mother died (thereby underestimating the effect of the mothers' death on infant survival).
+In this example, left-truncation biases the sample towards healthier or more robust infants, as frail infants on die earlier and thus on average before their mothers. This would bias the estimates if not properly taken into account (see @sec-non-param-lt).
 
 
-![Left: Kaplan-Meier estimate of survival probabilities of infants depending on status of the mother ignoring left-truncation. Right: Kaplan-Meier estimate of survival probabilities adjusting for left-truncation.](Figures/survival/km-infants.png){#fig-infants-lt fig-alt=""}
-
-To understand this, consider an excerpt from the infants data in @tbl-surv-data-infants.
-
-
-| group  |id| $t^L$| $t$| $\delta$|mother |
-|-------:|-:|-----:|----:|-----:|:------|
-|       1|1|    55|  365|     0|dead   |
-|       1|2|    55|  365|     0|alive  |
-|       1|3|    55|  365|     0|alive  |
-|       2|4|    13|   76|     1|dead   |
-|       2|5|    13|  365|     0|alive  |
-|       2|6|    13|  365|     0|alive  |
-|       4|7|     2|   16|     1|dead   |
-|       4|8|     2|  365|     0|alive  |
-|       4|9|     2|  365|     0|alive  |
-
-: Excerpt of the `infants` [@pkgeha] time-to-event dataset.
-Rows are individual observations (id), `group` indicates matched infants, $t^L$ is the left-truncation time (time of inclusion into the study), $t$ is the observed time, $\delta$ is the event indicator. {#tbl-surv-data-infants}
-
-
-Now recall the calculation of the Kaplan-Meier estimate from @sec-surv-km.
-In @tbl-surv-data-infants, without stratifying according to mother's status, the first observed event time is $t_{(1)} = t_7=16$. Then ignoring left-truncation,
-
-* $\calR_{t_{(1)}} = \{1,2,3,4,5,6,7,8,9\}$
-* $d_{t_{(1)}} = 1$
-* $n_{t_{(1)}} = 9$
-* $S(t_{(1)}) = 1 - \frac{1}{9} \approx 0.9$
-
-
-In contrast, when we take left-truncation into account, subjects only enter the risk set for the event after their left-truncation time (we already know they survived until $t_i^L$ so they are not at risk for the event before that time), thus
-
-* $\calR_{t_{(1)}} = \{4, 5, 6, 7, 8, 9\}$
-* $d_{t_{(1)}} = 1$
-* $n_{t_{(1)}} = 6$
-* $S(t_{(1)}) = 1 - \frac{1}{6} \approx 0.8$
-
-Thus, the definition of the KM estimator in @eq-km can still be used in case of left-truncation using the more general risk set definition
-
-$$
-\calR_\tau = \{i: t_i^L \ \leq \tau \leq t_i \}
-$$ {#eq-risk-lt}
-
-### Right-truncation {.unnumbered .unlisted}
+### Right-truncation {#sec-right-truncation}
 
 Right-truncation often occurs in retrospective sampling based on registry data, when data is queried for cases reported by a certain cut-off time (see for example @vakulenko-lagun.inverse.2020).
 A common example is the estimation of the incubation period of an infectious disease, which is the time from infection to the disease onset.
@@ -565,19 +490,50 @@ Note that in in practice, data sets will often not contain all types of censorin
 
 As the name suggests, non-parametric estimation (and semi-parametric estimation) techniques do not make (strong) assumptions about the underlying distribution of event times.
 
-A common principle for such techniques is to partition the follow-up into intervals or to define specific time-points during the follow-up and to estimate the continuous or discrete time hazards (@eq-discrete-hazard) for each interval/time-point.
-Then derive the respective estimates, for example the survival probability, based on the relationship between the hazard and other quantities (@sec-distributions or @sec-distributions-discrete).
+A common principle for such techniques is to partition the follow-up into intervals (or to define specific time-points during the follow-up) and to estimate the continuous (@eq-continuous-hazard) or discrete time (@eq-discrete-hazard) hazards for each interval/time-point.
+Once the respective hazard estimates are obtained, estimates of other quantities, for example the survival probability, can be derived based on the relationship given in @sec-distributions-continuous or @sec-distributions-discrete.
 
-The Kaplan-Meier estimator introduced earlier (@sec-surv-km) is an example for this principle.
-There, time-points $\tbk,\ k=1,\ldots,m$ are used to calculate the discrete time hazards
+#### Kaplan-Meier estimator {#sec-surv-km}
+The Kaplan-Meier estimator [@Kaplan1958], a simple, non-parametric estimator for the survival function (@eq-surv-prob), is an example for this principle.
+While it is usually used for continuous time, its construction can be motivated from a discrete time persepective. 
+Recall from XYZ the definition of ordered, unique event time $t_{(k)}, k=1,\ldots,m$. 
+Define $\tilde{Y} = t_{(k)} \Leftrightarrow Y \in (t_{(k-1)},t_{(k)}]$ as discrete time representation of $Y$.
+Using the quantities introduced in @sec-data-rc,the discrete time hazard @eq-discrete-hazard is estimated as the ratio of the number of events occurring at $t_{(k)}$, to the number of subjects at risk at $t_{(k)}$: 
+
 <!--  -->
 $$
 h^d(\tbk) = P\left(Y\in (t_{(k-1)},\tbk]|Y>t_{(k-1)}\right)=\frac{d_{\tbk}}{n_{\tbk}}.
 $$ {#eq-disc-haz-non-param}
+<!--  -->
+The survival probability and the definition of the Kaplan-Meier estimator (@eq-km) then follow from @eq-discrete-surv-prob:
+<!--  -->
+$$
+\KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{t_{(k)}}}{n_{t_{(k)}}}\right)
+$$ {#eq-km}
+<!--  -->
+which is a step-function at the  observed ordered event times $t_{(k)}, k=1,\ldots,m$ with $\hat{S}_{KM}(\tau) = 1\ \forall \tau < t_{(1)}$. It is usually estimated for all unique event times.
 
-The survival probability and the definition of the Kaplan-Meier estimator (@eq-km) then follow from @eq-discrete-surv-prob.
+For illustration, we consider the `tumor` data set from @sec-data-rc.
+@fig-km-tumor shows the estimated survival probability obtained by applying the Kaplan-Meier estimator to the full data set, containing observations of $n=776$ subjects.
+By definition, the survival function starts at $S(t)=1$ at $t=0$ and monotonically decreases towards $S(t)=0$ for $t\rightarrow \infty$. 
+However, follow-ups are usually not infinite and in the presence of censoring, the survival function may not reach 0 by the end of the observation period. For the Kaplan-Meier estimator specifically, $\hat{S}_{KM}(t_{(m)}) = 0$ only if the last observed time is an event time and there are no censored observations at the same time.
 
-Similarly, the Nelson-Aalen estimator (@Nelson1972,@Aalen1978) for the cumulative hazard is obtained via @eq-discrete-cumu-hazard as
+Dotted lines indicate the median survival, defined as the time at which the survival function reaches $S(t) = 0.5$. 
+In this example, the median survival time is approximately 1500 days.
+This means that 50% of the subjects are expected die within 1500 days after operation.
+
+![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools]. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time).](Figures/survival/km-tumor.png){#fig-km-tumor fig-alt="Illustration of the Kaplan-Meier estimate of the survival probability for the tumor data set. Median survival time is indicated by dotted lines."}
+
+While the Kaplan-Meier estimator does not directly support estimation of covariate effects on the estimated survival probabilities, it is often used for descriptive analysis by applying the estimator to different subgroups (referred to as stratification in survival analysis).
+For example, @fig-km-tumor-age-bin shows $\hat{S}_{KM}$ separately for subjects aged 50 years or older and subjects younger than 50 years, respectively. Dashed lines again illustrate median survival times.
+However, note that the median survival time does not exist for the younger age group, as their estimated survival function does not cross $0.5$.
+
+![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools] applied to subgroups of subjects of 50 or more years old and less than 50 years old, respectively. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time).](Figures/survival/km-age-bin-tumor.png){#fig-km-tumor-age-bin fig-alt="Illustration of the Kaplan-Meier estimate of the survival probability for the tumor data set, separately for two groups, patients below and above 50 years of age. Median survival time is indicated by dotted lines. Fot the younger age group, the line doesn't intersect with the survival curve."}
+
+
+#### Nelson-Aalen and Breslow estimator {#sec-surv-na}
+As the Kaplan-Meier estimator (@sec-surv-km), the Nelson-Aalen estimator (@Nelson1972,@Aalen1978) is based on the discrete time hazards @eq-disc-haz-non-param. 
+Rather than estimating the survival probability, the Nelson-Aalen estimator estimates the discrete time cumulative hazard function @eq-discrete-cumu-hazard and is defined as
 <!--  -->
 $$
 H_{NA}(\tau) = \sum_{k:\tbk\leq \tau} h^d(\tbk) = \sum_{k:\tbk\leq \tau} \frac{d_{\tbk}}{n_{\tbk}}.
@@ -585,9 +541,8 @@ $$ {#eq-nelson-aalen}
 <!--  -->
 Note that we use a continuous time valued $\tau$ for the definition, which implies that $H_{NA,e}(\tau) = H_{NA,e}(\tbk)\ \forall \tau \in [\tbk, t_{(k+1)})$.
 In words: For time points between two unique event times we assume the previous value of the estimate.
-Similar to the Kaplan-Meier estimator, $H_{NA}$ can deal with left-truncated data based on the general risk-set definition @eq-risk-lt.
 
-Based on @eq-surv-haz we can also define a survival probability estimator based on the Nelson-Aalen estimator of the cumulative hazard @eq-nelson-aalen as
+Based on @eq-surv-haz we can also define a survival probability estimator based on the Nelson-Aalen estimator as
 <!--  -->
 $$
 S_{NA}(\tau) = \exp(-H_{NA}(\tau)).
@@ -595,22 +550,88 @@ $$ {#eq-surv-na}
 <!--  -->
 This relationship is also used by @Breslow1972 to obtain survival probability estimates in the context of the Cox model (@sec-models-classical).
 
-In the prescence of other censoring types there are a number of alternatives to the Kaplan-Meier estimator.
+#### Left truncation {#sec-non-param-lt}
 
-#### Interval censoring {.unnumbered .unlisted}
-For interval-censoring, the Kaplan-Meier estimator is replaced by the nonparametric maximum likelihood estimator (NPMLE) [@Zhigang2010], which estimates the likelihood function under the assumption of left- or interval-censoring data as in @sec-surv-estimation-param.
+Non-and semi-parametric estimators can be easily extended to deal with left-truncation by adjusting the risk set definition (@eq-risk-set) to the more general definition [@McGough2021]
+<!--  -->
+$$
+\calR_\tau^L = \{i: t_i^L \ \leq \tau \leq t_i \}, 
+$$ {#eq-risk-lt}
+<!--  -->
+which excludes individuals from the risk set until their left-truncation time has occurred (@eq-risk-lt).
+
+The number of individuals at risk at $\tau$ is then
+<!--  -->
+$$
+n^L_\tau = |\calR_\tau^L| = \sum_i \II(t_i^L \leq \tau \leq t_i),
+$$ {#eq-risk-lt-n}
+<!--  -->
+where $t_i, t_i^L$ are the outcome time and left truncation time of observation $i$ respectively.
+
+The Kaplan-Meier (@eq-km) and Nelson-Aalen (@eq-nelson-aalen) estimators can still be used with $n_{t_{(k)}}$ replaced by $n^L_{t_{(k)}}$ and $d_{t_{(k)}}$ calculated in the usual manner.
+
+
+For illustration consider an excerpt from the infants data in @tbl-surv-data-infants discussed in @sec-left-truncation, where $t$ is the observed event or censoring time and $t^L$ is the left-truncation time.
+
+
+| group  |id| $t^L$| $t$| $\delta$|mother |
+|-------:|-:|-----:|----:|-----:|:------|
+|       1|1|    55|  365|     0|dead   |
+|       1|2|    55|  365|     0|alive  |
+|       1|3|    55|  365|     0|alive  |
+|       2|4|    13|   76|     1|dead   |
+|       2|5|    13|  365|     0|alive  |
+|       2|6|    13|  365|     0|alive  |
+|       4|7|     2|   16|     1|dead   |
+|       4|8|     2|  365|     0|alive  |
+|       4|9|     2|  365|     0|alive  |
+
+: Excerpt of the `infants` [@pkgeha] time-to-event dataset.
+Rows are individual observations (id), `group` indicates matched infants, $t^L$ is the left-truncation time (time of inclusion into the study), $t$ is the observed time, $\delta$ is the event indicator. {#tbl-surv-data-infants}
+
+In @tbl-surv-data-infants, without stratifying according to mother's status, the first observed event time is $t_{(1)} = t_7=16$. 
+Then, ignoring left-truncation,
+
+* $\calR_{t_{(1)}} = \{1,2,3,4,5,6,7,8,9\}$
+* $d_{t_{(1)}} = 1$
+* $n_{t_{(1)}} = 9$
+* $S(t_{(1)}) = 1 - \frac{1}{9} \approx 0.9$
+
+In contrast, when we take left-truncation into account, subjects only enter the risk set for the event after their left-truncation time (we already know they survived until $t_i^L$ so they are not at risk for the event before that time), thus
+
+* $\calR^L_{t_{(1)}} = \{4, 5, 6, 7, 8, 9\}$
+* $d_{t_{(1)}} = 1$
+* $n_{t_{(1)}}^L = 6$
+* $S(t_{(1)}) = 1 - \frac{1}{6} \approx 0.8$
+
+Thus, in the presence of left-truncation, $n_{t_{(k)}}^L \leq  n_{t_{(k)}}$ and therefore $S(t_{(k)})^L \leq S(t_{(k)})$.
+
+
+@fig-infants-lt shows the difference between estimated survival probabilities when left-truncation is ignored (left panel) and taken into account (right panel), respectively.
+It is clear that the survival probabilities were underestimated in both groups, but more so in the group of infants whose mother died (thereby underestimating the effect of the mothers' death on infant survival).
+
+
+![Left: Kaplan-Meier estimate of survival probabilities of infants depending on status of the mother ignoring left-truncation. Right: Kaplan-Meier estimate of survival probabilities adjusting for left-truncation.](Figures/survival/km-infants.png){#fig-infants-lt fig-alt=""}
+
+
+
+
+
+#### Interval-censoring {.unnumbered .unlisted}
+For interval-censoring, the Kaplan-Meier estimator is replaced by the nonparametric maximum likelihood estimator (NPMLE) [@Zhigang2010], which estimates the likelihood function under the assumption of left- or interval-censored data as in @sec-surv-estimation-param.
 The most common algorithm to compute this is the iterative Turnbull algorithm [@Turnbull1974].
 The intuition behind this algorithm is that an observation, $i$, should only contribute to the estimation at a given time-point, $\tau$, if the event could have happened in the censoring interval, $\tau \in (L_i, R_i]$.
 
-In summary:
+In summary [@Giolo2004]:
 
 Let $\tbk, k = 1,...,m$ be the ordered times at which to evaluate the NPMLE.
 
 1. Make an initial guess for $\hatS^0(\tbk), k = 1,...,m$.
 
-Where $\hatS^0$ is the initial guess and $\hatS^j$ is the estimated survival function at iteration $j$.
+Where $\hatS^0$ is the initial guess. 
+Let $\hatS^j$ be the estimated survival function at iteration $j$.
 
-2. **While** $\quad \lvert \hatS^j(\tbk) - \hatS^{j-1}(\tbk) \rvert > \epsilon, \forall k = 1,...,m \quad$ **Do:**
+1. **While** $\quad \lvert \hatS^j(\tbk) - \hatS^{j-1}(\tbk) \rvert > \epsilon, \forall k = 1,...,m \quad$ **Do:**
 
 a. Compute the probability of an event at each time-point:
 
@@ -632,24 +653,51 @@ $$
 n_{\tbk} = \sum^m_{l=k} d_{t_{(l)}}, \quad k = 1,...,m
 $$
 
-This serves a similar role to the usual 'number at risk' formula.n or after $\tbk$.
+This serves a similar role to the usual 'number at risk' formula.
 
 d. Calculate $\hatS^j$ using the Kaplan-Meier formula (@eq-km), substituting the values in Steps 2b and 2c.
 
 @Giolo2004 suggest using the Kaplan-Meier to find the initial guess in Step 1 and to use $\epsilon = 10^{-3}$.
 A similar algorithm can be used for left-censored data.
 
-#### Left truncation {.unnumbered .unlisted}
 
-In the presence of left-truncation, the Kaplan-Meier is calculated using the left-truncated risk-set definition [@McGough2021], which excludes individuals from the risk set until their left-truncation time has occurred (@eq-risk-lt).
-The number of individuals at risk at $\tau$ is then:
+## Estimation of the censoring distribution {#sec-censoring-distribution}
+
+The techniques discussed in section @sec-surv-estimation can also be used to estimate the distribution of censoring times $(t_i, 1-\delta_i)$. 
+This is often done in order to calculate the inverse probability of censoring weights (@sec-surv-ipcw) used in the evaluation of survival models (@sec-eval-crank-conc) and in order to account for (covariate-)dependent censoring (@willems2018correctingdependent).
+
+
+### The Kaplan-Meier estimator for the censoring distribution {#sec-surv-km-censoring}
+
+The Kaplan-Meier estimator can be used to estimate the distribution of censoring times.
+The definition of the risk set (@eq-risk-set) is thus the denominator $n_{\tau}$ in @eq-disc-haz-non-param remains the same, but the numerator $d_{\tau}$ is now the number of censoring events at $\tau$, which we denote as 
+<!--  -->
+$$
+d_\tau^C = \sum_i \II(t_i = \tau, \delta_i = 0).
+$$
+<!--  -->
+The Kaplan-Meier estimator for the censoring distribution is then given by
+<!--  -->
+$$
+G_{KM}(t) = \prod_{\ell=1}^g \left(1-\frac{d^C_{t_{(\ell)}}}{n_{t_{(\ell)}}}\right), 
+$$ {#eq-km-censoring}
+<!--  -->
+where $t_{(\ell)},l=1,\ldots,g$ are the unique, ordered censoring times.
+
+
+### Inverse probability of censoring weights (IPCW) {#sec-surv-ipcw}
+
+The inverse probability of censoring (IPC) weights are defined as
 
 $$
-n^L_\tau = \sum_i \II(t_i^L \leq \tau \leq t_i)
-$$
+w(\tau|\mathbf{x}) = \frac{1}{S(\tau|\mathbf{x})}
+$$ {#eq-ipcw}
 
-where $t_i, t_i^L$ are the outcome time and left truncation time of observation $i$ respectively.
-This equation can be substituted into the Kaplan-Meier formula (@eq-km), with $d_{\tbk}$ calculated in the usual manner.
+When no relationship between the censoring time and the covariates is assumed, the IPC weights are in most cases estimated by plugging in the Kaplan-Meier estimate of @eq-km-censoring into @eq-ipcw, such that 
+
+$$
+\hat{w}(\tau) = \frac{1}{\hat{G}_{KM}(\tau)}
+$$ {#eq-ipcw-km}
 
 ## Conclusion
 
@@ -657,14 +705,18 @@ This equation can be substituted into the Kaplan-Meier formula (@eq-km), with $d
 
 ## Key takeaways
 
-* 
+* The first step in any survival analysis is to understand the data and the type of censoring and or truncation present.
+* Any data set can have a combination of different types of censoring and truncation
+* Non-parametric estimators are well equipped to deal with right-censoring and left-truncation.
+* Parametric estimation can naturally deal with different types of censoring and truncation, but requires assumptions about the distribution of the event times.
 
 ::::
 
 :::: {.callout-tip icon=false}
 
 ## Further reading
-
+* @KalbfleischPrentice1973 provide an early, theoretical treatment of the main concepts of survival analysis.
+* @Klein2003 is a standard reference for survival analysis and provides a comprehensive overview of the different types of censoring and truncation
 * For practical discussion about survival models in the context of right-censoring and left-truncation see @McGough2021
 
 ::::

@@ -509,12 +509,12 @@ p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
   geom_vline(xintercept = 120, lty = 3) +
   # geom_step(data=km_sir_b, aes(col = pneumonia), lty = 2) +
   labs(
-    y = expression(P(Y <= tau~ "," ~ E == e))
+    y = expression(P(Y <= tau~ "," ~ E(Y) == e))
   ) +
   coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
 
 
-ggsave("Figures/survival/cif-sir.png", p_sir_cifs,
+ggsave("book/Figures/survival/cif-sir.png", p_sir_cifs,
   height=3, width=6, dpi=300)
 
 
@@ -551,12 +551,12 @@ p_cens_vs_cr = ggplot(
     coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
     geom_vline(xintercept = 120, lty = 3) +
     labs(
-      y = expression(P(Y <= tau)),
+      y = expression(P(Y <= tau~ "," ~ E(Y) == 2)),
       linetype = "assumption"
     )
 
 
-ggsave("Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
+ggsave("book/Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
 
 
 
