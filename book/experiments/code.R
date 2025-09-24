@@ -530,3 +530,57 @@ g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S
 
 ggsave("book/Figures/survtsk/heavisides.png",
   g_final, height=5, width=7, units="in", dpi=600)
+
+
+## ipcw reduction example 
+
+
+
+## pseudo-values example 
+library(survival)
+library(pseudo)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(patchwork)
+data("tumor", package = "pammtools")
+tumor_comp = tumor |> select(days, status, complications)
+tau = c(1000, 2000, 3000)
+pseudo_dfs = purrr::map_dfr(tau, function(.x) {
+  pseudo_mat = pseudosurv(time = tumor$days, event = tumor$status, tmax = .x)
+  cbind(tumor_comp, data.frame(pseudo = pseudo_mat$pseudo, time = pseudo_mat$time))
+}) |> mutate(time = factor(time))
+
+ndf = pammtools::make_newdata(pseudo_dfs, complications = unique(complications), time = unique(time))
+lm <- lm(formula = pseudo~complications*time, data = pseudo_dfs)
+summary(lm)
+
+ndf$estimate = predict(lm, newdata = ndf)
+ndf <- ndf |> 
+  mutate(model = "pseudo-values (LM)") |> 
+  mutate(time = as.numeric(as.character(time)))
+
+# stratified KM wrt complications
+km_complications = survfit(Surv(days, status)~complications, data = tumor)
+bkm_complications = broom::tidy(km_complications) |> 
+  mutate(model = "KM")
+
+
+p_km_complications = ggplot(bkm_complications, aes(x = time, y = estimate)) +
+  pammtools::geom_step(aes(col = strata)) +
+  geom_vline(xintercept = tau, lty = 3) +
+  ylim(c(0, 1)) +
+  ylab("S(t)") +
+  xlab("time") + 
+  geom_point(data = ndf, pch=19, size = 2)
+p_km_complications
+ggsave("book/Figures/survival/pseudo-complications-lm.png", p_km_complications, height=3, units="in", dpi=600)
+
+
+
+
+
+
+
+
+

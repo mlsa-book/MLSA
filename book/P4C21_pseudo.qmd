@@ -10,5 +10,103 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _wip.qmd >}}
 
-___
+Pseudo-value based approaches have been intorduced in the survival analysis community quite recently (see @andersenPseudoobservationsSurvivalAnalysis2010 for an overview), but have gained popularity ever since.
+
+Let $\psi(\tau|\mathbf{x})$ denote some quantity of interest, for example the survival probability $S(\tau | \mathbf{x})$ or the restricted mean survival time, $\text{RMST}(\tau | \mathbf{x})$.
+Assume we have an unbiased, univariate estimator for $\psi(\tau)$ (for example the Kaplan-Meier estimator in case of survival probability).
+Then we can define pseudo-values as
+
+<!--  -->
+$$
+\hat{\psi}_i(\tau) = n\hat{\psi}(\tau) - (n-1)\hat{\psi}^{-i}(\tau),
+$${#eq-pseudo-value}
+<!--  -->
+where $n$ is the total number of individuals, $\hat{\psi}(\tau)$ is an univariate estimate of the quantity of interest based on all observations and $\hat{\psi}^{-i}(\tau)$ is an estimate of the same quantity obtained by ommiting the $i$-th observation from the data set.
+
+
+
+Once pseudo-values are calculated, they are used as target variable in a regression task (@sec-ml-tasks-regr).
+
+To make this more concrete, let's assume we want to estimate the conditional survial probability $S(\tau | \mathbf{x}_i)$. 
+A suitable, univariate, unbiased estimator for the survival probability is the Kaplan-Meier estimator $\hat{S}_{KM}(\tau)$ (@sec-surv-km). 
+The appropriate pseudo-values are thus given by 
+<!--  -->
+$$
+\hat{\theta}_i(\tau) = n\hat{S}_{KM}(\tau) - (n-1)\hat{S}_{KM}^{-i}(\tau),
+$${#eq-pseudo-value-km}
+<!--  -->
+where $\hat{S}_{KM}^{-i}(\tau)$ is the Kaplan-Meier estimator of the survival probability obtained by ommiting the $i$-th observation from the data set.
+
+
+The final step is to fit a suitable model to the pseudo values 
+<!--  -->
+$$
+\hat{\hat{\theta}}(\tau) = f(\mathbf{x}),
+$$
+<!--  -->
+where $f$ is the model of choice (e.g. a (generalised) linear model or random forest), which depends on the quantitiy of interest and the goal of the analysis (for example prediction or estimation).
+
+
+For illustration, consider once again the tumor data introduced in Table @tbl-surv-data-tumor. We want to estimate the survival probability conditional on whether or not the patient experienced complications (no/yes) during the operation. The procedure is as follows: 
+
+(1) Calculate the pseudo-values $\hat{\theta}_i(\tau)$ at different time points of interest via @eq-pseudo-value-km (here $\tau \in \{1000, 2000, 3000\}$ days)
+(2) Fit a linear model $\hat{\theta}_i(\tau) = \beta_0 + \beta_1 x_{i,1} + \epsilon_i$, where $x_{i,1} = \mathbb{I}(\text{complications} = \text{"yes"})$. 
+(3) Predict the survival probability as $\hat{S}_{PV}(\tau|x_{1}) = \hat{\hat{\theta}}(\tau|x_{1}) = \hat{\beta}_0 + \hat{\beta}_1 x_{1}$.
+
+The results are shown in Figure @fig-pseudo-lm, where the solid lines are Kaplan-Meier estimates of the survival probability for comparison. Notably, the Kaplan-Meier estimates in the graphic have been obtained separately for each group and it's clear that the proportional hazards assumption does not hold for this example. The Kaplan-Meier estimates used for the calculation of the pseudo-values on the other hand were obtained by fitting a univariate Kaplan-Meier estimator, that was not stratified by the complication variable.
+Nevertheless, the pseudo-vaule based approach obtains correct estimates of the survival probabilities at the selected time points for both groups, since the linear model is fit to each time-point separately and thus is able to learn different values of $\hat{\beta}_0$ and $\hat{\beta}_1$ for each $\tau$.
+
+![Comparison of estimates of the survival probability estimates using the Kaplan-Meier estimator and estimates of a linear model based on pseudo-values.](Figures/survival/pseudo-complications-lm.png){#fig-pseudo-lm fig-alt=""}
+
+
+At his point one might wonder why go through all this effort just to obtain estimates of a quantity that can similarly be ontained by fitting a Kaplan-Meier estimator (which we have to do multiple times anyway in order to obtain the pseudo-values).
+The main reason is that we can obtain the estimates depending on covariates and interpret their effects directly as effects on the the quantity of interest, in this case the survival probability. For example, $\hat{\beta}_1$ can be interpreted as the effect of complications on the survival probability at time $\tau$. This is different from for example a Cox model with linear predictor $\eta_i = \beta_0 + \beta_1 x_{i,1}$, where $\beta_1$ can only be interpreted directly in terms of (log-)hazard ratios rather than survival probabilities.
+Another advantage is that the pseudo-value based approach can be used to estimate arbitrary quantities of interest, conditional on covariates, as long as an univariate, unbiased estimator of the quantity of interest is available. 
+
+For illustration, assume we are interested in the RMST and how it depends on covariates.
+An unbiased, univerate estimator fo the RMST can be obtaine via 
+
+$$
+\text{RMST}(\tau) = \int_0^\tau \hat{S}_{KM}(u) du,
+$$
+
+such that the pseudo-values are given by 
+
+$$
+\hat{\theta}_i(\tau) = n \text{RMST}(\tau) - (n-1)\text{RMST}^{-i}(\tau).
+$$ {#eq-pseudo-value-rmst}
+
+Once again, we fit a linear model 
+
+
+
+## Key takeaways
+
+* The IPCW reduction transforms a survival task to a weighted classification task.
+* It can greatly simplify the estimation of survival probabilities at a specific time point of interest.
+* Many learners for binary classification can be used out-of-the-box without further modifications.
+* Learners that support gradient based optimization such as gradient boosting and deep learning are particularly well suited for this task, as they support specification of (custom) loss functions and support integration of weights.
+::::
+
+:::: {.callout-important icon=false}
+
+## Limitations
+* Currently, the IPCW approach has only been described for right-censored data. Extensions to other settings might be possible, but have not been explored yet.
+* Extensions to event-history analysis is also not well explored at the moment of writting, although an extension to competing risks has been proposed recently (see further reading).
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* [@Vock2016] provide the main reference where they explicitly show how different learners (logistic regression, bayesian networks, decision trees and k-nearest neighbors) can be adapted to obtain unbiased estimates of the event probability in the presence of censoring based on adapted IPC weights. They also discuss suitable evaluation metrics.
+* [@gonzalezginestet2021stackedinverse] extend the approach to the competing risks setting.
+* [@pillerReductionTechniquesSurvival2025] provide an overview of different reduction techniques for survival analysis including the IPCW approach and implement it in the `mlr3proba`package [@pkgmlr3proba].
+::::
+
+
+
+
+
 

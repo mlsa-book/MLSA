@@ -9,65 +9,101 @@ abstract: TODO (150-200 WORDS)
 # IPCW-weighted classification {#sec-icpw-reduction}
 
 The inverse probability of censoring weights (IPCW; @sec-surv-ipcw) based reduction transforms a survival task to a weighted classification task (@Vock2016).
-Conceptually, it is one of the simplest reductions, but also the least general. 
+Conceptually, it is one of the simplest reductions, but currently also the least general. 
 
 Consider a survial data set $\mathcal{D} = \{(\mathbf{x}_i, y_i, \delta_i)\}_{i=1}^n$ with $\mathbf{x}_i \in \mathbb{R}^p$ as in @sec-data-rc. 
 Sometimes practitioners are not interested in estimation of the entire event time distribution. 
-Instead, one just wants to know the probability that an event occurs until a precspecified time point $\tau$, that is 
-
+Instead, one just wants to know the probability that an event occurs until a precspecified time point $\tau$ (sometimes referred to as $\tau$-year prediction in survival analysis):
+<!--  -->
 $$
-\pi(\mathbf{x}_i) = P(T \leq \tau|\mathbf{x}_i)
-$$ {#eq-binary-event-prob}
-
-It might be tempting to estimate @eq-binary-prob by defining a binary target variable
+\pi(\mathbf{x}_i;\tau) := P(T \leq \tau|\mathbf{x}_i) = 1-S(\tau|\mathbf{x}_i).
 $$
-e_i:= \mathbb{I}(y_i \leq \tau \wedge \delta_i = 1)
+<!--  -->
+It might be tempting to estimate this probability by defining a binary target variable
+<!--  -->
+$$
+e_i(\tau):= \mathbb{I}(y_i \leq \tau \wedge \delta_i = 1)
 $$ {#eq-binary-target}
-
+<!--  -->
 where all observations with event before time $\tau$ are considered ones (events) and all other observations zeros (non-events).
-Then one could estimate $\pi(\mathbf{x}_i)$ using any binary classification method that outputs (calibrated) probabilities as 
+Then one could estimate $\pi(\mathbf{x}_i;\tau)$ using any binary classification method that outputs (calibrated) probabilities as 
 $$
-\pi(\mathbf{x}_i) = P(e_i = 1|\mathbf{x}_i)
+\pi(\mathbf{x}_i;\tau) = P(e_i(\tau) = 1|\mathbf{x}_i)
 $$ {#eq-binary-prob}
 
-This approach would actually work, if there were no censoring in the data.
-In the presence of censoring, however, @eq-binary-target does not define a valid target variable, as observations censored before time $\tau$ ($y_i < \tau \wedge \delta_i = 0$) are neither events nor non-events (as the event possibly occured between $y_i$ and $\tau$). 
-Treating those observations as non-events would introduce bias.
+This approach would actually work, if there was no censoring in the data.
+In the presence of censoring, however, @eq-binary-target does not define a valid target variable, as observations censored before time $\tau$ ($y_i < \tau \wedge \delta_i = 0$) are neither events nor non-events at time $\tau$ as the event possibly occured between $y_i$ and $\tau$. 
+Treating those observations as non-events or removing them from the data without further modification would introduce bias.
 
-One way to deal with this is to calculate adapted IPC weights (@sec-surv-ipcw) for each observation as 
-
+[@Vock2016] suggest to adapt the estimation procedure to obtain unbiased estimates of @eq-binary-prob by first calculating weights for each observation as 
+<!--  -->
 $$
-\tilde{w}_i = \begin{cases}
-0 & \text{if } y_i < \tau \wedge \delta_i = 0\\
-\frac{1}{\hat{G}_{KM}(\min(y_i, \tau))} & \text{else}
+\tilde{w}_i(\tau) = \begin{cases}
+0 & \text{if } y_i < \tau \wedge \delta_i = 0,\\
+\hat{w}_i(\min(y_i, \tau)) & \text{else}
 \end{cases}
-$$ {#eq-ipc-weights-w_i}
+$$ {#eq-adapted-ipc-weights}
+<!--  -->
+where $\hat{w}_i(\min(y_i, \tau))$ are the IPC weights as defined in @eq-ipcw-km.
+These weights then need to be integrated into the estimation procedure, particularly by optimizing a weighted objective function.
 
-where $\hat{G}_{KM}$ is the Kaplan-Meier estimator of the censoring distribution (@eq-km-censoring).
-This means that observations censored before time $\tau$ are not considered at all, while uncensored observations will be upweighted.
-
-In order to obtain an unbiased estimate of @eq-binary-prob, these weights need to be integrated into the estimation procedure, particularly by optimizing a weighted objective function.
-
-Let $\ell_i(e_i, \pi(\mathbf{x}_i))$ be the point wise loss, then the learner needs to optimize the weighted objective function
+Let $\ell_i(e_i(\tau), \pi(\mathbf{x}_i;\tau))$ be the point wise loss, then the learner needs to optimize the weighted objective function
+<!--  -->
 $$
-\mathcal{L}(\pi) = \frac{1}{n} \sum_{i=1}^n \tilde{w}_i \ell_i(e_i, \pi(\mathbf{x}_i))
+\mathcal{l}(\pi) = \sum_{i=1}^n \tilde{w}_i(\tau) \ell_i(e_i(\tau), \pi(\mathbf{x}_i;\tau))
 $$ {#eq-ipcw-loss-weighted}
+<!--  -->
 
-This implies that the learner (and its implementation) needs to be able to handle weights (which is the case for most popular machine learning methods).
-How exactly @eq-ipcw-loss-weighted looks like, will depend on the choice of learner and objective function. 
-For example, using the Log loss (binary cross-entropy) $\ell_i(e_i, \pi(\mathbf{x}_i)) = e_i\log(\pi(\mathbf{x}_i)) + (1-e_i)\log(1 - \pi(\mathbf{x}_i))$ as loss function, 
+Thus, @eq-ipcw-loss-weighted can be optimized by any learner that can handle weights (which is the case for most popular machine learning methods).
+The exact form of @eq-ipcw-loss-weighted will depend on the choice of learner and objective function. 
+For example, using the log loss (binary cross-entropy) $\ell_i(e_i, \pi(\mathbf{x}_i)) = e_i\log(\pi(\mathbf{x}_i)) + (1-e_i)\log(1 - \pi(\mathbf{x}_i))$ as loss function, 
 @eq-ipcw-loss-weighted becomes 
 $$
-\mathcal{L}(\pi) = \frac{1}{n} \sum_{i=1}^n \tilde{w}_i (e_i\log(\pi(\mathbf{x}_i)) + (1-e_i)\log(1 - \pi(\mathbf{x}_i))),
+\mathcal{l}(\pi) = \sum_{i=1}^n \tilde{w}_i(\tau) (e_i(\tau)\log(\pi(\mathbf{x}_i;\tau)) + (1-e_i(\tau))\log(1 - \pi(\mathbf{x}_i;\tau))),
 $$ {#eq-ipcw-loss-weighted-logistic}
 
-which can be optimized by many implemented learners out-of-the-box without further modifications, for example logistic regression, variants of boosting algorithms (like XGBoost), Deep Learning algorithms and others. 
-For some implementations of other popular learners like decision trees or random forests, specifying a suitable, custom objective function like @eq-ipcw-loss-weighted-logistic might not be possible.
-However, in most implementations it is also possible to pass weights and instead use the weighted Gini impurity as a splitting criterion (@Vock2016).
+which can be optimized by many implemented learners out-of-the-box without further modifications, for example logistic regression, variants of boosting algorithms (such as XGBoost [@pkgxgboost]), Deep Learning algorithms and others. 
 
-Note that by optimizing @eq-ipcw-loss-weighted, we obtain an unbiased estimate of $\pi(\mathbf{x}_i)$. 
-However, when evaluating a specific prediction $\hat{\pi}(\mathbf{x}_i)$ on unseen test data, one cannot use standard evaluation metrics for binary classification, because the test data contains zeros (non-enevents), ones (events), but also censored observations.
-However, since we know the survival probability $\hat{S}(\tau|\mathbf{x}_i) = 1 - \hat{\pi}(\mathbf{x}_i)$ for each observation, we can use evaluation metrics for survival data discussed in part II of the book.
+
+The IPCW reduction can simplify the estimation of $\hat{S}(\tau|\mathbf{x}_i) = 1 - \hat{\pi}(\mathbf{x}_i;\tau)$, as it doesn't require survival specific learners. 
+For practical aplplication, it is nevertheless important to take into account the following considerations:
+
+- The weighting in @eq-ipcw-loss-weighted takes into account censoring, but the success of the operation will still depend on the choice of the loss function. 
+For example, the estimates might not be well calibrated if the chosen loss function does not yield well calibrated probabilities (for example hinge loss used by support vector machines).
+- When evaluating predictions $\hat{\pi}(\mathbf{x};\tau)$ on unseen test data, one cannot use standard evaluation metrics for binary classification, because the test data contains zeros (non-events), ones (events), but also censored observations. 
+However, as the procedure provides an estimate of the linear predictor, risk score as well as the event probability for each observation, we can use evaluation metrics for survival data discussed in the "Evaluation" part of the book (invert the predictions in order to maintain the usual interpretation of these metrics, if necessary).
+- @eq-adapted-ipc-weights implies that contributions of observations censored before time $\tau$ are multiplied with zero in @eq-ipcw-loss-weighted while uncensored observations are upweighted. Algorithmically, it would be more efficennt to remove censored observations from the data set before training in order to avoid unnecessary computations of $\ell_i$. However, this might interfere with the usual training and evaluation procedure, for example when used in combination with cross-validation.
+
+## Conclusion
+
+:::: {.callout-warning icon=false}
+
+## Key takeaways
+
+* The IPCW reduction transforms a survival task to a weighted classification task.
+* It can greatly simplify the estimation of survival probabilities at a specific time point of interest.
+* Many learners for binary classification can be used out-of-the-box without further modifications.
+* Learners that support gradient based optimization such as gradient boosting and deep learning are particularly well suited for this task, as they support specification of (custom) loss functions and support integration of weights.
+::::
+
+:::: {.callout-important icon=false}
+
+## Limitations
+* Currently, the IPCW approach has only been described for right-censored data. Extensions to other settings might be possible, but have not been explored yet.
+* Extensions to event-history analysis is also not well explored at the moment of writting, although an extension to competing risks has been proposed recently (see further reading).
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* [@Vock2016] provide the main reference where they explicitly show how different learners (logistic regression, bayesian networks, decision trees and k-nearest neighbors) can be adapted to obtain unbiased estimates of the event probability in the presence of censoring based on adapted IPC weights. They also discuss suitable evaluation metrics.
+* [@gonzalezginestet2021stackedinverse] extend the approach to the competing risks setting.
+* [@pillerReductionTechniquesSurvival2025] provide an overview of different reduction techniques for survival analysis including the IPCW approach and implement it in the `mlr3proba`package [@pkgmlr3proba].
+::::
+
+
 
 
 
