@@ -324,7 +324,7 @@ library(survival)
 library(mlr3proba)
 t <- tsk("rats")$filter(sample(tsk("rats")$nrow, 5))
 t$kaplan()$surv
-kable::knitr(t$data()[, c(3,4,5,1,2)],align = "l")
+knitr::kable(t$data()[, c(3,4,5,1,2)],align = "l")
 
 # PH vs AFT
 set.seed(290125)
