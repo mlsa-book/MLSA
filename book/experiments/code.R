@@ -118,17 +118,6 @@ g = ggplot(rbind(dcox, dran, drrt), aes(x = p, y = q, color = Group)) +
 ggsave("book/Figures/evaluation/calibD.png", g, height = 3, units = "in",
   dpi = 600)
 
-
-# Calibration point processes experiment
-rm(list = ls())
-set.seed(42)
-library(survival)
-
-event = rbinom(100, 1, 0.7)
-times = runif(100)
-H = survfit(Surv(times, event) ~ 1)$cumhaz
-c("Num deaths" = sum(event), "Sum H" = sum(H))
-
 ## Decision trees
 rm(list = ls())
 set.seed(20241104)
@@ -336,9 +325,221 @@ ggsave("book/Figures/survival/km-infants.png", p_km_infants_joined, height=3, wi
 
 
 ## table infant data
-
 inf_sub = infants |>
   filter(stratum %in% c(1, 2, 4)) |>
   select(stratum, enter, exit, event, mother)
 
 inf_sub |> knitr::kable()
+
+## competing risks
+library(mvna)
+library(etm)
+library(cmprsk)
+set.seed(241206)
+### table
+data(sir.adm, package = "mvna")
+tab_sir = sir.adm |> group_by(status) |> sample_n(2) |>
+  select(id, time, status, pneu)
+tab_sir |> knitr::kable()
+
+
+### AJ CIF estimates
+
+sir_data_cif = sir.adm |>
+  mutate(
+    from = 0,
+    to = dplyr::case_when(
+      status == 0 ~ "cens",
+      .default = as.character(status)))
+
+sir_data_cif |> dplyr::pull(status) |> table()
+
+cif = cuminc(
+  sir_data_cif$time,
+  sir_data_cif$to,
+  group = sir_data_cif$pneu,
+  cencode="cens")
+
+cif_sir_b = purrr::imap_dfr(cif[1:4], function(.x, .y) {
+  as.data.frame(.x) |>
+    cbind(
+      pneumonia = stringr::str_sub(.y, 1, 1),
+      transition = stringr::str_sub(.y, 3, 3)
+    )
+}) |>
+  mutate(
+    method = "Aalen-Johansen",
+    assumption = "competing risks censoring"
+  ) |>
+  rename(cif = est) |>
+  mutate(
+    pneumonia = factor(pneumonia, labels = c("no", "yes")),
+    transition = factor(transition, labels = c("discharge", "death")))
+
+
+km_sir_b = broom::tidy(survfit(Surv(time, status!=0)~pneu, data = sir.adm)) |>
+  rename(pneumonia = strata) |>
+  mutate(pneumonia= dplyr::case_when(
+    pneumonia == "pneu=0" ~ "no",
+    pneumonia == "pneu=1" ~ "yes"
+  )) |>
+  mutate(
+    method = "KM",
+    assumption="independent right-censoring",
+    transition = factor("death", levels=c("discharge", "death")),
+    cif = 1-estimate
+  )
+
+
+p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
+  geom_step(aes(col = pneumonia)) +
+  facet_wrap(~transition) +
+  geom_vline(xintercept = 120, lty = 3) +
+  # geom_step(data=km_sir_b, aes(col = pneumonia), lty = 2) +
+  labs(
+    y = expression(P(Y <= tau~ "," ~ E(Y) == e))
+  ) +
+  coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
+
+
+ggsave("book/Figures/survival/cif-sir.png", p_sir_cifs,
+  height=3, width=6, dpi=300)
+
+
+### Independent censoring vs. Competing Risks
+
+cox_sir = purrr::map_dfr(
+  .x = 1:2,
+  .f = function(.x) {
+
+    tmp = sir.adm
+    tmp$status = 1L*(tmp$status == .x)
+    m = coxph(Surv(time, status)~strata(pneu), data = tmp)
+    bm = basehaz(m) |>
+      rename(pneumonia = strata) |>
+      mutate(
+        cif = 1 - exp(-hazard),
+        pneumonia = dplyr::case_when(
+          pneumonia == "pneu=0" ~ "no",
+          pneumonia == "pneu=1" ~ "yes"
+        ),
+        transition = ifelse(.x==1, "discharge", "death")
+      )
+  }
+)
+
+p_cens_vs_cr = ggplot(
+  filter(cox_sir, transition == "death"),
+  aes(x = time, y = cif)) +
+    geom_step(aes(col = pneumonia, lty="independent censoring")) +
+    geom_step(
+      data = filter(cif_sir_b, transition == "death"),
+      aes(col=pneumonia, lty="competing risks")
+    ) +
+    coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
+    geom_vline(xintercept = 120, lty = 3) +
+    labs(
+      y = expression(P(Y <= tau~ "," ~ E(Y) == 2)),
+      linetype = "assumption"
+    )
+
+
+ggsave("book/Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
+
+
+
+### multi-state example
+
+library(mstate) #prothr dataset
+data(prothr, package = "mstate")
+prothr |>
+  filter(id %in% c(1, 8, 46)) |>
+  mutate(from = from -1, to = to -1) |>
+  knitr::kable()
+
+my.prothr <- prothr |>
+  mutate(transition = as.factor(paste0(from, "->", to))) |>
+  filter(Tstart != Tstop) # filter instantaneous transitions
+
+#' We use cox estimation without covariates because this is essentially `Nelson-Aalen`!!!!!)
+tmat = matrix(NA, nrow = 3, ncol = 3)
+tmat[1,2] <- 1
+tmat[1,3] <- 2
+tmat[2,1] <- 3
+tmat[2,3] <- 4
+tmat
+# placebo
+cox.bm.placebo = coxph(
+  Surv(Tstart,Tstop,status) ~ strata(trans),
+  data = my.prothr |> dplyr::filter(treat == "Placebo"),
+  method = "breslow")
+#' `msfit` has `newdata` arg => patient-specific transition hazards
+haz.bm.placebo = msfit(cox.bm.placebo, trans = tmat) # cumhaz
+tp.placebo = probtrans(haz.bm.placebo, predt=0, direction = "forward")
+# prednisone
+cox.bm.prednisone = coxph(
+  Surv(Tstart,Tstop,status) ~ strata(trans),
+  data = my.prothr |> dplyr::filter(treat == "Prednisone"),
+  method = "breslow")
+#' `msfit` has `newdata` arg => patient-specific transition hazards
+haz.bm.prednisone = msfit(cox.bm.prednisone, trans = tmat) # cumhaz
+tp.prednisone = probtrans(haz.bm.prednisone, predt=0, direction = "forward")
+
+time.placebo = tp.placebo[[1]]$time
+time.prednisone = tp.prednisone[[1]]$time
+placebo.df = data.frame(
+  time = rep(c(time.placebo), 4),
+  transition = rep(c("0->1", "0->2", "1->0", "1->2"), each = length(time.placebo)),
+  Treatment = factor("Placebo", levels = c("Placebo", "Prednisone"))
+)
+placebo.df$trans_prob = c(tp.placebo[[1]]$pstate2, tp.placebo[[1]]$pstate3, tp.placebo[[2]]$pstate1, tp.placebo[[2]]$pstate3)
+prednisone.df = data.frame(
+  time = rep(c(time.prednisone), 4),
+  transition = rep(c("0->1", "0->2", "1->0", "1->2"), each = length(time.prednisone)),
+  Treatment = factor("Prednisone", levels = c("Placebo", "Prednisone"))
+)
+prednisone.df$trans_prob = c(tp.prednisone[[1]]$pstate2, tp.prednisone[[1]]$pstate3, tp.prednisone[[2]]$pstate1, tp.prednisone[[2]]$pstate3)
+
+overall_df = rbind(placebo.df, prednisone.df)
+
+p_trans_prob_prothr = ggplot(overall_df, aes(x = time, y = trans_prob)) +
+  facet_wrap(~transition) +
+  geom_step(aes(col = Treatment)) +
+  scale_color_manual(values = c("steelblue", "firebrick4")) +
+  coord_cartesian(xlim = c(0, 4000), ylim = c(0, 1)) +
+  theme(legend.position = "bottom") +
+  labs(x = "Time", y = "Transition probability")
+
+ggsave("Figures/survival/multi-state-prothr.png",
+  p_trans_prob_prothr, width=5, height=5.2)
+
+
+## Survival task viz
+library(dplyr)
+library(patchwork)
+set.seed(20250822)
+
+sex <- rbinom(10, 1, 0.5)
+x_base <- ceiling(runif(10, ifelse(sex == 1, 20, 1), ifelse(sex == 1, 50, 30)))
+x <- unlist(lapply(x_base, function(val) c(0, val, 50)))
+
+df <- data.frame(x = x, y = c(1, 0, 0), group = as.factor(rep(1:10, each = 3)), sex = rep(as.factor(sex), each  = 3)) %>%
+  mutate(alpha = if_else(group == 10, 1, 0.1))
+
+(df %>% group_by(sex) %>% summarise(x = mean(x)))
+
+g <- ggplot(df, aes(x = x, y = y, group = group))
+g1 <- g + geom_step(linewidth = 1.3, color = "gray")
+g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity()
+g3 <- g1 + geom_smooth(aes(x = x, y = y), data.frame(x = c(0, mean(df$x), 50), y = c(1, 0, 0)),
+    inherit.aes = FALSE, method = "loess", se = FALSE, color = "black", linewidth = 1)
+g4 <- g +
+  geom_step(aes(color = sex), linewidth = 1.3, alpha = 0.5) +
+  geom_smooth(aes(x = x, y = y, group = sex, color = sex),
+  data.frame(x = c(0, 23.3, 50, 0, 40, 50), y = c(1, 0, 0, 1, 0, 0), sex = as.factor(c(1, 1, 1, 0, 0, 0))),
+    inherit.aes = FALSE, method = "loess", se = FALSE, linewidth = 1.5)
+
+g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S(t)") & guides(color  = "none")
+
+ggsave("book/Figures/survtsk/heavisides.png",
+  g_final, height=5, width=7, units="in", dpi=600)
