@@ -10,28 +10,13 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _wip_minor.qmd >}}
 
-Defining if a model is 'machine learning' is surprisingly difficult, with terms such as 'iterative' and 'loss optimization' being frequently used in often clunky definitions.
-This book defines machine learning models as those that:
-
-1. Require intensive model fitting procedures such as recursion or iteration;
-2. Are flexible with hyper-parameters that can be tuned;
-3. Trained using some form of loss optimization;
-4. Are 'black boxes' without simple closed-form expressions that can be easily interpreted;
-5. Aim to minimize the difference between predictions and truth whilst placing minimal assumptions on the underlying data form.
-
-In contrast, 'traditional' models, refer here to low-complexity models that are either non-parametric or have a simple closed-form expression with parameters that can be fit with maximum likelihood estimation (or an analogous method).
-Further, these traditional models are assumed to be fast to fit and highly interpretable, though can be inflexible and may make unreasonable assumptions as they assume underlying probability distributions to model data.
-
-Whilst this book is focused on machine learning, there are a few reasons to include a chapter on lower-complexity models.
-
-Firstly, it can be difficult to determine if a model is 'machine learning', as low-complexity models can be augmented with machine learning methods to create a model that could be termed as 'machine learning' (@sec-classical-improving).
-In fact, several papers have demonstrated that augmenting traditional models in this way can yield models that outperform machine learning alternatives even on high-dimensional data (when the number of variables far exceeds the number of rows) [@Zhang2021; @Spooner2020].
-Secondly, the majority of machine learning survival algorithms make use of traditional models, often using non-parametric estimators (@sec-classical-nonpar) and/or assuming a proportional hazards form (@sec-classical-cox), as a central component to construct an algorithm around.
-Finally, on lower dimensional data, traditional methods often outperform machine learning models even without further adjustment [@Beaulac2020; @Burk2024].
-
+In a predictive setting it can be easy to dismiss 'traditional models' and favour testing of more modern 'machine learning' tools; this would be a mistake.
+Firstly, on low dimensional data (small number of variables), traditional methods often outperform machine learning models [@Burk2025; @Beaulac2020].
+Secondly, even on high-dimensional data, several papers have demonstrated that augmenting traditional models (@sec-classical-improving) can yield models that outperform machine learning alternatives [@Zhang2021; @Spooner2020].
+Finally, the majority of machine learning survival algorithms make use of these traditional models, for example by using non-parametric estimators (@sec-classical-nonpar) and/or assuming a proportional hazards form (@sec-classical-cox), as a central component to construct an algorithm around.
 Therefore, a robust understanding of these models is imperative to fairly construct and evaluate machine learning survival models.
-This chapter begins with a recap of estimators seen in the first part of this book and demonstrating how they can be used as predictive models, with further estimators then introduced.
-Semi- and fully-parametric models are then introduced, most notably the Cox proportional hazards model and the accelerated failure time models.
+This chapter begins with demonstrating non-parametric estimators as predictive tools, including a recap of some estimators in @sec-surv.
+Semi- and fully-parametric models are then introduced, most notably the Cox proportional hazards model and the accelerated failure time model.
 Finally, methods to improve traditional models through machine learning methodology is presented.
 
 ## Non-Parametric Estimators {#sec-classical-nonpar}
@@ -43,7 +28,7 @@ Non-parametric estimators have already been introduced in @sec-surv-estimation-n
 Recall from @sec-surv-estimation-non-param the Kaplan-Meier and Nelson-Aalen estimators respectively defined by
 
 $$
-\KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{\tbk}}{\tbk}\right)
+S(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{\tbk}}{\tbk}\right)
 $$ {#eq-km-ml-two}
 
 and
@@ -53,28 +38,24 @@ H_{NA}(\tau) = \sum_{k:\tbk\leq \tau} \frac{d_{\tbk}}{n_{\tbk}}.
 $$
 
 where $d_{\tbk}$ and $n_{\tbk}$ are the number of events and observations at risk at the $k$th ordered event time, $\tbk$ respectively.
-For example, @tbl-rats-km shows the Kaplan-Meier estimator fit on the `rats` [@datarats] dataset.
-This can be used as a predictive model for a new rat in the dataset by simply ignoring covariates and taking the prediction to be the time-point of interest.
-For example, to predict the survival probability of a new rat at time $82$, this would simply be $\KMS(82) = 0.8$.
 
-| $\tau$ | $1 - d/n$ | $\KMS(\tau)$ |
-|------| --- | -- |
-| 55 | 0.8 | 0.8 |
-| 62 | 1 | 0.8 |
-| 91 | 1 | 0.8 |
-| 92 | 0.5 | 0.4 |
-| 104 | 1 | 0.4 |
-
-: Kaplan-Meier contributions (second column) and estimation (third column) at each time $\tau$ based on data from [@datarats]. {#tbl-rats-km}
+For example, @fig-km-rats shows the Kaplan-Meier estimator fit on the `rats` [@datarats] dataset.
+The top image displays how the estimator is a step function with steps occurring at event times (some examples in green dashed lines).
+At censoring times, the estimator stays constant (examples in blue dotted lines).
+The bottom image displays how to use the estimator as a predictive tool.
+To predict the survival probability of a new rat, one can find the estimated survival probability at a given time from the trained estimator, without needing any more details about the rat in question (as covariates are ignored).
+This provides a quick tool that tends to be well-calibrated to the average observation.
 
 As predictive models, these can also be extended to other censoring and truncation types as well as event history analysis more generally from using the estimators defined in @sec-surv-estimation-non-param, @sec-aalen-johanson, and @sec-ms-aalen-johanson.
+
+![Using the Kaplan-Meier estimator as a predictive tool. The top image shows the estimator fit to data, the green dashed lines so steps in the function at event times and the blue dotted lines are censoring times in the training data and no steps occur. The bottom image demonstrates using the estimator as a predictive tool by reading off the survival probability at given times.](Figures/classical/km_test.png){#fig-km-rats fig-alt="Two graphs both with time on the x-axis and survival probability on the y-axis. Both graphs show the same step function decreasing from S(t)=1 at t=0 to around S(t)=0.8 at around t=100. In the top graph, three dashed lines mark three steps in the function, two blue lines mark horizontal lines without steps. In the bottom graph, an arrow from t=60 points to the survival probability of around S(t)=0.98."}
 
 ### Conditional estimators
 
 As well as unconditional estimators, which do not account for covariates, an alternative is the conditional Akritas estimator [@Akritas1994] usually defined by [@Blanche2013]:
 
 $$
-\hatS(\tau|\xx^*, \lambda) = \prod_{k:\tbk\leq \tau} \Big(1 - \frac{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i = \tbk, \delta_i = 1)}{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i \geq \tbk)}\Big)
+S(\tau|\xx^*, \lambda) = \prod_{k:\tbk\leq \tau} \Big(1 - \frac{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i = \tbk, \delta_i = 1)}{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i \geq \tbk)}\Big)
 $$ {#eq-akritas}
 
 where $K$ is a kernel function, usually $K(x,y|\lambda) = \II(\lvert \hat{F}_X(x) - \hat{F}_X(y)\rvert < \lambda), \lambda \in (0, 1]$, $\hat{F}_X$ is the empirical distribution function of the data, and $\lambda$ is a hyper-parameter.
@@ -811,5 +792,6 @@ However, any machine learning models with the same prediction types can be stack
 * To learn more about hazard ratios from Cox models and complexities in interpretation, we recommend @Sashegyi2017 and @Spruance2004.
 * @Collett2014 and @KalbfleischPrentice1973 both provide comprehensive reading for traditional statistical models. The former is slightly less technical and covers extensions to multiple settings.
 * For more abstract feature selection algorithms that can be applied to any data (survival or otherwise), see @Chandrashekar2014 and @Guyon2003.
+* Kernel-based approaches have been suggested for smooth non-parametric estimates of the baseline hazard, these do not appear commonly used in practice but details can be found in @Gefeller1992 and @Muller1994.
 
 ::::
