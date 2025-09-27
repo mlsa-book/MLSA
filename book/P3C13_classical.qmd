@@ -141,25 +141,14 @@ However, the main contribution of Cox's work was to develop a method to estimate
 We derive the estimation of the parameters in some detail as the objective function of the Cox model is also used by many machine learning methods like boosting (@sec-boost) and neural networks (@sec-nnet).
 
 Recall from @sec-surv-estimation, to estimate the distribution of event times one either needs to make distributional assumptions and accordingly define the likelihood of observing the data (given model parameters), or to use non-parametric estimators, which usually do not incorporate covariate information. 
-Let $i(\tbk)$ be the index of the subject who experienced the event at ordered event time $\tbk$.
-Cox's idea was to define the likelihood of the observed data in terms of the probability that subject $i(\tbk)$ experienced the event at $\tbk$ given that someone in the risk set $\calR_{\tbk}$ experienced the event, and to relate this probability to hazards @eq-ph. 
+Let $i_{(k)}$ denote the subject who experienced the event at ordered event time $\tbk$.
+Cox's idea was to define the likelihood of the observed data in terms of the probability that subject $i_{(k)}$ experienced the event at $\tbk$ given that someone in the risk set $\calR_{\tbk}$ experienced the event, and to relate this probability to hazards @eq-ph. 
+Hence, the likelihood contribution of the $k$th event is given by
 
-<!-- DISCUSS: I had to introduce the i(\tbk) notation below, because the t_{(k)} wouldn't work on the left-hand side of the equation. But it clashes a bit with the definitions of x_{(k)} in @eq-unique-ordered-event-times. -->
-First we note that
-<!--  -->
-$$
-P\left(t_{i(\tbk)} = \tbk|i(\tbk) \in \calR_{\tbk}\right)\approx h_{PH}(\tbk|\mathbf{x}_{i(\tbk)})\Delta \tau,
-$$
-<!--  -->
-and hence the likelihood contribution of subject $i(\tbk)$ is given by
-<!--  -->
 $$\begin{align*}
-\ell^{Cox}_{i(\tbk)} & = P\left(t_{i(\tbk)} = \tbk|\exists j \in \calR_{\tbk}:t_j= \tbk\right)
-  =\frac{h_{PH}(\tbk|\mathbf{x}_{i(\tbk)})}{\sum_{j \in
-\calR_{\tbk}}
-h_{PH}(\tbk|\mathbf{x}_{j})}\\
- & =\frac{h_0\left(\tbk\right)\exp\left(\eta_{i(\tbk)}\right)}
-{\sum_{j\in \calR_{\tbk}} h_0\left(\tbk\right)\exp\left(\eta_j\right)}=\frac{\exp\left(\eta_{i(\tbk)}\right)}
+\ell^{Cox}_{i_{(k)}} 
+ & =\frac{h_0\left(\tbk\right)\exp\left(\eta_{i_{(k)}}\right)}
+{\sum_{j\in \calR_{\tbk}} h_0\left(\tbk\right)\exp\left(\eta_j\right)}=\frac{\exp\left(\eta_{i_{(k)}}\right)}
 {\sum_{j\in \calR_{\tbk}}\exp\left(\eta_j\right)},
 \end{align*}
 $$
@@ -168,7 +157,7 @@ which depends on $\bsbeta$ via $\eta=\mathbf{x}^\top\bsbeta$. Note how the basel
 Thus, for the estimation of $\bsbeta$, the baseline hazard can be considered a 'nuissance parameter' and the likelihood for the entire data set can be defined as:
 
 $$
-\mathcal{PL}(\beta) = \prod_{k=1}^m \ell^{Cox}_{i(\tbk)} = \prod_{k=1}^m \left(\frac{\exp(\eta_{i(\tbk)})}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}\right).
+\mathcal{L}_{PL}(\bsbeta) = \prod_{k=1}^m \ell^{Cox}_{i_{(k)}} = \prod_{k=1}^m \left(\frac{\exp(\eta_{i_{(k)}})}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}\right).
 $$ {#eq-partial}
 
 Note that in Equation (@eq-partial), the information of the event times is only used in the index of the product, thus the ranks of the occured events (and the associated covariate values) are preserved, but the baseline hazard $h_o$ and therefore the exact event time information is absent from the function. This likelihood is therefore referred to as *partial likelihood* [@Cox1975] function, as it doesn't use all of the information about the observed data.
@@ -177,7 +166,7 @@ Note that the partial likelihood is evaluated only at observed event times, but 
 The log-partial likelihood, usually prefered for optimization, is given by
 <!--  -->
 $$
-\mathcal{lPL}(\beta) = \sum_{k=1}^m \left(\eta_{i(\tbk)} - \log \left(\sum_{j \in \calR_{\tbk}} \exp(\eta_j)\right)\right),
+\mathcal{l}_{PL}(\bsbeta) = \sum_{k=1}^m \left(\eta_{i_{(k)}} - \log \left(\sum_{j \in \calR_{\tbk}} \exp(\eta_j)\right)\right),
 $${#eq-lpartial}
 <!--  -->
 such that 
@@ -224,7 +213,7 @@ However, there are some cases where modelling a particular distribution may make
 On these occasions, a particular probability distribution of the event times is assumed, with three common choices [@Kalbfleisch2011; @Wang2017] being the Exponential, Gompertz, and Weibull distributions.
 The Weibull distribution is particularly important as it reduces to the Exponential distribution when the shape parameter equals $1$.
 <!-- FIXME: AFT not introduced yet? -->
-Moreover, it is unique (and Exponential as a special case) in that it has both the PH and AFT property (technically a less known representation of Gompertz also has this property).
+Moreover, it is unique (and Exponential as a special case) in that it has both the PH and AFT (@sec-aft) property (technically a less known representation of Gompertz also has this property).
 
 Assuming a PH model one can plug in the hazard and survival functions from the Weibull distribution into (@eq-ph) and (@eq-ph-surv) respectively.
 First recall for a $\Weib(\gamma, \lambda)$ distribution with shape parameter $\gamma$ and scale parameter $\lambda$, the relevant functions can be given by [@KalbfleischPrentice1973]:
@@ -296,13 +285,13 @@ $$
 \eta_{e;i} = \mathbf{x}_{e;i}^T\bsbeta_e.
 $$
 <!--  -->
-In order to estimate $\bsbeta_e$, let $\tbke, k=1,\ldots,m(e)$ be the ordered unique event times at which events of cause $e$ occur and let $i(\tbke)$ be the index of the observation that experiences the $k$th event of cause $e$. Then the cause-specific partial likelihood is given by:
+In order to estimate $\bsbeta_e$, let $\tbke, k=1,\ldots,m(e)$ be the unique, ordered event times at which events of cause $e$ occur and let $i_{e;(k)}$ be the index of the observation that experiences the $k$th event of cause $e$. Then the cause-specific partial likelihood is given by:
 <!--  -->
 $$
-\calL(\bsbeta_e) = \prod_{k=1}^{m(e)} \Bigg(\frac{\exp(\eta_{e;i(\tbke)})}{\sum_{j \in \calR_{\tbke}} \exp(\eta_{e;j})}\Bigg),
+\calL_{PL}(\bsbeta_e) = \prod_{k=1}^{m(e)} \Bigg(\frac{\exp(\eta_{e;i_{e;(k)}})}{\sum_{j \in \calR_{\tbke}} \exp(\eta_{e;j})}\Bigg),
 $$ {#eq-partial-cr}
 
-This is identical to the single-event partial likelihood in (@eq-partial), with the only difference being that the product and sum are over the ordered event times for cause $e$.
+This is identical to the single-event partial likelihood in (@eq-partial), with the only difference being that the product and sum are over the unique, ordered event times for cause $e$.
 The risk-set definition is unaltered such that $\calR_{\tbke}$ is the set of observations that have not experienced and event of *any* cause or censoring by $\tbke$.
 
 Using the same logic, the Breslow estimator follows from (@eq-breslow):
@@ -333,26 +322,13 @@ h_{e}(\tau|\xx) = \Delta H_{e}(\tau|\xx) & = \Delta H_{Bres;e}(\tau)\exp(\mathbf
 \end{aligned}
 $$ {#eq-cause-specific-hazard-cox}
 <!--  -->
-where $\Delta H_{Bres;e}(\tau)$ is the increment of the cause-specific cumulative baseline hazard between successive time points.
+where $\Delta H_{Bres;e}(\tau)$ is the increment of the cause-specific cumulative baseline hazard between successive time points (note the missing sum over different time points compared to @eq-breslow-cr).
 With @eq-all-cause-surv-prob-cox and @eq-cause-specific-hazard-cox, the CIF is approximated by 
 <!--  -->
 $$
 F_e(\tau|\xx) = \sum_{k:\tbk \leq \tau} S(\tau|\xx) h_{e}(\tau|\xx).
 $$ {#eq-cif-cox}
 <!--  -->
-
-<!-- FIXME: the below is a bit weird here, because it applies to any parametric model, not only PH -->
-Instead of using the Cox model, one could theoretically assume a parametric form for the baseline hazard and create a fully-parametric cause-specific model, where again the likelihood is calculated for each independent cause separately:
-
-$$
-\calL(\bstheta_e) = \prod^n_{i=1} h_e(t_i|\xx_i, \bstheta_e)^{\delta_{i;e}} S_e(t_i|\xx_i, \bstheta_e)
-$$
-
-where $\delta_{i;e}$ is the event indicator for cause $e$.
-Note that here $S_e(t_i|\xx_i, \bstheta_e) = \exp(-H_e(t_i|\xx_i, \bstheta_e))$ is the survival for event $e$, not the all-cause survival, and thus assumes that events from other causes are treated as censored.
-Once $\bstheta_e$ is estimated, for each cause, the hazard functions $h_e(\tau|\xx, \bstheta_e)$ are immediately available from the definition of the assumed distribution (for example the Weibull distribution) and estimates of the all-cause survival probability and CIF could be once again obtained using the relationships given in @sec-competing-risks.
-
-In practice, this parametric approach doesn't appear to be common, partly because in many applications assuming the same distribution for all causes may not be realistic and data-driven selection of different distributions for different causes would induce additional complexity.
 
 #### Subdistribution PH models {.unlisted .unnumbered}
 
@@ -387,7 +363,7 @@ with subdistribution baseline hazard $h^{SD}_{e;0}(\tau)$ (we add the superscrip
 While the subdistribution hazards model is different from the proportional hazards Cox model, @Fine1999 showed that it's parameters could be estimated using a weighted partial likelihood, which is otherwise identical to the cause-specific partial likelihood (@eq-partial-cr):
 <!--  -->
 $$
-\calL_e(\beta) = \prod_{k=1}^m \left(\frac{\exp(\eta_{e;i(\tbke)})}{\sum_{j \in \calR_{e;\tbke}} w_{kj}\exp(\eta_{e;j})}\right),
+\calL_{PL}^{SD}(\bsbeta) = \prod_{k=1}^m \left(\frac{\exp(\eta_{e;i_{e;(k)}})}{\sum_{j \in \calR_{e;\tbke}} w_{kj}\exp(\eta_{e;j})}\right),
 $$ {#eq-fg-likelihood}
 <!--  -->
 In (@eq-fg-likelihood), $\tbke$ is the same as in the cause-specific case and weights $w_{kj}$ account for the fact that the subdistribution risk set is different from the cause-specific risk set.
