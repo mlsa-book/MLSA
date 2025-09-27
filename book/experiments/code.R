@@ -442,7 +442,6 @@ ggsave("book/Figures/classical/compare.png", g, height = 4, units = "in",
   dpi = 600)
 
 ## Humans vs dogs
-## FIXME - CURVES SHOULD BE SMOOTH
 library(extraDistr)
 age = seq.int(1, 100, 1)
 surv = pgompertz(age, 0.00005, 0.09, FALSE)
@@ -455,6 +454,32 @@ g <- ggplot(df, aes(x = age, y = survival, group = Species, color = Species)) + 
 
 ggsave("book/Figures/classical/dogs.png", g, height = 4, units = "in",
   dpi = 600)
+
+
+## KM for testing
+library(survival)
+library(patchwork)
+fit = survfit(Surv(rats$time, rats$status) ~ 1)
+fit$time[1:4]
+fit$surv
+fit$time
+g = ggplot(data.frame(x = fit$time,y = fit$surv), aes(x = x, y =y)) +
+  geom_step() + labs(x = "t", y = "S(t)") +
+  scale_x_continuous(expand = c(0, 0))
+
+g1 = g +
+  geom_vline(xintercept = fit$time[5:7], lty = 2, alpha = 1, color = 3, lwd = 1) +
+  geom_vline(xintercept = fit$time[9:10], lty = 3, alpha = 1,color = 4,lwd=1)
+
+g2 = g +
+  geom_segment(x = 60, y = 0, yend = fit$surv[12], color = 2, lwd = 1, arrow = arrow()) +
+  geom_segment(x = 23, xend = fit$time[12], y = fit$surv[12], color = 2, lwd = 1, arrow = arrow(ends = "first")) 
+
+g3 = g1 / g2  
+
+ggsave("book/Figures/classical/km_test.png", g3, height = 6.5, units = "in",
+  dpi = 600)
+
 
 ## competing risks
 library(mvna)
