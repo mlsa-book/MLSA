@@ -27,7 +27,7 @@ Whilst this book is focused on machine learning, there are a few reasons to incl
 Firstly, it can be difficult to determine if a model is 'machine learning', as low-complexity models can be augmented with machine learning methods to create a model that could be termed as 'machine learning' (@sec-classical-improving).
 In fact, several papers have demonstrated that augmenting traditional models in this way can yield models that outperform machine learning alternatives even on high-dimensional data (when the number of variables far exceeds the number of rows) [@Zhang2021; @Spooner2020].
 Secondly, the majority of machine learning survival algorithms make use of traditional models, often using non-parametric estimators (@sec-classical-nonpar) and/or assuming a proportional hazards form (@sec-classical-cox), as a central component to construct an algorithm around.
-Finally, on lower dimensional data, traditional methods often outperform machine learning models even without further adjustment [@Beaulac2020; @Burk2024].
+Finally, on lower dimensional data, traditional methods often outperform machine learning models even without further adjustment [@Beaulac2020; @Burk2025].
 
 Therefore, a robust understanding of these models is imperative to fairly construct and evaluate machine learning survival models.
 This chapter begins with a recap of estimators seen in the first part of this book and demonstrating how they can be used as predictive models, with further estimators then introduced.
@@ -43,7 +43,7 @@ Non-parametric estimators have already been introduced in @sec-surv-estimation-n
 Recall from @sec-surv-estimation-non-param the Kaplan-Meier and Nelson-Aalen estimators respectively defined by
 
 $$
-\KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{\tbk}}{\tbk}\right)
+S_{KM}(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{\tbk}}{\tbk}\right)
 $$ {#eq-km-ml-two}
 
 and
@@ -74,9 +74,8 @@ As predictive models, these can also be extended to other censoring and truncati
 As well as unconditional estimators, which do not account for covariates, an alternative is the conditional Akritas estimator [@Akritas1994] usually defined by [@Blanche2013]:
 
 $$
-\hatS(\tau|\xx^*, \lambda) = \prod_{k:\tbk\leq \tau} \Big(1 - \frac{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i = \tbk, \delta_i = 1)}{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i \geq \tbk)}\Big)
+S(\tau|\xx^*, \lambda) = \prod_{k:\tbk\leq \tau} \Big(1 - \frac{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i = \tbk, \delta_i = 1)}{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i \geq \tbk)}\Big)
 $$ {#eq-akritas}
-
 where $K$ is a kernel function, usually $K(x,y|\lambda) = \II(\lvert \hat{F}_X(x) - \hat{F}_X(y)\rvert < \lambda), \lambda \in (0, 1]$, $\hat{F}_X$ is the empirical distribution function of the data, and $\lambda$ is a hyper-parameter.
 The estimator can be interpreted as a conditional Kaplan-Meier estimator which is computed on a neighbourhood of subjects closest to $\xx^*$.
 In fact, if $\lambda = 1$ then $K(\cdot|\lambda) = 1$ and (@eq-akritas) is identical to (@eq-km-ml-two).
@@ -88,30 +87,33 @@ By first estimating $\hatF_X$ on separate training data, the estimator can be us
 
 This section begins with an introduction to the proportional hazards concept, introduces estimation with the Cox PH model, and then moves to fully parametric proportional hazards models, with the Weibull model as a motivating example.
 
-Let $\eta_i = \xx_i^\trans\bsbeta$ be the linear predictor for some observation $i$ with covariates $\xx_i$ and model coefficients $\bsbeta \in \Reals^p$, then proportional hazards (PH) models assume that the hazard function for $i$ follows the form:
+Let $\eta_i = \xx_i^\trans\bsbeta$ be the linear predictor for some observation $i$ with covariates $\xx_i$ and model coefficients $\bsbeta \in \Reals^p$, then proportional hazards (PH) models assume that the hazard function for $i$ follows the form
 $$
 h_{PH}(\tau|\xx_i)= h_0(\tau)\exp(\eta_i)
 $$ {#eq-ph}
 
-or in equivalent forms:
-
-$$
-S_{PH}(\tau|\xx_i)= S_0(\tau)^{\exp(\eta_i)}
-$$ {#eq-ph-surv}
+or equivalently:
 
 $$
 H_{PH}(\tau|\xx_i)= H_0(\tau)\exp(\eta_i)
 $$ {#eq-ph-cum}
 
-$h_0,S_0,H_0$ are referred to as the baseline hazard, survival, and cumulative hazard function respectively.
-Instead of modelling a separate intercept, the baseline hazard represents the hazard when the linear predictor is zero, hence the term 'baseline'.
-In that case, the PH model is simply $h_{PH}(\tau|\xx_i)= h_0(\tau)$.
+and
+
+$$
+S_{PH}(\tau|\xx_i)= S_0(\tau)^{\exp(\eta_i)}
+$$ {#eq-ph-surv}
+
+
+$h_0,H_0,S_0$ are referred to as the baseline hazard, cumulative hazard, and survival function respectively.
+Instead of modelling a separate intercept, the baseline hazard represents the hazard when the linear predictor is zero, hence the term 'baseline'. 
+Note that the baseline hazard may not have a meaningful interpretation, unless the covariates are all centered around zero or reference coded in case of categorical covariates (similar to the intercept $\beta_0$ in linear regression).
 
 It can be seen from (@eq-ph) that time is only incorporated via the baseline hazard (ignoring adaptations to time-varying models).
-Therefore, PH models estimate the baseline risk of an event at a given time, and modulate this risk according to individual covariates.
+Therefore, PH models estimate the baseline risk of an event at a given time, and modulate this risk according to the specification of covariates.
 This represents the eponymous 'proportional hazards' assumption as the individual's hazard at time $\tau$ is directly proportional to a multiplicative function of their own covariates: $h(\tau|\xx_i) \propto \exp(\eta_i)$.
 In other words, a unit change in a covariate acts multiplicatively on the estimated hazard.
-Further, the hazard ratio, which is a measure of the difference in risk, between two different subjects, depends solely on the value of their linear predictors and not on time.
+Further, the hazard ratio, which is a measure of the difference in risk, between two different subjects, depends solely on the value of their (linear) predictors and not on time.
 For a single covariate $x$:
 
 $$
@@ -124,62 +126,107 @@ $$
 h_{PH}(\tau|x_i) = \exp(\beta(x_i - x_j))h_{PH}(\tau|x_j)
 $$ {#eq-hazratio-diff}
 
-So in the case where the covariate differs between subjects by $1$, the hazard ratio increases by a multiple of $\exp(\beta)$.
-This yields an interpretable model, in which covariate effects (and hazard ratios) are constant over time and don't depend on $\tau$.
-Moving from parameter estimation, we next consider how to actually fit the $\beta$ parameters.
+So in the case where the covariate differs between subjects by $1$, the hazard ratio increases multiplicatively by $\exp(\beta)$.
+This yields an interpretable model, in which hazard ratios are constant over time and don't depend on $\tau$.
+That is, the covariates effect on the hazard is independent of time. 
+Note that this doesn't imply that the effect of covariates on the survival function is constant over time (a constant difference in hazards at each time point will accumulate over time and the difference between the survival functions will increase). 
 
-### Semi-Parametric PH
+We next consider how to fit the $\beta$ parameters semi-parametrically (@sec-ph-semi-parametric) and fully parametrically (@sec-ph-parametric).
+
+### Semi-Parametric PH {#sec-ph-semi-parametric}
 
 The Cox Proportional Hazards (Cox PH)  [@Cox1972], or Cox model, is likely the most widely known semi-parametric model and the most studied survival model [@Reid1994; @Wang2017].
-The Cox model fits the $\beta$ terms in (@eq-ph) by ignoring the baseline hazard as a 'nuissance parameter' and using the 'partial likelihood' function [@Cox1975]:
+Often, it is considered synonymous with proportional hazards and the functional form of the hazard given in (@eq-ph). 
+However, the main contribution of Cox's work was to develop a method to estimate $\bsbeta$ without making any assumptions about the baseline hazard. 
+We derive the estimation of the parameters in some detail as the objective function of the Cox model is also used by many machine learning methods like boosting (@sec-boost) and neural networks (@sec-nnet).
+
+Recall from @sec-surv-estimation, to estimate the distribution of event times one either needs to make distributional assumptions and accordingly define the likelihood of observing the data (given model parameters), or to use non-parametric estimators, which usually do not incorporate covariate information. 
+Let $i(\tbk)$ be the index of the subject who experienced the event at ordered event time $\tbk$.
+Cox's idea was to define the likelihood of the observed data in terms of the probability that subject $i(\tbk)$ experienced the event at $\tbk$ given that someone in the risk set $\calR_{\tbk}$ experienced the event, and to relate this probability to hazards @eq-ph. 
+
+<!-- DISCUSS: I had to introduce the i(\tbk) notation below, because the t_{(k)} wouldn't work on the left-hand side of the equation. But it clashes a bit with the definitions of x_{(k)} in @eq-unique-ordered-event-times. -->
+First we note that
+<!--  -->
+$$
+P\left(t_{i(\tbk)} = \tbk|i(\tbk) \in \calR_{\tbk}\right)\approx h_{PH}(\tbk|\mathbf{x}_{i(\tbk)})\Delta \tau,
+$$
+<!--  -->
+and hence the likelihood contribution of subject $i(\tbk)$ is given by
+<!--  -->
+$$\begin{align*}
+\ell^{Cox}_{i(\tbk)} & = P\left(t_{i(\tbk)} = \tbk|\exists j \in \calR_{\tbk}:t_j= \tbk\right)
+  =\frac{h_{PH}(\tbk|\mathbf{x}_{i(\tbk)})}{\sum_{j \in
+\calR_{\tbk}}
+h_{PH}(\tbk|\mathbf{x}_{j})}\\
+ & =\frac{h_0\left(\tbk\right)\exp\left(\eta_{i(\tbk)}\right)}
+{\sum_{j\in \calR_{\tbk}} h_0\left(\tbk\right)\exp\left(\eta_j\right)}=\frac{\exp\left(\eta_{i(\tbk)}\right)}
+{\sum_{j\in \calR_{\tbk}}\exp\left(\eta_j\right)},
+\end{align*}
+$$
+<!--  -->
+which depends on $\bsbeta$ via $\eta=\mathbf{x}^\top\bsbeta$. Note how the baseline hazard $h_0$ cancels out in the likelihood contribution and thus doesn't depend on time anymore.
+Thus, for the estimation of $\bsbeta$, the baseline hazard can be considered a 'nuissance parameter' and the likelihood for the entire data set can be defined as:
 
 $$
-\calL(\beta) = \prod_{k=1}^m \left(\frac{\exp(\eta_{\tbk})}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}\right)
+\mathcal{PL}(\beta) = \prod_{k=1}^m \ell^{Cox}_{i(\tbk)} = \prod_{k=1}^m \left(\frac{\exp(\eta_{i(\tbk)})}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}\right).
 $$ {#eq-partial}
 
-where $\eta_{\tbk}$ and $\calR_{\tbk}$ is the linear predictor and risk set (@sec-data-rc) at the $k$th ordered event time, $\tbk$, respectively.
-Note that the product is taken over uncensored observations only but the sum in the denominator is over all observations in the risk set (including if eventually censored).
+Note that in Equation (@eq-partial), the information of the event times is only used in the index of the product, thus the ranks of the occured events (and the associated covariate values) are preserved, but the baseline hazard $h_o$ and therefore the exact event time information is absent from the function. This likelihood is therefore referred to as *partial likelihood* [@Cox1975] function, as it doesn't use all of the information about the observed data.
+Note that the partial likelihood is evaluated only at observed event times, but the sum in the denominator is over all observations in the risk set (including eventually censored).
 
-The log-likelihood is then:
-
+The log-partial likelihood, usually prefered for optimization, is given by
+<!--  -->
 $$
-\call(\beta) = \sum_{k=1}^m \left(\eta_{\tbk} - \log \left(\sum_{j \in \calR_{\tbk}} \exp(\eta_j)\right)\right)
+\mathcal{lPL}(\beta) = \sum_{k=1}^m \left(\eta_{i(\tbk)} - \log \left(\sum_{j \in \calR_{\tbk}} \exp(\eta_j)\right)\right),
+$${#eq-lpartial}
+<!--  -->
+such that 
+<!--  -->
 $$
+\hat{\bsbeta} = \argmax_{\bsbeta}\ \mathcal{lPL}(\bsbeta).
+$${#eq-estimate-beta}
 
-Given these formulae, one can already make predictions in the form of relative risks (@sec-survtsk).
-To make survival distribution predictions, the baseline hazard must be estimated.
-The Breslow estimator [@Cox1975] provides a way to obtain an estimate of the cumulative baseline hazard, $H_0$, using the covariate effect estimates obtained from the partial likelihood (@eq-partial):
+Traditionally, $\hat{\bsbeta}$ is obtained using numerical optimization methods, such as Newton-Raphson or Fisher-Scoring, which require derivation the first and second deriviatives of @eq-lpartial.
 
+Importantly, the partial likelihood allows us to estimate covariate effects (and interpret them in terms of hazard ratios) without making any assumptions about the underlying distribution of event times.
+Obtaining $\hat{\bsbeta}$  also gives us enough information to make predictions in the form of relative risks (@sec-survtsk). 
+
+At this point, however, we don't have an estimate of the baseline hazard $h_0$ and thus cannot make survival distribution predictions.
+The Breslow estimator [@Breslow1972; @linBreslowEstimator2007] provides a way to obtain an estimate of the cumulative baseline hazard, $H_0$, using the parameters from the Cox model:
+<!--  -->
 $$
-\hat{H}_{Bres}(\tau) = \sum_{k:\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} \exp(\hat{\eta}_j)}
+H_{Bres}(\tau) = H_0(\tau) = \sum_{k:\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}.
 $$ {#eq-breslow}
-
-where $\hat{\eta}_j$ is the estimated linear predictor for observation $j$.
+<!--  -->
 Note that if the value for all covariates or their effects was zero, or if there were no covariates, then the Breslow estimator is identical to the Nelson-Aalen estimator (@sec-surv-na):
 
 $$
-\hat{H}_{Bres}(\tau) = \sum_{k:\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} 1} = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{n_{\tbk}} = \hat{H}_{NA}(\tau)
+H_{Bres}(\tau) = \sum_{k:\tbk \leq \tau} \frac{d_{\tbk}}{\sum_{j \in \calR_{\tbk}} 1} = \sum_{\tbk \leq \tau} \frac{d_{\tbk}}{n_{\tbk}} = H_{NA}(\tau).
 $$
 
-With these formulae, the Cox PH can be used as a predictive model by using training data to estimate $\hat{\bsbeta}$ with (@eq-partial).
+
+
+With these formulae, the Cox PH model can be used as a predictive model by using training data to estimate $\hat{\bsbeta}$ via (@eq-estimate-beta).
 These fitted coefficients are used to predict $\hat{\bseta}$ for new observations and finally the cumulative baseline hazard is computed with (@eq-breslow) to return a predicted distribution, for example the survival probability (@eq-ph-surv).
 
 <!-- FIXME -->
 The Cox model is is highly interpretable and has a long history of usage in clinical prediction modelling and analysis.
 However, the proportional hazards assumption is often violated in real life, leaving the model to be a questionable choice when used for data analysis or inference.
-One method to resolve this is to extend the model to handle time-varying coefficients and model stratification [@Cox1972], though it is surprisingly difficult to make meaningful and interpretable predictions from a time-varying model [@Reid1994].
-Whilst violation of the PH assumption can be a significant problem when interpreting model covariates, the goodness of fit is less important when using the model for predictive purposes.
-In fact, the Cox model often outperforms machine learning alternatives, including those that relax the PH assumption [@Burk2025, @Gensheimer2018; @Luxhoj1997; @VanBelle2011b].
+Over the years, extensions to the Cox model have been developed [@therneau2001modelingsurvival] to incorporate stratified baseline hazards (the PH assumption only has to hold within strata), time-varying effects (the effects of time-constant covariates change over time) and time-varying covariates (the values of covariates change over time).
+However, especially in case of time-varying covariates, it is difficult to make meaningful and interpretable predictions (as the values of covariates might not be known at the time of prediction).
+Whilst violation of the PH assumption can be problematic, especially for interpretation of covariate effects, it doesn't appear to cause problems in terms of prediction accuracy.
+In fact, the Cox model often outperforms machine learning alternatives, including those that relax the PH assumption [@Burk2025; @Gensheimer2018; @Luxhoj1997; @VanBelle2011b].
 
-### Parametric PH
+### Parametric PH {#sec-ph-parametric}
 
 Semi-parametric approaches (like the Cox model) are popular because they don't make an assumption about the underlying distribution of event times, leaving the baseline hazard unspecified.
 However, there are some cases where modelling a particular distribution may make sense.
 On these occasions, a particular probability distribution of the event times is assumed, with three common choices [@Kalbfleisch2011; @Wang2017] being the Exponential, Gompertz, and Weibull distributions.
 The Weibull distribution is particularly important as it reduces to the Exponential distribution when the shape parameter equals $1$.
+<!-- FIXME: AFT not introduced yet? -->
 Moreover, it is unique (and Exponential as a special case) in that it has both the PH and AFT property (technically a less known representation of Gompertz also has this property).
 
-Assuming a PH model one can plug in the hazard and survival functions from the Weibull distribution into (@eq-ph) and (@eq-ph-surv() respectively.
+Assuming a PH model one can plug in the hazard and survival functions from the Weibull distribution into (@eq-ph) and (@eq-ph-surv) respectively.
 First recall for a $\Weib(\gamma, \lambda)$ distribution with shape parameter $\gamma$ and scale parameter $\lambda$, the relevant functions can be given by [@KalbfleischPrentice1973]:
 
 $$
@@ -193,23 +240,23 @@ S(\tau) = \exp(-\lambda \tau^\gamma)
 $$
 
 Taking these to be the baseline hazard and survival functions respectively, they can be substituted into the Cox model as follows:
-
+<!--  -->
 $$
 h_{WeibullPH}(\tau|\xx_i)= (\lambda\gamma \tau^{\gamma-1}) \exp(\eta_i)
 $$ {#eq-ph-weibull}
-
+<!--  -->
 or equivalently
-
+<!--  -->
 $$
 S_{WeibullPH}(\tau|\xx_i)= (\exp(-\lambda \tau^\gamma))^{\exp(\eta_i)}
 $$
-
+<!--  -->
 Finally, these formulae can be used to define the full likelihood (@sec-surv-estimation-param) for the WeibullPH model (here for right-censored data):
 
 $$
 \begin{aligned}
 \calL(\bstheta) &= \prod_{i=1}^n h_Y(t_i|\xx_i, \bstheta)^{\delta_i}S_Y(t_i|\xx_i, \bstheta) \\
-&= \prod_{i=1}^n \Big((\lambda\gamma t_i^{\gamma-1} \exp(\eta_i))^{\delta_i}\Big)\Big(\exp(-\lambda t_i^\gamma\exp(\eta_i))\Big) \\
+&= \prod_{i=1}^n \Big((\lambda\gamma t_i^{\gamma-1} \exp(\eta_i))^{\delta_i}\Big)\Big(\exp(-\lambda t_i^\gamma\exp(\eta_i))\Big)
 \end{aligned}
 $$
 
@@ -218,11 +265,10 @@ with log-likelihood
 $$
 \begin{aligned}
 \call(\bstheta) &= \sum_{i=1}^n \delta_i[\log(\lambda\gamma) + (\gamma-1)\log(t_i) + \eta_i] - \lambda t_i^\gamma\exp(\eta_i) \\
-&\propto \sum_{i=1}^n \delta_i[\log(\lambda\gamma) + \gamma\log(t_i) + \eta_i] - \lambda t_i^\gamma \exp(\eta_i) \\
+&\propto \sum_{i=1}^n \delta_i[\log(\lambda\gamma) + \gamma\log(t_i) + \eta_i] - \lambda t_i^\gamma \exp(\eta_i)
 \end{aligned}
 $$
 
-These likelihoods can be optimized using any suitable method, for example Newton-Raphson or Fisher-Scoring (which require first and second deriviatives) or machine learning approaches like boosting (@sec-boost) and neural networks (@sec-nnet).
 Parameters can then be fit using maximum likelihood estimation (MLE) with respect to all unknown parameters $\bstheta = \{\bsbeta, \gamma, \lambda\}$.
 Expansion to other censoring types and truncation follows by using other likelihood forms presented in @sec-surv-estimation.
 
@@ -238,93 +284,128 @@ The first makes use of the cause-specific hazard to fit a cause-specific Cox mod
 
 #### Cause-specific PH models {.unlisted .unnumbered}
 
-In the first case, the baseline hazard function and the coefficients are replaced with cause-specific hazard and coefficients:
+In cause-specific models we define the hazard for cause $e$ as:
 
 $$
-h_{Cox;e}(\tau|\xx_i)= h_{e;0}(\tau)\exp(\eta_{e;i})
+h_{e}(\tau|\xx_{e;i})= h_{e;0}(\tau)\exp(\eta_{e;i}),
+$${#eq-cause-specific-hazard-ph}
+
+where $h_{e;0}$ is a cause-specific baseline hazard and $\xx_{e;i}$ is a set of cause-specific covariates (although in practice often the same covariates are used for all causes), and $\eta_{e;i}$ is the cause-specific linear predictor:
+<!--  -->
 $$
-
-Where $h_{e;0}$ is a cause-specific baseline hazard and $\eta_{e;i}$ is the cause-specific coefficient for observation $i$.
-
-The coefficients are fit by estimating $\hat{\eta}_{e;i}$ with the cause-specific partial likelihood:
-
+\eta_{e;i} = \mathbf{x}_{e;i}^T\bsbeta_e.
 $$
-\calL(\bsbeta_e) = \prod_{k=1}^m \Bigg(\frac{\exp(\eta_{\tbke})}{\sum_{j \in \calR_{\tbke}} \exp(\eta_{e;j})}\Bigg)
+<!--  -->
+In order to estimate $\bsbeta_e$, let $\tbke, k=1,\ldots,m(e)$ be the ordered unique event times at which events of cause $e$ occur and let $i(\tbke)$ be the index of the observation that experiences the $k$th event of cause $e$. Then the cause-specific partial likelihood is given by:
+<!--  -->
+$$
+\calL(\bsbeta_e) = \prod_{k=1}^{m(e)} \Bigg(\frac{\exp(\eta_{e;i(\tbke)})}{\sum_{j \in \calR_{\tbke}} \exp(\eta_{e;j})}\Bigg),
 $$ {#eq-partial-cr}
 
 This is identical to the single-event partial likelihood in (@eq-partial), with the only difference being that the product and sum are over the ordered event times for cause $e$.
-The risk-set definition is unaltered such that $\calR_{\tbke}$ is the set of observations that have not experienced *any* cause by $\tbke$, which is the $k$th observed event time for cause $e$.
-Using the same logic, the Breslow estimator follows from (@eq-breslow)
-:
-$$
-\hat{H}_{Bres;e}(\tau) = \sum_{k:\tbke \leq \tau} \frac{d_{\tbke}}{\sum_{j \in \calR_{\tbke}} \exp(\hat{\eta}_{e;j})}
-$$ {#eq-breslow-cr}
+The risk-set definition is unaltered such that $\calR_{\tbke}$ is the set of observations that have not experienced and event of *any* cause or censoring by $\tbke$.
 
-Here the baseline hazard is estimated using the Breslow estimator for the Cox semi-parametric cause-specific model.
-One could instead assume a parametric form for the baseline hazard and create a fully-parametric cause-specific model, where again the likelihood is calculated for each independent cause separately:
+Using the same logic, the Breslow estimator follows from (@eq-breslow):
+<!--  -->
+$$
+H_{Bres;e}(\tau) = \sum_{k:\tbke \leq \tau} \frac{d_{\tbke}}{\sum_{j \in \calR_{\tbke}} \exp(\eta_{e;j})},
+$$ {#eq-breslow-cr}
+<!--  -->
+and the feature-dependent, cause-specific cumulative hazard (@eq-ph-cum) as 
+
+$$
+H_{e}(\tau|\xx) = H_{Bres;e}(\tau)\exp(\mathbf{x}^T\bsbeta_e)
+$$ {#eq-cause-specific-cumu-hazard-cox}
+
+Finally, in order to obtain an estimate of the cumulative incidence function $F_e(\tau)$ (@eq-cif), we need an estimate of the all cause survival probability and an estimate of the cause-specific hazard (which is not directly available in the Cox modelas the Breslow estimator only provides an estimate of the cause-specific *cumulative* baseline hazard).
+The all cause survival probability is obtained using @eq-cause-specific-cumu-hazard-cox and the usual relationships (@eq-all-cause-cumu-hazard, @eq-surv-haz) as 
+<!--  -->
+$$
+S(\tau|\xx) = \exp\left(-\sum_{e=1}^q H_{e}(\tau|\xx)\right)
+$$ {#eq-all-cause-surv-prob-cox}
+<!--  -->
+and an estimate of the cause-specific hazard is obtained via
+<!--  -->
+$$
+\begin{aligned}
+h_{e}(\tau|\xx) = \Delta H_{e}(\tau|\xx) & = \Delta H_{Bres;e}(\tau)\exp(\mathbf{x}^T\bsbeta_e)\\
+ & = \frac{d_{\tbke}}{\sum_{j \in \calR_{\tbke}} \exp(\eta_{e;j})}\exp(\mathbf{x}^T\bsbeta_e),
+\end{aligned}
+$$ {#eq-cause-specific-hazard-cox}
+<!--  -->
+where $\Delta H_{Bres;e}(\tau)$ is the increment of the cause-specific cumulative baseline hazard between successive time points.
+With @eq-all-cause-surv-prob-cox and @eq-cause-specific-hazard-cox, the CIF is approximated by 
+<!--  -->
+$$
+F_e(\tau|\xx) = \sum_{k:\tbk \leq \tau} S(\tau|\xx) h_{e}(\tau|\xx).
+$$ {#eq-cif-cox}
+<!--  -->
+
+<!-- FIXME: the below is a bit weird here, because it applies to any parametric model, not only PH -->
+Instead of using the Cox model, one could theoretically assume a parametric form for the baseline hazard and create a fully-parametric cause-specific model, where again the likelihood is calculated for each independent cause separately:
 
 $$
 \calL(\bstheta_e) = \prod^n_{i=1} h_e(t_i|\xx_i, \bstheta_e)^{\delta_{i;e}} S_e(t_i|\xx_i, \bstheta_e)
 $$
 
 where $\delta_{i;e}$ is the event indicator for cause $e$.
-Note that here $S_e(t_i|\xx_i, \bstheta_e) = \exp(H(t_i|\xx_i, \bstheta_e))$ is the survival for event $e$, not the all-cause survival, and thus assumes that other causes are treated as censored.
+Note that here $S_e(t_i|\xx_i, \bstheta_e) = \exp(-H_e(t_i|\xx_i, \bstheta_e))$ is the survival for event $e$, not the all-cause survival, and thus assumes that events from other causes are treated as censored.
+Once $\bstheta_e$ is estimated, for each cause, the hazard functions $h_e(\tau|\xx, \bstheta_e)$ are immediately available from the definition of the assumed distribution (for example the Weibull distribution) and estimates of the all-cause survival probability and CIF could be once again obtained using the relationships given in @sec-competing-risks.
 
-Any PH distribution (Weibull etc.) can then be substituted into $h_e$ and $S_e$ in the same way as in the single-event case, with distribution parameters being estimated separately for each cause $e$.
+In practice, this parametric approach doesn't appear to be common, partly because in many applications assuming the same distribution for all causes may not be realistic and data-driven selection of different distributions for different causes would induce additional complexity.
 
 #### Subdistribution PH models {.unlisted .unnumbered}
 
 The methods discussed thus far estimate cause-specific hazards (@eq-cause-specific-hazard), which represent the instantaneous risk of an individual experiencing the cause of interest, given that they have not yet experienced *any* event.
 An alternative approach is to model subdistribution hazards, which model the risk of an individual experiencing the cause of interest, given they have not yet experienced the event of interest, but may have experienced a competing event.
-As will be shown below, the benefit of the subdistribution model is the ability to directly predict the cumulative incidence function (CIF) under a PH model.
-In this framework, the subdistribution hazard provides a relationship between covariates and the CIF for an event of interest [@Austin2016].
-Mathematically, the difference between cause-specific and subdistribution hazards comes from the definition of the risk set.
-As stated above, there is no cause-specific risk set definition.
-However, the subdistribution risk set is defined as:
+As will be shown below, the benefit of the subdistribution model is the ability to directly predict the cumulative incidence function (CIF) under a PH model, rather than using the indirect calculation in Equation (@eq-cif-cox).
+The subdistribution hazard approach also provides a direct relationship between covariates and the CIF for an event of interest [@Austin2016].
 
+Mathematically, the difference between cause-specific and subdistribution hazards comes from the definition of the risk set. The subdistribution risk set is defined as:
+<!--  -->
 $$
-\calR_{e;\tau} := \{i: t_i \geq \tau \vee [e_i \neq e \wedge \delta_i = 1]\}
+\calR_{e;\tau} := \{i: t_i \geq \tau \vee [t_i < \tau \wedge e_i \neq e \wedge \delta_i = 1]\}
 $$ {#eq-riskset-sd}
-
+<!--  -->
 Observe that in this definition the left-hand side is the same as the standard risk set definition (@eq-risk-set) and the right-hand side additionally includes those that have experienced a different event already.
 Anyone that has been censored ($e = e_0$) before $\tau$ is removed from the risk set.
 
-Using this latter definition of the risk set gives rise to the subdistribution hazard function for cause $e$:
-
+The definition of the subdistribution risk (@eq-riskset-sd) is equivalent to defining the subdistribution hazard for cause $e$ as:
+<!--  -->
 $$
-h^{SD}_{e}(\tau) = \lim_{\dtau \to 0} \frac{P(\tau \leq Y \leq \tau + \dtau, E = e\ |\ Y \geq \tau \vee (E \neq e \wedge \Delta=1))}{\dtau}
+h^{SD}_{e}(\tau) = \lim_{\dtau \to 0} \frac{P(\tau \leq Y \leq \tau + \dtau, E = e\ |\ Y \geq \tau \vee (E \neq e \wedge \Delta=1))}{\dtau}.
 $$ {#eq-hazard-sd}
-
-Subsituting (@eq-hazard-sd) into the baseline hazard of the Cox model yields the Fine-Gray subhazard model for the $e$th cause [@Fine1999]:
-
+<!--  -->
+Fine and Gray [@Fine1999] proposed a proportional hazards formulation of the subdistribution hazard (@eq-hazard-sd) as
+<!--  -->
 $$
-h_{FG;e}(\tau|\xx_i)= h^{SD}_{e;0}(\tau)\exp(\eta_i) 
+h_{FG;e}(\tau|\xx_i)= h^{SD}_{e;0}(\tau)\exp(\eta_i),
 $$ {#eq-cox-sd}
+<!--  -->
+with subdistribution baseline hazard $h^{SD}_{e;0}(\tau)$ (we add the superscript here in order to make explicit that this baseline hazard will differ from the one obtained from the Cox model (@eq-ph-cum) due to differences in risk set definition).
 
-This model form assumes that the subdistribution hazards are all proportional.
-Estimating the $\beta$ coefficients follows from a weighted, subdistribution adaptation of the partial likelihood (@eq-partial) which depends on the subdistribution risk set definition given in (@eq-riskset-sd).
-
+While the subdistribution hazards model is different from the proportional hazards Cox model, @Fine1999 showed that it's parameters could be estimated using a weighted partial likelihood, which is otherwise identical to the cause-specific partial likelihood (@eq-partial-cr):
+<!--  -->
 $$
-\calL_e(\beta) = \prod_{k=1}^m \left(\frac{\exp(\eta_{\tbke})}{\sum_{j \in \calR_{e;\tbke}} w_{kj}\exp(\eta_j)}\right)
+\calL_e(\beta) = \prod_{k=1}^m \left(\frac{\exp(\eta_{e;i(\tbke)})}{\sum_{j \in \calR_{e;\tbke}} w_{kj}\exp(\eta_{e;j})}\right),
 $$ {#eq-fg-likelihood}
-
-Where $\tbke$ is the same as in the cause-specific case.
-To account for the updated risk set definition in (@eq-riskset-sd), Fine and Gray defined the weights
-
+<!--  -->
+In (@eq-fg-likelihood), $\tbke$ is the same as in the cause-specific case and weights $w_{kj}$ account for the fact that the subdistribution risk set is different from the cause-specific risk set.
+The weights are defined as
+<!--  -->
 $$
-w_{kj} := \frac{\KMG(\tbke)}{\KMG(\min\{\tbke, t_j\})}
+w_{kj} := \frac{G_{KM}(\tbke)}{G_{KM}(\min\{\tbke, t_j\})},
 $$
-
-Where $\KMG$ is the Kaplan-Meier estimator fit on the censoring distribution (@sec-surv-km).
-The Fine-Gray model therefore uses inverse probability of censoring weighting (as in many measures in @sec-eval-crank-conc) to compensate for the effect of competing events.
-Because of the way the subdistribution risk set is defined in (@eq-riskset-sd), the denominator of (@eq-fg-likelihood) is a sum over individuals, $j \in \calR_{e;\tbke}$,  at time $\tbke$ who have either yet to experience an event ($t_j \geq \tbke$) or experienced a different event ($t_j < \tbke \wedge e_i \ne e \wedge \delta_i=1$).
+<!--  -->
+where $G_{KM}$ is the Kaplan-Meier estimator fit on the censoring distribution (@sec-surv-km).
+Because of the way the subdistribution risk set is defined in (@eq-riskset-sd), the denominator of (@eq-fg-likelihood) is a weighted sum over individuals, $j \in \calR_{e;\tbke}$,  at time $\tbke$ who have either yet to experience an event ($t_j \geq \tbke$) or experienced a different event ($t_j < \tbke \wedge e_i \ne e \wedge \delta_i=1$).
 The weighting function handles these cases as follows:
 
-1. If $t_j \geq \tbke$ then $w_{kj} = 1$ and thus observations who have not experienced any event contribute the most to the likelihood.
-2. If $t_j < \tbke$ then $w_{kj} < 1$ as $\KMG$ is a monotonically decreasing function with $w_{kj}$ continuing to decrease as the distance between $t_j$ and $\tbke$ increases. Thus the contribution from observations that have experienced competing events reduces over time.
+1. If $t_j \geq \tbke$ then $w_{kj} = 1$ and thus observations that have not experienced any event contribute fully to the denominator.
+2. If $t_j < \tbke$ then $w_{kj} < 1$ as $G_{KM}$ is a monotonically decreasing function and $w_{kj}$ continues to decrease as the distance between $t_j$ and $\tbke$ increases. Thus the contribution from observations that have experienced competing events reduces over time.
 
-Whilst modelling the subdistribution can seem unintuitive note that if there is only one event of interest then $w_{kj} = 1$ for all $k$ and $j$ and further $e_i \neq e$ must always be false, meaning (@eq-riskset-sd) reduces to the standard risk set definition (@eq-risk-set) as only the left condition can ever be true and by the same logic the subdistribution hazard reduces to the usual hazard definition.
-Therefore the standard Cox PH for single events is perfectly recovered.
+Whilst modelling the subdistribution can seem unintuitive, note that if there is only one event of interest then $w_{kj} = 1$ for all $k$ and $j$ and further $e_i \neq e$ must always be false, meaning (@eq-riskset-sd) reduces to the standard risk set definition (@eq-risk-set) as only the left condition can ever be true and by the same logic the subdistribution hazard reduces to the usual hazard definition.
+Therefore the standard Cox PH for single events is perfectly recovered. 
 
 Instead of interpreting the subdistribution hazards directly, @Austin2017b recommend interpreting the fitted coefficients via the cause-specific CIF and cumulative hazard forms of (@eq-cox-sd), which can be obtained in the 'usual' way by first integrating to obtain the cumulative hazard form:
 
@@ -354,14 +435,13 @@ $$
 $$ {#eq-fg-breslow}
 
 Use of the Fine-Gray model has to be carefully considered before model fitting.
-The subdistribution risk set definition, which includes competing events, treats all causes as non-terminal (even if realistically impossible), which means an observation could be considered at risk of the event of interest even after experiencing a competing event.
-In practice this is often not the case, especially in medical models where death is often a competing risk.
+The subdistribution risk set definition, which includes competing events, treats all causes as non-terminal (even if realistically impossible), which means an observation could be considered at risk of the event of interest even after experiencing a terminal event (like death).
 Moreover, combining subdistribution CIF estimates across causes can result in probabilities that exceed $1$, which should be impossible as events are mutually exclusive and exhaustive [@Austin2022b].
-In these above cases, estimating and summing cause-specific hazard functions is preferred [@Austin2022b].
-<!-- TODO: REFERENCE SECTION ON SUMMING CAUSE-SPECIFIC HAZARDS -->
+The cause-specific hazards approach for the estimation of the CIF (@sec-cr-notation and Equations @eq-all-cause-surv-prob-cox, @eq-cif-cox) is often preferred [@Austin2022b] as fitting subdistribution models requires model assumptions to hold for all causes simultaneously, which is not possible (@bonnevilleWhyYouShould2024).
 
-The Fine-Gray model is most appropriate when only concerned with a single event of interest and all-cause estimates are not of interest.
-Interpreting coefficient changes via (@eq-fg-cif) is slightly more intuitive as making inferences about the magnitude of effects of covariates on the incidence is more standard in clinical settings [@Austin2017b].
+The Fine-Gray model is most appropriate when one is only interested in analyzing one of the causes.
+In this case, interpretation of coefficients from a subdistribution model can be more intuitive as they represent the magnitude of the effect on the incidence, rather than the hazard, which is often of more interest, for example in clinical settings [@Austin2017b].
+
 
 ## Accelerated Failure Time {#sec-surv-models-param}
 
@@ -685,7 +765,7 @@ where $\calL$ is the likelihood defined in (@eq-partial) and $\gamma > 0$ is a h
 In contrast, the Ridge-Cox model estimates $\bsbeta$ as 
 
 $$
-\hat{\bsbeta} = \argmax \calL(\bsbeta); \text{ subject to } \sum \beta_j^2 \leq \gamma
+\hat{\bsbeta} = \argmax\ \calL(\bsbeta); \text{ subject to } \sum \beta_j^2 \leq \gamma
 $$
 
 Ridge and lasso are both shrinkage methods, which are used to reduce model variance and overfitting, especially in the context of multi-collinearity.
