@@ -31,3 +31,6 @@ bibtex:
 
 bibtek: bibtex
 
+bibwin:
+	@powershell -NoProfile -NonInteractive -Command "biber --tool --output-align --output-indent=2 --output-fieldcase=lower 'book/library.bib' -O 'book/library.bib'"
+	@powershell -NoProfile -NonInteractive -Command "Remove-Item -LiteralPath 'book/library.bib.blg' -Force -ErrorAction SilentlyContinue"
