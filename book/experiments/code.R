@@ -5,6 +5,19 @@ remotes::install_github("mlr-org/paradox", ref = 'v0.11.1', upgrade = "never")
 library(ggplot2)
 theme_set(theme_bw())
 
+library(distr6)
+library(ggplot2)
+g = dstr("Gompertz", shape = 2, decorators = "ExoticStatistics")
+t = seq.int(0, 1.5, length.out = 100)
+d = data.frame(t = t, fun = factor(rep(c("Density", "Hazard", "Cumulative Density", "Survival"), each = 100), levels = c("Density", "Hazard", "Cumulative Density", "Survival")), y = c(g$pdf(t), g$hazard(t), g$cdf(t), g$survival(t)))
+g = ggplot(d, aes(x = t, y = y, color = fun)) +
+  geom_line() +
+  facet_wrap(~fun, scales = "free", nrow = 2) +
+  theme_bw() +
+  theme(legend.position = "n")
+ggsave("book/Figures/introduction/gompertz.png", g, height = 3, units = "in",
+  dpi = 600)
+
 ## Ranking
 rm(list = ls())
 library(dplyr)
@@ -318,6 +331,156 @@ inf_sub = infants |>
 
 inf_sub |> knitr::kable()
 
+# Chapter 13 - Traditional models
+set.seed(2029)
+library(survival)
+library(mlr3proba)
+t <- tsk("rats")$filter(sample(tsk("rats")$nrow, 5))
+t$kaplan()$surv
+knitr::kable(t$data()[, c(3,4,5,1,2)],align = "l")
+
+# PH vs AFT
+set.seed(290125)
+library(survival)
+library(distr6)
+library(ggplot2)
+t = seq(0.1, 2.5, by = 0.02)
+
+hweib = function(shape, scale, eta, t, form) {
+  if (form == "AFT") {
+    mod_scale = scale * exp(-eta)
+  } else if (form == "PH") {
+    mod_scale = scale * exp(-eta/shape)
+  }
+  (shape/mod_scale) * (t/mod_scale)^(shape-1)
+}
+
+sweib = function(shape, scale, eta, t, form) {
+  if (form == "AFT") {
+    mod_scale = scale * exp(-eta)
+  } else if (form == "PH") {
+    mod_scale = scale * exp(-eta/shape)
+  }
+  exp(-(t/mod_scale)^shape)
+}
+
+
+
+# Modify shape and scale parameters for better intercepts
+plotWeib = function(type = c("hazard", "survival"), shape = 3, scale = 2) {
+  type = match.arg(type)
+
+  fun = ifelse (type == "hazard", hweib, sweib)
+  baseline = fun(shape, scale, 0, t, "PH")
+  PH = fun(shape, scale, log(2), t, "PH")
+  AFT = fun(shape, scale, log(2), t, "AFT")
+  ylabel = ifelse(type == "hazard", "h(t)", "S(t)")
+  
+  df = data.frame(
+    y = c(baseline, PH, AFT),
+    t = rep(t, 3),
+    Model = factor(rep(c("Baseline", "PH", "AFT"), 
+                      each = length(t)), levels = c("Baseline", "PH", "AFT"))
+  )
+
+  g <- ggplot(df, aes(x = t, y = y, color = Model)) +
+    geom_line(aes(alpha = if_else(
+      type == "hazard" & Model == "AFT" |
+      type == "survival" & Model == "PH",
+      0, 1))) +
+    theme(legend.position = "bottom") +
+    guides(alpha = "none") +
+    ylab(ylabel) +
+    scale_color_manual(values = c("Baseline" = "black", "AFT" = "red", "PH" = "blue"), aesthetics = c("color","fill"))
+}
+
+
+segment = function(start, form) {
+  if (form == "PH") {
+    map <- aes(
+      x = start,
+      xend = start,
+      y = hweib(3, 2, 0, start, "PH"),
+      yend = hweib(3, 2, log(2), start, "PH")
+    )
+  } else if (form == "AFT") {
+    map <- aes(
+      x = start,
+      xend = start * 2,
+      y = sweib(3, 2, 0, start * 2, "AFT"), # sense check
+      yend = sweib(3, 2, log(2), start, "AFT")
+    )
+  }
+
+  geom_segment(map,
+    arrow = arrow(ends = "both", length = unit(0.1, "in")),
+    inherit.aes = FALSE, size = 0.3,
+    color = "#6f6f6f"
+  )
+}
+
+p1 = plotWeib("hazard") +
+  ylim(0, 5) +
+  segment(1, "PH") + segment(1.5, "PH") + segment(2, "PH") +
+  geom_label(aes(x = x, y = y), data.frame(x = 1.45, y = hweib(3, 2, log(2), 2, "PH")), 
+    label = expression(h[PH](t)==2*h[0](t)),
+    inherit.aes = FALSE)
+
+p2 = plotWeib("survival") +
+  ylim(0, 1) +
+  segment(0.5, "AFT") + segment(0.75, "AFT") +
+  segment(1, "AFT") +
+  geom_label(aes(x = x, y = y), data.frame(x = 2.08, y = sweib(3, 2, 0, 1.5, "AFT")), 
+    label = expression(S[AFT](t)==S[0]("2t")),
+    inherit.aes = FALSE)
+
+g <- (p1 + p2) +
+  plot_layout(guides = "collect") & 
+  theme(legend.position = "bottom")
+
+ggsave("book/Figures/classical/compare.png", g, height = 4, units = "in",
+  dpi = 600)
+
+## Humans vs dogs
+library(extraDistr)
+age = seq.int(1, 100, 1)
+surv = pgompertz(age, 0.00005, 0.09, FALSE)
+ph_surv = surv^5
+aft_surv = round(pgompertz(age*5, 0.00005, 0.09, FALSE), 2)
+df = data.frame(age, survival = c(surv, ph_surv, aft_surv), Species = rep(c("Human", "Dog (PH)", "Dog (AFT)"), each = 100))
+
+g <- ggplot(df, aes(x = age, y = survival, group = Species, color = Species)) + geom_line() + xlim(0, 80) + labs(x = "T", y = "S(T)") +
+  scale_color_manual(values = c("Human" = "black", "Dog (AFT)" = "red", "Dog (PH)" = "blue"), aesthetics = c("color","fill"))
+
+ggsave("book/Figures/classical/dogs.png", g, height = 4, units = "in",
+  dpi = 600)
+
+
+## KM for testing
+library(survival)
+library(patchwork)
+fit = survfit(Surv(rats$time, rats$status) ~ 1)
+fit$time[1:4]
+fit$surv
+fit$time
+g = ggplot(data.frame(x = fit$time,y = fit$surv), aes(x = x, y =y)) +
+  geom_step() + labs(x = "t", y = "S(t)") +
+  scale_x_continuous(expand = c(0, 0))
+
+g1 = g +
+  geom_vline(xintercept = fit$time[5:7], lty = 2, alpha = 1, color = 3, lwd = 1) +
+  geom_vline(xintercept = fit$time[9:10], lty = 3, alpha = 1,color = 4,lwd=1)
+
+g2 = g +
+  geom_segment(x = 60, y = 0, yend = fit$surv[12], color = 2, lwd = 1, arrow = arrow()) +
+  geom_segment(x = 23, xend = fit$time[12], y = fit$surv[12], color = 2, lwd = 1, arrow = arrow(ends = "first")) 
+
+g3 = g1 / g2  
+
+ggsave("book/Figures/classical/km_test.png", g3, height = 6.5, units = "in",
+  dpi = 600)
+
+
 ## competing risks
 library(mvna)
 library(etm)
@@ -384,12 +547,12 @@ p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
   geom_vline(xintercept = 120, lty = 3) +
   # geom_step(data=km_sir_b, aes(col = pneumonia), lty = 2) +
   labs(
-    y = expression(P(Y <= tau~ "," ~ E == e))
+    y = expression(P(Y <= tau~ "," ~ E(Y) == e))
   ) +
   coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
 
 
-ggsave("Figures/survival/cif-sir.png", p_sir_cifs,
+ggsave("book/Figures/survival/cif-sir.png", p_sir_cifs,
   height=3, width=6, dpi=300)
 
 
@@ -426,12 +589,12 @@ p_cens_vs_cr = ggplot(
     coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
     geom_vline(xintercept = 120, lty = 3) +
     labs(
-      y = expression(P(Y <= tau)),
+      y = expression(P(Y <= tau~ "," ~ E(Y) == 2)),
       linetype = "assumption"
     )
 
 
-ggsave("Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
+ggsave("book/Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
 
 
 
