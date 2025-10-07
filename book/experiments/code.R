@@ -5,6 +5,19 @@ remotes::install_github("mlr-org/paradox", ref = 'v0.11.1', upgrade = "never")
 library(ggplot2)
 theme_set(theme_bw())
 
+library(distr6)
+library(ggplot2)
+g = dstr("Gompertz", shape = 2, decorators = "ExoticStatistics")
+t = seq.int(0, 1.5, length.out = 100)
+d = data.frame(t = t, fun = factor(rep(c("Density", "Hazard", "Cumulative Density", "Survival"), each = 100), levels = c("Density", "Hazard", "Cumulative Density", "Survival")), y = c(g$pdf(t), g$hazard(t), g$cdf(t), g$survival(t)))
+g = ggplot(d, aes(x = t, y = y, color = fun)) +
+  geom_line() +
+  facet_wrap(~fun, scales = "free", nrow = 2) +
+  theme_bw() +
+  theme(legend.position = "n")
+ggsave("book/Figures/introduction/gompertz.png", g, height = 3, units = "in",
+  dpi = 600)
+
 ## Ranking
 rm(list = ls())
 library(dplyr)
@@ -318,13 +331,13 @@ inf_sub = infants |>
 
 inf_sub |> knitr::kable()
 
-# Chapter 13 - Classical models
+# Chapter 13 - Traditional models
 set.seed(2029)
 library(survival)
 library(mlr3proba)
 t <- tsk("rats")$filter(sample(tsk("rats")$nrow, 5))
 t$kaplan()$surv
-kable::knitr(t$data()[, c(3,4,5,1,2)],align = "l")
+knitr::kable(t$data()[, c(3,4,5,1,2)],align = "l")
 
 # PH vs AFT
 set.seed(290125)
@@ -429,12 +442,11 @@ ggsave("book/Figures/classical/compare.png", g, height = 4, units = "in",
   dpi = 600)
 
 ## Humans vs dogs
+library(extraDistr)
 age = seq.int(1, 100, 1)
-d = dstr("Gompertz", scale = 0.00005, shape = 0.09, decorators = "ExoticStatistics")
-plot(d, "survival")
-surv = round(d$survival(x), 2)
+surv = pgompertz(age, 0.00005, 0.09, FALSE)
 ph_surv = surv^5
-aft_surv = round(d$survival(x * 5), 2)
+aft_surv = round(pgompertz(age*5, 0.00005, 0.09, FALSE), 2)
 df = data.frame(age, survival = c(surv, ph_surv, aft_surv), Species = rep(c("Human", "Dog (PH)", "Dog (AFT)"), each = 100))
 
 g <- ggplot(df, aes(x = age, y = survival, group = Species, color = Species)) + geom_line() + xlim(0, 80) + labs(x = "T", y = "S(T)") +
@@ -442,6 +454,32 @@ g <- ggplot(df, aes(x = age, y = survival, group = Species, color = Species)) + 
 
 ggsave("book/Figures/classical/dogs.png", g, height = 4, units = "in",
   dpi = 600)
+
+
+## KM for testing
+library(survival)
+library(patchwork)
+fit = survfit(Surv(rats$time, rats$status) ~ 1)
+fit$time[1:4]
+fit$surv
+fit$time
+g = ggplot(data.frame(x = fit$time,y = fit$surv), aes(x = x, y =y)) +
+  geom_step() + labs(x = "t", y = "S(t)") +
+  scale_x_continuous(expand = c(0, 0))
+
+g1 = g +
+  geom_vline(xintercept = fit$time[5:7], lty = 2, alpha = 1, color = 3, lwd = 1) +
+  geom_vline(xintercept = fit$time[9:10], lty = 3, alpha = 1,color = 4,lwd=1)
+
+g2 = g +
+  geom_segment(x = 60, y = 0, yend = fit$surv[12], color = 2, lwd = 1, arrow = arrow()) +
+  geom_segment(x = 23, xend = fit$time[12], y = fit$surv[12], color = 2, lwd = 1, arrow = arrow(ends = "first")) 
+
+g3 = g1 / g2  
+
+ggsave("book/Figures/classical/km_test.png", g3, height = 6.5, units = "in",
+  dpi = 600)
+
 
 ## competing risks
 library(mvna)
@@ -509,12 +547,12 @@ p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
   geom_vline(xintercept = 120, lty = 3) +
   # geom_step(data=km_sir_b, aes(col = pneumonia), lty = 2) +
   labs(
-    y = expression(P(Y <= tau~ "," ~ E == e))
+    y = expression(P(Y <= tau~ "," ~ E(Y) == e))
   ) +
   coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
 
 
-ggsave("Figures/survival/cif-sir.png", p_sir_cifs,
+ggsave("book/Figures/survival/cif-sir.png", p_sir_cifs,
   height=3, width=6, dpi=300)
 
 
@@ -551,12 +589,12 @@ p_cens_vs_cr = ggplot(
     coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
     geom_vline(xintercept = 120, lty = 3) +
     labs(
-      y = expression(P(Y <= tau)),
+      y = expression(P(Y <= tau~ "," ~ E(Y) == 2)),
       linetype = "assumption"
     )
 
 
-ggsave("Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
+ggsave("book/Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
 
 
 
