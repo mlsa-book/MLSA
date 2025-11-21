@@ -10,89 +10,176 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _wip.qmd >}}
 
-Pseudo-value based approaches have been intorduced in the survival analysis community quite recently (see @andersenPseudoobservationsSurvivalAnalysis2010 for an overview), but have gained popularity ever since.
+Pseudo-value based approaches have been introduced in the survival analysis community quite recently (see @andersenPseudoobservationsSurvivalAnalysis2010 for an overview), but have gained popularity ever since, due to their flexibility and their ability to relate feature effects directly to different quantities of interest.
 
 Let $\psi(\tau|\mathbf{x})$ denote some quantity of interest, for example the survival probability $S(\tau | \mathbf{x})$ or the restricted mean survival time, $\text{RMST}(\tau | \mathbf{x})$.
-Assume we have an unbiased, univariate estimator for $\psi(\tau)$ (for example the Kaplan-Meier estimator in case of survival probability).
+Assume we have an unbiased, univariate estimator $\psi(\tau)$ for the quantity of interest.
 Then we can define pseudo-values as
 
 <!--  -->
 $$
-\hat{\psi}_i(\tau) = n\hat{\psi}(\tau) - (n-1)\hat{\psi}^{-i}(\tau),
+\theta_i(\tau) = n\psi(\tau) - (n-1)\psi^{-i}(\tau),
 $${#eq-pseudo-value}
 <!--  -->
-where $n$ is the total number of individuals, $\hat{\psi}(\tau)$ is an univariate estimate of the quantity of interest based on all observations and $\hat{\psi}^{-i}(\tau)$ is an estimate of the same quantity obtained by ommiting the $i$-th observation from the data set.
+where $n$ is the total number of observations, $\psi(\tau)$ is an univariate estimator of the quantity of interest based on all observations and $\psi^{-i}(\tau)$ is an estimator of the same quantity obtained by ommiting the $i$-th observation from the data set. $\theta_i(\tau) \in \Reals$ is the $i$-th pseudo-value at time $\tau$ and
+
+- can take positive and negative values (depending on $\tau$, the data set $\mathcal{D}$ and the estimator $\psi(\tau)$),
+- is given for each observation $i$ at time $\tau$, regardless of its event time and status,
+- depends on $\tau$, but also features $\mathbf{x}_i$, as the features might affect the time until the event occurs and therefore the difference between $\psi(\tau)$ and $\psi^{-i}(\tau)$.
+
+
+The calculated pseudo-values are denoted by $\mathring{\theta}_i(\tau)$ and obtained by plugging in $\hat{\psi}(\tau)$ and $\hat{\psi}^{-i}(\tau)$ into @eq-pseudo-value. Once calculated, they are then used as target variable in a regression or classifcation task (@sec-ml-tasks), depending on the quantity of interest and the goals of the analysis, such that
+
+$$
+\mathring{\theta}_i(\tau) = h(f(\mathbf{x}_i)), 
+$${#eq-pseudo-value-model}
+
+where predictor $f(\mathbf{x}_i)$ is a function of the features $\xx_i$ (for example $f(\xx) = \xx^\top\bsbeta$) that is learned by the model of choice and $h(\cdot)$ is a known response function that maps the predictor to the target space (for example identity or sigmoid function). 
 
 
 
-Once pseudo-values are calculated, they are used as target variable in a regression task (@sec-ml-tasks-regr).
 
-To make this more concrete, let's assume we want to estimate the conditional survial probability $S(\tau | \mathbf{x}_i)$. 
-A suitable, univariate, unbiased estimator for the survival probability is the Kaplan-Meier estimator $\hat{S}_{KM}(\tau)$ (@sec-surv-km). 
+
+## Pseudo-values for Survival Probability {#sec-pseudo-value-S}
+
+Assume we want to estimate the conditional survival probability $S(\tau | \mathbf{x}_i)$. 
+A suitable, univariate, unbiased estimator for the survival probability is the Kaplan-Meier estimator $S_{KM}(\tau)$ (@sec-surv-km). 
 The appropriate pseudo-values are thus given by 
 <!--  -->
 $$
-\hat{\theta}_i(\tau) = n\hat{S}_{KM}(\tau) - (n-1)\hat{S}_{KM}^{-i}(\tau),
-$${#eq-pseudo-value-km}
+\theta_i(\tau) = nS_{KM}(\tau) - (n-1)S_{KM}^{-i}(\tau),
+$${#eq-pseudo-value-S}
 <!--  -->
-where $\hat{S}_{KM}^{-i}(\tau)$ is the Kaplan-Meier estimator of the survival probability obtained by ommiting the $i$-th observation from the data set.
+where $S_{KM}^{-i}(\tau)$ is the Kaplan-Meier estimator of the survival probability obtained by ommiting the $i$-th observation from the data set.
 
+For illustration, consider once again the tumor data introduced in Table @tbl-surv-data-tumor. We want to estimate the survival probability conditional on whether the patient experienced complications (no/yes) during the operation at three different time points $\tau \in \{1000, 2000, 3000\}$ days after operation. The procedure is as follows: 
 
-The final step is to fit a suitable model to the pseudo values 
-<!--  -->
-$$
-\hat{\hat{\theta}}(\tau) = f(\mathbf{x}),
-$$
-<!--  -->
-where $f$ is the model of choice (e.g. a (generalised) linear model or random forest), which depends on the quantitiy of interest and the goal of the analysis (for example prediction or estimation).
+(1) Calculate pseudo-values $\mathring{\theta}_i(\tau)$ at different time points of interest, by pluggin in the respective Kaplan-Meier estimates $\hat{S}_{KM}(\tau)$ and $\hat{S}_{KM}^{-i}(\tau)$ into @eq-pseudo-value-S.
+(2) Fit a linear model $\mathring{\theta}_i(\tau) = \beta_0 + \beta_1 x_{i,1} + \epsilon_i$, where $x_{i,1} = \mathbb{I}(\text{complications}_i = \text{"yes"})$. 
+(3) Predict the survival probability as $\hat{S}_{PV}(\tau|x_{1}) = \hat{\mathring{\theta}}(\tau|x_{1}) = \hat{\beta}_0 + \hat{\beta}_1 x_{1}$.
 
-
-For illustration, consider once again the tumor data introduced in Table @tbl-surv-data-tumor. We want to estimate the survival probability conditional on whether or not the patient experienced complications (no/yes) during the operation. The procedure is as follows: 
-
-(1) Calculate the pseudo-values $\hat{\theta}_i(\tau)$ at different time points of interest via @eq-pseudo-value-km (here $\tau \in \{1000, 2000, 3000\}$ days)
-(2) Fit a linear model $\hat{\theta}_i(\tau) = \beta_0 + \beta_1 x_{i,1} + \epsilon_i$, where $x_{i,1} = \mathbb{I}(\text{complications} = \text{"yes"})$. 
-(3) Predict the survival probability as $\hat{S}_{PV}(\tau|x_{1}) = \hat{\hat{\theta}}(\tau|x_{1}) = \hat{\beta}_0 + \hat{\beta}_1 x_{1}$.
-
-The results are shown in Figure @fig-pseudo-lm, where the solid lines are Kaplan-Meier estimates of the survival probability for comparison. Notably, the Kaplan-Meier estimates in the graphic have been obtained separately for each group and it's clear that the proportional hazards assumption does not hold for this example. The Kaplan-Meier estimates used for the calculation of the pseudo-values on the other hand were obtained by fitting a univariate Kaplan-Meier estimator, that was not stratified by the complication variable.
+The results are shown in Figure @fig-pseudo-lm, where the black dots indicate the survival probability predictions from the pseudo-value based approach and the solid lines are Kaplan-Meier estimates of the survival probability for comparison. Notably, the Kaplan-Meier estimates in the graphic have been obtained separately for each group (stratified by the complication variable) and it's clear that the proportional hazards assumption does not hold for this example. The Kaplan-Meier estimates used for the calculation of the pseudo-values on the other hand were obtained by fitting a univariate Kaplan-Meier estimator, that was not stratified by the complication variable.
 Nevertheless, the pseudo-vaule based approach obtains correct estimates of the survival probabilities at the selected time points for both groups, since the linear model is fit to each time-point separately and thus is able to learn different values of $\hat{\beta}_0$ and $\hat{\beta}_1$ for each $\tau$.
+Note that in the example above, $\hat{\beta}_1$ can be interpreted directly as the effect of complications on the survival probability at time $\tau$. Here, $\hat{\beta}_1\approx -0.23$, thus the expected survival probability at time $\tau = 1000$ for patients with complications is reduced by ca. 23 percentage points compared to patients without complications.
+This is different to for example a Cox model with linear predictor $\eta_i = \beta_0 + \beta_1 x_{i,1}$, where $\beta_1$ can only be interpreted directly in terms of (log-)hazard ratios rather than survival probabilities.
+Note that this interpretation only holds for $\tau = 1000$. At $\tau = 3000$ days, $\hat{\beta}_1 \approx -0.13$, thus the average effect of complications depends on $\tau$  and is lower at the later time point. 
 
 ![Comparison of estimates of the survival probability estimates using the Kaplan-Meier estimator and estimates of a linear model based on pseudo-values.](Figures/survival/pseudo-complications-lm.png){#fig-pseudo-lm fig-alt=""}
 
 
-At his point one might wonder why go through all this effort just to obtain estimates of a quantity that can similarly be ontained by fitting a Kaplan-Meier estimator (which we have to do multiple times anyway in order to obtain the pseudo-values).
-The main reason is that we can obtain the estimates depending on covariates and interpret their effects directly as effects on the the quantity of interest, in this case the survival probability. For example, $\hat{\beta}_1$ can be interpreted as the effect of complications on the survival probability at time $\tau$. This is different from for example a Cox model with linear predictor $\eta_i = \beta_0 + \beta_1 x_{i,1}$, where $\beta_1$ can only be interpreted directly in terms of (log-)hazard ratios rather than survival probabilities.
-Another advantage is that the pseudo-value based approach can be used to estimate arbitrary quantities of interest, conditional on covariates, as long as an univariate, unbiased estimator of the quantity of interest is available. 
+## Pseudo-values for RMST {#sec-pseudo-value-rmst}
 
-For illustration, assume we are interested in the RMST and how it depends on covariates.
-An unbiased, univerate estimator fo the RMST can be obtaine via 
+An unbiased, univariate estimator for the restricted mean survival time (RMST;  @eq-rmst) can be obtained via 
 
 $$
-\text{RMST}(\tau) = \int_0^\tau \hat{S}_{KM}(u) du,
+\text{RMST}(\tau) = \int_0^\tau S_{KM}(u) du,
 $$
 
 such that the pseudo-values are given by 
 
 $$
-\hat{\theta}_i(\tau) = n \text{RMST}(\tau) - (n-1)\text{RMST}^{-i}(\tau).
+\theta_i(\tau) = n \text{RMST}(\tau) - (n-1)\text{RMST}^{-i}(\tau).
 $$ {#eq-pseudo-value-rmst}
 
-Once again, we fit a linear model 
+Continuing the tumor data example above, we are interested in the RMST and how it depends on covariates. 
+The general idea is illustrated in Figure @fig-pseudo-rmst, which displays survival curves for each group (complications vs. no complications) with the area under the curve up to $\tau = 1000$ days shaded, representing the RMST.
+If we are interested in the difference between patients with and without complications, we can simply calculate the difference between the RMSTs for the two groups, which is here given by $\approx 246$ days.
+Thus, within the first 1000 days after operation, patients with complications are expected to live 246 days less than patients with complications.
+
+![Survival curves with RMST visualization at $\tau = 1000$ days, stratified by complications status. The shaded area under each curve represents the RMST, with the numerical value displayed as text.](Figures/reductions/pseudo-rmst-complications-lm.png){#fig-pseudo-rmst fig-alt="Two-panel faceted plot showing survival curves for patients with and without complications. Each panel displays a survival curve with the area under the curve up to 1000 days shaded in a transparent color, representing the Restricted Mean Survival Time (RMST). The RMST value is displayed as text within each panel."}
+
+For a pseudo-value based analysis, we once again, we fit a linear model 
+
+$$
+\mathring{\theta}_i(\tau) = \beta_0 + \beta_1 x_{i,1} + \epsilon_i, 
+$$
+
+where $\mathring{\theta}_i(\tau)$ is now the pseudo-value of the restricted mean survival time at time $\tau$ for observation $i$, obtained by using $\widehat{\text{RMST}}(\tau)$ and $\widehat{\text{RMST}}^{-i}(\tau)$ in @eq-pseudo-value-rmst.
 
 
+For timepoint $\tau = 1000$ days, we obtain an estimate of $\hat{\beta}_1 \approx -239$. 
+Thus, the expected RMST for patients with complications is reduced by circa 239 days, which is similar to the result obtained from the Kaplan-Meier analyis in Figure @fig-pseudo-rmst. However, 
+using pseudo values from @eq-pseudo-value-rmst, we can directly extend the predictor, for example to 
+$$
+\mathring{\theta}_i(\tau) = \beta_0 + \beta_1 x_{i,1} + \beta_2 x_{i,2} + \epsilon_i,
+$$
+
+where $x_{i,1}$ as before and $x_{i,2}$ is the age of subject $i$. The respective estimates are $\hat{\beta}_1 \approx -230$ and $\hat{\beta}_2 \approx -3$, such that the expected RMST is reduced by circa 3 days per year of age. The effect of $\hat{\beta}_1$ is slightly reduced when age is included and can be interpreted as the effect of complications adjusted for age. 
+
+
+
+
+## Pseudo-values in Event-History Analysis
+
+The pseudo-value approach can be extended to more complex event-history settings, including competing risks and multi-state models (@andersenPseudoobservationsSurvivalAnalysis2010; @parnerRegressionModelsCensored2023; @andersen2003generalisedlinear). The key idea remains the same: use univariate, non-parametric estimators of the quantity of interest to calculate pseudo-values, which can then be used as target variables in regression models.
+
+### Pseudo-values for Competing Risks
+
+In the competing risks setting, a quantity of particular interest is the cumulative incidence function (CIF) $F_e(\tau)$ (@eq-cif), which represents the probability of experiencing event type $e$ before time $\tau$. A suitable, univariate, unbiased estimator for the CIF is the Aalen-Johansen estimator $F_{AJ,e}(\tau)$ (@sec-aalen-johanson). The pseudo-values for the CIF are thus given by
+
+$$
+\theta_{i,e}(\tau) = nF_{AJ,e}(\tau) - (n-1)F_{AJ,e}^{-i}(\tau),
+$${#eq-pseudo-value-cif}
+
+where $F_{AJ,e}^{-i}(\tau)$ is the Aalen-Johansen estimator of the CIF for event type $e$ obtained by omitting the $i$-th observation from the data set.
+
+Once calculated, these pseudo-values can once again be used as target variables in regression models to estimate the conditional CIF $F_e(\tau | \mathbf{x}_i)$ via @eq-pseudo-value-model. This allows for direct interpretation of covariate effects on the cumulative incidence of a specific event type.
+
+### Pseudo-values for Multi-State Models
+
+In multi-state settings, transition probabilities $P_{\ell e}(\zeta, \tau)$ (@eq-ms-trans-prob-mat) are often of primary interest. These represent the probability of being in state $e$ at time $\tau$ given occupation of state $\ell$ at time $\zeta$. Non-parametric estimators for transition probabilities can be obtained via the Aalen-Johansen estimator for multi-state models (@sec-ms-aalen-johanson). The pseudo-values for transition probabilities are then defined as
+
+$$
+\theta_{i,\ell e}(\zeta, \tau) = nP_{AJ,\ell e}(\zeta, \tau) - (n-1)P_{AJ,\ell e}^{-i}(\zeta, \tau),
+$${#eq-pseudo-value-trans-prob}
+
+where $P_{AJ,\ell e}(\zeta, \tau)$ is the Aalen-Johansen estimator of the transition probability from state $\ell$ to state $e$ between times $\zeta$ and $\tau$, and $P_{AJ,\ell e}^{-i}(\zeta, \tau)$ is the same estimator obtained by omitting the $i$-th observation.
+
+These pseudo-values can be used to model conditional transition probabilities $P_{\ell e}(\zeta, \tau | \mathbf{x}_i)$ using standard regression techniques. This approach is particularly flexible as it allows for modeling state occupation probabilities directly, without the need to specify and estimate all transition hazards (@andersen2003generalisedlinear).
+
+
+
+
+
+## Advantages and Limitations
+Although the examples given in (@sec-pseudo-value-S) and (@sec-pseudo-value-rmst) are relatively simple, they illustrate the main advantages and limitations of the pseudo-value approach for machine learning based survival analysis: 
+
+On the plus side one can, 
+
+- estimate/predict various quantities of interest at selected time points $\tau$, conditional on covariates, as long as an univariate, unbiased estimator of the quantity of interest is available,
+- learn function $f(\xx)$ in @eq-pseudo-value-model using any machine or deep learning method without any additional modifications, as the pseudo-value (target variable) is a scalar value for each observation $i$ at time $\tau$; there is no need to change the model interface or implement a custom loss function, 
+- interpret the effects of features directly as effects on the quantity of interest $\hat{\psi}(\tau|\xx)$ (when the response function $h$ in @eq-pseudo-value-model is the identity function).
+
+
+However, there are also some limitations: 
+
+- Pseudo-values can take on positive and negative values, threfore it is not guaranteed that the model predictions are within the range of the target. For exapmle, survival probabilities should be within $[0,1]$, which can only be insured if the response function $h$ is chosen suitably. In context of statistical modeling, generalized linear models with suitable link functions can be used to ensure that the predictions are within the range of the target. In machine learning, similar approaches can be used, for example by clipping the predictions to the range of the target or use suitable activation functions. In many cases, however, predictions will be within the desired range even when using the idendity function, especially if $\tau$ is not at the edges of the follow-up period (where the survival probability is close to 0 or 1) and if $\xx$ is not an outlier in the feature space.
+- the pseudo-values are technically not independent (all observations are used to calculate $\hat{\psi}(\tau)$ and most to calculate $\hat{\psi}^{-i}(\tau)$); this does not affect the estimation of $f(\xx)$ too much, but robust variance estimation is prefered in context of statistical inference, for example using generalized estimating equations (GEEs) rather than linear models or generalized linear models. 
+- Interpretation of feature effects is hindered to some extent by being time dependent; this can however also be viewed as an advantage, as the approach does not make strict assumptions like proportional hazards or accelerated failure time assumptions, which can be violated in practice.
+- Calculating pseudo-values can be computationally expensive if predictions are needed at many time points $\tau$ and for many observations $i$, as the univariate estimator $\psi(\tau)$ has to be calculated n + 1 times per time point $\tau$. However, for specific use cases efficient implementations based on infinitisimal jack-knife methods have been suggested in the literature and implemented in standard software packages (@parnerRegressionModelsCensored2023). 
+
+
+
+
+## Conclusion
+
+:::: {.callout-warning icon=false}
 
 ## Key takeaways
 
-* The IPCW reduction transforms a survival task to a weighted classification task.
-* It can greatly simplify the estimation of survival probabilities at a specific time point of interest.
-* Many learners for binary classification can be used out-of-the-box without further modifications.
-* Learners that support gradient based optimization such as gradient boosting and deep learning are particularly well suited for this task, as they support specification of (custom) loss functions and support integration of weights.
+* The pseudo-value based approach allows to estimate arbitrary quantities of interest conditional on covariates, as long as an univariate, unbiased estimator of the quantity of interest is available.
+* It avoids strong assumptions like the proportional hazards assumption or the accelerated failure time assumption, which can be violated in practice.
+* In context of machine learning, this approach can greatly simplify analyis of time-to-event data, as standard implementations can be used out-of-the-box without any additional modifications.
+* In contrast to many survival specific machine learning methods currently available, it can be applied used in complex settings, including competing risks and multi-state models.
+* Feature effects can ben interpreted directly as effects on the quantity of interest, rather than being expressed in terms of hazard ratios or other relative measures.
 ::::
 
 :::: {.callout-important icon=false}
 
 ## Limitations
-* Currently, the IPCW approach has only been described for right-censored data. Extensions to other settings might be possible, but have not been explored yet.
-* Extensions to event-history analysis is also not well explored at the moment of writting, although an extension to competing risks has been proposed recently (see further reading).
+* Pseudo-values can take negative and positive values, thus direct applicatoin of regression algorithms might produce predictions outside the range of the target. Some methods, like deep learning, support the use of activation functions and custom loss functions, but other learners might need additional adaptation in order to map the predictions to the target space.
+* Interpretation of feature effects is only direct, if the response function is the identity function.
+* Calculating pseudo-values can be computationally expensive if predictions are needed at many time points $\tau$ and data set size $n$ is large.
 
 ::::
 
@@ -100,9 +187,7 @@ Once again, we fit a linear model
 
 ## Further reading
 
-* [@Vock2016] provide the main reference where they explicitly show how different learners (logistic regression, bayesian networks, decision trees and k-nearest neighbors) can be adapted to obtain unbiased estimates of the event probability in the presence of censoring based on adapted IPC weights. They also discuss suitable evaluation metrics.
-* [@gonzalezginestet2021stackedinverse] extend the approach to the competing risks setting.
-* [@pillerReductionTechniquesSurvival2025] provide an overview of different reduction techniques for survival analysis including the IPCW approach and implement it in the `mlr3proba`package [@pkgmlr3proba].
+* 
 ::::
 
 

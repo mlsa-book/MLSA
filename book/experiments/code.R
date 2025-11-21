@@ -709,6 +709,11 @@ library(patchwork)
 data("tumor", package = "pammtools")
 tumor_comp = tumor |> select(days, status, complications)
 tau = c(1000, 2000, 3000)
+
+
+### survival probability
+
+
 pseudo_dfs = purrr::map_dfr(tau, function(.x) {
   pseudo_mat = pseudosurv(time = tumor$days, event = tumor$status, tmax = .x)
   cbind(tumor_comp, data.frame(pseudo = pseudo_mat$pseudo, time = pseudo_mat$time))
@@ -739,6 +744,136 @@ p_km_complications = ggplot(bkm_complications, aes(x = time, y = estimate)) +
 p_km_complications
 ggsave("book/Figures/survival/pseudo-complications-lm.png", p_km_complications, height=3, units="in", dpi=600)
 
+
+### restricted mean survival time
+library(survival)
+library(pseudo)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(patchwork)
+data("tumor", package = "pammtools")
+tumor_comp = tumor |> select(days, status, complications)
+tau = c(1000, 2000, 3000)
+
+
+rmst_dfs = purrr::map_dfr(tau, function(.x) {
+  rmst = pseudomean(time = tumor$days, event = tumor$status, tmax = .x)
+  cbind(tumor_comp, data.frame(pseudo = rmst, time = .x))
+}) |> mutate(time = factor(time))
+
+ndf = pammtools::make_newdata(rmst_dfs, complications = unique(complications), time = unique(time))
+lm <- lm(formula = pseudo~complications*time, data = rmst_dfs)
+summary(lm)
+
+ndf$estimate = predict(lm, newdata = ndf)
+ndf <- ndf |> 
+  mutate(model = "pseudo-values (LM)") |> 
+  mutate(time = as.numeric(as.character(time)))
+
+tumor$pseudo = dplyr::filter(rmst_dfs, time == 1000)$pseudo
+lm1000 = lm(pseudo ~ complications + age, data = tumor)
+summary(lm1000)
+
+# Get KM fits for each group and prepare data for plotting
+km_complications = survfit(Surv(days, status)~complications, data = tumor)
+bkm_complications = broom::tidy(km_complications) |>
+  mutate(complications = gsub("complications=", "", strata))
+
+# Use single tau for RMST visualization
+tau_rmst = 1000
+
+# Calculate RMST for each group at tau_rmst
+calculate_rmst_at_tau = function(km_fit, tau) {
+  times = km_fit$time[km_fit$time <= tau]
+  surv = km_fit$surv[km_fit$time <= tau]
+  
+  # Add time 0 if needed
+  if (length(times) == 0 || times[1] > 0) {
+    times = c(0, times)
+    surv = c(1, surv)
+  }
+  
+  # Add tau if beyond last time point
+  if (max(times) < tau) {
+    times = c(times, tau)
+    surv = c(surv, tail(surv, 1))
+  }
+  
+  # Calculate RMST using trapezoidal rule
+  rmst = 0
+  for (i in 2:length(times)) {
+    width = times[i] - times[i-1]
+    avg_height = (surv[i] + surv[i-1]) / 2
+    rmst = rmst + width * avg_height
+  }
+  
+  return(rmst)
+}
+
+# Get KM fits for each group separately
+km_no = survfit(Surv(days, status)~1, data = tumor |> filter(complications == "no"))
+km_yes = survfit(Surv(days, status)~1, data = tumor |> filter(complications == "yes"))
+
+rmst_no = calculate_rmst_at_tau(km_no, tau_rmst)
+rmst_yes = calculate_rmst_at_tau(km_yes, tau_rmst)
+
+# Prepare data for ribbon (shaded area up to tau_rmst)
+bkm_for_ribbon = bkm_complications |>
+  filter(time <= tau_rmst) |>
+  group_by(complications) |>
+  arrange(time) |>
+  group_modify(~ {
+    df = .x
+    # Add time 0 if not present
+    if (min(df$time) > 0) {
+      df = bind_rows(data.frame(time = 0, estimate = 1), df)
+    }
+    # Add tau_rmst if needed
+    if (max(df$time) < tau_rmst) {
+      df = bind_rows(df, data.frame(time = tau_rmst, estimate = tail(df$estimate, 1)))
+    }
+    df
+  }) |>
+  ungroup()
+
+# Create annotation data for RMST values
+rmst_annotations = data.frame(
+  complications = c("no", "yes"),
+  rmst_value = c(rmst_no, rmst_yes),
+  x = tau_rmst / 2,
+  y = 0.25
+) |>
+  mutate(
+    label = paste0("RMST [", round(rmst_value, 1), "d]")
+  )
+
+# Create plot with facets
+p_rmst_complications = ggplot(bkm_complications, aes(x = time, y = estimate)) +
+  # Shade area under curves (RMST) - up to tau_rmst
+  geom_ribbon(data = bkm_for_ribbon, 
+              aes(x = time, ymin = 0, ymax = estimate, fill = complications),
+              alpha = 0.3, inherit.aes = FALSE) +
+  # Survival curves
+  geom_step(aes(color = complications), linewidth = 1.3) +
+  # Vertical line at tau_rmst
+  geom_vline(xintercept = tau_rmst, lty = 2, alpha = 0.7, linewidth = 0.8) +
+  # RMST annotation
+  geom_text(data = rmst_annotations, 
+            aes(x = x, y = y, label = label),
+            inherit.aes = FALSE, size = 3.5, fontface = "bold") +
+  facet_wrap(~ complications, 
+             labeller = labeller(complications = c("no" = "No Complications", "yes" = "Complications"))) +
+  ylab("S(t)") +
+  xlab("time (days)") +
+  labs(color = "Complications", fill = "Complications") +
+  ylim(c(0, 1)) +
+  xlim(c(0, max(bkm_complications$time))) +
+  theme(legend.position = "none",
+        strip.text = element_text(size = 11, face = "bold"))
+
+# p_rmst_complications
+ggsave("book/Figures/reductions/pseudo-rmst-complications-lm.png", p_rmst_complications, height=6, width=12, units="in", dpi=600)
 
 
 
