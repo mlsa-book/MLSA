@@ -20,12 +20,27 @@ Using regression and classification models to solve problems based on survival d
 
 This book is intended to bridge the gap between survival analysis and machine learning to increase accessibility and to formalize and demystify the combined field of 'machine learning survival analysis'.
 This chapter highlights the importance of survival analysis and why predictions in a survival setting ('survival predictions') stand out from regression and classification predictions.
-Some motivating examples are first provided and then important concepts for machine learning survival analysis are introduced.
+Some motivating examples are first provided and then important concepts for survival analysis and machine learning are introduced.
 
-### Waiting for a bus
+### Survival analysis
+
+The term survival analysis highlights the closely related nature of the field with medical statistics and in particular predicting survival times (the time until death).
+However, this is certainly not the only application of the field.
+In engineering, the field is often referred to as _reliability analysis_, as a common task is predicting the reliability of a component in a machine, for example predicting when an engine in a plane needs to be replaced.
+In economics, the term _duration analysis_ is often found, and in other areas _failure-time analysis_ may also be used.
+
+In @sec-surv, 'survival analysis' is introduced to specifically refer to the case when the event of interest can occur exactly once (e.g., death).
+In @sec-eha, 'event history analysis' is defined, which is a generalization of survival analysis to the case when one or more events can occur one or more times.
+To align with common practice, the term 'survival analysis' is used throughout the book and it should be clear from context when the more general event history methodology should be used.
+
+One of the key aims in this book is to highlight the ubiquitous nature of survival analysis and to encourage more machine learning practitioners to use survival analysis when appropriate.
+Machine learning practitioners are likely familiar with regression and classification.
+However, there are many cases when survival analysis should be used instead, for example at your local bus stop.
+
+#### Not quite regression: Waiting for a bus {.unnumbered .unlisted}
 
 Every day you are making survival predictions.
-For example, you are making a survival prediction by guessing when a bus will arrive at your bus stop.
+For example, by guessing when a bus will arrive at your bus stop.
 On first glance, many would call this a regression problem, as regression is tasked with making continuous predictions.
 However, unless you are reading this from an area that has a perfect public transport system, then there is a non-zero probability that your bus will never arrive.
 Maybe it will break down, be so delayed that you stop waiting, or be taken on a diversion that misses your stop.
@@ -42,11 +57,7 @@ It is still informative to know the bus was running late before the break down h
 
 ![Demonstrating censoring. The top, blue bus is censored for some reason after 4 minutes, the bottom, red bus arrives at its intended destination after 2 minutes.](Figures/introduction/bus.png){#fig-bus width=400 fig-alt="Two cartoon buses are pictured over a number line from 0 to 5.The top, blue bus has a yellow line from '0' to '4' with a warning sign at the end indicated successful arrival. The bottom, red bus has a green line from '0' to '2' with a check mark at the end indicated successful arrival."}
 
-Whilst it is common in survival analysis to talk about predicting the time to an event, such as in the previous example, this is not the quantity that model usually estimate directly.
-Instead, survival models generally predict survival time distributions, which describe the probability of the event occurring over time (a distribution).
-This is more informative than predicting a single event time as it naturally incorporates uncertainty (vital for working with censoring) and can also be used to make other types of prediction, discussed further in @sec-survtsk.
-
-### Allocating resources
+#### Still not regression: Relative risks {.unnumbered .unlisted}
 
 As well as survival distribution predictions, another common survival problem is to rank observations or separate them into risk groups, for example to allocate resources.
 Take the example of triaging patients in an emergency department.
@@ -57,25 +68,16 @@ In this case, the event of interest is requiring escalation of care.
 Reasons for censoring might include the patient leaving without being seen.
 As will be seen in @sec-survtsk, risk rankings are closely related to predicting survival distributions.
 
-### Survival analysis
+#### Not quite classification: Survival probabilities {.unnumbered .unlisted}
 
-While the term survival analysis does highlight the closely related nature of the field with medical statistics and in particular predicting survival times (the time until death), this is certainly not the only application of the field (as seen in the earlier bus example).
-In engineering, the field is often referred to as _reliability analysis_, as a common task is predicting the reliability of a component in a machine, for example predicting when an engine in a plane needs to be replaced.
-In economics, the term _duration analysis_ is often found, and in other areas _failure-time analysis_ may also be used.
-
-In @sec-surv, 'survival analysis' is introduced to specifically refer to the case when the event of interest can occur exactly once (e.g., death).
-In @sec-eha, 'event history analysis' is defined, which is a generalization of survival analysis to the case when one or more events can occur one or more times.
-To align with common practice, the term 'survival analysis' is used throughout the book and it should be clear from context when the more general event history methodology should be used.
-
-<!-- note to self: check if we define EHA as multiple events, multiple times, or both -->
-
-One of our key aims in this book is to highlight the ubiquitous nature of survival analysis and to encourage more machine learning practitioners to use survival analysis when appropriate.
-Machine learning practitioners are likely familiar with regression and classification, which are the subjects of popular machine learning books (some listed above) however there will be  cases when survival analysis should be used instead.
-The previous bus example gives one such case, where regression may appear sensible on the surface however this would not succeed in handling censored data.
-Another common example where survival analysis should be used but is not is to make 'T-year' probability predictions.
-These predictions are commonly found when discussing severe illnesses, for example statements such as "the five-year survival rate of cancer is p%."
-On the surface this may seem like a probabilistic classification problem, but once again modelling in this way would ignore censoring, for example due to some patients being lost to follow-up.
-Understanding censoring in all its many forms, is the first step to identifying a survival analysis problem, the second is knowing what to predict.
+The previous bus example gives highlights where regression _could_ be used but survival analysis is potentially a better solution to the problem.
+Another frequent example is providing a prognosis to a patient after diagnosis, for example if an elderly man is diagnosed with prostate cancer, the oncologist might say (in some softer words) say "the ten-year survival rate of cancer in 75-year old males is 67.5\%".
+This might appear as a probabilistic classification problem as the clinician is implicitly saying "if we look at who did or did not die from prostate cancer (the outcome) given a sample of similar people (the covariates), then approximately 67.5\% survived".
+However, data is not this clean.
+There is no perfect sample of people with prostate cancer where it is _known_ each patient did or did not die after 10 years.
+In fact, many of those patients will no longer be under observation, perhaps because they moved abroad, died of another cause, or simply stopped turning up for appointments - each of these is a censoring event.
+Once again, using techniques from survival analysis will better capture these nuances.
+In fact, one can actually use a combination of classification and survival analysis methods through reductions and this will be returned to in @sec-redux-classification.
 
 ### Machine learning survival analysis {#sec-intro-mlsa}
 
@@ -100,9 +102,9 @@ Relative to other areas of supervised learning, development in survival analysis
 Despite this, development of models has converged on three primary tasks of interest, or 'survival problems', which are defined by the type of prediction the model makes.
 The formal definition of a machine learning survival analysis task is provided in @sec-ml, but informally one is encountering a survival problem if training a model on data where censoring is present in order to predict one of (@sec-survtsk):
 
-i. A 'relative risk': The risk of an event taking place.
+i. A 'relative risk': The risk of an event taking place (the resource allocation example above).
 i. A 'survival time': The time at which the event will take place.
-i. A 'survival distribution': The probability distribution of the event times, i.e., the probability of the event occurring over time.
+i. A 'survival distribution': The probability distribution of the event times, which is the probability of the event occurring over time (the bus example above).
 
 This presents a key difference between survival analysis and other machine learning areas.
 There are three separate objects that can be predicted, and not all models can predict each one.
