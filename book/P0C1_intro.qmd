@@ -8,131 +8,124 @@ abstract: TODO (150-200 WORDS)
 
 # Introduction {#sec-intro}
 
-{{< include _wip.qmd >}}
+{{< include _wip_minor.qmd >}}
 
-There are many books dedicated to regression and classification as machine learning problems but the 'bibles' of machine learning focus almost entirely on regression and classification [@Bishop2006; @Hastie2001; @Hastie2013].
-There are also excellent books dedicated to survival analysis, such as @Collett2014 and @KalbfleischPrentice1973, but without the inclusion of machine learning models.
+In the broadest sense, survival analysis is concerned with predicting the time until an event occurs.
+This definition will be refined in this chapter and Part I.
 Survival analysis has important applications to fields that directly impact day-to-day life, including healthcare, finance, and engineering.
-Using regression and classification models to solve problems based on survival datasets can lead to biased results, which in turn may have negative consequences.
-
+Machine learning techniques can identify patterns and make predictions on unseen data, even in very large datasets with many covariates and/or large sample sizes.
+Despite this, the canonical machine learning texts focus almost entirely on regression and classification [@Bishop2006; @Hastie2001; @Hastie2013].
+There are also excellent books dedicated to survival analysis, such as @Collett2014 and @KalbfleischPrentice1973, but they do not include modern machine learning models.
+Using regression or classification models to solve problems based on survival datasets can lead to biased results as they poorly capture 'censored' observations - those that do not experience the event of interest within an observation window.
+This book is intended to bridge the gap between survival analysis and machine learning to formalize and demystify the combined field of 'machine learning survival analysis'.
 
 ## Defining Machine Learning Survival Analysis
 
-This book is intended to bridge the gap between survival analysis and machine learning to increase accessibility and to formalize and demystify the combined field of 'machine learning survival analysis'.
-This chapter highlights the importance of survival analysis and why predictions in a survival setting ('survival predictions') stand out from regression and classification predictions.
+This chapter highlights the importance of survival analysis and why predictions in a survival setting differ from regression and classification.
 Some motivating examples are first provided and then important concepts for survival analysis and machine learning are introduced.
 
 ### Survival analysis
 
-The term survival analysis highlights the closely related nature of the field with medical statistics and in particular predicting survival times (the time until death).
+The term survival analysis highlights the field's close relation to medical statistics and in particular predicting survival times (the time until death).
 However, this is certainly not the only application of the field.
 In engineering, the field is often referred to as _reliability analysis_, as a common task is predicting the reliability of a component in a machine, for example predicting when an engine in a plane needs to be replaced.
 In economics, the term _duration analysis_ is often found, and in other areas _failure-time analysis_ may also be used.
 
 In @sec-surv, 'survival analysis' is introduced to specifically refer to the case when the event of interest can occur exactly once (e.g., death).
 In @sec-eha, 'event history analysis' is defined, which is a generalization of survival analysis to the case when one or more events can occur one or more times.
-To align with common practice, the term 'survival analysis' is used throughout the book and it should be clear from context when the more general event history methodology should be used.
+To align with common practice, the term 'survival analysis' is used throughout the book and context will make clear when the more general event history methods apply.
 
 One of the key aims in this book is to highlight the ubiquitous nature of survival analysis and to encourage more machine learning practitioners to use survival analysis when appropriate.
 Machine learning practitioners are likely familiar with regression and classification.
-However, there are many cases when survival analysis should be used instead, for example at your local bus stop.
+However, there are many cases when survival analysis should be used instead, for example at your local bus stop...
 
 #### Not quite regression: Waiting for a bus {.unnumbered .unlisted}
 
 Every day you are making survival predictions.
 For example, by guessing when a bus will arrive at your bus stop.
-On first glance, many would call this a regression problem, as regression is tasked with making continuous predictions.
-However, unless you are reading this from an area that has a perfect public transport system, then there is a non-zero probability that your bus will never arrive.
+At first glance, many would call this a regression problem, as regression is tasked with making continuous predictions.
+However, transport systems are not perfect and there is a non-zero probability that your bus will never arrive.
 Maybe it will break down, be so delayed that you stop waiting, or be taken on a diversion that misses your stop.
-So in this case, a regression analysis would either dismiss these broken down buses, or act like they arrived at a time they did not.
+Regression analysis assumes the outcome is always observed, so in this example, a regression model would either dismiss these broken down buses, or act like they arrived at a time they did not.
 In survival analysis, these possibilities are referred to as censoring events.
-An observation (the bus) is *censored* when the event of interest (arriving at your bus stop) does not occur (due to break down, diversion, etc.) or when the time of event is unknown (for example, because you stopped waiting).
-The defining characteristic of survival analysis is making use of these censored observations as training data.
-Instead of ignoring all buses that break down, models that make survival predictions ('survival models') use all data up until the point of censoring.
+An observation (the bus) is *censored* when the event of interest (arriving at your bus stop) does not occur (due to break down, diversion, etc.) or its time of occurrence is unknown (for example, because you stopped waiting).
+A defining characteristic of survival analysis is that censored observations are used for model training, not dismissed as missing data.
 In other words, whilst your bus did not arrive, you still know that it 'survived' for at least some amount of time (its 'censoring time') before the censoring event.
-Crucially, censored events are not missing data, they contain real and usable information.
 @fig-bus illustrates these concepts, where the bottom, red bus arrives two minutes after leaving the previous stop.
 Whereas it took the top, blue bus four minutes between leaving the previous bus stop and breaking down.
-It is still informative to know the bus was running late before the break down happened (which may or may not have been related in this case) and it is this partial information that survival models are designed to make use of.
 
 ![Demonstrating censoring. The top, blue bus is censored for some reason after 4 minutes, the bottom, red bus arrives at its intended destination after 2 minutes.](Figures/introduction/bus.png){#fig-bus width=400 fig-alt="Two cartoon buses are pictured over a number line from 0 to 5.The top, blue bus has a yellow line from '0' to '4' with a warning sign at the end indicated successful arrival. The bottom, red bus has a green line from '0' to '2' with a check mark at the end indicated successful arrival."}
 
 #### Still not regression: Relative risks {.unnumbered .unlisted}
 
-As well as survival distribution predictions, another common survival problem is to rank observations or separate them into risk groups, for example to allocate resources.
+As well as survival distribution predictions, another common task in survival analysis is to rank observations or separate them into risk groups, for example to allocate resources.
 Take the example of triaging patients in an emergency department.
 A patient presents with a set of symptoms and is compared to all other patients arriving at the emergency department.
 Their symptoms are assessed to understand how urgently they need to receive help and how their level of risk compares to others.
-This is also a survival prediction.
-In this case, the event of interest is requiring escalation of care.
-Reasons for censoring might include the patient leaving without being seen.
-As will be seen in @sec-survtsk, risk rankings are closely related to predicting survival distributions.
+This is again a survival prediction where the event of interest is escalation of care, and reasons for censoring might include the patient leaving before being seen.
+As will be seen in @sec-survtsk, risk rankings are mathematically tied to survival distributions.
 
 #### Not quite classification: Survival probabilities {.unnumbered .unlisted}
 
-The previous bus example gives highlights where regression _could_ be used but survival analysis is potentially a better solution to the problem.
-Another frequent example is providing a prognosis to a patient after diagnosis, for example if an elderly man is diagnosed with prostate cancer, the oncologist might say (in some softer words) say "the ten-year survival rate of cancer in 75-year old males is 67.5\%".
-This might appear as a probabilistic classification problem as the clinician is implicitly saying "if we look at who did or did not die from prostate cancer (the outcome) given a sample of similar people (the covariates), then approximately 67.5\% survived".
-However, data is not this clean.
-There is no perfect sample of people with prostate cancer where it is _known_ each patient did or did not die after 10 years.
-In fact, many of those patients will no longer be under observation, perhaps because they moved abroad, died of another cause, or simply stopped turning up for appointments - each of these is a censoring event.
-Once again, using techniques from survival analysis will better capture these nuances.
-In fact, one can actually use a combination of classification and survival analysis methods through reductions and this will be returned to in @sec-redux-classification.
+The bus example highlighted the relationship between survival analysis and regression.
+This example examines the close connection to classification.
+Support an elderly man is diagnosed with prostate cancer, the oncologist might tell him (in some softer words) "the ten-year survival rate of cancer in 75-year old males is 67.5\%".
+This initially appears as a probabilistic classification problem as the clinician is implicitly saying "if we look at who did or did not die from prostate cancer (the outcome), given a sample of similar people (the covariates), then approximately 67.5\% survived".
+But in the real-world, data is rarely this clean and there will be many patients in a dataset for whom it is unknown if they did or not die from their cancer 10 years from diagnosis.
+Perhaps because they moved abroad, died of another cause, or simply stopped turning up for appointments -- each of these is a censoring event.
+Once again, using techniques from survival analysis would allow more precise modelling of these censored observations.
+In fact, one can actually use a combination of classification and survival analysis methods through reductions and this will be returned to in @sec-discrete-time-reduction.
 
 ### Machine learning survival analysis {#sec-intro-mlsa}
 
 Machine learning is the field of Statistics primarily concerned with building models to either predict outputs from inputs or to learn relationships from data [@Hastie2001].
-This book is limited to the former case, or more specifically supervised learning, as this is the field in which the vast majority of survival problems live.
+This book focuses on the supervised learning setting, where the goal is to predict outcomes from labelled training data.
 
 Defining if a model is 'machine learning' is surprisingly difficult, with terms such as 'iterative' and 'loss optimization' being frequently used in often clunky definitions.
 This book defines machine learning models as those that:
 
-1. Require intensive model fitting procedures such as recursion or iteration;
-2. Are flexible in that they have hyper-parameters that can be tuned (@sec-ml);
-3. Trained using some form of loss optimization;
-4. Are 'black boxes' without simple closed-form expressions that can be easily interpreted;
-5. Aim to minimize the difference between predictions and ground truth whilst placing minimal assumptions on the underlying data form.
+1. Require intensive model fitting procedures such as iteration;
+2. Aim to minimize the difference between predictions and ground truth;
+3. Place few assumptions on the underlying data;
+4. Trained using some form of loss optimization;
+5. Are flexible with tunable hyper-parameters (@sec-ml);
+6. Often function as 'black boxes' without simple closed-form expressions that can be easily interpreted.
 
-However, there are other models, which one might think of as a 'traditional statistical' models (@sec-classical), that can also be used for machine learning.
-These 'traditional' models are low-complexity models that are either non-parametric or have a simple closed-form expression with parameters that can be fit with maximum likelihood estimation (or an analogous method).
-Whilst these traditional models are usually fast to train and are highly interpretable, they can be inflexible and may make unreasonable assumptions as they assume underlying probability distributions to model data.
-Augmenting these models with certain methods, leads to powerful models that can also be considered 'machine learning' tools; hence their inclusion in this book.
+There are some models that one might think of as 'traditional statistical' models (@sec-classical), that can also be used for machine learning.
+These 'traditional' models are low-complexity and are either non-parametric or have a simple closed-form expression with parameters that can be fit with maximum likelihood estimation (or an analogous method).
+While these traditional models are usually fast to train and highly interpretable, they can be inflexible and may impose rigid and/or unrealistic assumptions about the underlying distribution of teh data.
+Augmenting these models with certain methods (@sec-classical-improving) leads to powerful models that can also be considered 'machine learning' tools; hence their inclusion in this book.
 
 Relative to other areas of supervised learning, development in survival analysis has been slow, as will be seen when discussing models in Part III.
-Despite this, development of models has converged on three primary tasks of interest, or 'survival problems', which are defined by the type of prediction the model makes.
-The formal definition of a machine learning survival analysis task is provided in @sec-ml, but informally one is encountering a survival problem if training a model on data where censoring is present in order to predict one of (@sec-survtsk):
+Despite this, development of models has converged on three primary tasks of interest, or _survival problems_, which are defined by the type of prediction the model makes.
+The mathematical definition of a machine learning survival analysis task is provided in @sec-survtsk.
+Generally, one is encountering a survival problem if training a model on data where censoring is present in order to predict one of (@sec-survtsk):
 
-i. A 'relative risk': The risk of an event taking place (the resource allocation example above).
-i. A 'survival time': The time at which the event will take place.
-i. A 'survival distribution': The probability distribution of the event times, which is the probability of the event occurring over time (the bus example above).
+i. A _relative risk_: The risk of an event taking place (the triage example above).
+i. A _survival time_: The time at which the event will take place.
+i. A _survival distribution_: The probability distribution over event times (the bus example above).
 
-This presents a key difference between survival analysis and other machine learning areas.
-There are three separate objects that can be predicted, and not all models can predict each one.
-Moreover, each prediction type serves a different purpose and you may require deploying multiple models to serve each one.
-As an example, an engineer is unlikely to care the exact time at which a plane engine fails, but they might greatly value knowing when the probability of failure increases above 50\% -- a survival distribution prediction.
-Returning to the triage example, a physician cannot process a survival distribution prediction to make urgent decisions, but they could assign limited resources if it is clear that one patient is at far greater risk than another -- a relative risk prediction.
+Each prediction type serves a different purpose and you may require training multiple models to optimally predict each one.
+However, as will be seen in @sec-survtsk, there are mathematical methods to transform these tasks between one another.
+As an example, an engineer is unlikely to care about the exact time at which a plane engine fails, but they might greatly value knowing when the probability of failure increases above 50\% -- a survival distribution prediction.
+Returning to the triage example, a physician cannot process a survival distribution prediction to make urgent decisions, but they could assign limited resources if it is clear that one patient is at substantially greater risk than another -- a relative risk prediction.
 
-Another important difference that separates survival analysis from other statistical settings, is the focus on less common forms of distribution defining functions.
-A distribution defining function is a function that uniquely defines a probability distribution, most commonly the probability density function (pdf) and cumulative distribution function (cdf).
-In the context of survival analysis, the pdf at time $t$ is the likelihood of an event taking place at $t$, *independently of any past knowledge*, and the cdf is the probability that the event has *already* taken place at $t$, which is the opposite of the usual survival prediction of interest.
-Hence, survival analysis predictions usually focus on predicting the *survival function*, which is simply one minus the cdf, and the *hazard function*, which is the likelihood of the event occurring at $t$ *given* that the observation has survived to at least time $t$.
+When it comes to making distribution predictions, survival analysis stands out again.
+Common _distribution defining functions_, functions that uniquely define a probability distribution, are the probability density function (PDF) and cumulative distribution function (CDF).
+In survival settings, interpreting the PDF can be counter-intuitive as it is an unconditional quantity that does not account for whether the event has or has not already occurred.
+The CDF is the probability that the event has 'already' taken place at $t$, which is opposite to the usual survival prediction: whether the event 'will' take place.
+Therefore, survival analysis focuses instead on predicting the *survival function*, which is simply one minus the CDF, and the *hazard function*, which is the conditional rate of the event occurring at $t$ given that the observation has survived up to $t$.
 
-These functions are formally defined in @sec-surv and are visualized in @fig-distrfunctions assuming a Gompertz distribution, which is often chosen to model adult lifespans.
+These functions are formally defined in @sec-surv and are visualized in @fig-distrfunctions with a Gompertz distribution, which is often chosen to model adult lifespans.
 The figure demonstrates the utility of the survival and hazard functions for survival analysis.
-The survival function (bottom right) is a decreasing function from one to zero, at a given time point, $t$, this is interpreted as the probability of surviving until time point, $t$, or more generally the probability that the event of interest has not yet occurred.
+The survival function (bottom right) is a decreasing function from one to zero.
+This is the probability of surviving until a given time, $t$, or equivalently the probability that the event of interest has not yet occurred.
 The hazard function (top right), starts at zero and is not upper-bounded at one as it is a conditional probability.
-Even though the pdf peaks just before 0.5, the hazard function continues to increase as it is conditioned on not having experienced the event, hence the risk of event just continues to increase.
+Even though the PDF peaks just before 0.5, the hazard function continues to increase as it is conditioned on not having experienced the event, hence the risk of event continues to increase.
 
 ![Probability density (top left), hazard (top right), cumulative density (bottom left), and survival (bottom right) functions of a Gompertz(1, 2) distribution.](Figures/introduction/gompertz.png){#fig-distrfunctions fig-alt="Four line graphs. The density plot increases from (0,1) to (0.4, 1.25) and then decreases to (1.5, 0). The hazard smoothly increases from (0, 0) to (1.5, 20). The cumulative density smoothly increases from (0,1) to (1.5, 1) and the survival function is the reverse shape to the cumulative density from (0, 1) to (1.5, 0)."}
 
-Instead of duplicating content from machine learning or survival analysis books, this book primarily focuses on defining the suitability of different methods and models depending on the availability data.
-For example, when might you consider a neural network instead of a Cox Proportional Hazards model?
-When might you use a random forest instead of a support vector machine?
-Is a discrimination-booted gradient boosting machine more appropriate than other objectives?
-Can you even use a machine learning model if you have left-censored multi-state data (we will define these terms later)?
-
-From fitting a model to evaluating its predictions, knowing the different prediction types is vital to interpretation of results, these will be formalised in @sec-surv.
-
+<!-- reviewed to here -->
 ## Censoring and Truncation
 
 As already discussed, censoring is the defining feature of survival analysis.
