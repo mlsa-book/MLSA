@@ -19,7 +19,7 @@ There are also excellent books dedicated to survival analysis, such as @Collett2
 Using regression or classification models to solve problems based on survival datasets can lead to biased results as they poorly capture 'censored' observations - those that do not experience the event of interest within an observation window.
 This book is intended to bridge the gap between survival analysis and machine learning to formalize and demystify the combined field of 'machine learning survival analysis'.
 
-## Defining Machine Learning Survival Analysis
+## Defining Machine Learning Survival Analysis {#sec-intro-def}
 
 This chapter highlights the importance of survival analysis and why predictions in a survival setting differ from regression and classification.
 Some motivating examples are first provided and then important concepts for survival analysis and machine learning are introduced.
@@ -39,7 +39,7 @@ One of the key aims in this book is to highlight the ubiquitous nature of surviv
 Machine learning practitioners are likely familiar with regression and classification.
 However, there are many cases when survival analysis should be used instead, for example at your local bus stop...
 
-#### Not quite regression: Waiting for a bus {.unnumbered .unlisted}
+#### Waiting for a bus {.unnumbered .unlisted}
 
 Every day you are making survival predictions.
 For example, by guessing when a bus will arrive at your bus stop.
@@ -56,7 +56,7 @@ Whereas it took the top, blue bus four minutes between leaving the previous bus 
 
 ![Demonstrating censoring. The top, blue bus is censored for some reason after 4 minutes, the bottom, red bus arrives at its intended destination after 2 minutes.](Figures/introduction/bus.png){#fig-bus width=400 fig-alt="Two cartoon buses are pictured over a number line from 0 to 5.The top, blue bus has a yellow line from '0' to '4' with a warning sign at the end indicated successful arrival. The bottom, red bus has a green line from '0' to '2' with a check mark at the end indicated successful arrival."}
 
-#### Still not regression: Relative risks {.unnumbered .unlisted}
+#### Hospital triage {.unnumbered .unlisted}
 
 As well as survival distribution predictions, another common task in survival analysis is to rank observations or separate them into risk groups, for example to allocate resources.
 Take the example of triaging patients in an emergency department.
@@ -65,7 +65,7 @@ Their symptoms are assessed to understand how urgently they need to receive help
 This is again a survival prediction where the event of interest is escalation of care, and reasons for censoring might include the patient leaving before being seen.
 As will be seen in @sec-survtsk, risk rankings are mathematically tied to survival distributions.
 
-#### Not quite classification: Survival probabilities {.unnumbered .unlisted}
+#### T-year survival probabilities {.unnumbered .unlisted}
 
 The bus example highlighted the relationship between survival analysis and regression.
 This example examines the close connection to classification.
@@ -125,28 +125,33 @@ Even though the PDF peaks just before 0.5, the hazard function continues to incr
 
 ![Probability density (top left), hazard (top right), cumulative density (bottom left), and survival (bottom right) functions of a Gompertz(1, 2) distribution.](Figures/introduction/gompertz.png){#fig-distrfunctions fig-alt="Four line graphs. The density plot increases from (0,1) to (0.4, 1.25) and then decreases to (1.5, 0). The hazard smoothly increases from (0, 0) to (1.5, 20). The cumulative density smoothly increases from (0,1) to (1.5, 1) and the survival function is the reverse shape to the cumulative density from (0, 1) to (1.5, 0)."}
 
-<!-- reviewed to here -->
 ## Censoring and Truncation
 
-As already discussed, censoring is the defining feature of survival analysis.
-As well censoring, some survival problems may also deal with 'truncation', which can be thought of as a stricter form of censoring.
-In general terms, truncation is the process of *fully* excluding data whereas censoring is the process of *partially* excluding data.
-In survival analysis, data is measured over time and censoring or truncation apply to the survival time outcome.
-The precise definitions of different types of censoring and truncation are provided in @sec-surv, for now we just provide a non-technical summary of the most common form of both to highlight how prominent they are.
+As already discussed, censoring is a defining feature of survival analysis.
+As well censoring, survival data can include _truncation_, which can be thought of as a stricter form of censoring.
+Truncation is the process of fully excluding data whereas censoring is the process of partially excluding data.
+The precise definitions of different types of censoring and truncation are provided in @sec-surv, non-technical summaries of the most common forms of censoring and truncation are provided below.
 
-The most common form of censoring is right-censoring (@fig-intro-censoring, middle), this occurs when the true survival time is 'to the right of', i.e., larger than (if you imagine a number line), the observed censoring time.
-The examples above are all forms of right-censoring.
-A canonical example of right-censoring is as follows: if a medical study lasts five years and patients are censored if they are alive at the end of the study, then all patients alive at five years are right-censored as their true survival time must be greater than five years.
+The most common form of censoring is right-censoring (@fig-intro-censoring, middle), this occurs when the true survival time is greater than ('to the right of' if you imagine a number line) the observed censoring time.
+The examples in @sec-intro-def are all forms of right-censoring.
+Left-censoring is recorded when the event of interest is less than ('to the left of') the observed censoring time.
+@sec-surv provides an example of someone telling an interviewer that they started using a phone (the event of interest) before the interview, but they do not remember when.
+If the time-to-event outcome is "age at first phone use" then a 23-year-old who does not remember must therefore be left-censored at '23'.
 
-In contrast, the most common form of truncation is left-truncation, which can occur in a few different situations and results in data before the truncation time either being partially or fully removed (@fig-intro-censoring, bottom).
+Left-truncation is the more common form of truncation.
+It can occur in a few different situations and results in data before the truncation time either being partially or fully removed (@fig-intro-censoring, bottom).
+Left-censoring occurs because the event of interest has already happened but not known when.
+Left-truncation occurs because a portion of data that occurred before the study start is removed but the event of interest has not yet occurred.
+
 The examples below look at partial left-truncation, complete truncation, and using partial truncation to fix biases.
 
 **Example 1: Partial left-truncation**
-Say a study begins in 2024 to predict the time until death for a patient diagnosed with tuberculosis (TB) treated with a novel treatment.
-The study consists of many individuals, however some of these already had TB before 2024.
-Left-truncation would occur if the study excludes data about the individuals who had TB before 2024, i.e., treated them as if they were diagnosed with TB on entry to the study - this is partial left-truncation.
-Excluding this data would bias the results, especially if the novel treatment is most effective for people in the early-stages of the disease.
-One common way to account for this bias would be to record the *initial* date of diagnosis and the date the treatment began.
+Say a study looks at predicting the time until death for a patient diagnosed with tuberculosis (TB) treated with a novel treatment.
+The study design uses a convenience sample which means some individuals had TB from the study start and others did not.
+Left-truncation would occur if the study excludes the at-risk time of individuals who had TB at the study start, meaning that they were treated as if they were diagnosed with TB on entry to the study - this is partial left-truncation.
+Excluding this data would induce survivorship bias - accidentally conditioning on observations that are more likely to survive - as individuals with more aggressive strains are systematically excluded.
+One common way to account for this bias would be to record the initial date of diagnosis, the date the treatment began, and specialized methods introduced in @sec-surv.
+This is distinct from left-censoring because the event of interest, death, has not yet occurred.
 
 **Example 2: Complete left-truncation**
 Consider researchers exploring if survival models can be used to more accurately predict the exact day a pregnant person will give birth, with abortion and miscarriage treated as competing risks.
@@ -154,20 +159,23 @@ Unfortunately, there will be cases of miscarriage occurring before a person find
 The first, more obvious, consequence of this omission is that the true number of miscarriages will be underestimated.
 The second consequence is that the time until miscarriage outcome will be overestimated, as earlier miscarriages are not recorded so the outcome time is skewed towards later ones.
 To demonstrate why this is problematic, if someone discovers they are pregnant early and this new model is used to predict the outcome of their pregnancy, then even if it correctly predicts they have a miscarriage, it is likely to predict this happens later than it actually does, which could have an effect on any potential treatment (physical and/or mental) that may need to be allocated.
-The bias in this example is particularly hard to address as the data is completely truncated - the subjects are omitted without the researchers being aware of them.
+The bias in this example is particularly hard to address as the data is completely truncated - the subjects are omitted without the researchers being aware of them - thus any techniques require external data or sensitivity analyses.
 
 ![Censoring and truncation. Top row: no censoring or truncation, a patient is diagnosed with a disease, enrolled in a study, and dies during the observed period, their survival time is known. Middle: right censoring, a patient is diagnosed and enrolled in a study, they leave the study either due it ending or for some other reason, this is recorded as their censoring time and they die at some unknown later time to the right of the censoring time. Right: left truncation, a patient is diagnosed with a disease but not enrolled to a study until some time afterwards, their data before this time has not been collected and is completely unknown, they then die during the study period.](Figures/introduction/censoring.png){#fig-intro-censoring fig-alt="TODO"}
 
 **Example 3: Immortal time bias**
 Immortal time bias occurs when an observation in the data is guaranteed to survive a period of time (hence being 'immortal' in that time) by virtue of the study design.
-For example, say a randomised controlled trial is conducted to test if a novel chemotherapy treatment improves survival rates from a given cancer.
+For example, say a randomized controlled trial is conducted to test if a novel chemotherapy treatment improves survival rates from a given cancer.
 The trial is split into two arms, one for existing treatments and one for the novel treatment, and a patient is eligible for the novel treatment only if they have been living with cancer for two years and no other treatment has been shown to work.
 Finally, patients are enrolled into the study from the date of diagnosis.
 This dataset now includes immortal time bias as patients can only be in the novel treatment arm if they have already survived two years, whereas patients in the other arm have no such restriction.
 Hence, even if the novel treatment has no benefit, patients in the novel arm are guaranteed to have a better survival outcome (from diagnosis) as they would not have been included if they died before two years, whereas patients may die (even if by chance) in the control arm before this time (@fig-intro-immortal).
-To control for this bias, one could improve the study design by considering the time to death given two years of surviving and therefore partially left-truncating data before this time.
+To control for this bias, one could improve the study design by only conditioning the sample on those (in both arms) who have already survived two years, thereby using partial left-truncation as a corrective strategy.
 Or, one could determine eligibility at the time of diagnosis by randomly assigning patients to each group but only starting the novel treatment at two years.
-Detecting immortal time bias is hugely important, especially in randomised controlled trials to ensure novel treatments are not oversold.
+Detecting immortal time bias is hugely important, especially in randomized controlled trials to ensure novel treatments are not oversold.
+
+Right-truncation is rare as it requires very specific, data collection.
+For example, if studying death from disease using a retrospective dataset, then right-truncation would occur if the dataset was sampled to only include observations who die; excluding observations that survived beyond the observation period.
 
 Censoring is a mechanism applied at the data collection stage in order to yield more useful results by recording as much data as possible.
 Truncation is due to the study design and may either create or remove biases in data collection/curation.
