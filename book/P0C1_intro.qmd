@@ -192,17 +192,61 @@ The first Part of this book will continue to demystify the concepts of censoring
 
 ## Start to finish {#sec-mlsa}
 
-1. First look at data to identify time and outcome
-2. Do you need survival or EHA?
-3. Identify type of censoring and truncation
-4. Use that to identify metrics
-5. Use that to identify models
-6. Run experiments
+To help make the concepts in this book less abstract, this section outlines what you may consider when undertaking machine learning survival analysis.
+There are many different ways to break down such an analysis and the following presents one such possibility:
 
+1. Establish the research question
+2. Gather relevant data
+3. Describe the outcome
+4. Identify censoring/truncation in the data and describe strategies for handling them
+5. Describe the prediction type
+6. Select metrics based on the data
+7. Select models based on the data and metrics
+8. Split data for model training
+9. Evaluate your model
 
-## Reproducibility
+A hypothetical example is given below, it is adapted from @Dennis2020.
+Terms and methods below will be defined throughout the rest of this book.
 
-This book includes simulations and figures generated in $\Rstats$, the code for any figures or experiments in this book are freely available at [https://github.com/mlsa-book/MLSA](https://github.com/mlsa-book/MLSA) under an MIT license and all content on this website is available under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+**1. Research question**
+Say that we are looking to predict the 30-day survival distribution for a patient with Type 2 diabetes being admitted to a critical care setting in England, UK for COVID-19.
+
+**2. Data**
+This is clearly a retrospective study as the pandemic is in the past but there are many datasets with relevant information, such as the COVID-19 Hospitalisation in English Surveillance System (CHESS) dataset.
+To reduce biases that could arise from data collection (such as left-truncation biases), a fixed date of interest is set: 1 March 2020 to 27 July 2020.
+
+**3. Outcome**
+The outcome of interest is 30-day in-hospital all-cause mortality, which is the risk of dying from any cause within 30 days of being admitted to hospital, meaning it can occur at most once (@sec-surv).
+Other potential outcomes include: discharge, loss to follow-up, patient survives to 30 days.
+
+**4. Censoring/truncation**
+The study is focused on admissions during the observation period, thus excludes patients diagnosed with COVID-19 before 1 March 2020.
+Immortal time bias and survivorship bias are avoided by defining study entry as hospital admission and using a fixed 30-day observation window, with inclusion/exclusion into the study not dependent on any outcomes, treatment, patient age, illness length.
+Loss to follow-up is assumed to be a random, independent right-censoring event.
+Surviving to 30 days is an administrative right-censoring event (@sec-surv) -- which means the reason for censoring is due to the observation window closing and not the patient (as in the bus example above).
+Discharge is a competing risk as once a patient is discharged (@sec-eha), they are no longer at risk of 'in-hospital' mortality.
+
+**5. Prediction types**
+As the goal is survival probability over time, the survival task is to predict a probability distribution over the 30-day horizon (@sec-survtsk).
+
+**6. Metrics**
+The task is to evaluate survival distribution predictions, whilst accounting for competing risks.
+Proper scoring rules (@sec-rules) are ideal for evaluating distribution predictions and the right-censored logloss is one example of a scoring rule that can be extended to evaluate predictions when competing risks are present.
+
+**7. Models**
+The sample of interest from the CHESS dataset has over 20,000 observations with relatively few features.
+This means that traditional survival models (@sec-classical) can be considered alongside more modern alternatives.
+Given the focus on survival distribution predictions, one might start by considering a Fine and Gray model with optional boosting to improve predictions (@sec-boost).
+Additionally, cause-specific random survival forests with log-rank splitting might also be worth exploring (@sec-ranfor).
+
+**8. Data splitting**
+Given the size of the dataset, a simple hold-out splitting strategy might suffice (@sec-ml).
+For example with a random subset of 15,000 observations to develop models and the rest used to evaluate model predictions.
+As the rate of censoring is unlikely to be too small or large (can be confirmed with exploratory analysis), stratified sampling of the data is not required.
+
+**9. Evaluation**
+Finally, with all the above in place, the models can be trained on the same training data and then evaluated using the metrics outlined above.
+Once the optimal model has been found, it can be retrained on the complete dataset for feature analysis or deployment.
 
 :::: {.callout-tip icon=false}
 
