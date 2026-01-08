@@ -876,8 +876,385 @@ p_rmst_complications = ggplot(bkm_complications, aes(x = time, y = estimate)) +
 ggsave("book/Figures/reductions/pseudo-rmst-complications-lm.png", p_rmst_complications, height=6, width=12, units="in", dpi=600)
 
 
+## Discrete time model example
+rm(list = ls())
+library(survival)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(pammtools)
+data("tumor", package = "pammtools")
+tumor_comp = tumor |> select(days, status, complications)
+
+# Create 100 equidistant cut points
+max_time = max(tumor_comp$days)
+cut_points = seq(0, max_time, length.out = 101)  # 101 points create 100 intervals
+J = length(cut_points) - 1
+
+# Transform data to long format using pammtools
+ped_data = as_ped(
+  data = tumor_comp,
+  formula = Surv(days, status) ~ complications,
+  cut = cut_points[-1],  # pammtools expects cut points without 0
+  id = "id"
+) |>
+  mutate(interval = factor(interval))  # Convert interval to factor for separate baseline hazards
+
+# For discrete time, we use ped_status as the outcome (event indicator in each interval)
+# Rename for clarity in discrete time context
+transformed_data = ped_data |>
+  rename(delta_ij = ped_status)
+
+# Fit logistic regression model
+glm_fit = glm(delta_ij ~ interval + complications, 
+              family = binomial(), 
+              data = transformed_data)
+
+# Create new data for predictions using distinct combinations from ped_data
+# This is equivalent to make_newdata for creating prediction grids
+pred_data = ped_data |>
+  distinct(interval, complications, .keep_all = TRUE) |>
+  select(interval, complications, tend)
+
+# Add hazard predictions on response scale manually
+pred_data$hazard = predict(glm_fit, newdata = pred_data, type = "response")
+
+# Calculate survival probabilities from discrete hazards
+# S(j) = prod_{k=1}^j (1 - h(k))
+surv_data = pred_data |>
+  arrange(complications, interval) |>
+  group_by(complications) |>
+  mutate(
+    survival = cumprod(1 - hazard),
+    time = tend  # Use tend from ped_data structure
+  ) |>
+  ungroup() |>
+  select(complications, time, survival) |>
+  mutate(model = "Discrete Time (GLM)")
+
+# Add time 0 with survival = 1 and ensure proper ordering
+surv_data = bind_rows(
+  data.frame(
+    complications = rep(unique(tumor_comp$complications), each = 1),
+    time = 0,
+    survival = 1,
+    model = "Discrete Time (GLM)"
+  ),
+  surv_data
+) |>
+  arrange(complications, time)
+
+# Get KM estimates for comparison
+km_complications = survfit(Surv(days, status) ~ complications, data = tumor_comp)
+bkm_complications = broom::tidy(km_complications) |>
+  mutate(
+    complications = gsub("complications=", "", strata),
+    model = "Kaplan-Meier"
+  ) |>
+  select(complications, time, estimate, model) |>
+  rename(survival = estimate)
+
+# Combine data for plotting
+plot_data = bind_rows(
+  surv_data,
+  bkm_complications
+)
+
+# Create plot - use color for model, linetype for complications
+p_discrete_time = ggplot(plot_data, aes(x = time, y = survival, color = model, linetype = complications)) +
+  geom_step(data = filter(plot_data, model == "Kaplan-Meier"), linewidth = 1.2) +
+  geom_line(data = filter(plot_data, model == "Discrete Time (GLM)"), linewidth = 1.2) +
+  ylab("S(t)") +
+  xlab("time (days)") +
+  ylim(c(0, 1)) +
+  scale_color_manual(
+    values = c("Kaplan-Meier" = "black", "Discrete Time (GLM)" = "steelblue"),
+    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Discrete Time (GLM)" = "Discrete Time (GLM)")
+  ) +
+  scale_linetype_manual(
+    values = c("no" = "solid", "yes" = "dashed"),
+    labels = c("no" = "No Complications", "yes" = "Complications")
+  ) +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(title = "Model"), linetype = guide_legend(title = "Complications"))
+
+ggsave("book/Figures/reductions/discrete-time-complications-glm.png", p_discrete_time, 
+       height=4, width=8, units="in", dpi=600)
 
 
+# Fit logistic regression model with interaction to allow separate baseline hazards for each group
+glm_fit_interaction = glm(delta_ij ~ interval * complications, 
+                          family = binomial(), 
+                          data = transformed_data)
+
+# Create new data for predictions using distinct combinations from ped_data
+# This is equivalent to make_newdata for creating prediction grids
+pred_data_interaction = ped_data |>
+  distinct(interval, complications, .keep_all = TRUE) |>
+  select(interval, complications, tend)
+
+# Add hazard predictions on response scale manually
+pred_data_interaction$hazard = predict(glm_fit_interaction, newdata = pred_data_interaction, type = "response")
+
+# Calculate survival probabilities from discrete hazards
+surv_data_interaction = pred_data_interaction |>
+  arrange(complications, interval) |>
+  group_by(complications) |>
+  mutate(
+    survival = cumprod(1 - hazard),
+    time = tend  # Use tend from ped_data structure
+  ) |>
+  ungroup() |>
+  select(complications, time, survival) |>
+  mutate(model = "Discrete Time (GLM, Interaction)")
+
+# Add time 0 with survival = 1 and ensure proper ordering
+surv_data_interaction = bind_rows(
+  data.frame(
+    complications = rep(unique(tumor_comp$complications), each = 1),
+    time = 0,
+    survival = 1,
+    model = "Discrete Time (GLM, Interaction)"
+  ),
+  surv_data_interaction
+) |>
+  arrange(complications, time)
+
+# Combine data for plotting
+plot_data_interaction = bind_rows(
+  surv_data_interaction,
+  bkm_complications
+)
+
+# Create plot - use color for model, linetype for complications
+p_discrete_time_interaction = ggplot(plot_data_interaction, aes(x = time, y = survival, color = model, linetype = complications)) +
+  geom_step(data = filter(plot_data_interaction, model == "Kaplan-Meier"), linewidth = 1.2) +
+  geom_line(data = filter(plot_data_interaction, model == "Discrete Time (GLM, Interaction)"), linewidth = 1.2) +
+  ylab("S(t)") +
+  xlab("time (days)") +
+  ylim(c(0, 1)) +
+  scale_color_manual(
+    values = c("Kaplan-Meier" = "black", "Discrete Time (GLM, Interaction)" = "steelblue"),
+    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Discrete Time (GLM, Interaction)" = "Discrete Time (GLM)")
+  ) +
+  scale_linetype_manual(
+    values = c("no" = "solid", "yes" = "dashed"),
+    labels = c("no" = "No Complications", "yes" = "Complications")
+  ) +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(title = "Model"), linetype = guide_legend(title = "Complications"))
+
+ggsave("book/Figures/reductions/discrete-time-complications-glm-interaction.png", p_discrete_time_interaction, 
+       height=4, width=8, units="in", dpi=600)
+
+
+## Piecewise Exponential Model (PEM) example
+rm(list = ls())
+library(survival)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(broom)
+library(pammtools)
+data("tumor", package = "pammtools")
+tumor_comp = tumor |> select(days, status, complications)
+
+# Create 100 equidistant cut points
+max_time = max(tumor_comp$days)
+cut_points = seq(0, max_time, length.out = 101)  # 101 points create 100 intervals
+J = length(cut_points) - 1
+
+# Transform data to piecewise exponential data format using pammtools
+ped_data = as_ped(
+  data = tumor_comp,
+  formula = Surv(days, status) ~ complications,
+  cut = cut_points[-1],  # pammtools expects cut points without 0
+  id = "id"
+) |>
+  mutate(interval = factor(interval))  # Convert interval to factor
+
+# Fit Poisson regression model with interaction
+# The offset is automatically included by pammtools
+pem_fit = glm(
+  ped_status ~ interval * complications + offset(offset),
+  family = poisson(),
+  data = ped_data
+)
+
+# Get predicted hazards for each interval and complication group
+pred_data_pem = ped_data |>
+  distinct(interval, complications, .keep_all = TRUE) |>
+  select(interval, complications, tstart, tend, offset)
+
+# Predict expected number of events (which is hazard * time at risk)
+pred_data_pem$expected_events = predict(pem_fit, newdata = pred_data_pem, type = "response")
+# Convert to hazard rate: hazard = expected_events / time_at_risk
+pred_data_pem$hazard = pred_data_pem$expected_events / exp(pred_data_pem$offset)
+
+# Calculate survival probabilities from piecewise constant hazards
+# S(t) = exp(-integral of hazard from 0 to t)
+surv_data_pem = pred_data_pem |>
+  arrange(complications, interval) |>
+  group_by(complications) |>
+  mutate(
+    # Cumulative hazard up to end of each interval
+    cumhaz = cumsum(hazard * (tend - tstart)),
+    survival = exp(-cumhaz),
+    time = tend
+  ) |>
+  ungroup() |>
+  select(complications, time, survival) |>
+  mutate(model = "Piecewise Exponential (PEM)")
+
+# Add time 0 with survival = 1
+surv_data_pem = bind_rows(
+  data.frame(
+    complications = rep(unique(tumor_comp$complications), each = 1),
+    time = 0,
+    survival = 1,
+    model = "Piecewise Exponential (PEM)"
+  ),
+  surv_data_pem
+) |>
+  arrange(complications, time)
+
+# Get KM estimates for comparison
+km_complications = survfit(Surv(days, status) ~ complications, data = tumor_comp)
+bkm_complications = broom::tidy(km_complications) |>
+  mutate(
+    complications = gsub("complications=", "", strata),
+    model = "Kaplan-Meier"
+  ) |>
+  select(complications, time, estimate, model) |>
+  rename(survival = estimate)
+
+# Combine data for plotting
+plot_data_pem = bind_rows(
+  surv_data_pem,
+  bkm_complications
+)
+
+# Create plot - use color for model, linetype for complications
+p_pem = ggplot(plot_data_pem, aes(x = time, y = survival, color = model, linetype = complications)) +
+  geom_step(data = filter(plot_data_pem, model == "Kaplan-Meier"), linewidth = 1.2) +
+  geom_line(data = filter(plot_data_pem, model == "Piecewise Exponential (PEM)"), linewidth = 1.2) +
+  ylab("S(t)") +
+  xlab("time (days)") +
+  ylim(c(0, 1)) +
+  scale_color_manual(
+    values = c("Kaplan-Meier" = "black", "Piecewise Exponential (PEM)" = "steelblue"),
+    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Piecewise Exponential (PEM)" = "Piecewise Exponential (PEM)")
+  ) +
+  scale_linetype_manual(
+    values = c("no" = "solid", "yes" = "dashed"),
+    labels = c("no" = "No Complications", "yes" = "Complications")
+  ) +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(title = "Model"), linetype = guide_legend(title = "Complications"))
+
+ggsave("book/Figures/reductions/pem-complications-interaction.png", p_pem, 
+       height=4, width=8, units="in", dpi=600)
+
+
+## Comparison: Pooled Logistic Regression vs Nelson-Aalen increments
+rm(list = ls())
+library(survival)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(pammtools)
+data("tumor", package = "pammtools")
+tumor_comp = tumor |> select(days, status, complications)
+
+# Get unique event times (only where events occurred)
+unique_event_times = sort(unique(tumor_comp$days[tumor_comp$status == 1]))
+
+# Create stacked data using intervals at unique event times
+# This creates one row per subject per interval up to their event/censoring time
+ped_data_na = as_ped(
+  data = tumor_comp,
+  formula = Surv(days, status) ~ 1,  # No covariates
+  cut = unique_event_times,  # Use unique event times as cut points
+  id = "id"
+) |>
+  mutate(interval = factor(interval)) |> 
+  group_by(id) |>
+  mutate(time = cumsum(exp(offset))) |> 
+  filter(time >= tend) |> # <- this needed in order to achieve stacked survival data set
+  ungroup()
+
+# Fit pooled logistic regression without covariates
+# This estimates the discrete hazard at each event time
+glm_na = glm(
+  ped_status ~ interval - 1,  # -1 removes intercept, estimates separate hazard for each interval
+  family = binomial(),
+  data = ped_data_na
+)
+
+# Get predicted hazards at each event time
+pred_na = ped_data_na |>
+  distinct(interval, .keep_all = TRUE) |>
+  select(interval, tend)
+
+pred_na$hazard_glm = predict(glm_na, newdata = pred_na, type = "response")
+
+# Calculate Nelson-Aalen increments manually
+# h^d(t_k) = d_{t_k} / n_{t_k}
+na_increments = data.frame(
+  time = unique_event_times,
+  hazard_na = NA_real_
+)
+
+for (i in seq_along(unique_event_times)) {
+  t_k = unique_event_times[i]
+  # Number at risk at time t_k
+  n_k = sum(tumor_comp$days >= t_k)
+  # Number of events at time t_k
+  d_k = sum(tumor_comp$days == t_k & tumor_comp$status == 1)
+  # Nelson-Aalen increment
+  na_increments$hazard_na[i] = d_k / n_k
+}
+
+# Match times and compare
+comparison = pred_na |>
+  mutate(time = tend) |>
+  select(time, hazard_glm) |>
+  inner_join(na_increments, by = "time") |>
+  arrange(time)
+
+# Print comparison
+cat("Comparison of Pooled Logistic Regression vs Nelson-Aalen increments:\n")
+cat("========================================\n")
+print(comparison)
+
+# Calculate differences
+comparison = comparison |>
+  mutate(difference = hazard_glm - hazard_na,
+         relative_diff = (hazard_glm - hazard_na) / hazard_na * 100)
+
+cat("\nSummary statistics:\n")
+cat("Mean absolute difference:", mean(abs(comparison$difference)), "\n")
+cat("Max absolute difference:", max(abs(comparison$difference)), "\n")
+cat("Mean relative difference (%):", mean(abs(comparison$relative_diff)), "\n")
+
+# Create comparison plot
+p_comparison = ggplot(comparison, aes(x = time, y = hazard_glm)) +
+  geom_point(aes(color = "Pooled Logistic"), size = 2, alpha = 0.7) +
+  geom_point(aes(y = hazard_na, color = "Nelson-Aalen"), size = 2, alpha = 0.7) +
+  geom_line(aes(y = hazard_glm, color = "Pooled Logistic"), alpha = 0.5) +
+  geom_line(aes(y = hazard_na, color = "Nelson-Aalen"), alpha = 0.5) +
+  ylab("Discrete hazard h^d(t)") +
+  xlab("time (days)") +
+  scale_color_manual(
+    values = c("Pooled Logistic" = "steelblue", "Nelson-Aalen" = "black"),
+    name = "Method"
+  ) +
+  theme(legend.position = "bottom")
+
+ggsave("book/Figures/reductions/pooled-logistic-vs-na.png", p_comparison, 
+       height=4, width=8, units="in", dpi=600)
+
+cat("\nFigure saved to book/Figures/reductions/pooled-logistic-vs-na.png\n")
 
 
 
