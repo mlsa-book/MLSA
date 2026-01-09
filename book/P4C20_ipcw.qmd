@@ -31,11 +31,11 @@ $$
 \pi(\mathbf{x}_i;\tau) = P(e_i(\tau) = 1|\mathbf{x}_i)
 $$ {#eq-binary-prob}
 
-This approach would actually work if there was no censoring before $\tau$ in the data.
-In the presence of censoring, however, @eq-binary-target does not define a valid target variable, as observations censored before time $\tau$ ($y_i < \tau \wedge \delta_i = 0$) are neither events nor non-events at time $\tau$ (as the event possibly occured between $y_i$ and $\tau$). 
+This approach could work if there was no censoring before $\tau$ in the data.
+However, in the presence of censoring, (@eq-binary-target) does not define a valid target variable, as observations censored before time $\tau$ ($y_i < \tau \wedge \delta_i = 0$) are neither events nor non-events at time $\tau$ (as the event possibly occurred between $y_i$ and $\tau$). 
 Treating those observations as non-events or removing them from the data without further modification would introduce bias.
 
-@Vock2016 suggest to adapt the estimation procedure to obtain unbiased estimates of @eq-binary-prob by first calculating weights for each observation as 
+@Vock2016 suggest to adapt the estimation procedure to obtain unbiased estimates of (@eq-binary-prob) by first calculating weights for each observation as 
 <!--  -->
 $$
 \tilde{w}_i(\tau) = \begin{cases}
@@ -46,8 +46,11 @@ $$ {#eq-adapted-ipc-weights}
 <!--  -->
 where $\hat{w}_i(\min(y_i, \tau))$ are the IPC weights as defined in @eq-ipcw-km.
 These weights then need to be integrated into the estimation procedure, particularly by optimizing a weighted objective function. 
-Essentially, censored observations are removed (by setting the weight to zero) and uncensored observations are upweighted in order to compensate for the information loss. The higher the probability of an observation to be censored at $\tau$, the higher its weight will be.
+In words, censored observations are removed (the weight is zero) and uncensored observations are upweighted in order to compensate for the information loss.
+The higher the probability of an observation to be censored at $\tau$, the higher its weight will be.
+These weights need to be integrated into the estimation procedure by optimizing a weighted objective function. 
 
+Incorporating this weighting scheme allows the binary target variable in (@eq-binary-target) to be used as a valid object of prediction.
 Let $\ell_i(e_i(\tau), \pi(\mathbf{x}_i;\tau))$ be the point wise loss, then the learner needs to optimize the weighted objective function
 <!--  -->
 $$
@@ -55,8 +58,8 @@ $$
 $$ {#eq-ipcw-loss-weighted}
 <!--  -->
 
-Thus, @eq-ipcw-loss-weighted can be optimized by any classification learner that can handle weights (which is the case for most popular machine learning methods).
-The exact form of @eq-ipcw-loss-weighted will depend on the choice of learner and objective function. 
+Thus, (@eq-ipcw-loss-weighted) can be optimized by any classification learner that can handle weights (which is the case for most popular machine learning methods).
+The exact form of (@eq-ipcw-loss-weighted) will depend on the choice of learner and objective function. 
 For example, using the log loss (binary cross-entropy) $\ell_i(e_i, \pi(\mathbf{x}_i)) = e_i\log(\pi(\mathbf{x}_i)) + (1-e_i)\log(1 - \pi(\mathbf{x}_i))$ as loss function, 
 @eq-ipcw-loss-weighted becomes 
 $$
@@ -69,11 +72,11 @@ which can be optimized by many implemented learners out-of-the-box without furth
 The IPCW reduction can simplify the estimation of $\hat{S}(\tau|\mathbf{x}_i) = 1 - \hat{\pi}(\mathbf{x}_i;\tau)$, as it doesn't require survival specific learners. 
 For practical applications, it is nevertheless important to take into account the following considerations:
 
-- The weighting in @eq-ipcw-loss-weighted takes into account censoring, but success of the procedure will still depend on the choice of the loss function. 
-For example, the estimates might not be well calibrated if the chosen loss function does not yield well calibrated probabilities (for example hinge loss used by support vector machines).
+- While the weighting in (@eq-ipcw-loss-weighted) takes into account censoring, the success of the prediction still depends on the choice of model and loss function.
+For example, the estimates might not be well calibrated if the chosen loss function does not yield well calibrated probabilities (for example, the hinge loss used by support vector machines).
 - When evaluating predictions $\hat{\pi}(\mathbf{x};\tau)$ on unseen test data, one cannot use standard evaluation metrics for binary classification, because the test data contains zeros (non-events), ones (events), but also censored observations. 
 However, as the procedure provides an estimate of the linear predictor, risk score as well as the event probability for each observation, we can use evaluation metrics for survival data discussed in the "Evaluation" part of the book. Use of standard classfication metrics based on only uncensored data during evaluation would require IPC weighting similar to the training phase.
-- @eq-adapted-ipc-weights implies that contributions of observations censored before time $\tau$ are multiplied with zero in @eq-ipcw-loss-weighted while uncensored observations are upweighted. Algorithmically, it would be more efficient to remove censored observations from the data set before training in order to avoid unnecessary computations of $\ell_i$. However, this might interfere with the usual training and evaluation procedures, for example when used in combination with cross-validation.
+- (@eq-adapted-ipc-weights) implies that contributions of observations censored before time $\tau$ are multiplied by zero in (@eq-ipcw-loss-weighted) while uncensored observations are upweighted. Algorithmically, it would be more efficient to remove censored observations from the data set before training to avoid unnecessary computations of $\ell_i$. However, this might interfere with the usual training and evaluation procedures, for example when used in combination with cross-validation.
 
 ## Conclusion
 
