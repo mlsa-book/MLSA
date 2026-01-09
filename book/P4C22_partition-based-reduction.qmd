@@ -27,8 +27,8 @@ $$\mathcal{A} = \{a_0, \ldots, a_J\}, \quad a_0 < a_1 < \ldots < a_J$$ {#eq-cut-
 
 This partitioning is used to create a transformed data set. 
 Using this transformed data, standard regression or classification methods can be used in order to estimate (discrete) hazards in each interval. 
-Section @sec-data-transformation introduces the required data transformation formally. 
-Sections @sec-discrete-time-reduction and @sec-piecewise-constant-hazards then provide theoretical justification why models applied to such transformed data are valid approaches for estimation in time-to-event analysis and provide illustrative examples for such models.
+@sec-data-transformation introduces the required data transformation formally. 
+@sec-discrete-time-reduction, @sec-survival-stacking and @sec-piecewise-constant-hazards introduce specific reductions based on this data transformation, provide theoretical justification why models applied to such transformed data are valid approaches for estimation in time-to-event analysis and provide illustrative examples for such models. @sec-choice-of-interval-boundaries discusses computational aspects and modeling choices (related to the choice of interval boundaries $a_j$).
 
 
 ## Data Transformation {#sec-data-transformation}
@@ -70,27 +70,24 @@ with $\xx_{ij} = \xx_{i}$ for all $j$, if the features are constant over time.
 
 
 Thus, given the partition $\mathcal{A}$, the standard time-to-event data $\calD = \{(t_i, \delta_i, \xx_i)\}_{i=1,\ldots,n}$ is transformed to data 
-$$\calD_{\mathcal{A}} = \{(i, j, \delta_{ij}, t_{ij}, t_j, \xx_{ij})\}_{i=1,\ldots,n; j=1,\ldots,J_i},$$  {#eq-transformed-data}
+<!--  -->
+$$\calD_{\mathcal{A}} = \{(i, j, \delta_{ij}, t_{ij}, t_j, \xx_{ij})\}_{i=1,\ldots,n;\  j=1,\ldots,J_i},$$  {#eq-transformed-data}
+<!--  -->
 where $i$ and $j$ indices are usually only used for "book-keeping" purposes but are not used in modeling later on.
 
 The data transformation procedure described above is illustrated in Figure @fig-data-trafo for hypothetical data. 
-The left hand side of Figure @fig-data-trafo shows data in standard time-to-event format with one row per subject $i=1,\ldots,3$ and $\mathcal{D} = \{(1.3, 0, 31), (0.5, 0, 67), (2.7, 1, 42)\}$. For the transformation, we choose (arbitrary) interval boundaries $\mathcal{A} = \{1, 1.5, 3\}$, which gives intervals $(0,1], (1,1.5], (1.5,3]$. The right-hand side of Figure @fig-data-trafo shows the transformed data $\mathcal{D}_{\mathcal{A}}$, where the first three rows keep track of subject and interval information and the other columns are the interval-specific event indicator, representation of time and (time-dependent) features as defined in Equations @eq-interval-indicator, @eq-time-at-risk, @eq-interval-endpoint and @eq-interval-features, respectively. 
-For censored subjects, $\delta_{ij} = 0$ for all $j$ and for subjects who experienced an event, $\delta_{ij} = 1$ for the last interval $j = J_i$, and zero otherwise.
+The left hand side of Figure @fig-data-trafo shows data in standard time-to-event format with one row per subject $i=1,\ldots,3$ and $\mathcal{D} = \{(1.3, 0, 31), (0.5, 1, 57), (2.7, 1, 42)\}$. For the transformation, we choose (arbitrary) interval boundaries $\mathcal{A} = \{1, 1.5, 3\}$, which gives intervals $(0,1], (1,1.5], (1.5,3]$. The right-hand side of Figure @fig-data-trafo shows the transformed data $\mathcal{D}_{\mathcal{A}}$, where the first three columns keep track of subject and interval information and the other columns are the interval-specific event indicator, time at risk in the respective interval,representation of time and (time-dependent) features as defined in Equations @eq-interval-indicator, @eq-time-at-risk, @eq-interval-endpoint and @eq-interval-features, respectively.
 
-<!-- FIXME: create proper figure/table with better columns -->
-![Illustration of the data transfomration needed for partition based reductions. Left: Data in standard time-to-event format. Right: Transformed data using interval boundaries $\mathcal{A} = \{1, 1.5, 3\}$.](Figures/reductions/ped-data-trafo.png){#fig-data-trafo fig-alt="Partitioning the follow-up time into discrete intervals." width=80%}
+![Illustration of the data transfomration needed for partition based reductions. Left: Data in standard time-to-event format. Right: Transformed data using interval boundaries $\mathcal{A} = \{1, 1.5, 3\}$.](Figures/reductions/data-trafo-pem.png){#fig-data-trafo fig-alt="Partitioning the follow-up time into discrete intervals." width=80%}
 
-Note that the transformed data contains the same time-to-event information as the original data since, given the interval boundaries $\mathcal{A}$, the variables $\delta_{ij}$ and $t_{ij}$ are deterministic functions of the original data.
-
-
-
+Note that $\delta_{ij}=0$ for all intervals except the last of subject $i$, where $\delta_{iJ_i} = \delta_i$, so either 0 or 1. Thus the total number of events is the same in both the original and transformed data. In general, both data sets contain the same time-to-event information as the original data since, given the interval boundaries $\mathcal{A}$, the variables $\delta_{ij}$ and $t_{ij}$ are deterministic functions of the original data.
 
 
 
 ## Discrete Time Survival Analysis {#sec-discrete-time-reduction}
 
 Consider the partitioning of the follow-up @eq-cut-points and assume we are only interested in whether the event occured within an interval rather than the exact event time. 
-Using the notation from @sec-distributions-discrete, we can write the likelihood of the $i$th observed data point $P(Y_i \in (a_{J_i-1}, a_{J_i}]) = P(\tilde{Y}_i = J_i)$ for subjects who experienced an event ($\delta_i = 1$) and 
+Using the notation from @sec-distributions-discrete, the likelihood contribution of the $i$th observation is given by $P(Y_i \in (a_{J_i-1}, a_{J_i}]) = P(\tilde{Y}_i = J_i)$ for subjects who experienced an event ($\delta_i = 1$) and 
 $P(Y_i > a_{J_i}) = P(\tilde{Y}_i > J_i)$ for subjects who were censored ($\delta_i = 0$). 
 
 Thus, using definitions @eq-discrete-surv-prob and @eq-discrete-prob, the likelihood contribution of subject $i$ is given by
@@ -113,7 +110,7 @@ L_i
 & = \prod_{j=1}^{J_i} (1-h^d(j))^{1-\delta_{ij}}h^d(j)^{\delta_{ij}},
 \end{aligned}$${#eq-discrete-likelihood-2}
 <!--  -->
-where the last equality follows from $\delta_{ij}=0 \forall j=1,\ldots,J_i$, if $\delta_i = 0$ and thus 
+where the last equality follows from $\delta_{ij}=0\ \forall j=1,\ldots,J_i$, if $\delta_i = 0$ and thus 
 $\prod{1-h^d(j)}^{1-\delta_{ij}}h^d(j)^{\delta_{ij}} = \prod{1-h^d(j)}^{1-\delta_{ij}}$.
 
 The importance of this result may not be immediately apparent, but recall that if $Z \sim Bernoulli(\pi)$, where $\pi = P(Z = 1)$, then likelihood contribution of $Z$ is given by $P(Z = z) = \pi^z (1-\pi)^{1-z}$. 
@@ -139,7 +136,7 @@ $$\calD_{\mathcal{A}} = \{(\delta_{ij}, \xx_{i}, t_{j})\}_{i=1,\ldots,n;\quad j=
 
 ### Example: Logistic Regression
 
-To illustrate the discrete time reduction approach, once again consider the tumor data set introduced in Table @tbl-surv-data-tumor. The follow-up time is partitioned into $J = 100$ equidistant intervals and the data is transformed the data according to the procedure described in @sec-data-transformation.
+To illustrate the discrete time reduction approach, once again consider the tumor data set introduced in Table @tbl-surv-data-tumor. The follow-up time is partitioned into $J = 100$ equidistant intervals and the data is transformed according to the procedure described in @sec-data-transformation.
 Define $x_{i1} = \mathbb{I}(\text{complications}_i = \text{"yes"})$.
 We then fit a logistic regression model 
 <!--  -->
@@ -172,12 +169,12 @@ While this is a simple example with only one feature, it shows that the discrete
 Importantly, the estimated survival probabilities are discrete, representing survival probabilities at the interval endpoints. 
 However, a simple solution to generate continuous survival function predictions is to linearly interpolate between the interval endpoints.
 
-The example also raises the question about the choice of the number of intervals $J$ and the placement of interval boundaries $\mathcal{A}$. These questions will be discussed in more detail in @sec-choice-of-interval-boundaries, which is relevant for both, the discrete time reduction approach and the piecewise constant hazards approach discussed in the next section.
+The example also raises the question about the choice of the number of intervals $J$ and the placement of interval boundaries $\mathcal{A}$. These questions will be discussed in more detail in @sec-choice-of-interval-boundaries, which is relevant for both, the discrete time reduction approach and the piecewise constant hazards approach discussed in @sec-piecewise-constant-hazards.
 
 ## Survival Stacking {#sec-survival-stacking}
 
 Survival stacking (@craigreviewsurvival) casts survival tasks to classification tasks similarly to the discrete time method described in Section @sec-discrete-time-reduction.
-However, there is a small but important difference in the creation of event indicators $\delta_{ij}$. Rather than constructing intervals based on partitioning of the follow-up along boundary points $\mathcal{A}$, survival stacking uses the unique, observed event times $t_{(1)}, < \ldots < t_{(m)}$ (@eq-unique-ordered-event-times) and defines
+However, there is a small but important difference in the creation of event indicators $\delta_{ij}$. Rather than constructing intervals based on partitioning of the follow-up along boundary points $\mathcal{A}$, survival stacking uses the unique, observed, ordered event times $t_{(1)}, < \ldots < t_{(m)}$ (@eq-unique-ordered-event-times) and defines
 <!--  -->
 $$\delta_{ij} = \begin{cases}
 1, & t_i = t_{(j)} \text{ and } \delta_i = 1 \\
@@ -196,23 +193,17 @@ At time $t_{(2)} = 2.7$, however, only subject $3$ is still at risk for the even
 <!-- https://drive.google.com/file/d/1kOnoJpER1hrM19x5IQ1PqAAAh0G-wvqZ/view?usp=sharing -->
 ![Illustration of the data transfomration needed for survival stacking. Left: Data in standard time-to-event format. Right: Transformed data using unique, observed event times $t_{(1)}, < \ldots < t_{(m)}$.](Figures/reductions/data-trafo-pooled-log-reg.png){#fig-data-trafo-stacking fig-alt="Partitioning the follow-up time into discrete intervals." width=80%}
 
-Note that in contrast to @fig-data-trafo, here subject $1$ has only one row and subject $3$ has two rather than three rows. This could suggest that the data transformation for survival stacking creates smaller data sets, however, we need to create a data set for each observed event time $t_{(j)}, j=1,\ldots,m$, whereas for the discret time approach in @sec-discrete-time-reduction one can freely choose the number and placement of interval boundaries $\mathcal{A}$, such that $|\mathcal{A}| < m$.
+Note that in contrast to @fig-data-trafo, here subject $1$ has only one row and subject $3$ has two rather than three rows. This could suggest that the data transformation for survival stacking creates smaller data sets, however, we need to create a data set for each observed event time $t_{(j)}, j=1,\ldots,m$, whereas for the discret time approach in @sec-discrete-time-reduction one can freely choose the number and placement of interval boundaries $\mathcal{A}$, such that $|\mathcal{A}| < m$ in most cases.
 
 Data transformation @eq-interval-indicator-stacking yields data 
 <!--  -->
-$$\calD_{\mathcal{A}} = \{(\delta_{ij}, t_{j}, \xx_{ij})\}_{i=1,\ldots,n;\ j=1,\ldots,m: i \in R_{t_{(j)}}},$${#eq-survival-stacking-data}
+$$\calD_{\mathcal{A}} = \{(\delta_{ij}, t_{j}, \xx_{ij})\}_{i=1,\ldots,n;\ j=1,\ldots,m:\ i \in R_{t_{(j)}}},$${#eq-survival-stacking-data}
 <!--  -->
 where the $\delta_{ij}$ can be used as targets for binary classification and as before, any algorithm that returns class probabilities can be used for estimation. 
 
 ### Example: Pooled Logistic Regression
 
 When the learner used to estimate the probabilities for an event at time $t_{(j)}$ is a logistic regression model, the method is known as pooled logistic regression (@dagostinoRelationPooledLogistic1990a). Pooled because rather than fitting one separate logistic regression model for each event time $t_{(j)}$, a single logistic regression model is fitted to the stacked data set, conditional on the interval information $t_j$ and potentially other features $\xx_{i}$.
-
-
-
-
-
-
 
 
 
@@ -257,7 +248,7 @@ $$\begin{aligned}
 where the last equality follows from $\delta_{ij} \in \{0,1\}$ and $0!=1!=1$.
 
 Note that $\calL_{i,\text{Poisson}} \propto \calL_i$ from equation @eq-pem-likelihood-general, since $t_{ij}$ is a constant and does not depend on the parameters of interest (here $h_j$). 
-This implies that we can estimate a model with piecewise constant hazards by optimizing the Poisson likelihood @eq-pem-poisson-likelihood with respect to $h_j$. The $t_{ij}$ term enters as an offset term $\log(t_{ij})$ in the Poisson regression model.
+This implies that we can estimate a model with piecewise constant hazards by optimizing the Poisson likelihood @eq-pem-poisson-likelihood. The $t_{ij}$ term enters as an offset term $\log(t_{ij})$ in the Poisson regression model.
 
 More generally, in the presence of features $\xx_i$, assume $\delta_{ij}|\xx_i \stackrel{iid}{\sim} \text{Poisson}(\mu_{ij})$, where $\mu_{ij} = h_{ij} t_{ij}$ is the expected number of events in interval $j$ given features $\xx_i$ and $h_{ij} = g(t_j, \xx_i)$ is the hazard rate in interval $j$ given features $\xx_i$.
 This can be estimated by fitting a Poisson regression model with log-link to the transformed data set
@@ -280,8 +271,10 @@ To illustrate the piecewise constant hazards approach, we once again consider th
 We partition the follow-up time into $J = 100$ equidistant intervals.
 We then fit a Poisson regression model with interaction between interval and complications to allow for separate baseline hazards for each complications group: 
 
-<!-- FIXME: eq not correct -->
-$$\log(\mathbb{E}[\Delta_{ij}]) = \beta_{0} + \sum_{k=1}^{J-1} \beta_{0k} \mathbb{I}(j=k) + \log(t_{ij}),$${#eq-pem-model-interaction}
+<!--  -->
+$$\log(\mu_{ij}) = \log(\mathbb{E}[\Delta_{ij}]) = \underbrace{\beta_{0j} + \beta_{1j}x_{i1}}_{\log(h_{ij})} + \log(t_{ij}),$${#eq-pem-model-interaction}
+<!--  -->
+where $x_{i1} = \mathbb{I}(\text{complications}_i = \text{"yes"})$, $\beta_{0j}$ are the interval-specific intercepts for the reference group (no complications), $\beta_{1j}$ are the deviations from the reference group for the complications group (as in @eq-discrete-time-glm-interaction, this is estimated as an interaction model using reference coded categorical features for interval and complications), and $\log(t_{ij})$ enters as offset term.
 
 <!-- TODO: show estimated hazards? -->
 
@@ -290,9 +283,6 @@ The piecewise exponential model provides an excellent fit to the data, closely a
 This demonstrates that the piecewise constant hazards approach can effectively estimate the survival distribution when using a sufficient number of intervals.
 
 ![Comparison of survival probability estimates using the piecewise exponential model (Poisson regression) and the Kaplan-Meier estimator, for patients with and without complications.](Figures/reductions/pem-complications-interaction.png){#fig-pem-interaction fig-alt="Single plot showing survival curves for patients with and without complications. Kaplan-Meier estimates are shown as solid lines and piecewise exponential model estimates are shown as dashed lines, both colored by complications status."}
-
-
-
 
 
 ## Choice of Interval Boundaries {#sec-choice-of-interval-boundaries}
@@ -384,6 +374,45 @@ The complete gradient boosting algorithm for Poisson regression with offset usin
 **Prediction:** For new observations with features $\xx^*$ and time $t_j^*$, the predicted log-hazard is $\hat{g}(\xx^*, t_j^*) = g_M(\xx^*, t_j^*)$, and the predicted hazard rate is $\hat{h}(\xx^*, t_j^*) = \exp(\hat{g}(\xx^*, t_j^*))$.
 
 The algorithm iteratively improves the model by fitting trees to the residuals from the previous iteration. Each tree captures patterns in the data that were not well explained by the previous model, and the shrinkage parameter $\nu$ ensures that updates are gradual, reducing overfitting. The offset term $\log(t_{ij})$ is implicitly accounted for in the pseudo-residual calculation, as the predicted expected number of events $\hat{\mu}_{ij}^{(m-1)} = \exp(g_{m-1}(\xx_i, t_j))t_{ij}$ includes the time at risk $t_{ij}$. 
+
+## Conclusion
+
+:::: {.callout-warning icon=false}
+
+## Key takeaways
+
+* The pseudo-value based approach allows to estimate arbitrary quantities of interest conditional on covariates, as long as an univariate, unbiased estimator of the quantity of interest is available.
+* It avoids strong assumptions like the proportional hazards assumption or the accelerated failure time assumption, which can be violated in practice.
+* In context of machine learning, this approach can greatly simplify analyis of time-to-event data, as standard implementations can be used out-of-the-box without any additional modifications.
+* In contrast to many survival specific machine learning methods currently available, it can be applied used in complex settings, including competing risks and multi-state models.
+* Feature effects can ben interpreted directly as effects on the quantity of interest, rather than being expressed in terms of hazard ratios or other relative measures.
+::::
+
+:::: {.callout-important icon=false}
+
+## Limitations
+* Pseudo-values can take negative and positive values, thus direct applicatoin of regression algorithms might produce predictions outside the range of the target. Some methods, like deep learning, support the use of activation functions and custom loss functions, but other learners might need additional adaptation in order to map the predictions to the target space.
+* Interpretation of feature effects is only direct, if the response function is the identity function.
+* Calculating pseudo-values can be computationally expensive if predictions are needed at many time points $\tau$ and data set size $n$ is large.
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* @andersenPseudoobservationsSurvivalAnalysis2010 provides an overview of the pseudo-value approach and its application to various quantities of interest in survival analysis.
+* @johansen2021regressionmodels propose an extension of pseudo-value based regression for interval censored data using parametric univariate estimators.
+* @mogensen2013randomforestb use pseudo-values in combination with random forests for competing risks analysis.
+* @Zhao2020 propose a deep learning based approach for survival analysis using pseudo-values.
+
+::::
+
+
+
+
+
+
 
 
 
