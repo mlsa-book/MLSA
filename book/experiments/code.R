@@ -693,3 +693,78 @@ g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S
 
 ggsave("book/Figures/survtsk/heavisides.png",
   g_final, height=5, width=7, units="in", dpi=600)
+
+## Survival prediction types
+library(tidyverse)
+library(survival)
+library(survminer)
+library(ggpubr)
+library(patchwork)
+
+set.seed(1)
+
+n <- 5
+dat <- data.frame(
+  id    = 1:n,
+  age   = round(rnorm(n, mean = 62, sd = 10)),
+  sex   = sample(0:1, n, replace = TRUE),
+  trt   = sample(0:1, n, replace = TRUE),
+  x    = round(rnorm(n), 2),
+  time  = round(runif(n, pmax(0, 3 + rnorm(n, sd = 3)), 15 + rnorm(n, sd = 3))),
+  event = rbinom(n, 1, prob = 0.65)
+)
+# data plot
+row_cols <- scales::hue_pal()(n)
+p_table <- ggtexttable(
+  dat,
+  rows = NULL,
+  theme = ttheme(
+    base_size = 9,
+    base_colour = "black",
+    padding = unit(c(2, 2), "mm"),
+    tbody.style = tbody_style(
+      fill = rep(row_cols, ncol(dat)),  # repeat each row color across columns
+      col = "black"
+    )
+  )
+)
+
+# survival time 'predictions'
+times = dat$time + rnorm(n, 0, 2)
+p_bars = ggplot(data.frame(y=factor(dat$id), x=times)) +
+  geom_col(aes(x,y,fill=y), width = 0.7, alpha = 0.9) +
+  labs(
+    title = "Predicted survival times",
+    x = "Time",
+    y = "Subject"
+  ) + theme(legend.position = "none")
+
+# relative risk 'predictions'
+risks = as.numeric(scale(-times + rnorm(n, 0, 2), TRUE, FALSE))
+p_risks <- ggplot(data.frame(x = factor(dat$id), y = risks)) +
+  geom_bar(aes(x=x, y=y, fill = x), stat='identity', position=position_dodge(width = 0)) +
+  labs(
+    title = "Predicted relative risk scores",
+    x = "Subject",
+    y = "Relative risk"
+  ) + theme(legend.position = "none")
+
+# -----------------------------
+# Plot D (bottom-right): survival curves by treatment
+# -----------------------------
+p_curves <- data.frame(Subject = factor(1:n), x = rep(0:20, each = n), y = punif(rep(0:20, each=n), 3 + rnorm(n, 3), 15 + rnorm(n, 3), FALSE)) %>%
+  ggplot(aes(x = x, y = y, group = Subject, color = Subject)) +
+  ylim(0, 1) +
+  geom_step(lwd = 1) +
+  labs(
+    title = "Predicted distributions",
+    x = "Time",
+    y = "Survival probability"
+  ) + theme(legend.position = "none")
+
+
+g <- ((p_table | p_bars) /
+  (p_risks | p_curves)) 
+
+ggsave("book/Figures/survtsk/predict_types.png",
+  g, height=5, width=7, units="in", dpi=600)
