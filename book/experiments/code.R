@@ -754,7 +754,7 @@ p_risks <- ggplot(data.frame(x = factor(dat$id), y = risks)) +
 # -----------------------------
 p_curves <- data.frame(Subject = factor(1:n), x = rep(0:20, each = n), y = punif(rep(0:20, each=n), 3 + rnorm(n, 3), 15 + rnorm(n, 3), FALSE)) %>%
   ggplot(aes(x = x, y = y, group = Subject, color = Subject)) +
-  ylim(0, 1) +
+  ylim(0, 1) + xlim(5, 20) +
   geom_step(lwd = 1) +
   labs(
     title = "Predicted distributions",
