@@ -6,10 +6,10 @@ library(ggplot2)
 theme_set(theme_bw())
 
 library(distr6)
-library(ggplot2)
 g = dstr("Gompertz", shape = 2, decorators = "ExoticStatistics")
 t = seq.int(0, 1.5, length.out = 100)
-d = data.frame(t = t, fun = factor(rep(c("Density", "Hazard", "Cumulative Density", "Survival"), each = 100), levels = c("Density", "Hazard", "Cumulative Density", "Survival")), y = c(g$pdf(t), g$hazard(t), g$cdf(t), g$survival(t)))
+functions <- c("Probability density function, y=f(t)", "Cumulative distribution function, y=F(t)", "Hazard function, y=h(t)", "Survival function, y=S(t)")
+d = data.frame(t = t, fun = factor(rep(functions, each = 100), levels = functions), y = c(g$pdf(t), g$hazard(t), g$cdf(t), g$survival(t)))
 g = ggplot(d, aes(x = t, y = y, color = fun)) +
   geom_line() +
   facet_wrap(~fun, scales = "free", nrow = 2) +
