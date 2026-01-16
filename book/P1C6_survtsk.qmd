@@ -13,28 +13,23 @@ abstract: "This chapter introduces the different survival problems and formalise
 The preceding chapters have focused on understanding survival data.
 This final chapter turns to the prediction tasks themselves.
 
-Recall from @sec-ml-basics that a general prediction problem is one in which:
-
-1. a dataset, $\calD$, is split for training, $\dtrain$, and testing, $\dtest$;
-2. a model is fit on $\dtrain$; and
-3. the model predicts a representation of the unknown ground truth, $Y$, given $\dtest$.
-
-The process of model fitting is model-dependent and ranges from non-parametric methods to machine learning approaches; these are discussed in Part III.
-Survival analysis introduces complexity in defining the 'representations of $Y$'; this is the focus of this chapter.
+Recall from @sec-ml-tasks that a machine learning task is the specification of a mathematical problem that is solved by a given algorithm.
+A task, $f: \calX \rightarrow \calY$ has three components, a description of the input data $\calX$, a description of the expected output (target) $\calY$, and a description of the estimation function to be learnt $f$.
+The previous two chapters described handling of the input data and Part III will describe the various different algorithms that can be used for $f$.
+This chapter will tackle the final part of the survival task definition, which is describing the codomain $\calY$.
 
 In general there are four common *prediction types* or *prediction problems* which codify different representations of $Y$, these are:  
 
 1. Survival distributions;
-2. Time-to-event;
-3. Relative risks;
+2. Relative risks;
+3. Survival times;
 4. Prognostic index.
 
-The first of these is considered *probabilistic* as it predicts the probability of an event occurring over time.
-The second is *deterministic* as the prediction is a single point prediction.
-The final two do not directly predict the event of interest but instead provide different interpretations that both relate to the risk of the event.
-The relative risks and time-to-event prediction types can both be derived from a survival distribution prediction, and the prognostic index is often used as an interim step before making a probabilistic prediction (see @sec-surv-models-crank); so all of these prediction types are closely related.
+In analogy to regression tasks, survival distribution predictions are _probabilistic_ (prediction of probability over time) and survival time predictions are _deterministic_ (single point prediction).
+Relative risk and prognostic index predictions do not directly predict when or if the event of interest will occur, but instead provide different interpretations that relate to the risk of the event compared to others in the same sample.
+The relative risks and time-to-event prediction types can both be derived from a survival distribution prediction, and the prognostic index is often used as an interim step before making a probabilistic prediction (some examples of this in @sec-models-classical); so all of these prediction types are closely related.
 
-It is vital to clearly separate which prediction problem you are working with, as they are not directly compatible with one another.
+Despite their close nature, it is vital to clearly separate which prediction problem you are working with, as they are not directly compatible with one another.
 For example, it is not meaningful to compare a relative risk prediction from one model to a survival distribution prediction of another.
 Moreover, prediction types may look similar but have very different implications, for example if one erroneously interprets a survival time as a relative risk then they could assume an individual has a worse outcome than they do as longer survival times imply lower risk.
 
@@ -43,27 +38,14 @@ For example, survival times are not advised in domains where over-confidence can
 Whilst clinicians will usually not present a probability distribution to a patient (@fig-survtsk-overview, top-right), it is common to relay information such as '5-year survival probability', which is read from a predicted survival distribution.
 Finally, relative risk predictions are often used for triage and resource allocation, such as assigning patients to particular wards or beds (@fig-survtsk-overview, bottom).
 
-![Illustration of prediction types. Survival time predictions (top-left) are limited to domains where uncertainty is less important. Survival probabilities (top-right) are shared with patients as 'T-year survival probabilities'. Relative risk predictions (bottom) are used for triage and resource allocation.](Figures/survtsk/overview.png){#fig-survtsk-overview width=60% fig-alt="Cartoon illustration of predictive types. Top left shows a marathon runner with a predicted survival time '4 hours 13 min', top right shows a doctor presenting a graph to a patient representing distribution predictions, bottom shows a clinician looking at a chart that ranks patients."}
+![Illustration of prediction types. Tabular survival data (top-left) can be used to make three distinct prediction types, each conveying different information. Predicted survival times (top-right) provide a single number estimating the time until an event takes place. Predicted relative risk scores (bottom-left) compare the risk of event between subjects within the same sample. Predicted survival distribution (bottom-right) estimate the probability of the event taking place over time.](Figures/survtsk/predict_types.png){#fig-survtsk-overview width=100% fig-alt="Graphical illustration of prediction types. Top-left panel is an example of survival data in a table. Top-right panel is horizontal bars for each subject in the data ranging from 0 to approximately their real survival time. Bottom-left panel is vertical bars ranging from -4 to +8, indicating different risk profiles for each subject. Bottom-right panel is step functions, one for each subject, illustrating individual survival function probabilities decreasing over time."}
 
-<!-- FIXME: FIGURE TO BE UPDATED -->
-
-Whilst one prediction type is necessary to define a model's output, it is often the case that an algorithm might use another prediction type as an interim prediction.
-This chaining of predictions is called 'composition' as two components are composed to create a final prediction, this is commonly the case for distribution predictions.
-It is also possible to convert prediction types between one another.
-@tbl-survtsk-trafo highlights how distribution and survival time predictions can be transformed to most other forms and how all forms can be transformed to a relative risk prediction.
-These transformations will be discussed in more detail in the rest of this chapter.
+Whilst one prediction type is necessary to define a model's output, it is often the case that an algorithm might use another prediction type as an interim prediction, this will be seen throughout Part III.
+Under some assumptions, prediction types can also be converted between each other, this will be discussed in the rest of this chapter.
 
 Throughout this chapter let  $\calX \subseteq \Reals^{n \times p}$ be a set representing covariates.
 Note that the type of censoring in the data is part of the estimation problem and does not affect the prediction types, hence this chapter does not differentiate between right, left, or interval censoring.
 The focus is primarily on the single-event setting, a brief section on other settings is included at the end of the chapter.
-
-| | Distribution | Risk | Time | PI |
-|-|-|-|-|-|
-|Distribution, $\hatS$ | $\hatS$ | $\sum_t \hatH(t)$ | $\RMST(\tau)$ | NA |
-| Risk, $\hat{r}$ | $\Phi(\hat{r})$ | $\hat{r}$ | NA | NA |
-| Time, $\haty$ | $\Distr(\haty, \sigma)$ | $-\haty$ | $\haty$ | NA |
-| PI, $\hat{\eta}$ | $\phi(\hat{\eta}, \haty)$ | $\hat{\eta}$ or $-\hat{\eta}$ | NA | $\hat{\eta}$ | 
-: Converting prediction types between one another. Rows are the original prediction type and columns are the transformed prediction, entries are the transformation methods. 'NA' indicates transformation is not possible between the two prediction types without significant assumptions. $\phi, \Phi$ are arbitrary functions. {#tbl-survtsk-trafo}
 
 ## Predicting Distributions {#sec-survtsk-dist}
 
@@ -101,8 +83,8 @@ In machine learning terms, this task is the problem of estimating, $g: \calX \ri
 Interpretation of these rankings is more complex than might be imagined as the meaning differs between models, parametrizations, and even software implementations.
 To be consistent, in this book a larger risk value *always* corresponds to a higher risk of an event and lower values corresponding to lower risk.
 
-A potential confusion that should be avoided is conflating this risk prediction with a prediction of absolute risk.
-Risk predictions are specifically *relative risks*, which means the risks are only comparable to other observations within the same sample.
+A potential confusion that should be avoided is conflating a relative risk prediction with a prediction of absolute risk.
+Relative risks means the risks are only comparable to other observations within the same sample.
 For example, given three subjects, $\{i,j,k\}$, a risk prediction may be $\{0.5, 10, 0.1\}$ respectively.
 From these predictions, two primary types of conclusion can be drawn.
 
@@ -148,11 +130,11 @@ Predicting a time-to-event is the problem of estimating when an individual will 
 Mathematically, the problem is the task of estimating $g: \calX \rightarrow \PReals$, that is, predicting a single value over $[0,\infty]$.
 
 For practical purposes, the expected time-to-event would be the ideal prediction type as it is easy to interpret and communicate.
-However, evaluation of these predictions is tricky.
+However, evaluation of these predictions is tricky and generally ill-advised.
 Take the following example.
 Say someone is censored at $\tau=5$, there is no way to know if they would have experienced the event at $\tau=6$ or $\tau=600$, all that can be known is that the model correctly identified they did not experience the event before $\tau=6$.
 Furthermore, if the model had predicted $\tau=3$, metrics such as mean absolute error would be misleading, as an MAE of $5 - 3 = 2$ would make the model seem artificially better than it was, if the event actually occurred at $\tau=600$.
-Therefore, when an observation is censored, the best one can do is evaluate a classification task: did the model predict that the event did not occur before the censoring time.
+Therefore, when an observation is censored, the best one can do is evaluate a classification task: did the model predict that the event did not occur before the censoring time?
 As this is not the task of interest, one is left to evaluate uncensored observations only, which can introduce bias to the evaluation.
 Given this complexity, the time-to-event point prediction is rare in practice.
 
@@ -165,21 +147,20 @@ It is not possible to make the transformation in the opposite direction without 
 ### Times and distributions
 
 Moving from a survival time to a distribution prediction is rare given the reasons outlined above.
-Theoretically one *could* make a prediction for the expected survival time, $\hat{y}$ and then assume a particular distributional form.
-For example, one could assume $\operatorname{TruncatedNormal}(\haty, \sigma, a=0, b=\infty)$ where $\haty$ is the predicted expected survival time, $\sigma$ is a parameter representing variance to be estimated or assumed, and $\{a, b\}$ is the distribution support.
-This method clearly has drawbacks given the number of required assumptions and as such is not commonly seen in practice.
+In analogy to regression, one could take a survival time point prediction and construct a survival distribution by assuming a distributional form, for example $\operatorname{TruncatedNormal}(\haty, \sigma, a=0, b=\infty)$ where $\haty$ is the predicted expected survival time, $\sigma$ is a parameter representing variance to be estimated or assumed, and $\{a, b\}$ is the distribution support.
+In survival analysis, this method clearly has drawbacks given the number of required assumptions and as such is not commonly seen in practice.
 
-In the other direction, it is common to to reduce a distribution prediction to a survival time prediction by *attempting* to compute the mean or median of the distribution.
+In the other direction, it is more common to reduce a distribution prediction to a survival time prediction by *attempting* to compute the mean or median of the distribution.
 When there is no censoring, one can calculate the expectation from the predicted survival function using the 'Darth Vader rule' [@Muldowney2012]:
 
 $$
 \EE[Y] = \int^\infty_0 S_Y(y) \ \dy
 $$ {#eq-darth}
 
-However, this rule is rarely usable in practice as censoring results in estimated survival distributions being 'improper'.
+However, this rule is often not usable in practice as the presence of censoring results in estimated survival distributions being 'improper'.
 A valid probability distribution for a random variable $Y$ satisfies: $\int f_Y = 1$, $S_Y(0) = 1$ and $S_Y(\infty) = 0$.
-This last condition is often violated in survival distribution predictions, which often use semi-parametric methodology (@sec-surv-models-crank), resulting in improper distributions.
-Recall from @sec-surv-km that the Kaplan-Meier estimator is defined as:
+This last condition is often violated in survival distribution predictions, which often use non-parametric estimators as an interim step before making full distribution predictions (some examples in @sec-classical-cox), resulting in improper distributions.
+To see why this is the case, recall from @sec-surv-km that the Kaplan-Meier estimator is defined as:
 
 $$
 \KMS(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{t_{(k)}}}{n_{t_{(k)}}}\right)
@@ -192,14 +173,14 @@ Heuristics have been proposed to address this including linear extrapolation to 
 Another possibility is to instead report the median survival time, but this is only defined if the survival curves drop below $0.5$ within the observed period, which is not guaranteed [@Haider2020].
 
 One alternative is to estimate the *restricted mean survival time* (RMST) [@Han2022; @andersen.regression.2004].
-In contrast to @eq-darth, which integrates the survival curve over the entire time axis, the RMST places an upper-bound on the integral:
+In contrast to (@eq-darth), which integrates the survival curve over the entire time axis, the RMST places an upper-bound on the integral:
 
 $$
 \RMST(\tau) = \int^\tau_0 S_Y(y) \ \dy
 $$ {#eq-rmst}
 
-Clearly then $\RMST(\infty) = \EE[Y]$ by @eq-darth.
-Whereas @eq-darth represents the average survival over $[0,\infty)$, @eq-rmst represents the average survival time up to $\tau$.
+It follows from (@eq-darth) that $\RMST(\infty) = \EE[Y]$ .
+Whereas (@eq-darth) represents the average survival over $[0,\infty)$, (@eq-rmst) represents the average survival time up to $\tau$.
 Equivalently, the RMST is the average amount of time each individual spends without experiencing the event up to $\tau$.
 The RMST treats all events happening after $\tau$ as if they happened at $\tau$.
 Hence, it is a truncated expectation, estimating: $\EE[\min(Y, \tau)]$
@@ -208,6 +189,7 @@ For example, say individuals are observed over times $[0,100]$ and administrativ
 However, one can compute $\RMST(100)$ which provides an interpretable lower bound for the mean survival time: $\RMST(100) \leq \EE[Y]$.
 This avoids assumptions beyond $\tau=100$ and offers an interpretable prediction: "the average survival time is at least $\RMST(100)$" (@fig-survtsk-rmst).
 The RMST avoids the pitfalls of computing the mean and median by remaining valid even when the predicted distribution is improper, provided that $\tau$ is chosen within the range of observed follow-up times.
+Note this whilst this results in a prediction on the scale of a survival time, it is _not_ a survival time prediction as it does not represent $\EE[Y]$.
 
 As a worked example, say for an individual, $i$, we have: $(t, \hatS_i(t)) = (0, 1), (1, 0.8), (2, 0.4), (3, 0.15)$.
 Using a Riemann sum approximation, $\RMST(3) \approx 1 + 0.8 + 0.4 = 2.2$ and $\RMST(4) \approx 1 + 0.8 + 0.4 + 0.15 = 2.35$.
@@ -235,9 +217,7 @@ A prognostic index is a special case of the survival ranking task, assuming that
 For example, one could define $g(\bseta) = 1 \text{ if } \eta < \text{5 or } 0 \text{ otherwise }$ however this would prevent the prognostic index being used as a ranking method and it would defeat the point of a prognostic index.
 
 As with a risk prediction, there is no general relationship between the prognostic index and survival time.
-However, there are cases where there may be a clear relationship between the two.
-For example, one can theoretically estimate a survival time from the linear predictor used in an accelerated failure time model (@sec-surv-models).
-<!-- FIXME: UPDATE REFERENCE ABOVE WITH UPDATED VERSION WHEN MERGED -->
+However, there are cases where there may be a clear relationship between the two (an example for accelerated failure time models given in @sec-surv-models-param).
 
 ### Prognostic index and distributions
 
