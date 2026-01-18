@@ -699,16 +699,68 @@ ggsave("book/Figures/survtsk/heavisides.png",
 
 
 
-## pseudo-values example 
+######################## pseudo-values ########################################
 library(survival)
 library(pseudo)
 library(ggplot2)
 theme_set(theme_bw())
 library(dplyr)
 library(patchwork)
+library(mgcv)
 data("tumor", package = "pammtools")
 tumor_comp = tumor |> select(days, status, complications)
 tau = c(1000, 2000, 3000)
+
+## Pseudo-value calculation table for illustration
+# Calculate pseudo-values for time point 1000 for first 4 subjects
+tau_table = 1000
+n = nrow(tumor)
+
+# Calculate overall KM at time tau
+km_all = survfit(Surv(days, status) ~ 1, data = tumor)
+km_all_tau = summary(km_all, times = tau_table, extend = TRUE)$surv[1]
+if (is.na(km_all_tau)) {
+  # If tau is beyond last time, use last survival value
+  km_all_tau = tail(km_all$surv, 1)
+}
+
+# Select 4 subjects for illustration
+subjects = 1:4
+results_table = data.frame(
+  Subject = integer(),
+  Days = integer(),
+  Status = integer(),
+  KM_Overall = numeric(),
+  KM_Minus_i = numeric(),
+  Pseudo_Value = numeric()
+)
+
+for (i in subjects) {
+  # Calculate KM without subject i
+  tumor_minus_i = tumor[-i, ]
+  km_minus_i = survfit(Surv(days, status) ~ 1, data = tumor_minus_i)
+  km_minus_i_tau = summary(km_minus_i, times = tau_table, extend = TRUE)$surv[1]
+  if (is.na(km_minus_i_tau)) {
+    km_minus_i_tau = tail(km_minus_i$surv, 1)
+  }
+  
+  # Calculate pseudo-value: θ_i(τ) = n*S_KM(τ) - (n-1)*S_KM^{-i}(τ)
+  pseudo = n * km_all_tau - (n - 1) * km_minus_i_tau
+  
+  results_table = rbind(results_table, data.frame(
+    Subject = i,
+    Days = tumor$days[i],
+    Status = tumor$status[i],
+    KM_Overall = round(km_all_tau, 4),
+    KM_Minus_i = round(km_minus_i_tau, 4),
+    Pseudo_Value = round(pseudo, 4)
+  ))
+}
+
+results_table = results_table |> cbind(tumor[1:4, c("age", "complications")])
+
+knitr::kable(results_table, format = "markdown")
+
 
 
 ### survival probability
@@ -716,12 +768,31 @@ tau = c(1000, 2000, 3000)
 
 pseudo_dfs = purrr::map_dfr(tau, function(.x) {
   pseudo_mat = pseudosurv(time = tumor$days, event = tumor$status, tmax = .x)
-  cbind(tumor_comp, data.frame(pseudo = pseudo_mat$pseudo, time = pseudo_mat$time))
+  cbind(tumor_comp, data.frame(pseudo = pseudo_mat$pseudo, time = pseudo_mat$time, age = tumor$age))
 }) |> mutate(time = factor(time))
 
 ndf = pammtools::make_newdata(pseudo_dfs, complications = unique(complications), time = unique(time))
 lm <- lm(formula = pseudo~complications*time, data = pseudo_dfs)
 summary(lm)
+
+## Additive GAM: pseudo ~ complications + s(age) at each time point; store models in a list
+gam_models = purrr::map(tau, function(.x) {
+  d = pseudo_dfs |> filter(as.character(time) == as.character(.x))
+  gam(pseudo ~ complications + age, data = d)
+})
+names(gam_models) = paste0("tau_", tau)
+
+## Table of age and complications coefficients from GAMs at each time point
+coef_age_table = purrr::map_dfr(seq_along(tau), function(i) {
+  pt = summary(gam_models[[i]])$p.table
+  data.frame(
+    tau = tau[i],
+    age = pt["age", "Estimate"],
+    complications = pt["complicationsyes", "Estimate"]
+  )
+})
+knitr::kable(coef_age_table, format = "markdown", digits = 4,
+             col.names = c("τ (days)", "age", "complications"))
 
 ndf$estimate = predict(lm, newdata = ndf)
 ndf <- ndf |> 
@@ -735,7 +806,7 @@ bkm_complications = broom::tidy(km_complications) |>
 
 
 p_km_complications = ggplot(bkm_complications, aes(x = time, y = estimate)) +
-  pammtools::geom_step(aes(col = strata)) +
+  geom_step(aes(col = strata)) +
   geom_vline(xintercept = tau, lty = 3) +
   ylim(c(0, 1)) +
   ylab("S(t)") +
@@ -743,7 +814,6 @@ p_km_complications = ggplot(bkm_complications, aes(x = time, y = estimate)) +
   geom_point(data = ndf, pch=19, size = 2)
 p_km_complications
 ggsave("book/Figures/survival/pseudo-complications-lm.png", p_km_complications, height=3, units="in", dpi=600)
-
 
 ### restricted mean survival time
 library(survival)
