@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.8.27">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Raphael Sonabend and Andreas Bender">
+
+<title>17&nbsp; Pseudo-value regression – Machine Learning in Survival Analysis</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for citations */
+div.csl-bib-body { }
+div.csl-entry {
+  clear: both;
+  margin-bottom: 0em;
+}
+.hanging-indent div.csl-entry {
+  margin-left:2em;
+  text-indent:-2em;
+}
+div.csl-left-margin {
+  min-width:2em;
+  float:left;
+}
+div.csl-right-inline {
+  margin-left:2em;
+  padding-left:1em;
+}
+div.csl-indent {
+  margin-left: 2em;
+}</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<link href="./P4C22_partition-based-reduction.html" rel="next">
+<link href="./P4C20_ipcw.html" rel="prev">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/axe/axe-check.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-14d2473a982606de670f0038afa36c2b.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-1008a5a8f5e3c2ed0fd245401abc5d00.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-sidebar floating quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./P4C19_reductions.html">Reduction Techniques</a></li><li class="breadcrumb-item"><a href="./P4C21_pseudo.html"><span class="chapter-number">17</span>&nbsp; <span class="chapter-title">Pseudo-value regression</span></a></li></ol></nav>
+        <a class="flex-grow-1" role="navigation" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="./">Machine Learning in Survival Analysis</a> 
+        <div class="sidebar-tools-main tools-wide">
+    <a href="https://github.com/mlsa-book/MLSA/tree/main/book/" title="Source Code" class="quarto-navigation-tool px-1" aria-label="Source Code"><i class="bi bi-github"></i></a>
+    <a href="./Machine-Learning-in-Survival-Analysis.pdf" title="Download PDF" class="quarto-navigation-tool px-1" aria-label="Download PDF"><i class="bi bi-file-pdf"></i></a>
+  <a href="" class="quarto-reader-toggle quarto-navigation-tool px-1" onclick="window.quartoToggleReader(); return false;" title="Toggle reader mode">
+  <div class="quarto-reader-toggle-btn">
+  <i class="bi"></i>
+  </div>
+</a>
+</div>
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P0C0_notation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Symbols and Notation</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P0C1_intro.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Introduction</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false">
+ <span class="menu-text">Survival Analysis and Machine Learning</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P1C3_machinelearning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Machine Learning</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P1C4_survival.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Survival Analysis</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P1C5_eha.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Event-history Analysis</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P1C6_survtsk.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Survival Task</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false">
+ <span class="menu-text">Evaluation</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P2C8_rank.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Discrimination</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P2C9_calib.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Calibration</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P2C10_rules.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Scoring Rules</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P2C11_time.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Survival Time Measures</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false">
+ <span class="menu-text">Models</span></a>
+          <a class="sidebar-item-toggle text-start collapsed" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" role="navigation" aria-expanded="false" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 ">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C13_classical.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Traditional Survival Models</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C14_forests.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Random Forests</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C15_svm.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">12</span>&nbsp; <span class="chapter-title">Support Vector Machines</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C16_boosting.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">13</span>&nbsp; <span class="chapter-title">Boosting Methods</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P3C17_neural.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">14</span>&nbsp; <span class="chapter-title">Neural Networks</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true">
+ <span class="menu-text">Reduction Techniques</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" role="navigation" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P4C19_reductions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">15</span>&nbsp; <span class="chapter-title">Reduction Techniques for Survival Analysis</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P4C20_ipcw.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">16</span>&nbsp; <span class="chapter-title">IPC weighted classification</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P4C21_pseudo.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">17</span>&nbsp; <span class="chapter-title">Pseudo-value regression</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P4C22_partition-based-reduction.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">18</span>&nbsp; <span class="chapter-title">Partition based reductions</span></span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P4C24_eha.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">19</span>&nbsp; <span class="chapter-title">Reductions for Event-History Analysis</span></span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P5C24_conclusions.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">20</span>&nbsp; <span class="chapter-title">FAQs and Outlook</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./P5C26_references.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">References</span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#sec-pseudo-value-S" id="toc-sec-pseudo-value-S" class="nav-link active" data-scroll-target="#sec-pseudo-value-S"><span class="header-section-number">17.1</span> Pseudo-values for Survival Probability</a></li>
+  <li><a href="#sec-pseudo-value-rmst" id="toc-sec-pseudo-value-rmst" class="nav-link" data-scroll-target="#sec-pseudo-value-rmst"><span class="header-section-number">17.2</span> Pseudo-values for RMST</a></li>
+  <li><a href="#sec-pseudo-value-eha" id="toc-sec-pseudo-value-eha" class="nav-link" data-scroll-target="#sec-pseudo-value-eha"><span class="header-section-number">17.3</span> Pseudo-values in Event-History Analysis</a>
+  <ul class="collapse">
+  <li><a href="#sec-pseudo-value-cr" id="toc-sec-pseudo-value-cr" class="nav-link" data-scroll-target="#sec-pseudo-value-cr"><span class="header-section-number">17.3.1</span> Pseudo-values for Competing Risks</a></li>
+  <li><a href="#sec-pseudo-value-trans-prob" id="toc-sec-pseudo-value-trans-prob" class="nav-link" data-scroll-target="#sec-pseudo-value-trans-prob"><span class="header-section-number">17.3.2</span> Pseudo-values for Multi-State Models</a></li>
+  </ul></li>
+  <li><a href="#advantages-and-limitations" id="toc-advantages-and-limitations" class="nav-link" data-scroll-target="#advantages-and-limitations"><span class="header-section-number">17.4</span> Advantages and Limitations</a></li>
+  <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion"><span class="header-section-number">17.5</span> Conclusion</a></li>
+  </ul>
+<div class="toc-actions"><ul><li><a href="https://github.com/mlsa-book/MLSA/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li><li><a href="https://github.com/mlsa-book/MLSA/edit/main/book/P4C21_pseudo.qmd" class="toc-action"><i class="bi empty"></i>Edit this page</a></li><li><a href="https://github.com/mlsa-book/MLSA/blob/main/book/P4C21_pseudo.qmd" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default"><nav class="quarto-page-breadcrumbs quarto-title-breadcrumbs d-none d-lg-block" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="./P4C19_reductions.html">Reduction Techniques</a></li><li class="breadcrumb-item"><a href="./P4C21_pseudo.html"><span class="chapter-number">17</span>&nbsp; <span class="chapter-title">Pseudo-value regression</span></a></li></ol></nav>
+<div class="quarto-title">
+<h1 class="title"><span id="sec-pseudo-value-reduction" class="quarto-section-identifier"><span class="chapter-number">17</span>&nbsp; <span class="chapter-title">Pseudo-value regression</span></span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+<div>
+  <div class="abstract">
+    <div class="block-title">Abstract</div>
+    TODO (150-200 WORDS)
+  </div>
+</div>
+
+
+</header>
+
+
+<div class="callout callout-style-default callout-warning callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Minor changes expected!
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<p><strong>This page is a work in progress and minor changes will be made over time.</strong></p>
+</div>
+</div>
+<p>Pseudo-value based approaches have been introduced in the survival analysis community quite recently (see <span class="citation" data-cites="andersenPseudoobservationsSurvivalAnalysis2010">Andersen and Pohar Perme (<a href="P5C26_references.html#ref-andersenPseudoobservationsSurvivalAnalysis2010" role="doc-biblioref">2010</a>)</span> for an overview), but have gained popularity ever since due to their flexibility and ease of application. Similar to the IPCW based reduction (<a href="P4C20_ipcw.html" class="quarto-xref"><span>Chapter 16</span></a>). After data transformation, they allow the application of arbitrary regression learners for uncensored data in order to estimate a quantity of interest (like the survival probability, restricted mean survival time, cumulative incidence function, etc.) conditional on features. It’s a two step approach where</p>
+<ul>
+<li>a jackknife (leave-one-out) procedure based on univariate (featureless) estimators for the quantity of interest is used to calculate pseudo-values, which are defined for all subjects in the data, regardless of their censoring status.</li>
+<li>the calculated pseudo-values are used as outcome in a regression task (<a href="P1C3_machinelearning.html#sec-ml-tasks-regr" class="quarto-xref"><span>Section 2.2.1</span></a>) to learn a function that maps the features to the pseudo-values. Predictions from the model are conditional predictions of the quantity of interest.</li>
+</ul>
+<p>Formally, let <span class="math inline">\(\psi(\tau|\mathbf{x})\)</span> denote some quantity of interest, for example the survival probability <span class="math inline">\(S(\tau | \mathbf{x})\)</span> or the restricted mean survival time, <span class="math inline">\(\text{RMST}(\tau | \mathbf{x})\)</span>. Let <span class="math inline">\(\psi(\tau)\)</span> be an univariate (featureless), unbiased estimator of the quantity of interest based on all observations and <span class="math inline">\(\psi^{-i}(\tau)\)</span> be an unbiased estimator of the same quantity obtained by omitting the <span class="math inline">\(i\)</span>-th observation from the data set (for example <span class="math inline">\(S_{KM}(\tau)\)</span> and <span class="math inline">\(S_{KM}^{-i}(\tau)\)</span> for the survival probability). Let <span class="math inline">\(n\)</span> the size of the data set. Pseudo-values are defined by <!--  --> <span id="eq-pseudo-value"><span class="math display">\[
+\theta_i(\tau) = n\psi(\tau) - (n-1)\psi^{-i}(\tau).
+\tag{17.1}\]</span></span> <!--  --></p>
+<p>Thus, the calculation of the pseudo-values requires <span class="math inline">\(n+1\)</span> estimates of the univariate estimator <span class="math inline">\(\psi(\tau)\)</span> per time point <span class="math inline">\(\tau\)</span> (<span class="math inline">\(n\)</span> estimates omitting each observation in the data set plus one for the overall estimate). This may seem prohibitive, but calculation of univariate estimators is usually fast and methods that use efficient approximations have been proposed in the literature (<span class="citation" data-cites="parnerRegressionModelsCensored2023">Parner, Andersen, and Overgaard (<a href="P5C26_references.html#ref-parnerRegressionModelsCensored2023" role="doc-biblioref">2023</a>)</span>, <span class="citation" data-cites="bouaziz2023fastapproximations">Bouaziz (<a href="P5C26_references.html#ref-bouaziz2023fastapproximations" role="doc-biblioref">2023</a>)</span>). Also, pseudo-value analysis is usually used when the interest lies in estimation at one or few time points <span class="math inline">\(\tau\)</span> rather than the entire event time distribution.</p>
+<p>An important property of pseudo-values is that their expectation conditional on features <span class="math inline">\(\mathbf{x}_i\)</span> is equal to the quantity of interest, that is <!--  --> <span id="eq-pseudo-value-expectation-1"><span class="math display">\[
+E(\theta_i(\tau|\mathbf{x}_i)) = \psi(\tau|\mathbf{x}_i).
+\tag{17.2}\]</span></span> <!--  --> In order to learn the relationship of features with the quantities in (<a href="#eq-pseudo-value-expectation-1" class="quarto-xref"><span>17.2</span></a>), the pseudo-values are regressed on the features <span class="math inline">\(\mathbf{x}_i\)</span> by specifying <!--  --> <span id="eq-pseudo-value-expectation-2"><span class="math display">\[
+E(\theta_i(\tau|\mathbf{x}_i)) = h(f_{\tau}(\mathbf{x}_i)),
+\tag{17.3}\]</span></span> <!--  --> where <span class="math inline">\(f_{\tau}(\mathbf{x}_i)\)</span> is a function of the features <span class="math inline">\(\mathbf{x}_i\)</span> (for example <span class="math inline">\(f_{\tau}(\mathbf{x}) = \mathbf{x}^\top\boldsymbol{\beta}_{\tau}\)</span>) that is learned by the model and <span class="math inline">\(h(\cdot)\)</span> is a known response function (similar to the response function in a generalised linear model) that maps the predictor to the target space (for example identity or sigmoid function). From Equations (<a href="#eq-pseudo-value-expectation-1" class="quarto-xref"><span>17.2</span></a>) and (<a href="#eq-pseudo-value-expectation-2" class="quarto-xref"><span>17.3</span></a>) it follows that the predictions from the regression models give the conditional prediction of the quantity of interest. Subscript <span class="math inline">\(\tau\)</span> indicates that the function is time-dependent and will be different for each time point <span class="math inline">\(\tau\)</span>. If the response function <span class="math inline">\(h\)</span> is the identity function, <span class="math inline">\(h(f_{\tau}(\mathbf{x}_i)) = f_{\tau}(\mathbf{x}_i)\)</span>, the feature effects can be interpreted directly as effects on the quantity of interest (rather than being expressed in terms of hazard ratios or other relative measures).</p>
+<p>The algorithm for pseudo-value based prediction is given by</p>
+<ol type="1">
+<li>Define the quantity of interest <span class="math inline">\(\psi(\tau|\mathbf{x}_i)\)</span>, choose a suitable univariate estimator <span class="math inline">\(\psi(\tau)\)</span> and set <span class="math inline">\(\tau\)</span> (one or few time points are typically of interest).</li>
+<li>Calculate the pseudo-values <!--  --> <span class="math display">\[
+\tilde{\theta}_i(\tau) = n\hat{\psi}(\tau) - (n-1)\hat{\psi}^{-i}(\tau)
+\]</span> <!--  --> by plugging in the estimates of <span class="math inline">\(\psi(\tau)\)</span> into (<a href="#eq-pseudo-value" class="quarto-xref"><span>17.1</span></a>).</li>
+<li>Regress <span class="math inline">\(\tilde{\theta}_i(\tau),i=1,\ldots,n\)</span> on the features <span class="math inline">\(\mathbf{x}_i\)</span> to obtain an estimate of <span class="math inline">\(\hat{f}_{\tau}(\cdot)\)</span>.</li>
+<li>Specify the response function <span class="math inline">\(h(\cdot)\)</span>.</li>
+<li>Generate predictions of the quantity of interest as <!--  --> <span id="eq-pseudo-value-prediction"><span class="math display">\[
+\hat{\tilde{\theta}}(\tau|\mathbf{x}) = \hat{\psi}(\tau|\mathbf{x}) = h(\hat{f}_{\tau}(\mathbf{x})).
+\tag{17.4}\]</span></span> <!--  --></li>
+</ol>
+<p>Steps 3 and 4 can be combined in one step, for example in the specification of the mean link (and variance) function when estimating the model using generalized estimating equations (GEEs; <span class="citation" data-cites="hardinGeneralizedEstimatingEquations2012">Hardin and Hilbe (<a href="P5C26_references.html#ref-hardinGeneralizedEstimatingEquations2012" role="doc-biblioref">2012</a>)</span>). When using machine learning methods on the other hand it will often be easier to first estimate (and evaluate) the model and then apply the response function to the raw predictions.</p>
+<p>In the following sections we provide step-by-step examples of pseudo-value based prediction for the survival probability (<a href="#sec-pseudo-value-S" class="quarto-xref"><span>Section 17.1</span></a>) as well as the restricted mean survival time (<a href="#sec-pseudo-value-rmst" class="quarto-xref"><span>Section 17.2</span></a>). <a href="#sec-pseudo-value-eha" class="quarto-xref"><span>Section 17.3</span></a> gives details on the extension to competing risks and multi-state models.</p>
+<section id="sec-pseudo-value-S" class="level2" data-number="17.1">
+<h2 data-number="17.1" class="anchored" data-anchor-id="sec-pseudo-value-S"><span class="header-section-number">17.1</span> Pseudo-values for Survival Probability</h2>
+<p>This section details the use of pseudo-values for the estimation of the survival probability conditional on features. For illustration, we consider the tumor data set (introduced in <a href="P1C4_survival.html#sec-data-rc" class="quarto-xref"><span>Section 3.2</span></a>, Table <a href="P1C4_survival.html#tbl-surv-data-tumor" class="quarto-xref">Table&nbsp;<span>3.1</span></a>), that contains right-censored data on time-until-death after operation (in days) and features age as well ascomplications, which indicates whether complications occured during tumor removal at baseline. To keep it simple and intuitive, we will use a linear model for the regression step, but recall that any suitable learner for regression could be used.</p>
+<p>We are interested in the conditional survival probability of tumor patients at different time points <span class="math inline">\(\tau \in \{1000, 2000, 3000\}\)</span> days. Therefore, we set <span class="math inline">\(\psi(\tau|\mathbf{x}_i) = S(\tau|\mathbf{x}_i)\)</span> and <span class="math inline">\(\hat{\psi}(\tau) = \hat{S}_{KM}(\tau)\)</span>. Pseudo-values are then calculated as <!--  --> <span id="eq-pseudo-value-calculation-S"><span class="math display">\[
+\tilde{\theta}_i(\tau) = n\hat{S}_{KM}(\tau) - (n-1)\hat{S}_{KM}^{-i}(\tau).
+\tag{17.5}\]</span></span> <!--  --> The resulting estimates and calculated pseudo-values are shown for the first 4 subjects of the data in <a href="#tbl-pseudo-value-calculation" class="quarto-xref">Table&nbsp;<span>17.1</span></a> for <span class="math inline">\(\tau = 1000\)</span> days. The Kaplan-Meier estimate using the entire data is given as <span class="math inline">\(\hat{S}_{KM}(1000) = 0.6175\)</span> and the leave-one-out estimates <span class="math inline">\(\hat{S}_{KM}^{-i}(1000)\)</span> are <span class="math inline">\(0.6172\)</span>, <span class="math inline">\(0.6169\)</span>, <span class="math inline">\(0.6184\)</span> and <span class="math inline">\(0.6183\)</span>, respectively. Note that the differences are small, but for the calculation of the pseudo-values, the estimates are multiplied by <span class="math inline">\(n\)</span> and <span class="math inline">\(n-1\)</span>, respectively.</p>
+<div id="tbl-pseudo-value-calculation" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-pseudo-value-calculation-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;17.1: Illustration of pseudo-value calculation for the first 4 subjects from the tumor data set at time point <span class="math inline">\(\tau = 1000\)</span> days. The table shows the overall Kaplan-Meier estimate <span class="math inline">\(\hat{S}_{KM}(\tau)\)</span>, the leave-one-out Kaplan-Meier estimate <span class="math inline">\(\hat{S}_{KM}^{-i}(\tau)\)</span> (obtained by omitting subject <span class="math inline">\(i\)</span>), and the calculated pseudo-value <span class="math inline">\(\tilde{\theta}_i(\tau)\)</span>. The features age and complications have not been used for the calculation of the pseudo-values but can be included in the regression step.
+</figcaption>
+<div aria-describedby="tbl-pseudo-value-calculation-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 10%">
+<col style="width: 6%">
+<col style="width: 9%">
+<col style="width: 15%">
+<col style="width: 15%">
+<col style="width: 17%">
+<col style="width: 5%">
+<col style="width: 19%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;"><span class="math inline">\(i\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(t_i\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(\delta_i\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(\hat{S}_{KM}(\tau)\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(\hat{S}_{KM}^{-i}(\tau)\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(\tilde{\theta}_i(\tau)\)</span></th>
+<th style="text-align: right;">age</th>
+<th style="text-align: left;">complications</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">579</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0.6175</td>
+<td style="text-align: right;">0.6172</td>
+<td style="text-align: right;">0.8597</td>
+<td style="text-align: right;">58</td>
+<td style="text-align: left;">no</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">1192</td>
+<td style="text-align: right;">0</td>
+<td style="text-align: right;">0.6175</td>
+<td style="text-align: right;">0.6169</td>
+<td style="text-align: right;">1.0600</td>
+<td style="text-align: right;">52</td>
+<td style="text-align: left;">yes</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: right;">308</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.6175</td>
+<td style="text-align: right;">0.6184</td>
+<td style="text-align: right;">-0.0442</td>
+<td style="text-align: right;">74</td>
+<td style="text-align: left;">no</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">33</td>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">0.6175</td>
+<td style="text-align: right;">0.6183</td>
+<td style="text-align: right;">-0.0119</td>
+<td style="text-align: right;">57</td>
+<td style="text-align: left;">yes</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>In the third step, a linear model is fitted to the pseudo-values such that <!--  --> <span id="eq-pseudo-value-S-lm"><span class="math display">\[
+\hat{\tilde{\theta}}_i(\tau) = \hat{S}(\tau|\mathbf{x}_i) = \mathbf{x}_i^\top\hat{\boldsymbol{\beta}}_{\tau}.
+\tag{17.6}\]</span></span> <!--  --></p>
+<p>First, consider a linear model without features, that is <span class="math inline">\(\hat{S}(\tau|\mathbf{x}_i) = \hat{\beta}_{\tau,0}\)</span>. By construction of the pseudo-values, at time point <span class="math inline">\(\tau = 1000\)</span> days we have <span class="math inline">\(\hat{\tilde{\theta}}(1000) = \hat{\beta}_{1000,0} = \frac{1}{n} \sum_{i=1}^n \tilde{\theta}_i(1000) = 0.6175 = \hat{S}_{KM}(1000)\)</span>. Of course it doesn’t really make sense to estimate <span class="math inline">\(n+1\)</span> Kaplan-Meier curves just to obtain the overall Kaplan-Meier estimate at one time-point, but this example illustrates that pseudo-value based regression provides consistent estimators of the survival probability.</p>
+<p>In a next step, we include complications as a predictor and specify <!--  --> <span id="eq-pseudo-value-S-lm-complications"><span class="math display">\[
+\hat{S}(\tau|\mathbf{x}_i) = \hat{\beta}_{\tau,0} + \hat{\beta}_{\tau,1} x_{i,1},\quad x_{i,1} = \mathbb{I}(\text{complications}_i = \text{"yes"}).
+\tag{17.7}\]</span></span> <!--  --> We also repeat the analysis for each time-point <span class="math inline">\(\tau \in \{1000, 2000, 3000\}\)</span> days separately. The results are shown in <a href="#fig-pseudo-lm" class="quarto-xref">Figure&nbsp;<span>17.1</span></a>, where the black dots indicate the survival probability predictions from the pseudo-value based approach and the solid lines are Kaplan-Meier estimates of the survival probability for comparison. Notably, the Kaplan-Meier estimates in the graphic have been obtained separately for each group (that is stratified by the complication variable) and the results indicate that the proportional hazards assumption does not hold for this example, as the shape of the survival function differs between the two groups (intuitively, patients with complications have a higher hazard in the first days after operation and therefore lower survival probability). The Kaplan-Meier estimates used for the calculation of the pseudo-values on the other hand were obtained by applying a univariate Kaplan-Meier estimator. Despite not stratifying the estimator when calculating the pseudo-values, the pseudo-value based approach still obtains correct estimates of the survival probabilities at the selected time points for both groups. This works even when the proportional hazards assumption is violated as the linear model is fit to each time-point separately and thus is able to learn different values of <span class="math inline">\(\hat{\beta}_{\tau,0}\)</span> and <span class="math inline">\(\hat{\beta}_{\tau,1}\)</span> for each <span class="math inline">\(\tau\)</span>.</p>
+<p>Because we use the identity response function in the linear model, <span class="math inline">\(\hat{\beta}_{\tau,1}\)</span> can be interpreted directly as the effect of complications on the survival probability at time <span class="math inline">\(\tau\)</span>. Here, <span class="math inline">\(\hat{\beta}_{1000,1}\approx -0.23\)</span> and so the expected survival probability at time <span class="math inline">\(\tau = 1000\)</span> for patients with complications is reduced by around 23 percentage points compared to patients without complications. In contrast, in a Cox model (<a href="P3C13_classical.html#sec-classical-cox" class="quarto-xref"><span>Section 10.2</span></a>) with linear predictor <span class="math inline">\(\eta_i = \beta_0 + \beta_1 x_{i,1}\)</span>, <span class="math inline">\(\beta_1\)</span> can only be directly interpreted in terms of (log-)hazard ratios rather than survival probabilities (and under the proportional hazards assumption). Also note that the above results only hold for <span class="math inline">\(\tau = 1000\)</span>. At <span class="math inline">\(\tau = 2000\)</span> days, <span class="math inline">\(\hat{\beta}_{2000,1} \approx -0.18\)</span>, and at <span class="math inline">\(\tau = 3000\)</span> days, <span class="math inline">\(\hat{\beta}_{3000,1} \approx -0.13\)</span>, thus the average effect of complications depends on <span class="math inline">\(\tau\)</span> and decreases over time (complications have a time-varying effect).</p>
+<div id="fig-pseudo-lm" class="quarto-float quarto-figure quarto-figure-center anchored" alt="">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-pseudo-lm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="Figures/survival/pseudo-complications-lm.png" class="img-fluid figure-img" alt="">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-pseudo-lm-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;17.1: Comparison of estimates of the survival probability estimates using the Kaplan-Meier estimator and estimates of a linear model based on pseudo-values.
+</figcaption>
+</figure>
+</div>
+<p>Besides the direct (time-varying) interpretation of the feature effects this might still feel overly complex given that similar results can be extracted from the stratified Kaplan-Meier analysis. However, once we add continuous features like age, Kaplan-Meier estimators are no longer applicable. Other models like Cox models assume proportional hazards and the estimated effects are expressed in terms of hazard ratios rather than survival probabilities.</p>
+<p>Thus, in a final illustration, we add age to the model, such that</p>
+<p><span class="math display">\[
+\hat{S}(\tau|\mathbf{x}_i) = \hat{\beta}_{\tau,0} + \hat{\beta}_{\tau,1} x_{i,1} + \hat{\beta}_{\tau,2} x_{i,2},\quad x_{i,1} = \mathbb{I}(\text{complications}_i = \text{"yes"}), x_{i,2} = \text{age}_i
+\]</span></p>
+<p>The resulting estimates are given in <a href="#tbl-pseudo-lm-age" class="quarto-xref">Table&nbsp;<span>17.2</span></a>, where the effects of age and complications are given for each time-point <span class="math inline">\(\tau \in \{1000, 2000, 3000\}\)</span> days separately.</p>
+<div id="tbl-pseudo-lm-age" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-pseudo-lm-age-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;17.2: Estimates of the effects of age and complications on the survival probability at different time points <span class="math inline">\(\tau \in \{1000, 2000, 3000\}\)</span> days.
+</figcaption>
+<div aria-describedby="tbl-pseudo-lm-age-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<thead>
+<tr class="header">
+<th style="text-align: right;"><span class="math inline">\(\tau\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(\hat{\beta}_{\tau,1}\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(\hat{\beta}_{\tau,2}\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">1000</td>
+<td style="text-align: right;">-0.2205</td>
+<td style="text-align: right;">-0.0032</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2000</td>
+<td style="text-align: right;">-0.1428</td>
+<td style="text-align: right;">-0.0070</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3000</td>
+<td style="text-align: right;">-0.1050</td>
+<td style="text-align: right;">-0.0071</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>Conditional on <span class="math inline">\(\tau\)</span>, the interpretation is equivalent to a standard multiple linear regression model. For example, at <span class="math inline">\(\tau = 1000\)</span> days, the effect of age is <span class="math inline">\(\hat{\beta}_{1000,2} \approx -0.0032\)</span>, which means that, given everything else being equal, the expected survival probability is reduced by ca 0.32 percentage points per additional year of age. Considering the change of the coefficients over time, one can conclude that the effect of complications decreases over time while the effect of age increases between 1000 and 2000 days and then appears to remain stable at around <span class="math inline">\(0.7\)</span> percentage points per additional year.</p>
+</section>
+<section id="sec-pseudo-value-rmst" class="level2" data-number="17.2">
+<h2 data-number="17.2" class="anchored" data-anchor-id="sec-pseudo-value-rmst"><span class="header-section-number">17.2</span> Pseudo-values for RMST</h2>
+<p>An unbiased, univariate estimator for the restricted mean survival time (RMST; Equation (<a href="P1C6_survtsk.html#eq-rmst" class="quarto-xref"><span>5.2</span></a>)) can be obtained via <!--  --> <span class="math display">\[
+\text{RMST}(\tau) = \int_0^\tau S_{KM}(u) du,
+\]</span> <!--  --> such that the calculated pseudo-values are given by <!--  --> <span id="eq-pseudo-value-rmst"><span class="math display">\[
+\tilde{\theta}_i(\tau) = n \widehat{\text{RMST}}(\tau) - (n-1)\widehat{\text{RMST}}^{-i}(\tau),
+\tag{17.8}\]</span></span> <!--  --> where <span class="math inline">\(\tilde{\theta}_i(\tau)\)</span> is now the pseudo-value of the restricted mean survival time at time <span class="math inline">\(\tau\)</span> for observation <span class="math inline">\(i\)</span>.</p>
+<p>Continuing the tumor data example from <a href="#sec-pseudo-value-S" class="quarto-xref"><span>Section 17.1</span></a>, we are now interested in the RMST and how it depends on covariates. The general idea is illustrated in Figure <a href="#fig-pseudo-rmst" class="quarto-xref">Figure&nbsp;<span>17.2</span></a>, which displays survival curves for each group (complications vs.&nbsp;no complications) with the RMST shown as the area under the curve up to <span class="math inline">\(\tau = 1000\)</span> days. If one is interested in the difference between patients with and without complications, then the difference in RMSTs between the two groups can be calculated, which around <span class="math inline">\(246\)</span> days in this example. Thus, within the first 1000 days after operation, patients with complications are expected to live 246 days less than patients without complications.</p>
+<div id="fig-pseudo-rmst" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Two-panel faceted plot showing survival curves for patients with and without complications. Each panel displays a survival curve with the area under the curve up to 1000 days shaded in a transparent color, representing the Restricted Mean Survival Time (RMST). The RMST value is displayed as text within each panel.">
+<figure class="quarto-float quarto-float-fig figure">
+<div aria-describedby="fig-pseudo-rmst-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<img src="Figures/reductions/pseudo-rmst-complications-lm.png" class="img-fluid figure-img" alt="Two-panel faceted plot showing survival curves for patients with and without complications. Each panel displays a survival curve with the area under the curve up to 1000 days shaded in a transparent color, representing the Restricted Mean Survival Time (RMST). The RMST value is displayed as text within each panel.">
+</div>
+<figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-pseudo-rmst-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Figure&nbsp;17.2: Survival curves with RMST visualization at <span class="math inline">\(\tau = 1000\)</span> days, stratified by complications status. The shaded area under each curve represents the RMST, with the numerical value displayed as text.
+</figcaption>
+</figure>
+</div>
+<p>For a pseudo-value based analysis, we once again fit a linear model <!--  --> <span class="math display">\[
+\hat{\tilde{\theta}}_i(\tau) = \widehat{\text{RMST}}(\tau|\mathbf{x}_i) = \hat{\beta}_{\tau,0} + \hat{\beta}_{\tau,1} x_{i,1}
+\]</span> <!--  --></p>
+<p>For time point <span class="math inline">\(\tau = 1000\)</span> days, we obtain an estimate of <span class="math inline">\(\hat{\beta}_1 \approx -239\)</span>. Thus, the expected RMST for patients with complications is reduced by around 239 days, which is similar to the result obtained from the Kaplan-Meier analysis in Figure <a href="#fig-pseudo-rmst" class="quarto-xref">Figure&nbsp;<span>17.2</span></a>. However, using pseudo-values from (<a href="#eq-pseudo-value-rmst" class="quarto-xref"><span>17.8</span></a>), we can directly extend the predictor, for example by including age: <!--  --> <span class="math display">\[
+\hat{\tilde{\theta}}_i(\tau) = \hat{\beta}_{\tau,0} + \hat{\beta}_{\tau,1} x_{i,1} + \hat{\beta}_{\tau,2} x_{i,2}
+\]</span> <!--  --> where <span class="math inline">\(x_{i,1}\)</span> as before and <span class="math inline">\(x_{i,2}\)</span> is the age of subject <span class="math inline">\(i\)</span>. The respective estimates are <span class="math inline">\(\hat{\beta}_1 \approx -230\)</span> and <span class="math inline">\(\hat{\beta}_2 \approx -3\)</span>, such that, given everything else being equal, the expected RMST is reduced by circa 3 days per year of age. The effect of complications, <span class="math inline">\(\hat{\beta}_1\)</span>, is slightly reduced when age is included and can be interpreted as the effect of complications on RMST adjusted for age.</p>
+</section>
+<section id="sec-pseudo-value-eha" class="level2" data-number="17.3">
+<h2 data-number="17.3" class="anchored" data-anchor-id="sec-pseudo-value-eha"><span class="header-section-number">17.3</span> Pseudo-values in Event-History Analysis</h2>
+<p>The pseudo-value approach can be extended to more complex event-history settings, including competing risks and multi-state models (<span class="citation" data-cites="andersenPseudoobservationsSurvivalAnalysis2010">Andersen and Pohar Perme (<a href="P5C26_references.html#ref-andersenPseudoobservationsSurvivalAnalysis2010" role="doc-biblioref">2010</a>)</span>; <span class="citation" data-cites="parnerRegressionModelsCensored2023">Parner, Andersen, and Overgaard (<a href="P5C26_references.html#ref-parnerRegressionModelsCensored2023" role="doc-biblioref">2023</a>)</span>; <span class="citation" data-cites="andersen2003generalisedlinear">Andersen, Klein, and Rosthøj (<a href="P5C26_references.html#ref-andersen2003generalisedlinear" role="doc-biblioref">2003</a>)</span>). The key idea remains the same: use univariate, non-parametric estimators of the quantity of interest to calculate pseudo-values, which can then be used as target variables in regression models.</p>
+<section id="sec-pseudo-value-cr" class="level3" data-number="17.3.1">
+<h3 data-number="17.3.1" class="anchored" data-anchor-id="sec-pseudo-value-cr"><span class="header-section-number">17.3.1</span> Pseudo-values for Competing Risks</h3>
+<p>In the competing risks setting (<a href="P1C5_eha.html#sec-competing-risks" class="quarto-xref"><span>Section 4.2</span></a>), a quantity of particular interest is the cumulative incidence function (CIF) <span class="math inline">\(F_e(\tau)\)</span> (<a href="P1C5_eha.html#eq-cif" class="quarto-xref"><span>4.9</span></a>), which represents the probability of experiencing event type <span class="math inline">\(e\)</span> before time <span class="math inline">\(\tau\)</span>. A suitable, univariate, unbiased estimator for the CIF is the Aalen-Johansen estimator. Pseudo-values for the CIF are thus given by <!--  --> <span id="eq-pseudo-value-cif"><span class="math display">\[
+\theta_{i,e}(\tau) = nF_{AJ,e}(\tau) - (n-1)F_{AJ,e}^{-i}(\tau),
+\tag{17.9}\]</span></span> <!--  --> where <span class="math inline">\(F_{AJ,e}^{-i}(\tau)\)</span> is the Aalen-Johansen estimator of the CIF for event type <span class="math inline">\(e\)</span> obtained by omitting the <span class="math inline">\(i\)</span>-th observation from the data set.</p>
+<p>Once calculated, these pseudo-values can once again be used as target variables in regression models to estimate the conditional CIF <span class="math inline">\(F_e(\tau | \mathbf{x}_i)\)</span> via <a href="#eq-pseudo-value-expectation-2" class="quarto-xref"><span>17.3</span></a>. This allows for direct interpretation of covariate effects on the cumulative incidence of a specific event type.</p>
+</section>
+<section id="sec-pseudo-value-trans-prob" class="level3" data-number="17.3.2">
+<h3 data-number="17.3.2" class="anchored" data-anchor-id="sec-pseudo-value-trans-prob"><span class="header-section-number">17.3.2</span> Pseudo-values for Multi-State Models</h3>
+<!-- TODO: when eha section is updated to contain definitions of state occupation probabilities, update this section accordingly -->
+<p>In multi-state settings (<a href="P1C5_eha.html#sec-multi-state" class="quarto-xref"><span>Section 4.3</span></a>), pseudo-values are often used in order to estimate state occupation probabilities conditional on features. These represent the probability of being in state <span class="math inline">\(e\)</span> at time <span class="math inline">\(\tau\)</span>. Non-parametric estimators for state occupation probabilities can be obtained via the Aalen-Johansen estimator for multi-state models (<a href="P1C5_eha.html#sec-ms-aalen-johanson" class="quarto-xref"><span>Section 4.3.4</span></a>). The pseudo-values for state occupation probabilities are then defined as</p>
+<p><span id="eq-pseudo-value-trans-prob"><span class="math display">\[
+\tilde{\theta}_{i,e}(\tau) = nP_{AJ,e}(\tau) - (n-1)P_{AJ,e}^{-i}(\tau),
+\tag{17.10}\]</span></span></p>
+<p>where <span class="math inline">\(P_{AJ,e}(\tau)\)</span> is the Aalen-Johansen estimator of the state occupation probability for event type <span class="math inline">\(e\)</span> at time <span class="math inline">\(\tau\)</span>, and <span class="math inline">\(P_{AJ,e}^{-i}(\tau)\)</span> is the same estimator obtained by omitting the <span class="math inline">\(i\)</span>-th observation.</p>
+<p>These pseudo-values can be used to model conditional state occupation probabilities <span class="math inline">\(P_e(\tau | \mathbf{x}_i)\)</span> using standard regression techniques. This approach is particularly flexible as it allows for modeling state occupation probabilities directly, without the need to specify and estimate all transition hazards (<span class="citation" data-cites="andersen2003generalisedlinear">Andersen, Klein, and Rosthøj (<a href="P5C26_references.html#ref-andersen2003generalisedlinear" role="doc-biblioref">2003</a>)</span>).</p>
+</section>
+</section>
+<section id="advantages-and-limitations" class="level2" data-number="17.4">
+<h2 data-number="17.4" class="anchored" data-anchor-id="advantages-and-limitations"><span class="header-section-number">17.4</span> Advantages and Limitations</h2>
+<p>Although the examples given in (<a href="#sec-pseudo-value-S" class="quarto-xref"><span>Section 17.1</span></a>) and (<a href="#sec-pseudo-value-rmst" class="quarto-xref"><span>Section 17.2</span></a>) are relatively simple, they illustrate the main advantages and limitations of the pseudo-value approach for machine learning based survival analysis:</p>
+<p>On the plus side one can,</p>
+<ul>
+<li>estimate/predict various quantities of interest at selected time points <span class="math inline">\(\tau\)</span>, conditional on covariates, as long as an univariate, unbiased estimator of the quantity of interest is available,</li>
+<li>learn function <span class="math inline">\(f(\mathbf{x})\)</span> in <a href="#eq-pseudo-value-expectation-2" class="quarto-xref"><span>17.3</span></a> using any regression machine or deep learning method for uncensored data without any additional modifications by using the pseudo-values as target variables,</li>
+<li>interpret the effects of features directly as effects on the quantity of interest <span class="math inline">\(\psi(\tau|\mathbf{x})\)</span> (at least when the response function <span class="math inline">\(h\)</span> in <a href="#eq-pseudo-value-expectation-2" class="quarto-xref"><span>17.3</span></a> is the identity function).</li>
+<li>when used in usual machine learning workflows, pseudo-values are calculated for the entire data set before splitting the data into training and test sets</li>
+<li>no survival specific metrics are needed for training and validation as pseudo-values can be considered uncensored data. However, since predictions (after application of the response function) reflect the quantity of interest, evaluation can also be performed using survival metrics in combination with the untransformed (censored data), for example when comparing the predictions with predictions from survival learners.</li>
+</ul>
+<p>However, there are also some limitations:</p>
+<ul>
+<li>Pseudo-values can take on positive and negative values, therefore it is not guaranteed that the model predictions are within the range of the target. For example, survival probabilities should be within <span class="math inline">\([0,1]\)</span>, which can only be insured if the response function <span class="math inline">\(h\)</span> is chosen suitably. In context of statistical modeling, generalized estimating equations (<span class="citation" data-cites="hardinGeneralizedEstimatingEquations2012">Hardin and Hilbe (<a href="P5C26_references.html#ref-hardinGeneralizedEstimatingEquations2012" role="doc-biblioref">2012</a>)</span>) with suitable link functions can be used to ensure that the predictions are within the range of the target (standard GLMs are not suitable as the pseudo-values are not necessarily in the range of the target space). In machine learning, similar approaches can be used, for example by clipping the predictions to the range of the target or using suitable transformations/activation functions. However, even without transformation, predictions will often be within the desired range, especially if <span class="math inline">\(\tau\)</span> is not at the edge of the follow-up period (where the survival probability is close to 0 or 1) and if <span class="math inline">\(\mathbf{x}\)</span> is not an outlier in the feature space.</li>
+<li>Pseudo-values are technically not independent (all observations are used to calculate <span class="math inline">\(\hat{\psi}(\tau)\)</span> and most to calculate <span class="math inline">\(\hat{\psi}^{-i}(\tau)\)</span>); this does not affect the estimation of <span class="math inline">\(f(\mathbf{x})\)</span> too much, but robust variance estimation is preferred in context of statistical inference, for example using generalized estimating equations with robust (sandwich) variance estimation.</li>
+<li>Interpretation of feature effects is hindered to some extent by being time dependent; this can however also be viewed as an advantage, as the approach does not make strict assumptions like proportional hazards or accelerated failure time assumptions, which can be violated in practice.</li>
+<li>Calculating pseudo-values can be computationally expensive if predictions are needed at many time points <span class="math inline">\(\tau\)</span> and for many observations <span class="math inline">\(i\)</span>, as the univariate estimator <span class="math inline">\(\psi(\tau)\)</span> has to be calculated <span class="math inline">\(n + 1\)</span> times per time point. However, for specific use cases efficient implementations based on infinitesimal jack-knife and other methods have been suggested in the literature and implemented in standard software packages (<span class="citation" data-cites="parnerRegressionModelsCensored2023">Parner, Andersen, and Overgaard (<a href="P5C26_references.html#ref-parnerRegressionModelsCensored2023" role="doc-biblioref">2023</a>)</span>, <span class="citation" data-cites="bouaziz2023fastapproximations">Bouaziz (<a href="P5C26_references.html#ref-bouaziz2023fastapproximations" role="doc-biblioref">2023</a>)</span>).</li>
+</ul>
+</section>
+<section id="conclusion" class="level2" data-number="17.5">
+<h2 data-number="17.5" class="anchored" data-anchor-id="conclusion"><span class="header-section-number">17.5</span> Conclusion</h2>
+<div class="callout callout-style-default callout-warning no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Warning</span>Key takeaways
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>The pseudo-value based approach allows estimation of arbitrary quantities of interest conditional on covariates, as long as an univariate, unbiased estimator of the quantity of interest is available.</li>
+<li>It avoids strong assumptions like the proportional hazards assumption or the accelerated failure time assumption, which can be violated in practice.</li>
+<li>In context of machine learning, this approach can greatly simplify analysis of time-to-event data, as standard implementations can be used out-of-the-box without any additional modifications.</li>
+<li>In contrast to many survival specific machine learning methods currently available, this method can be applied in complex settings, including competing risks and multi-state models.</li>
+<li>Feature effects can be interpreted directly as effects on the quantity of interest, rather than being expressed in terms of hazard ratios or other relative measures.</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-important no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Important</span>Limitations
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li>Pseudo-values can take positive and negative values, which may require appropriate response functions to ensure predictions are within the target range.</li>
+<li>Calculation of pseudo-values requires <span class="math inline">\(n+1\)</span> estimates of the univariate estimator per time point, which can be computationally expensive for many time points. However, efficient approximations are available.</li>
+</ul>
+</div>
+</div>
+<div class="callout callout-style-default callout-tip no-icon callout-titled">
+<div class="callout-header d-flex align-content-center">
+<div class="callout-icon-container">
+<i class="callout-icon no-icon"></i>
+</div>
+<div class="callout-title-container flex-fill">
+<span class="screen-reader-only">Tip</span>Further reading
+</div>
+</div>
+<div class="callout-body-container callout-body">
+<ul>
+<li><span class="citation" data-cites="andersenPseudoobservationsSurvivalAnalysis2010">Andersen and Pohar Perme (<a href="P5C26_references.html#ref-andersenPseudoobservationsSurvivalAnalysis2010" role="doc-biblioref">2010</a>)</span> provides a comprehensive overview of pseudo-value methods in survival analysis.</li>
+</ul>
+</div>
+</div>
+
+
+<div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list" style="display: none">
+<div id="ref-andersen2003generalisedlinear" class="csl-entry" role="listitem">
+Andersen, Per Kragh, John P. Klein, and Susanne Rosthøj. 2003. <span>“Generalised <span>Linear Models</span> for <span>Correlated Pseudo-Observations</span>, with <span>Applications</span> to <span>Multi-State Models</span>.”</span> <em>Biometrika</em> 90 (1): 15–27. <a href="https://www.jstor.org/stable/30042016">https://www.jstor.org/stable/30042016</a>.
+</div>
+<div id="ref-andersenPseudoobservationsSurvivalAnalysis2010" class="csl-entry" role="listitem">
+Andersen, Per Kragh, and Maja Pohar Perme. 2010. <span>“Pseudo-Observations in Survival Analysis.”</span> <em>Statistical Methods in Medical Research</em> 19 (1): 71–99. <a href="https://doi.org/10.1177/0962280209105020">https://doi.org/10.1177/0962280209105020</a>.
+</div>
+<div id="ref-bouaziz2023fastapproximations" class="csl-entry" role="listitem">
+Bouaziz, Olivier. 2023. <span>“Fast Approximations of Pseudo-Observations in the Context of Right Censoring and Interval Censoring.”</span> <em>Biometrical Journal</em> 65 (4): 2200071. <a href="https://doi.org/10.1002/bimj.202200071">https://doi.org/10.1002/bimj.202200071</a>.
+</div>
+<div id="ref-hardinGeneralizedEstimatingEquations2012" class="csl-entry" role="listitem">
+Hardin, James W., and Joseph M. Hilbe. 2012. <em>Generalized <span>Estimating Equations</span></em>. 2nd ed. New York: <span>Chapman and Hall/CRC</span>. <a href="https://doi.org/10.1201/b13880">https://doi.org/10.1201/b13880</a>.
+</div>
+<div id="ref-parnerRegressionModelsCensored2023" class="csl-entry" role="listitem">
+Parner, Erik T., Per K. Andersen, and Morten Overgaard. 2023. <span>“Regression Models for Censored Time-to-Event Data Using Infinitesimal Jack-Knife Pseudo-Observations, with Applications to Left-Truncation.”</span> <em>Lifetime Data Analysis</em> 29 (3): 654–71. <a href="https://doi.org/10.1007/s10985-023-09597-5">https://doi.org/10.1007/s10985-023-09597-5</a>.
+</div>
+</div>
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+<nav class="page-navigation">
+  <div class="nav-page nav-page-previous">
+      <a href="./P4C20_ipcw.html" class="pagination-link" aria-label="IPC weighted classification">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">16</span>&nbsp; <span class="chapter-title">IPC weighted classification</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="./P4C22_partition-based-reduction.html" class="pagination-link" aria-label="Partition based reductions">
+        <span class="nav-page-text"><span class="chapter-number">18</span>&nbsp; <span class="chapter-title">Partition based reductions</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>All content licensed under <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/">CC BY-NC-SA 4.0</a> <br> © Raphael Sonabend, Andreas Bender.</p>
+</div>   
+    <div class="nav-footer-center">
+<p><a href="https://www.mlsabook.com">Website</a> | <a href="https://github.com/mlsa-book/MLSA">GitHub</a></p>
+<div class="toc-actions d-sm-block d-md-none"><ul><li><a href="https://github.com/mlsa-book/MLSA/issues/new" class="toc-action"><i class="bi bi-github"></i>Report an issue</a></li><li><a href="https://github.com/mlsa-book/MLSA/edit/main/book/P4C21_pseudo.qmd" class="toc-action"><i class="bi empty"></i>Edit this page</a></li><li><a href="https://github.com/mlsa-book/MLSA/blob/main/book/P4C21_pseudo.qmd" class="toc-action"><i class="bi empty"></i>View source</a></li></ul></div></div>
+    <div class="nav-footer-right">
+<p>Built with <a href="https://quarto.org/">Quarto</a>.</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+</body></html>
