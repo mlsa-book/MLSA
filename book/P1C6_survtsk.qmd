@@ -1,5 +1,5 @@
 ---
-abstract: "This chapter introduces the different survival problems and formalises them as survival tasks. There are four prediction types in survival analysis: relative risks - predicting the risk of an event compared to others in the sample, survival times - predicting the time until an event happens, prognostic index - predicting a linear predictor to assess outcomes based on risk factors, and survival distributions - predicting the probability of an event taking place over time. These reduce to three formal survival tasks: deterministic (survival time), ranking (risks and prognostic index), and probabilistic (distribution). This separation of tasks helps create a taxonomy of survival models and losses that is used throughout the book." 
+abstract: "This chapter introduces the different survival problems and formalizes them as survival tasks. There are four prediction types in survival analysis: relative risks - predicting the risk of an event compared to others in the sample, survival times - predicting the time until an event happens, prognostic index - predicting a linear predictor to assess outcomes based on risk factors, and survival distributions - predicting the probability of an event taking place over time. These reduce to three formal survival tasks: deterministic (survival time), ranking (risks and prognostic index), and probabilistic (distribution). This separation of tasks helps create a taxonomy of survival models and losses that is used throughout the book." 
 ---
 
 ::: {.content-visible when-format="html"}
@@ -10,148 +10,179 @@ abstract: "This chapter introduces the different survival problems and formalise
 
 {{< include _wip_minor.qmd >}}
 
-The preceding chapters have focused on understanding survival data.
-This final chapter turns to the prediction tasks themselves.
+A machine learning task specifies a mathematical problem to be solved by an algorithm (@sec-ml-tasks).
+Formally, a task is a mapping $f: \calX \rightarrow \calY$ with three components: a description of the input space $\calX$, a description of the target space $\calY$, and a description of the estimation procedure that learns $f$ from data.
+A _survival task_ is a machine learning task in which the target space $\calY_S$ corresponds to a _survival prediction type_ (@sec-surv-tsk-predicts), and the learning algorithm $f_S$ is designed to handle censoring and/or truncation while targeting that prediction type (as in the methods introduced in Part III).
 
-Recall from @sec-ml-tasks that a machine learning task is the specification of a mathematical problem that is solved by a given algorithm.
-A task, $f: \calX \rightarrow \calY$ has three components, a description of the input data $\calX$, a description of the expected output (target) $\calY$, and a description of the estimation function to be learnt $f$.
-The previous two chapters described handling of the input data and Part III will describe the various different algorithms that can be used for $f$.
-This chapter will tackle the final part of the survival task definition, which is describing the codomain $\calY$.
+Throughout this chapter let  $\calX \subseteq \Reals^{n \times p}$ be a set representing the covariate matrix.
+The censoring mechanism does not affect the definition of the prediction types, hence this chapter does not distinguish between right-, left-, or interval-censoring when defining $\calY_S$.
 
-In general there are four common *prediction types* or *prediction problems* which codify different representations of $Y$, these are:  
+## Survival prediction types {#sec-surv-tsk-predicts}
 
-1. Survival distributions;
-2. Relative risks;
-3. Survival times;
-4. Prognostic index.
+Survival prediction types describe the codomain $\calY_S$, four are commonly defined:
 
-In analogy to regression tasks, survival distribution predictions are _probabilistic_ (prediction of probability over time) and survival time predictions are _deterministic_ (single point prediction).
-Relative risk and prognostic index predictions do not directly predict when or if the event of interest will occur, but instead provide different interpretations that relate to the risk of the event compared to others in the same sample.
-The relative risks and time-to-event prediction types can both be derived from a survival distribution prediction, and the prognostic index is often used as an interim step before making a probabilistic prediction (some examples of this in @sec-classical); so all of these prediction types are closely related.
+1. Survival distribution: Probability of the event occurring over time;
+2. Relative risk: A scalar quantity representing the risk of event that is meaningful only in comparison to other individuals in the sample;
+3. Survival time or time-to-event: A point prediction of the time at which the event of interest will occur;
+4. Prognostic index: A risk score usually based on a linear predictor.
 
-Despite their close nature, it is vital to clearly separate which prediction problem you are working with, as they are not directly compatible with one another.
-For example, it is not meaningful to compare a relative risk prediction from one model to a survival distribution prediction of another.
-Moreover, prediction types may look similar but have very different implications, for example if one erroneously interprets a survival time as a relative risk then they could assume an individual has a worse outcome than they do as longer survival times imply lower risk.
+Survival distribution predictions are _probabilistic_ as they return a full distribution over time.
+Survival time predictions are _deterministic_ point predictions in the sense that they return a single scalar value, though uncertainty remains due to underlying variance.
+Relative risk and prognostic index predictions do not directly predict when or if the event of interest will occur, instead they produce scores that can be used to rank or compare an individual's risk to others in the same cohort.
 
-Practically, the complexity of interpreting survival time and prognostic index predictions mean they are not generally used in practice for predictive models.
-Instead, it is more common to use probability distribution predictions when there is a need to estimate the event over time (e.g., "$\tau$-year survival probabilities"), whereas relative risk predictions are more common for resource allocation and risk comparison.
+To distinguish the types of 'risk', it may be helpful to view survival distribution predictions as a form of _absolute risk_ prediction: the output has a direct probabilistic interpretation without requiring comparison to other predictions to be meaningfully understood.
+By contrast, the other prediction types are _relative risk_ predictions: their scale is directly tied to others in the sample and are most (in some cases _only_) interpretable through comparisons.
 
-@fig-survtsk-overview conveys the different information provided by the first three prediction types; as will be seen shortly, the prognostic index is very closely related to relative risk predictions.
-An example of tabular survival data is in the top-left panel, the remaining three show the different predictions that could be made for each of the five observations.
-The top-right panel shows predicted survival times, for each observation this is a single scalar value representing the estimate time the event will take place.
-The bottom-left panel are relative risk predictions, each subject's risk is centered around some baseline observation (one in which all covariates are zero) and the direction and magnitude of their risk scores can be compared.
-Finally, the bottom-right panel shows survival distribution predictions, where each observations survival probability is estimated over time.
+These prediction types are closely related.
+Relative risks and survival time predictions can be derived from a predicted survival distribution, though the reverse does not hold in general as a single survival time or risk score does not uniquely determine a probability distribution.
+Both prognostic index and time-to-event predictions can usually be interpreted as a type of relative risk prediction.
+Under (often strict) assumptions, prediction types can be converted between each other.
+In fact, many algorithms target a single prediction type but internally compute another as an intermediate step, this pattern will appear throughout Part III, for example with the prognostic index being computed in linear models before being transformed into a survival distribution prediction (some algorithmic examples in @sec-classical).
 
-![Illustration of prediction types. Tabular survival data (top-left) can be used to make three distinct prediction types, each conveying different information. Predicted survival times (top-right) provide a single number estimating the time until an event takes place. Predicted relative risk scores (bottom-left) compare the risk of event between subjects within the same sample. Predicted survival distribution (bottom-right) estimate the probability of the event taking place over time.](Figures/survtsk/predict_types.png){#fig-survtsk-overview width=100% fig-alt="Graphical illustration of prediction types. Top-left panel is an example of survival data in a table. Top-right panel is horizontal bars for each subject in the data ranging from 0 to approximately their real survival time. Bottom-left panel is vertical bars ranging from -4 to +8, indicating different risk profiles for each subject. Bottom-right panel is step functions, one for each subject, illustrating individual survival function probabilities decreasing over time."}
+Despite their close connection, it is essential to keep discussion of prediction types distinct as they are not directly comparable.
+For example, it is not meaningful to compare a relative risk score from one model to a survival distribution prediction of another without first transforming the distribution prediction.
+Even within a single prediction type, interpretations can be confused.
+For example, in some literature a larger value of a risk score implies higher risk of event, whereas in other sources, a larger value implies lower risk.
+Distinction of prediction types is also critical for evaluation as each prediction type naturally aligns with different types of metrics, a topic returned to throughout Part II.
 
-Whilst one prediction type is necessary to define a model's output, it is often the case that an algorithm might use another prediction type as an interim prediction, this will be seen throughout Part III.
-Under some assumptions, prediction types can also be converted between each other, this will be discussed in the rest of this chapter.
+In applied predictive modelling, _direct_ survival time prediction is uncommon as time-to-event predictions are difficult to interpret and evaluate under censoring.
+Instead, practitioners often report distribution-derived summaries such as $\tau$-year survival probabilities or the predicted median survival time.
+Similarly, the prognostic index is more commonly used for model interpretation or inference, whereas relative risk predictions are common in applications such as resource allocation and risk stratification.
+Though, as will be seen below, a prognostic index can usually be interpreted as a relative risk.
 
-Throughout this chapter let  $\calX \subseteq \Reals^{n \times p}$ be a set representing covariates.
-Note that the type of censoring in the data is part of the estimation problem and does not affect the prediction types, hence this chapter does not differentiate between right, left, or interval censoring.
-The focus is primarily on the single-event setting, a brief section on other settings is included at the end of the chapter.
+@fig-survtsk-overview illustrates the different information provided by the different prediction types; the prognostic index is omitted as it would visually look the same as the relative risk prediction type.
+An example of tabular survival data is in the top-left panel.
+The top-right panel shows predicted survival times, for each observation this is a single scalar value representing the estimated time the event will take place.
+The bottom-left panel visualizes relative risk predictions, each subject's score is defined relative to a baseline (an individual with covariates set to zero) and scores can be compared in direction and magnitude.
+Finally, the bottom-right panel shows survival distribution predictions, where each observation's survival probability is estimated over time.
 
-## Predicting Distributions {#sec-survtsk-dist}
+![Illustration of prediction types. Tabular survival data (top-left) can be used by an algorithm to make various prediction types, each conveying different information. Survival times (top-right) provide a single number estimating the time until an event takes place. Relative risk scores (bottom-left) compare the risk of event between subjects within the same sample. Survival distributions (bottom-right) estimate the probability of the event taking place over time.](Figures/survtsk/predict_types.png){#fig-survtsk-overview width=100% fig-alt="Graphical illustration of prediction types. Top-left panel is an example of survival data in a table. Top-right panel is horizontal bars for each subject in the data ranging from 0 to approximately their real survival time. Bottom-left panel is vertical bars ranging from -4 to +8, indicating different risk profiles for each subject. Bottom-right panel is step functions, one for each subject, illustrating individual survival function probabilities decreasing over time."}
 
-Predicting a survival distribution means predicting the probability of an individual surviving over time from $0$ to $\infty$.
-Ideally one would make predictions over the continuous $\NNReals$, however, in practice it is more common for predictions to be made over $\Naturals$.
-This is due to the majority of models using discrete non-parametric estimators to create a distribution prediction.
-Distributional prediction can, in theory, target any of the distribution defining functions introduced in @sec-distributions, but predicting $S(t)$ and/or $h(t)$ is most common.
-This is a *probabilistic survival task* as uncertainty is explicit in the prediction.
-Mathematically, the task is defined by $g: \calX \rightarrow \calS$ where $\calS \subseteq \Distr(\NNReals)$ is a set of distributions on $\NNReals$.
-In the competing risks setting this would instead be $g: \calX \rightarrow \calS^q$ when predicting $q$ cause-specific distributions or $g: \calX \rightarrow [0,1]^{q\times q}$ for more general multi-state models.
+## Predicting distributions {#sec-survtsk-dist}
 
-Practically, especially in healthcare, survival distribution predictions are often used to estimate '$\tau$-year survival probabilities', which is the probability of survival at a given point in time.
-Therefore a clinician is not likely to display a survival curve to a patient, but may use their individual features to compute probabilities of survival at key time-points (often, 5, 10 years) -- an example of this in use is the PREDICT breast cancer tool [@Candido2017].
-In other contexts, such as engineering, survival distributions might be used to establish thresholds for replacing components.
-For example, one could use a survival model to estimate the reliability of a plane engine over time, a threshold could be set such that the engine will be replaced when $\hatS(t) < 0.6$.
+Predicting a survival distribution means estimating the probability of an individual experiencing the event of interest from time-point $0$ to $\infty$.
+In principle, such predictions are defined over the continuous $\NNReals$.
+However, in practice it is more common for predictions to be made over the discrete $\Naturals$.
+This reflects the fact that many algorithms rely on discrete, non-parametric estimators or piecewise-constant representations of the underlying distribution prediction.
 
-Predicting $\tau$-year survival probabilities is often confused with a classification problem, which make probabilities for one or more events occurring at a fixed point in time.
-However, a classification model would be unable to use any observations that were censored before the time of interest and discarding these observations would bias any results [@DeRong2025].
+Theoretically, distributional prediction can target any of the distribution defining functions introduced in @sec-distributions, though predicting $S(t)$ or $h(t)$ is most common.
+Mathematically, the survival task associated with the distribution prediction type is defined by $f_S: \calX \rightarrow \calS$, where $\calS \subseteq \Distr(\NNReals)$ denotes a set of distributions on $\NNReals$.
+In the most general multi-state setting, this generalizes to $f_S: \calX \rightarrow [0,1]^{q\times q}$ for $q$ different states, this simplifies to $f_S: \calX \rightarrow \calS^q$ in the competing risks setting.
 
-Another potential source of confusion can arise when trying to figure out what it actually means to predict a distribution that represents a single event occurring for a single observation.
-In reality, something either does or does not happen at a point in time, so what does it really mean to predict a distribution around this event?
-To make this clear, @fig-survtsk-heaviside visualizes what the survival task aims to achieve.
-The top-left image shows the real-world distribution when an event occurs, this is a heaviside function where the survival probability drops immediately from $1$ to $0$ when the event occurs; the top-right image highlights this curve for a single event.
-The bottom-left shows what we aim to achieve, which is a survival curve prediction that accurately captures the average survival distribution across all of these events.
-Finally, the bottom-right curve shows the same events split according to a single, binary covariate with one prediction per covariate value.
-In a machine learning task, this is essentially repeated for every possible combination of covariates.
+In applied settings, communicating a predicted distribution over time is a daunting task for both clinician and patient.
+Instead, distribution predictions are commonly used to derive time-specific survival probabilities, which represent the probability of surviving beyond a relevant time point, for example the probability of being alive ten years after a diagnosis of Huntingdon's disease.
+Predicting '$\tau$-year survival probabilities' is sometimes mistakenly framed as a classification problem, in which a model predicts whether an event will occur by a fixed time.
+This is misleading as traditional classification models cannot incorporate observations censored before the time horizon of interest, and discarding such observations would bias any results [@DeRong2025].
 
-![Comparing theoretical real-world events to survival distribution predictions.](Figures/survtsk/heavisides.png){#fig-survtsk-heaviside width=80% fig-alt="Four graphs with 'survival probability S(t)' on the y-axis and 't' on the x-axis. The top left shows 10 random heaviside functions. The top right shows 1 of these highlighted. The bottom left shows a smooth curve superimposed across all of the same lines. The bottom right shows the same 10 lines but split between red and blue with two smooth curves in the same colors superimposed on top."}
+Survival distributions can also be used for decision making by establishing thresholds on survival probabilities.
+For example, in an engineering context, a survival model might be used to estimate the reliability of a jet engine over time, with a maintenance rule defined such that the engine is serviced once the predicted survival probability falls below a predefined reliability threshold (which could be as high as 0.95).
 
-## Predicting Relative Risks {#sec-survtsk-risk}
+Another source of potential confusion can arise when trying to interpret a survival distribution prediction for an individual in the single-event setting.
+In reality, an event either does or does not occur at a specific time, so it is natural to ask what it means to predict an individual's survival probability distribution.
+@fig-survtsk-heaviside visualizes what the survival distribution prediction aims to achieve.
+The top-left panel shows the idealized 'real-world' survival curves for multiple individuals, each represented by a Heaviside step function that drops from $1$ to $0$ when the individual experiences the event.
+The top-right panel highlights a curve for a single event.
+The bottom-left panel shows the goal of survival distribution predictions: a smooth survival function that captures the average behavior of these individual events across the population.
+Finally, the bottom-right panel shows the same events stratified by a single binary covariate, producing one survival distribution prediction for each subgroup.
+In a machine learning task, this stratification process is generalized by conditioning on the full covariate vector, yielding one predicted survival distribution for each individual.
 
-Predicting relative risks is defined as predicting a continuous rank for an individual's relative risk of experiencing the event.
-Therefore this might also be known as a 'ranking' problem or predicting 'continuous rankings'.
-In machine learning terms, this task is the problem of estimating, $g: \calX \rightarrow \Reals$.
+![Demonstrating the relationship from theoretical real-world event curves to survival distribution predictions.](Figures/survtsk/heavisides.png){#fig-survtsk-heaviside width=80% fig-alt="Four graphs with 'survival probability S(t)' on the y-axis and 't' on the x-axis. The top left shows 10 random heaviside functions. The top right shows 1 of these highlighted. The bottom left shows a smooth curve superimposed across all of the same lines. The bottom right shows the same 10 lines but split between red and blue with two smooth curves in the same colors superimposed on top."}
 
-Interpretation of these rankings is more complex than might be imagined as the meaning differs between models, parametrizations, and even software implementations.
-To be consistent, in this book a larger risk value *always* corresponds to a higher risk of an event and lower values corresponding to lower risk.
+## Predicting relative risks {#sec-survtsk-risk}
 
-A potential confusion that should be avoided is conflating a relative risk prediction with a prediction of absolute risk.
-Relative risks means the risks are only comparable to other observations within the same sample.
-For example, given three subjects, $\{i,j,k\}$, a risk prediction may be $\{0.5, 10, 0.1\}$ respectively.
-From these predictions, two primary types of conclusion can be drawn.
+Predicting relative risk scores refers to estimating a value that ranks individuals in a cohort according to their predicted risk of experiencing the event.
+These scores are meaningful only in comparison to other individuals in the same cohort used to train the model; they cannot be interpreted in isolation, nor can they be compared to scores produced by a different model, except under very strong assumptions.
+The interpretation of these scores can also differ across model classes, parameterizations, and even software implementations.
+For example, some models produce scores where larger values correspond to higher risk, whereas others produce scores where smaller values correspond to higher risk. 
+To avoid ambiguity, throughout this book larger values always correspond to higher risk and smaller values correspond to lower risk.
+In machine learning terms, the relative risks prediction is the problem of estimating $f_S: \calX \rightarrow \Reals$.
 
-1) Conclusions comparing subjects:
+As an example of this prediction type, consider three individuals, $\{i,j,k\}$ with predicted risks $\{0.5, 10, 0.1\}$, respectively.
+From these values, two broad types of conclusion can be drawn.
 
-* The corresponding ranks for $i,j,k$ are $2,3,1$;
-* $k$ is at the least risk and $j$ is at the highest risk;
-* The risk of $i$ is slightly higher than that of $k$ but $j$'s risk is considerably higher than both the others.
+1. Conclusions comparing individuals
 
-2) Conclusions comparing risk groups:
+* The corresponding ranks for $\{i,j,k\}$ are $\{2,3,1\}$.
+* $k$ has the lowest risk and $j$ the highest risk.
+* The risk of $i$ is slightly higher than that of $k$, whereas $j$'s risk is substantially higher than both.
 
-* Thresholding risks at $0.4$ means $k$ is at a low-risk but $i$ and $j$ are high-risk.
-* Thresholding risks at $1.0$ means $i$ and $k$ are low-risk but $j$ is high-risk.
+2. Conclusions comparing risk groups:
 
-Whilst many important conclusions can be drawn from these predictions, the values themselves have no meaning when not compared to other individuals.
-Similarly, the values have no meanings across research, even if observation $k$ is at low-risk according to this sample, it may be high risk compared to another.
-Finally, as with relative risks in other domains, differences in relative risk should be interpreted with care.
-In the example above, $j$'s relative risk is 100 times that of $k$, but if $k$'s overall probability of experiencing the event is $0.0001$, then $j$'s overall probability of experiencing the event is still only $0.01$.
+* Thresholding at $0.4$ classifies $k$ as low-risk and $i$ and $j$ as high-risk.
+* Thresholding at $1.0$ classifies $i$ and $k$ as low-risk and $j$ as high-risk.
 
-Estimation and interpretation of risks in the competing risks setting follows analogously.
-Though one must be cautious whether predicting and interpreting risks for each of the $q$ causes, $g: \calX \rightarrow \Reals^q$, or a single all-cause risk.
-Risks can be derived directly or using one of the transformation methods listed below.
-For multi-state models, predictions of risks is not clearly defined.
+As in other domains, differences in relative risks should always be interpreted cautiously.
+In the example above, $j$'s relative risk is 100 times that of $k$; however, if $k$'s absolute probability of experiencing the event is $0.0001$, then $j$'s absolute probability remains small at $0.01$.
+
+Estimation and interpretation of risks in the competing risks settings follows similar principles.
+Though, one must take care to clearly identify if the task of interest is to predict risks for each of the $q$ causes, $f_S: \calX \rightarrow \Reals^q$, or a single all-cause risk.
+In multi-state models, the notion of a single scalar 'risk' is less clearly defined and any risk-based summaries derived from survival probabilities should be interpreted with caution.
 
 ### Distributions and risks
 
-In general it is not possible to easily convert a risk prediction to a distribution.
-However, this may be possible if the risk prediction corresponds to a particular model form.
-This is discussed further in @sec-survtsk-PI.
-
-More common is transformation from a distribution to a risk.
-Theoretically the simplest way to do so would be to take the mean or median of the distribution, however as will be discussed in detail in @sec-survtsk-time this is practically difficult.
-Instead, a stable approach is to use the 'ensemble' or 'expected mortality' to create a measure of risk [@Ishwaran2008].
-The expected mortality is defined by
+In general it is not possible to uniquely recover a survival distribution from a relative risk score, except in very specific cases (discussed in @sec-survtsk-PI).
+The reverse direction, deriving a risk score from a predicted survival distribution, is more common.
+One stable approach to compute a risk score is by calculating the 'ensemble mortality' or 'expected mortality' [@Ishwaran2008].
+The expected mortality for an individual $i$ is defined as
 
 $$
-\sum_t -\log(\hatS_i(t)) = \sum_t \hatH_i(t)
+\sum_{\tau \in \calT} -\log(\hatS_i(\tau)) = \sum_{\tau \in \calT} \hatH_i(\tau),
 $$
 
-and is closely related to the calibration measure defined in @sec-alpha.
-This represents the expected number of events for individuals with similar characteristics to $i$.
-This is a measure of risk as a larger value indicates that among individuals with a similar profile, there is expected to be a larger number of events and therefore have greater risk than those with smaller ensemble mortality.
-For example, say for an individual, $i$, we have: $(t, \hatS_i(t)) = (0, 1), (1, 0.8), (2, 0.4), (3, 0.15)$ then, $(t, \hatH_i(t)) = (0, 0), (1, 0.10), (2, 0.40), (3, 0.82)$, then their relative risk prediction is $\sum_t \hatH_i(t) = 0 + 0.10 + 0.4 + 0.82 = 1.32$.
+where $\hatS_i$ is the predicted survival function, $\hatH_i$ is the corresponding cumulative hazard, and $\calT$ is the set of observed time points.
+This quantity represents the expected number of events among individuals with similar covariate profiles to $i$.
+A larger value therefore indicates that $i$ has a higher risk profile, hence being a suitable quantity to represent a relative risk score.
+As a concrete example, consider two individuals, $i$ and $j$, with predicted survival probabilities at times $\calT = \{0,1,2,3\}$:
 
-## Predicting Survival Times {#sec-survtsk-time}
+$$
+\begin{aligned}
+&(\tau, \hatS_i(\tau)) = (0, 1), (1, 0.8), (2, 0.4), (3, 0.15), \\
+&(\tau, \hatS_j(\tau)) = (0, 1), (1, 0.6), (2, 0.4), (3, 0.35).
+\end{aligned}
+$$
 
-Predicting a time-to-event is the problem of estimating when an individual will experience an event.
-Mathematically, the problem is the task of estimating $g: \calX \rightarrow \PReals$, that is, predicting a single value over $[0,\infty]$.
+From these values alone, it is not immediately obvious which individual would be considered at higher risk.
+The corresponding cumulative hazards are
 
-For practical purposes, the expected time-to-event would be the ideal prediction type as it is easy to interpret and communicate.
-However, evaluation of these predictions is tricky and generally ill-advised.
-Take the following example.
-Say someone is censored at $\tau=5$, there is no way to know if they would have experienced the event at $\tau=6$ or $\tau=600$, all that can be known is that the model correctly identified they did not experience the event before $\tau=6$.
-Furthermore, if the model had predicted $\tau=3$, metrics such as mean absolute error would be misleading, as an MAE of $5 - 3 = 2$ would make the model seem artificially better than it was, if the event actually occurred at $\tau=600$.
-Therefore, when an observation is censored, the best one can do is evaluate a classification task: did the model predict that the event did not occur before the censoring time?
-As this is not the task of interest, one is left to evaluate uncensored observations only, which can introduce bias to the evaluation.
-Given this complexity, the time-to-event point prediction is rare in practice.
+$$
+\begin{aligned}
+&(\tau, \hatH_i(\tau)) = (0, 0), (1, 0.10), (2, 0.40), (3, 0.82), \\
+&(\tau, \hatH_j(\tau)) = (0, 0), (1, 0.22), (2, 0.40), (3, 0.46).
+\end{aligned}
+$$
 
-In the competing risks setting, 'survival time' is ill-defined as it is ambiguous whether this refers to the time until a specific event or until any event takes place.
-For multi-state models, there is no single notion of a 'survival time'
-One could estimate the sojourn time, the expected time spent in a given state, using the estimated transition probabilities.
-This is particularly well-defined in Markov or semi-Markov models, where sojourn times follow from standard stochastic process theory.
+Using the ensemble mortality approach, this yields relative risk scores of 
+
+$$
+\begin{aligned}
+&\sum_{\tau \in \calT} \hatH_i(\tau) = 0 + 0.10 + 0.40 + 0.82 = 1.32, \\
+&\sum_{\tau \in \calT} \hatH_j(\tau) = 0 + 0.22 + 0.40 + 0.46 = 1.08.
+\end{aligned}
+$$
+
+Under this method, individual $i$ is considered to be at 1.2 times higher risk than individual $j$.
+
+## Predicting survival times {#sec-survtsk-time}
+
+Predicting a survival time refers to estimating when an individual will experience the event of interest.
+Mathematically, this corresponds to estimating $f_S: \calX \rightarrow \PReals$, that is, predicting a single non-negative value on $[0,\infty]$.
+
+From a practical perspective, the expected time-to-event may appears to be an attractive prediction type as it initially appears simple to interpret and communicate.
+However, evaluating survival time point predictions is challenging and generally ill-advised.
+To illustrate this, consider an individual censored at time $t=5$.
+There is no way to know if the event would have occurred at $\tau=6$ or $\tau=600$; all that is known is that the event did not occur before $t=5$.
+As a result, it is impossible to assess how close a time prediction is to the true, unobserved event time.
+
+Even when a prediction is clearly incorrect, its degree of error cannot be quantified.
+For the same individual censored at $t=5$, suppose a model predicts a survival time of $\hat{t} = 3$.
+This prediction is clearly wrong as the event did not occur before $t=5$.
+However, the prediction might only be slightly wrong if the true event time were $\tau=6$, or extremely wrong if the true event time were $\tau=600$.
+Consequently, any evaluation of survival time point predictions is misleading.
+As such, this book recommends either directly predicting survival times and treating them as a special case of relative risk prediction, or directly predicting and evaluating a survival distribution and then deriving time-oriented summaries.
+
+In the competing risks setting, 'survival time' is even mre ill-defined as it is ambiguous whether this refers to the time until a specific event or until any event takes place.
+For multi-state models, there is no single notion of a 'survival time', instead one could estimate the sojourn time, the expected time spent in a given state, using the estimated transition probabilities.
+Sojourn times are particularly well-defined in Markov or semi-Markov models, where sojourn times follow from standard stochastic process theory.
 These derivations are beyond the scope of this book; for further detail, see for example [@Ibe2013].
 
 ### Times and risks
@@ -216,7 +247,7 @@ The actual choice of $\tau$ varies by the use-case.
 
 ![Illustrating the RMST at the final observed time-point. The RMST is the area under the survival curve up to the point of interest. The red vertical line represents the final observed time-point, the survival curve (blue) after that point is unknown.](Figures/survtsk/rmst.png){#fig-survtsk-rmst width=80% fig-alt="Graph with 'survival probability S(t)' on the y-axis and 'Time' on the x-axis. A vertical red-line at x=100 represents the cut-off point. The area under the curve before the cut-off point is highlighted in blue, representing the RMST(100)."}
 
-## Prognostic Index Predictions {#sec-survtsk-PI}
+## Prognostic index predictions {#sec-survtsk-PI}
 
 In medical terminology (often used in survival analysis), a prognostic index is a tool that predicts outcomes based on risk factors.
 Given covariates, $\XX \in \Reals^{n \times p}$, and coefficients, $\bsbeta \in \Reals^p$, the *linear predictor* is defined as $\bseta := \XX\bsbeta$.
@@ -249,8 +280,8 @@ The precise manner in which these components are combined is algorithm-specific 
 To give a concrete illustration in this section, one class of model known as proportional hazards models, construct survival predictions as
 
 $$
-S(\tau|\xx) = S_0(\tau)^{\exp(\eta)}
-$$,
+S(\tau|\xx) = S_0(\tau)^{\exp(\eta)},
+$$
 
 where $S_0(\tau)$ is known as the baseline survival function, and $\eta$ is the prognostic index.
 
@@ -283,9 +314,10 @@ where $S_0(\tau)$ is known as the baseline survival function, and $\eta$ is the 
 
 ## Further reading
 
-* @Sonabend2022 and @Haider2020 discuss methods methods to transforming survival distribution predictions to relative risk and survival time predictions;
-* For deeper discussion of the restricted mean survival time, see @Uno2014, @Han2022, and @Royston2011;
-* For more dynamic survival tasks that update predictions over time see @VanHouwelingen2007;
-* For more academic discussion about different ways to transform linear predictors to survival distributions and their relationships, see @Kalbfleisch1980.
+* @Sonabend2022 and @Haider2020 discuss methods methods to transforming survival distribution predictions to relative risk and survival time predictions.
+* For deeper discussion of the restricted mean survival time, see @Uno2014, @Han2022, and @Royston2011.
+* @VanHouwelingen2007 provides a comprehensive overview of dynamic survival tasks that update predictions over time.
+* See @Kalbfleisch1980 for more academic discussion about different ways to transform linear predictors to survival distributions and their relationships.
+* See @Candido2017 for a real-world example of how survival distribution predictions can be computed in a healthcare setting.
 
 ::::
