@@ -2,14 +2,34 @@ remotes::install_github("mlr-org/mlr3proba", ref = 'v0.5.7', upgrade = "never")
 remotes::install_github("mlr-org/mlr3", ref = 'v0.16.1', upgrade = "never")
 remotes::install_github("mlr-org/paradox", ref = 'v0.11.1', upgrade = "never")
 
-library(ggplot2)
+rm(list = ls())
+library(tidyverse)
 theme_set(theme_bw())
-
 library(distr6)
-library(ggplot2)
+library(mlr3)
+library(mlr3proba)
+library(mlr3pipelines)
+library(mlr3extralearners)
+library(survival)
+library(patchwork)
+library(survminer)
+library(party)
+library(pammtools)
+library(extraDistr)
+library(mvna)
+library(etm)
+library(cmprsk)
+library(mstate) #prothr dataset
+library(ggpubr)
+library(pseudo)
+library(mgcv)
+library(broom)
+
+## Intro - distributions
 g = dstr("Gompertz", shape = 2, decorators = "ExoticStatistics")
 t = seq.int(0, 1.5, length.out = 100)
-d = data.frame(t = t, fun = factor(rep(c("Density", "Hazard", "Cumulative Density", "Survival"), each = 100), levels = c("Density", "Hazard", "Cumulative Density", "Survival")), y = c(g$pdf(t), g$hazard(t), g$cdf(t), g$survival(t)))
+functions <- c("Probability density function, y=f(t)", "Cumulative distribution function, y=F(t)", "Hazard function, y=h(t)", "Survival function, y=S(t)")
+d = data.frame(t = t, fun = factor(rep(functions, each = 100), levels = functions), y = c(g$pdf(t), g$hazard(t), g$cdf(t), g$survival(t)))
 g = ggplot(d, aes(x = t, y = y, color = fun)) +
   geom_line() +
   facet_wrap(~fun, scales = "free", nrow = 2) +
@@ -19,11 +39,6 @@ ggsave("book/Figures/introduction/gompertz.png", g, height = 3, units = "in",
   dpi = 600)
 
 ## Ranking
-rm(list = ls())
-library(dplyr)
-library(mlr3)
-library(mlr3proba)
-
 s_t = tsk("whas")
 time = s_t$unique_times()
 c_t = s_t$data() %>% mutate(status = 1 - status) %>% as_task_surv(event = "status")
@@ -63,12 +78,7 @@ set.seed(20231207)
 round(resample(s_t, lrn("surv.coxph"), rsmp("cv", folds = 3))$aggregate(m), 2)
 
 ## Calibration
-rm(list = ls())
-library(mlr3proba)
-library(mlr3pipelines)
-library(mlr3extralearners)
-library(ggplot2)
-library(dplyr)
+
 set.seed(20231211)
 t = tgen("simsurv")$generate(400)
 s = partition(t)
@@ -119,7 +129,7 @@ ggsave("book/Figures/evaluation/calibD.png", g, height = 3, units = "in",
   dpi = 600)
 
 ## Decision trees
-rm(list = ls())
+
 set.seed(20241104)
 
 data <- read.csv("book/experiments/cars.csv")[, -1]
@@ -152,12 +162,7 @@ rattle::fancyRpartPlot(fit, caption = "")
 dev.off()
 
 # Log-rank test
-rm(list = ls())
 set.seed(20241125)
-library(survival)
-library(ggplot2)
-library(patchwork)
-library(survminer)
 sf0 <- survfit(Surv(time, status) ~ 1, lung)
 p0 <- ggplot(rbind(data.frame(x=sf0$time, y=sf0$surv), data.frame(x=0,y=1)), aes(x=x,y=y))+geom_step()
 
@@ -192,19 +197,16 @@ ggsave("book/Figures/forests/logrank.png", g, height = 6, units = "in",
 
 
 # Random forest plot
-rm(list = ls())
+
 set.seed(20241109)
-library(survival)
-library(party)
 fit <- party::ctree(Surv(time, status) ~ ., lung)
 png("book/Figures/forests/lung.png", height = 400, width = 600)
 plot(fit)
 dev.off()
 
 ## bootstrapped rsfs
-rm(list = ls())
-library(ggplot2)
-library(patchwork)
+
+
 
 x = 0:13
 y1 = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.8, 0.1, 0.1)
@@ -240,7 +242,7 @@ ggsave("book/Figures/forests/bootstrap.png", g, height = 6, units = "in",
   dpi = 600)
 
 ## Kaplan Meier
-library(survival)
+
 data("tumor", package = "pammtools")
 tumor <- cbind(id = seq_len(nrow(tumor)), tumor)
 tumor_duplicated = tumor |>
@@ -318,7 +320,7 @@ p_km_infants_lt = ggplot(bkm_infants_lt, aes(x = time, y = estimate)) +
   ylim(c(0, 1)) +
   ylab("S(t)") +
   xlab("time")
-library(patchwork)
+
 
 p_km_infants_joined = p_km_infants + p_km_infants_lt + plot_layout(guides =  "collect")
 ggsave("book/Figures/survival/km-infants.png", p_km_infants_joined, height=3, width=7, units="in", dpi=600)
@@ -333,17 +335,14 @@ inf_sub |> knitr::kable()
 
 # Chapter 13 - Traditional models
 set.seed(2029)
-library(survival)
-library(mlr3proba)
+
+
 t <- tsk("rats")$filter(sample(tsk("rats")$nrow, 5))
 t$kaplan()$surv
 knitr::kable(t$data()[, c(3,4,5,1,2)],align = "l")
 
 # PH vs AFT
 set.seed(290125)
-library(survival)
-library(distr6)
-library(ggplot2)
 t = seq(0.1, 2.5, by = 0.02)
 
 hweib = function(shape, scale, eta, t, form) {
@@ -442,7 +441,6 @@ ggsave("book/Figures/classical/compare.png", g, height = 4, units = "in",
   dpi = 600)
 
 ## Humans vs dogs
-library(extraDistr)
 age = seq.int(1, 100, 1)
 surv = pgompertz(age, 0.00005, 0.09, FALSE)
 ph_surv = surv^5
@@ -457,8 +455,8 @@ ggsave("book/Figures/classical/dogs.png", g, height = 4, units = "in",
 
 
 ## KM for testing
-library(survival)
-library(patchwork)
+
+
 fit = survfit(Surv(rats$time, rats$status) ~ 1)
 fit$time[1:4]
 fit$surv
@@ -482,9 +480,6 @@ ggsave("book/Figures/classical/km_test.png", g3, height = 6.5, units = "in",
 
 
 ## competing risks
-library(mvna)
-library(etm)
-library(cmprsk)
 set.seed(241206)
 ### table
 data(sir.adm, package = "mvna")
@@ -599,8 +594,6 @@ ggsave("book/Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, 
 
 
 ### multi-state example
-
-library(mstate) #prothr dataset
 data(prothr, package = "mstate")
 prothr |>
   filter(id %in% c(1, 8, 46)) |>
@@ -665,8 +658,8 @@ ggsave("Figures/survival/multi-state-prothr.png",
 
 
 ## Survival task viz
-library(dplyr)
-library(patchwork)
+
+
 set.seed(20250822)
 
 sex <- rbinom(10, 1, 0.5)
@@ -694,19 +687,76 @@ g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S
 ggsave("book/Figures/survtsk/heavisides.png",
   g_final, height=5, width=7, units="in", dpi=600)
 
+## Survival prediction types
+set.seed(1)
 
-## ipcw reduction example 
+n <- 5
+dat <- data.frame(
+  id    = 1:n,
+  age   = round(rnorm(n, mean = 62, sd = 10)),
+  sex   = sample(0:1, n, replace = TRUE),
+  trt   = sample(0:1, n, replace = TRUE),
+  x    = round(rnorm(n), 2),
+  time  = round(runif(n, pmax(0, 3 + rnorm(n, sd = 3)), 15 + rnorm(n, sd = 3))),
+  event = rbinom(n, 1, prob = 0.65)
+)
+# data plot
+row_cols <- scales::hue_pal()(n)
+p_table <- ggtexttable(
+  dat,
+  rows = NULL,
+  theme = ttheme(
+    base_size = 9,
+    base_colour = "black",
+    padding = unit(c(2, 2), "mm"),
+    tbody.style = tbody_style(
+      fill = rep(row_cols, ncol(dat)),  # repeat each row color across columns
+      col = "black"
+    )
+  )
+)
+
+# survival time 'predictions'
+times = dat$time + rnorm(n, 0, 2)
+p_bars = ggplot(data.frame(y=factor(dat$id), x=times)) +
+  geom_col(aes(x,y,fill=y), width = 0.7, alpha = 0.9) +
+  labs(
+    title = "Predicted survival times",
+    x = "Time",
+    y = "Subject"
+  ) + theme(legend.position = "none")
+
+# relative risk 'predictions'
+risks = as.numeric(scale(-times + rnorm(n, 0, 2), TRUE, FALSE))
+p_risks <- ggplot(data.frame(x = factor(dat$id), y = risks)) +
+  geom_bar(aes(x=x, y=y, fill = x), stat='identity', position=position_dodge(width = 0)) +
+  labs(
+    title = "Predicted relative risk scores",
+    x = "Subject",
+    y = "Relative risk"
+  ) + theme(legend.position = "none")
+
+# -----------------------------
+# Plot D (bottom-right): survival curves by treatment
+# -----------------------------
+p_curves <- data.frame(Subject = factor(1:n), x = rep(0:20, each = n), y = punif(rep(0:20, each=n), 3 + rnorm(n, 3), 15 + rnorm(n, 3), FALSE)) %>%
+  ggplot(aes(x = x, y = y, group = Subject, color = Subject)) +
+  ylim(0, 1) + xlim(5, 20) +
+  geom_step(lwd = 1) +
+  labs(
+    title = "Predicted distributions",
+    x = "Time",
+    y = "Survival probability"
+  ) + theme(legend.position = "none")
 
 
+g <- ((p_table | p_bars) /
+  (p_risks | p_curves)) 
+
+ggsave("book/Figures/survtsk/predict_types.png",
+  g, height=5, width=7, units="in", dpi=600)
 
 ######################## pseudo-values ########################################
-library(survival)
-library(pseudo)
-library(ggplot2)
-theme_set(theme_bw())
-library(dplyr)
-library(patchwork)
-library(mgcv)
 data("tumor", package = "pammtools")
 tumor_comp = tumor |> select(days, status, complications)
 tau = c(1000, 2000, 3000)
@@ -816,12 +866,6 @@ p_km_complications
 ggsave("book/Figures/survival/pseudo-complications-lm.png", p_km_complications, height=3, units="in", dpi=600)
 
 ### restricted mean survival time
-library(survival)
-library(pseudo)
-library(ggplot2)
-theme_set(theme_bw())
-library(dplyr)
-library(patchwork)
 data("tumor", package = "pammtools")
 tumor_comp = tumor |> select(days, status, complications)
 tau = c(1000, 2000, 3000)
@@ -947,12 +991,10 @@ ggsave("book/Figures/reductions/pseudo-rmst-complications-lm.png", p_rmst_compli
 
 
 ## Discrete time model example
-rm(list = ls())
-library(survival)
-library(ggplot2)
-theme_set(theme_bw())
-library(dplyr)
-library(pammtools)
+
+
+
+
 data("tumor", package = "pammtools")
 tumor_comp = tumor |> select(days, status, complications)
 
@@ -1119,13 +1161,6 @@ ggsave("book/Figures/reductions/discrete-time-complications-glm-interaction.png"
 
 
 ## Piecewise Exponential Model (PEM) example
-rm(list = ls())
-library(survival)
-library(ggplot2)
-theme_set(theme_bw())
-library(dplyr)
-library(broom)
-library(pammtools)
 data("tumor", package = "pammtools")
 tumor_comp = tumor |> select(days, status, complications)
 
@@ -1227,12 +1262,10 @@ ggsave("book/Figures/reductions/pem-complications-interaction.png", p_pem,
 
 
 ## Comparison: Pooled Logistic Regression vs Nelson-Aalen increments
-rm(list = ls())
-library(survival)
-library(ggplot2)
-theme_set(theme_bw())
-library(dplyr)
-library(pammtools)
+
+
+
+
 data("tumor", package = "pammtools")
 tumor_comp = tumor |> select(days, status, complications)
 
@@ -1328,13 +1361,6 @@ cat("\nFigure saved to book/Figures/reductions/pooled-logistic-vs-na.png\n")
 
 
 ## PEM interval comparison figure
-rm(list = ls())
-library(survival)
-library(ggplot2)
-theme_set(theme_bw())
-library(dplyr)
-library(pammtools)
-library(patchwork)
 
 # Set seed for reproducibility
 set.seed(20250115)
@@ -1494,6 +1520,35 @@ ggsave("book/Figures/reductions/pem-interval-comparison.png", p_pem_comparison,
 
 cat("\nFigure saved to book/Figures/reductions/pem-interval-comparison.png\n")
 
+## Survtsk chapter RMST comparison
+yi = c(1,0.8,0.75,0.75,0.7,rep(0.6, 5))
+yj = c(1,0.9,0.85,0.6,0.5,rep(0, 5))
+df <- data.frame(x = rep(0:9,2), y = c(yi, yj), Patient=rep(c("i", "j"), each = 10))
 
+plot_rmst <- function(df, patient) {
+  filtered_df <- df %>%
+    filter(Patient == patient, x <= 5)
+  rect_df <-  filtered_df %>%
+    arrange(x) %>%
+    mutate(xmin = x, xmax = lead(x), ymin = 0, ymax = y) %>%
+    filter(!is.na(xmax))
 
+  ggplot(df, aes(x = x, y = y, group = Patient)) +
+    geom_step(aes(linetype = Patient), lwd = 1) +
+    geom_rect(
+      data = rect_df,
+      aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
+      alpha = 0.3,
+      inherit.aes = FALSE) +
+    annotate("text", x = 2, y = 0.4,
+      label = as.expression(bquote(RMST[.(patient)] * "(" * 5 * ")" == .(round(sum(filtered_df$y), 2)))),
+      parse = TRUE) +
+    labs(x = "Time", y = "Survival probability", title = paste0("RMST(5) for patient ", patient))    
+}
 
+p1 <- plot_rmst(df, "i")
+p2 <- plot_rmst(df, "j")
+p_rmst_survtsk <- (p1 + p2) + plot_layout(guides = "collect")
+
+ggsave("book/Figures/survtsk/rmst.png", p_rmst_survtsk,
+       height = 4, width = 9, units = "in", dpi = 600)
