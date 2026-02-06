@@ -5,6 +5,19 @@ remotes::install_github("mlr-org/paradox", ref = 'v0.11.1', upgrade = "never")
 library(ggplot2)
 theme_set(theme_bw())
 
+library(distr6)
+library(ggplot2)
+g = dstr("Gompertz", shape = 2, decorators = "ExoticStatistics")
+t = seq.int(0, 1.5, length.out = 100)
+d = data.frame(t = t, fun = factor(rep(c("Density", "Hazard", "Cumulative Density", "Survival"), each = 100), levels = c("Density", "Hazard", "Cumulative Density", "Survival")), y = c(g$pdf(t), g$hazard(t), g$cdf(t), g$survival(t)))
+g = ggplot(d, aes(x = t, y = y, color = fun)) +
+  geom_line() +
+  facet_wrap(~fun, scales = "free", nrow = 2) +
+  theme_bw() +
+  theme(legend.position = "n")
+ggsave("book/Figures/introduction/gompertz.png", g, height = 3, units = "in",
+  dpi = 600)
+
 ## Ranking
 rm(list = ls())
 library(dplyr)
@@ -318,13 +331,13 @@ inf_sub = infants |>
 
 inf_sub |> knitr::kable()
 
-# Chapter 13 - Classical models
+# Chapter 13 - Traditional models
 set.seed(2029)
 library(survival)
 library(mlr3proba)
 t <- tsk("rats")$filter(sample(tsk("rats")$nrow, 5))
 t$kaplan()$surv
-kable::knitr(t$data()[, c(3,4,5,1,2)],align = "l")
+knitr::kable(t$data()[, c(3,4,5,1,2)],align = "l")
 
 # PH vs AFT
 set.seed(290125)
@@ -429,12 +442,11 @@ ggsave("book/Figures/classical/compare.png", g, height = 4, units = "in",
   dpi = 600)
 
 ## Humans vs dogs
+library(extraDistr)
 age = seq.int(1, 100, 1)
-d = dstr("Gompertz", scale = 0.00005, shape = 0.09, decorators = "ExoticStatistics")
-plot(d, "survival")
-surv = round(d$survival(x), 2)
+surv = pgompertz(age, 0.00005, 0.09, FALSE)
 ph_surv = surv^5
-aft_surv = round(d$survival(x * 5), 2)
+aft_surv = round(pgompertz(age*5, 0.00005, 0.09, FALSE), 2)
 df = data.frame(age, survival = c(surv, ph_surv, aft_surv), Species = rep(c("Human", "Dog (PH)", "Dog (AFT)"), each = 100))
 
 g <- ggplot(df, aes(x = age, y = survival, group = Species, color = Species)) + geom_line() + xlim(0, 80) + labs(x = "T", y = "S(T)") +
@@ -442,6 +454,32 @@ g <- ggplot(df, aes(x = age, y = survival, group = Species, color = Species)) + 
 
 ggsave("book/Figures/classical/dogs.png", g, height = 4, units = "in",
   dpi = 600)
+
+
+## KM for testing
+library(survival)
+library(patchwork)
+fit = survfit(Surv(rats$time, rats$status) ~ 1)
+fit$time[1:4]
+fit$surv
+fit$time
+g = ggplot(data.frame(x = fit$time,y = fit$surv), aes(x = x, y =y)) +
+  geom_step() + labs(x = "t", y = "S(t)") +
+  scale_x_continuous(expand = c(0, 0))
+
+g1 = g +
+  geom_vline(xintercept = fit$time[5:7], lty = 2, alpha = 1, color = 3, lwd = 1) +
+  geom_vline(xintercept = fit$time[9:10], lty = 3, alpha = 1,color = 4,lwd=1)
+
+g2 = g +
+  geom_segment(x = 60, y = 0, yend = fit$surv[12], color = 2, lwd = 1, arrow = arrow()) +
+  geom_segment(x = 23, xend = fit$time[12], y = fit$surv[12], color = 2, lwd = 1, arrow = arrow(ends = "first")) 
+
+g3 = g1 / g2  
+
+ggsave("book/Figures/classical/km_test.png", g3, height = 6.5, units = "in",
+  dpi = 600)
+
 
 ## competing risks
 library(mvna)
@@ -509,12 +547,12 @@ p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
   geom_vline(xintercept = 120, lty = 3) +
   # geom_step(data=km_sir_b, aes(col = pneumonia), lty = 2) +
   labs(
-    y = expression(P(Y <= tau~ "," ~ E == e))
+    y = expression(P(Y <= tau~ "," ~ E(Y) == e))
   ) +
   coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
 
 
-ggsave("Figures/survival/cif-sir.png", p_sir_cifs,
+ggsave("book/Figures/survival/cif-sir.png", p_sir_cifs,
   height=3, width=6, dpi=300)
 
 
@@ -551,12 +589,12 @@ p_cens_vs_cr = ggplot(
     coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
     geom_vline(xintercept = 120, lty = 3) +
     labs(
-      y = expression(P(Y <= tau)),
+      y = expression(P(Y <= tau~ "," ~ E(Y) == 2)),
       linetype = "assumption"
     )
 
 
-ggsave("Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
+ggsave("book/Figures/survival/cens-vs-cr.png", p_cens_vs_cr, height=3, width=6, dpi=300)
 
 
 
@@ -624,4 +662,838 @@ p_trans_prob_prothr = ggplot(overall_df, aes(x = time, y = trans_prob)) +
 
 ggsave("Figures/survival/multi-state-prothr.png",
   p_trans_prob_prothr, width=5, height=5.2)
+
+
+## Survival task viz
+library(dplyr)
+library(patchwork)
+set.seed(20250822)
+
+sex <- rbinom(10, 1, 0.5)
+x_base <- ceiling(runif(10, ifelse(sex == 1, 20, 1), ifelse(sex == 1, 50, 30)))
+x <- unlist(lapply(x_base, function(val) c(0, val, 50)))
+
+df <- data.frame(x = x, y = c(1, 0, 0), group = as.factor(rep(1:10, each = 3)), sex = rep(as.factor(sex), each  = 3)) %>%
+  mutate(alpha = if_else(group == 10, 1, 0.1))
+
+(df %>% group_by(sex) %>% summarise(x = mean(x)))
+
+g <- ggplot(df, aes(x = x, y = y, group = group))
+g1 <- g + geom_step(linewidth = 1.3, color = "gray")
+g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity()
+g3 <- g1 + geom_smooth(aes(x = x, y = y), data.frame(x = c(0, mean(df$x), 50), y = c(1, 0, 0)),
+    inherit.aes = FALSE, method = "loess", se = FALSE, color = "black", linewidth = 1)
+g4 <- g +
+  geom_step(aes(color = sex), linewidth = 1.3, alpha = 0.5) +
+  geom_smooth(aes(x = x, y = y, group = sex, color = sex),
+  data.frame(x = c(0, 23.3, 50, 0, 40, 50), y = c(1, 0, 0, 1, 0, 0), sex = as.factor(c(1, 1, 1, 0, 0, 0))),
+    inherit.aes = FALSE, method = "loess", se = FALSE, linewidth = 1.5)
+
+g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S(t)") & guides(color  = "none")
+
+ggsave("book/Figures/survtsk/heavisides.png",
+  g_final, height=5, width=7, units="in", dpi=600)
+
+
+## ipcw reduction example 
+
+
+
+######################## pseudo-values ########################################
+library(survival)
+library(pseudo)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(patchwork)
+library(mgcv)
+data("tumor", package = "pammtools")
+tumor_comp = tumor |> select(days, status, complications)
+tau = c(1000, 2000, 3000)
+
+## Pseudo-value calculation table for illustration
+# Calculate pseudo-values for time point 1000 for first 4 subjects
+tau_table = 1000
+n = nrow(tumor)
+
+# Calculate overall KM at time tau
+km_all = survfit(Surv(days, status) ~ 1, data = tumor)
+km_all_tau = summary(km_all, times = tau_table, extend = TRUE)$surv[1]
+if (is.na(km_all_tau)) {
+  # If tau is beyond last time, use last survival value
+  km_all_tau = tail(km_all$surv, 1)
+}
+
+# Select 4 subjects for illustration
+subjects = 1:4
+results_table = data.frame(
+  Subject = integer(),
+  Days = integer(),
+  Status = integer(),
+  KM_Overall = numeric(),
+  KM_Minus_i = numeric(),
+  Pseudo_Value = numeric()
+)
+
+for (i in subjects) {
+  # Calculate KM without subject i
+  tumor_minus_i = tumor[-i, ]
+  km_minus_i = survfit(Surv(days, status) ~ 1, data = tumor_minus_i)
+  km_minus_i_tau = summary(km_minus_i, times = tau_table, extend = TRUE)$surv[1]
+  if (is.na(km_minus_i_tau)) {
+    km_minus_i_tau = tail(km_minus_i$surv, 1)
+  }
+  
+  # Calculate pseudo-value: θ_i(τ) = n*S_KM(τ) - (n-1)*S_KM^{-i}(τ)
+  pseudo = n * km_all_tau - (n - 1) * km_minus_i_tau
+  
+  results_table = rbind(results_table, data.frame(
+    Subject = i,
+    Days = tumor$days[i],
+    Status = tumor$status[i],
+    KM_Overall = round(km_all_tau, 4),
+    KM_Minus_i = round(km_minus_i_tau, 4),
+    Pseudo_Value = round(pseudo, 4)
+  ))
+}
+
+results_table = results_table |> cbind(tumor[1:4, c("age", "complications")])
+
+knitr::kable(results_table, format = "markdown")
+
+
+
+### survival probability
+
+
+pseudo_dfs = purrr::map_dfr(tau, function(.x) {
+  pseudo_mat = pseudosurv(time = tumor$days, event = tumor$status, tmax = .x)
+  cbind(tumor_comp, data.frame(pseudo = pseudo_mat$pseudo, time = pseudo_mat$time, age = tumor$age))
+}) |> mutate(time = factor(time))
+
+ndf = pammtools::make_newdata(pseudo_dfs, complications = unique(complications), time = unique(time))
+lm <- lm(formula = pseudo~complications*time, data = pseudo_dfs)
+summary(lm)
+
+## Additive GAM: pseudo ~ complications + s(age) at each time point; store models in a list
+gam_models = purrr::map(tau, function(.x) {
+  d = pseudo_dfs |> filter(as.character(time) == as.character(.x))
+  gam(pseudo ~ complications + age, data = d)
+})
+names(gam_models) = paste0("tau_", tau)
+
+## Table of age and complications coefficients from GAMs at each time point
+coef_age_table = purrr::map_dfr(seq_along(tau), function(i) {
+  pt = summary(gam_models[[i]])$p.table
+  data.frame(
+    tau = tau[i],
+    age = pt["age", "Estimate"],
+    complications = pt["complicationsyes", "Estimate"]
+  )
+})
+knitr::kable(coef_age_table, format = "markdown", digits = 4,
+             col.names = c("τ (days)", "age", "complications"))
+
+ndf$estimate = predict(lm, newdata = ndf)
+ndf <- ndf |> 
+  mutate(model = "pseudo-values (LM)") |> 
+  mutate(time = as.numeric(as.character(time)))
+
+# stratified KM wrt complications
+km_complications = survfit(Surv(days, status)~complications, data = tumor)
+bkm_complications = broom::tidy(km_complications) |> 
+  mutate(model = "KM")
+
+
+p_km_complications = ggplot(bkm_complications, aes(x = time, y = estimate)) +
+  geom_step(aes(col = strata)) +
+  geom_vline(xintercept = tau, lty = 3) +
+  ylim(c(0, 1)) +
+  ylab("S(t)") +
+  xlab("time") + 
+  geom_point(data = ndf, pch=19, size = 2)
+p_km_complications
+ggsave("book/Figures/survival/pseudo-complications-lm.png", p_km_complications, height=3, units="in", dpi=600)
+
+### restricted mean survival time
+library(survival)
+library(pseudo)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(patchwork)
+data("tumor", package = "pammtools")
+tumor_comp = tumor |> select(days, status, complications)
+tau = c(1000, 2000, 3000)
+
+
+rmst_dfs = purrr::map_dfr(tau, function(.x) {
+  rmst = pseudomean(time = tumor$days, event = tumor$status, tmax = .x)
+  cbind(tumor_comp, data.frame(pseudo = rmst, time = .x))
+}) |> mutate(time = factor(time))
+
+ndf = pammtools::make_newdata(rmst_dfs, complications = unique(complications), time = unique(time))
+lm <- lm(formula = pseudo~complications*time, data = rmst_dfs)
+summary(lm)
+
+ndf$estimate = predict(lm, newdata = ndf)
+ndf <- ndf |> 
+  mutate(model = "pseudo-values (LM)") |> 
+  mutate(time = as.numeric(as.character(time)))
+
+tumor$pseudo = dplyr::filter(rmst_dfs, time == 1000)$pseudo
+lm1000 = lm(pseudo ~ complications + age, data = tumor)
+summary(lm1000)
+
+# Get KM fits for each group and prepare data for plotting
+km_complications = survfit(Surv(days, status)~complications, data = tumor)
+bkm_complications = broom::tidy(km_complications) |>
+  mutate(complications = gsub("complications=", "", strata))
+
+# Use single tau for RMST visualization
+tau_rmst = 1000
+
+# Calculate RMST for each group at tau_rmst
+calculate_rmst_at_tau = function(km_fit, tau) {
+  times = km_fit$time[km_fit$time <= tau]
+  surv = km_fit$surv[km_fit$time <= tau]
+  
+  # Add time 0 if needed
+  if (length(times) == 0 || times[1] > 0) {
+    times = c(0, times)
+    surv = c(1, surv)
+  }
+  
+  # Add tau if beyond last time point
+  if (max(times) < tau) {
+    times = c(times, tau)
+    surv = c(surv, tail(surv, 1))
+  }
+  
+  # Calculate RMST using trapezoidal rule
+  rmst = 0
+  for (i in 2:length(times)) {
+    width = times[i] - times[i-1]
+    avg_height = (surv[i] + surv[i-1]) / 2
+    rmst = rmst + width * avg_height
+  }
+  
+  return(rmst)
+}
+
+# Get KM fits for each group separately
+km_no = survfit(Surv(days, status)~1, data = tumor |> filter(complications == "no"))
+km_yes = survfit(Surv(days, status)~1, data = tumor |> filter(complications == "yes"))
+
+rmst_no = calculate_rmst_at_tau(km_no, tau_rmst)
+rmst_yes = calculate_rmst_at_tau(km_yes, tau_rmst)
+
+# Prepare data for ribbon (shaded area up to tau_rmst)
+bkm_for_ribbon = bkm_complications |>
+  filter(time <= tau_rmst) |>
+  group_by(complications) |>
+  arrange(time) |>
+  group_modify(~ {
+    df = .x
+    # Add time 0 if not present
+    if (min(df$time) > 0) {
+      df = bind_rows(data.frame(time = 0, estimate = 1), df)
+    }
+    # Add tau_rmst if needed
+    if (max(df$time) < tau_rmst) {
+      df = bind_rows(df, data.frame(time = tau_rmst, estimate = tail(df$estimate, 1)))
+    }
+    df
+  }) |>
+  ungroup()
+
+# Create annotation data for RMST values
+rmst_annotations = data.frame(
+  complications = c("no", "yes"),
+  rmst_value = c(rmst_no, rmst_yes),
+  x = tau_rmst / 2,
+  y = 0.25
+) |>
+  mutate(
+    label = paste0("RMST [", round(rmst_value, 1), "d]")
+  )
+
+# Create plot with facets
+p_rmst_complications = ggplot(bkm_complications, aes(x = time, y = estimate)) +
+  # Shade area under curves (RMST) - up to tau_rmst
+  geom_ribbon(data = bkm_for_ribbon, 
+              aes(x = time, ymin = 0, ymax = estimate, fill = complications),
+              alpha = 0.3, inherit.aes = FALSE) +
+  # Survival curves
+  geom_step(aes(color = complications), linewidth = 1.3) +
+  # Vertical line at tau_rmst
+  geom_vline(xintercept = tau_rmst, lty = 2, alpha = 0.7, linewidth = 0.8) +
+  # RMST annotation
+  geom_text(data = rmst_annotations, 
+            aes(x = x, y = y, label = label),
+            inherit.aes = FALSE, size = 3.5, fontface = "bold") +
+  facet_wrap(~ complications, 
+             labeller = labeller(complications = c("no" = "No Complications", "yes" = "Complications"))) +
+  ylab("S(t)") +
+  xlab("time (days)") +
+  labs(color = "Complications", fill = "Complications") +
+  ylim(c(0, 1)) +
+  xlim(c(0, max(bkm_complications$time))) +
+  theme(legend.position = "none",
+        strip.text = element_text(size = 11, face = "bold"))
+
+# p_rmst_complications
+ggsave("book/Figures/reductions/pseudo-rmst-complications-lm.png", p_rmst_complications, height=6, width=12, units="in", dpi=600)
+
+
+## Discrete time model example
+rm(list = ls())
+library(survival)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(pammtools)
+data("tumor", package = "pammtools")
+tumor_comp = tumor |> select(days, status, complications)
+
+# Create 100 equidistant cut points
+max_time = max(tumor_comp$days)
+cut_points = seq(0, max_time, length.out = 101)  # 101 points create 100 intervals
+J = length(cut_points) - 1
+
+# Transform data to long format using pammtools
+ped_data = as_ped(
+  data = tumor_comp,
+  formula = Surv(days, status) ~ complications,
+  cut = cut_points[-1],  # pammtools expects cut points without 0
+  id = "id"
+) |>
+  mutate(interval = factor(interval))  # Convert interval to factor for separate baseline hazards
+
+# For discrete time, we use ped_status as the outcome (event indicator in each interval)
+# Rename for clarity in discrete time context
+transformed_data = ped_data |>
+  rename(delta_ij = ped_status)
+
+# Fit logistic regression model
+glm_fit = glm(delta_ij ~ interval + complications, 
+              family = binomial(), 
+              data = transformed_data)
+
+# Create new data for predictions using distinct combinations from ped_data
+# This is equivalent to make_newdata for creating prediction grids
+pred_data = ped_data |>
+  distinct(interval, complications, .keep_all = TRUE) |>
+  select(interval, complications, tend)
+
+# Add hazard predictions on response scale manually
+pred_data$hazard = predict(glm_fit, newdata = pred_data, type = "response")
+
+# Calculate survival probabilities from discrete hazards
+# S(j) = prod_{k=1}^j (1 - h(k))
+surv_data = pred_data |>
+  arrange(complications, interval) |>
+  group_by(complications) |>
+  mutate(
+    survival = cumprod(1 - hazard),
+    time = tend  # Use tend from ped_data structure
+  ) |>
+  ungroup() |>
+  select(complications, time, survival) |>
+  mutate(model = "Discrete Time (GLM)")
+
+# Add time 0 with survival = 1 and ensure proper ordering
+surv_data = bind_rows(
+  data.frame(
+    complications = rep(unique(tumor_comp$complications), each = 1),
+    time = 0,
+    survival = 1,
+    model = "Discrete Time (GLM)"
+  ),
+  surv_data
+) |>
+  arrange(complications, time)
+
+# Get KM estimates for comparison
+km_complications = survfit(Surv(days, status) ~ complications, data = tumor_comp)
+bkm_complications = broom::tidy(km_complications) |>
+  mutate(
+    complications = gsub("complications=", "", strata),
+    model = "Kaplan-Meier"
+  ) |>
+  select(complications, time, estimate, model) |>
+  rename(survival = estimate)
+
+# Combine data for plotting
+plot_data = bind_rows(
+  surv_data,
+  bkm_complications
+)
+
+# Create plot - use color for model, linetype for complications
+p_discrete_time = ggplot(plot_data, aes(x = time, y = survival, color = model, linetype = complications)) +
+  geom_step(data = filter(plot_data, model == "Kaplan-Meier"), linewidth = 1.2) +
+  geom_line(data = filter(plot_data, model == "Discrete Time (GLM)"), linewidth = 1.2) +
+  ylab("S(t)") +
+  xlab("time (days)") +
+  ylim(c(0, 1)) +
+  scale_color_manual(
+    values = c("Kaplan-Meier" = "black", "Discrete Time (GLM)" = "steelblue"),
+    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Discrete Time (GLM)" = "Discrete Time (GLM)")
+  ) +
+  scale_linetype_manual(
+    values = c("no" = "solid", "yes" = "dashed"),
+    labels = c("no" = "No Complications", "yes" = "Complications")
+  ) +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(title = "Model"), linetype = guide_legend(title = "Complications"))
+
+ggsave("book/Figures/reductions/discrete-time-complications-glm.png", p_discrete_time, 
+       height=4, width=8, units="in", dpi=600)
+
+
+# Fit logistic regression model with interaction to allow separate baseline hazards for each group
+glm_fit_interaction = glm(delta_ij ~ interval * complications, 
+                          family = binomial(), 
+                          data = transformed_data)
+
+# Create new data for predictions using distinct combinations from ped_data
+# This is equivalent to make_newdata for creating prediction grids
+pred_data_interaction = ped_data |>
+  distinct(interval, complications, .keep_all = TRUE) |>
+  select(interval, complications, tend)
+
+# Add hazard predictions on response scale manually
+pred_data_interaction$hazard = predict(glm_fit_interaction, newdata = pred_data_interaction, type = "response")
+
+# Calculate survival probabilities from discrete hazards
+surv_data_interaction = pred_data_interaction |>
+  arrange(complications, interval) |>
+  group_by(complications) |>
+  mutate(
+    survival = cumprod(1 - hazard),
+    time = tend  # Use tend from ped_data structure
+  ) |>
+  ungroup() |>
+  select(complications, time, survival) |>
+  mutate(model = "Discrete Time (GLM, Interaction)")
+
+# Add time 0 with survival = 1 and ensure proper ordering
+surv_data_interaction = bind_rows(
+  data.frame(
+    complications = rep(unique(tumor_comp$complications), each = 1),
+    time = 0,
+    survival = 1,
+    model = "Discrete Time (GLM, Interaction)"
+  ),
+  surv_data_interaction
+) |>
+  arrange(complications, time)
+
+# Combine data for plotting
+plot_data_interaction = bind_rows(
+  surv_data_interaction,
+  bkm_complications
+)
+
+# Create plot - use color for model, linetype for complications
+p_discrete_time_interaction = ggplot(plot_data_interaction, aes(x = time, y = survival, color = model, linetype = complications)) +
+  geom_step(data = filter(plot_data_interaction, model == "Kaplan-Meier"), linewidth = 1.2) +
+  geom_line(data = filter(plot_data_interaction, model == "Discrete Time (GLM, Interaction)"), linewidth = 1.2) +
+  ylab("S(t)") +
+  xlab("time (days)") +
+  ylim(c(0, 1)) +
+  scale_color_manual(
+    values = c("Kaplan-Meier" = "black", "Discrete Time (GLM, Interaction)" = "steelblue"),
+    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Discrete Time (GLM, Interaction)" = "Discrete Time (GLM)")
+  ) +
+  scale_linetype_manual(
+    values = c("no" = "solid", "yes" = "dashed"),
+    labels = c("no" = "No Complications", "yes" = "Complications")
+  ) +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(title = "Model"), linetype = guide_legend(title = "Complications"))
+
+ggsave("book/Figures/reductions/discrete-time-complications-glm-interaction.png", p_discrete_time_interaction, 
+       height=4, width=8, units="in", dpi=600)
+
+
+## Piecewise Exponential Model (PEM) example
+rm(list = ls())
+library(survival)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(broom)
+library(pammtools)
+data("tumor", package = "pammtools")
+tumor_comp = tumor |> select(days, status, complications)
+
+# Create 100 equidistant cut points
+max_time = max(tumor_comp$days)
+cut_points = seq(0, max_time, length.out = 101)  # 101 points create 100 intervals
+J = length(cut_points) - 1
+
+# Transform data to piecewise exponential data format using pammtools
+ped_data = as_ped(
+  data = tumor_comp,
+  formula = Surv(days, status) ~ complications,
+  cut = cut_points[-1],  # pammtools expects cut points without 0
+  id = "id"
+) |>
+  mutate(interval = factor(interval))  # Convert interval to factor
+
+# Fit Poisson regression model with interaction
+# The offset is automatically included by pammtools
+pem_fit = glm(
+  ped_status ~ interval * complications + offset(offset),
+  family = poisson(),
+  data = ped_data
+)
+
+# Get predicted hazards for each interval and complication group
+pred_data_pem = ped_data |>
+  distinct(interval, complications, .keep_all = TRUE) |>
+  select(interval, complications, tstart, tend, offset)
+
+# Predict expected number of events (which is hazard * time at risk)
+pred_data_pem$expected_events = predict(pem_fit, newdata = pred_data_pem, type = "response")
+# Convert to hazard rate: hazard = expected_events / time_at_risk
+pred_data_pem$hazard = pred_data_pem$expected_events / exp(pred_data_pem$offset)
+
+# Calculate survival probabilities from piecewise constant hazards
+# S(t) = exp(-integral of hazard from 0 to t)
+surv_data_pem = pred_data_pem |>
+  arrange(complications, interval) |>
+  group_by(complications) |>
+  mutate(
+    # Cumulative hazard up to end of each interval
+    cumhaz = cumsum(hazard * (tend - tstart)),
+    survival = exp(-cumhaz),
+    time = tend
+  ) |>
+  ungroup() |>
+  select(complications, time, survival) |>
+  mutate(model = "Piecewise Exponential (PEM)")
+
+# Add time 0 with survival = 1
+surv_data_pem = bind_rows(
+  data.frame(
+    complications = rep(unique(tumor_comp$complications), each = 1),
+    time = 0,
+    survival = 1,
+    model = "Piecewise Exponential (PEM)"
+  ),
+  surv_data_pem
+) |>
+  arrange(complications, time)
+
+# Get KM estimates for comparison
+km_complications = survfit(Surv(days, status) ~ complications, data = tumor_comp)
+bkm_complications = broom::tidy(km_complications) |>
+  mutate(
+    complications = gsub("complications=", "", strata),
+    model = "Kaplan-Meier"
+  ) |>
+  select(complications, time, estimate, model) |>
+  rename(survival = estimate)
+
+# Combine data for plotting
+plot_data_pem = bind_rows(
+  surv_data_pem,
+  bkm_complications
+)
+
+# Create plot - use color for model, linetype for complications
+p_pem = ggplot(plot_data_pem, aes(x = time, y = survival, color = model, linetype = complications)) +
+  geom_step(data = filter(plot_data_pem, model == "Kaplan-Meier"), linewidth = 1.2) +
+  geom_line(data = filter(plot_data_pem, model == "Piecewise Exponential (PEM)"), linewidth = 1.2) +
+  ylab("S(t)") +
+  xlab("time (days)") +
+  ylim(c(0, 1)) +
+  scale_color_manual(
+    values = c("Kaplan-Meier" = "black", "Piecewise Exponential (PEM)" = "steelblue"),
+    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Piecewise Exponential (PEM)" = "Piecewise Exponential (PEM)")
+  ) +
+  scale_linetype_manual(
+    values = c("no" = "solid", "yes" = "dashed"),
+    labels = c("no" = "No Complications", "yes" = "Complications")
+  ) +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(title = "Model"), linetype = guide_legend(title = "Complications"))
+
+ggsave("book/Figures/reductions/pem-complications-interaction.png", p_pem, 
+       height=4, width=8, units="in", dpi=600)
+
+
+## Comparison: Pooled Logistic Regression vs Nelson-Aalen increments
+rm(list = ls())
+library(survival)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(pammtools)
+data("tumor", package = "pammtools")
+tumor_comp = tumor |> select(days, status, complications)
+
+# Get unique event times (only where events occurred)
+unique_event_times = sort(unique(tumor_comp$days[tumor_comp$status == 1]))
+
+# Create stacked data using intervals at unique event times
+# This creates one row per subject per interval up to their event/censoring time
+ped_data_na = as_ped(
+  data = tumor_comp,
+  formula = Surv(days, status) ~ 1,  # No covariates
+  cut = unique_event_times,  # Use unique event times as cut points
+  id = "id"
+) |>
+  mutate(interval = factor(interval)) |> 
+  group_by(id) |>
+  mutate(time = cumsum(exp(offset))) |> 
+  filter(time >= tend) |> # <- this needed in order to achieve stacked survival data set
+  ungroup()
+
+# Fit pooled logistic regression without covariates
+# This estimates the discrete hazard at each event time
+glm_na = glm(
+  ped_status ~ interval - 1,  # -1 removes intercept, estimates separate hazard for each interval
+  family = binomial(),
+  data = ped_data_na
+)
+
+# Get predicted hazards at each event time
+pred_na = ped_data_na |>
+  distinct(interval, .keep_all = TRUE) |>
+  select(interval, tend)
+
+pred_na$hazard_glm = predict(glm_na, newdata = pred_na, type = "response")
+
+# Calculate Nelson-Aalen increments manually
+# h^d(t_k) = d_{t_k} / n_{t_k}
+na_increments = data.frame(
+  time = unique_event_times,
+  hazard_na = NA_real_
+)
+
+for (i in seq_along(unique_event_times)) {
+  t_k = unique_event_times[i]
+  # Number at risk at time t_k
+  n_k = sum(tumor_comp$days >= t_k)
+  # Number of events at time t_k
+  d_k = sum(tumor_comp$days == t_k & tumor_comp$status == 1)
+  # Nelson-Aalen increment
+  na_increments$hazard_na[i] = d_k / n_k
+}
+
+# Match times and compare
+comparison = pred_na |>
+  mutate(time = tend) |>
+  select(time, hazard_glm) |>
+  inner_join(na_increments, by = "time") |>
+  arrange(time)
+
+# Print comparison
+cat("Comparison of Pooled Logistic Regression vs Nelson-Aalen increments:\n")
+cat("========================================\n")
+print(comparison)
+
+# Calculate differences
+comparison = comparison |>
+  mutate(difference = hazard_glm - hazard_na,
+         relative_diff = (hazard_glm - hazard_na) / hazard_na * 100)
+
+cat("\nSummary statistics:\n")
+cat("Mean absolute difference:", mean(abs(comparison$difference)), "\n")
+cat("Max absolute difference:", max(abs(comparison$difference)), "\n")
+cat("Mean relative difference (%):", mean(abs(comparison$relative_diff)), "\n")
+
+# Create comparison plot
+p_comparison = ggplot(comparison, aes(x = time, y = hazard_glm)) +
+  geom_point(aes(color = "Pooled Logistic"), size = 2, alpha = 0.7) +
+  geom_point(aes(y = hazard_na, color = "Nelson-Aalen"), size = 2, alpha = 0.7) +
+  geom_line(aes(y = hazard_glm, color = "Pooled Logistic"), alpha = 0.5) +
+  geom_line(aes(y = hazard_na, color = "Nelson-Aalen"), alpha = 0.5) +
+  ylab("Discrete hazard h^d(t)") +
+  xlab("time (days)") +
+  scale_color_manual(
+    values = c("Pooled Logistic" = "steelblue", "Nelson-Aalen" = "black"),
+    name = "Method"
+  ) +
+  theme(legend.position = "bottom")
+
+ggsave("book/Figures/reductions/pooled-logistic-vs-na.png", p_comparison, 
+       height=4, width=8, units="in", dpi=600)
+
+cat("\nFigure saved to book/Figures/reductions/pooled-logistic-vs-na.png\n")
+
+
+## PEM interval comparison figure
+rm(list = ls())
+library(survival)
+library(ggplot2)
+theme_set(theme_bw())
+library(dplyr)
+library(pammtools)
+library(patchwork)
+
+# Set seed for reproducibility
+set.seed(20250115)
+
+# Generate true hazard function (Weibull hazard with increasing shape)
+# h(t) = (shape/scale) * (t/scale)^(shape-1)
+shape = 2.5
+scale = 1000
+max_time = 3000
+t_true = seq(0, max_time, length.out = 1000)
+h_true = (shape/scale) * (t_true/scale)^(shape-1)
+h_true[1] = 0  # Set h(0) = 0
+
+# Simulate survival data from Weibull distribution
+n = 500
+# Generate event times from Weibull
+event_times = rweibull(n, shape = shape, scale = scale)
+# Generate censoring times (uniform)
+censor_times = runif(n, min = max_time * 0.5, max = max_time * 1.5)
+# Observed times and status
+obs_times = pmin(event_times, censor_times)
+status = as.numeric(event_times <= censor_times)
+
+# Create data frame
+sim_data = data.frame(
+  id = 1:n,
+  time = obs_times,
+  status = status
+)
+
+# Configuration 1: Few intervals with equidistant boundaries
+J_few = 10
+cut_points_few_eq = seq(0, max_time, length.out = J_few + 1)
+
+# Configuration 2: Many intervals with equidistant boundaries
+J_many = 50
+cut_points_many_eq = seq(0, max_time, length.out = J_many + 1)
+
+# Configuration 3: Few intervals with data-driven boundaries (quantiles of event times)
+J_few = 10
+event_times_only = obs_times[status == 1]
+if (length(event_times_only) > 0) {
+  quantiles = quantile(event_times_only, probs = seq(0, 1, length.out = J_few + 1))
+  quantiles[1] = 0
+  quantiles[length(quantiles)] = max_time
+  cut_points_few_data = unique(sort(quantiles))
+} else {
+  cut_points_few_data = seq(0, max_time, length.out = J_few + 1)
+}
+
+# Configuration 4: Many intervals with data-driven boundaries
+J_many = 50
+if (length(event_times_only) > 0) {
+  quantiles = quantile(event_times_only, probs = seq(0, 1, length.out = J_many + 1))
+  quantiles[1] = 0
+  quantiles[length(quantiles)] = max_time
+  cut_points_many_data = unique(sort(quantiles))
+} else {
+  cut_points_many_data = seq(0, max_time, length.out = J_many + 1)
+}
+
+# Function to fit PEM and extract hazard estimates
+fit_pem_hazard = function(data, cut_points, label) {
+  # Transform data
+  ped_data = as_ped(
+    data = data,
+    formula = Surv(time, status) ~ 1,
+    cut = cut_points[-1],
+    id = "id"
+  ) |>
+    mutate(interval = factor(interval))
+  
+  # Fit Poisson regression
+  pem_fit = glm(
+    ped_status ~ interval - 1 + offset(offset),
+    family = poisson(),
+    data = ped_data
+  )
+  
+  # Get predicted hazards
+  pred_data = ped_data |>
+    distinct(interval, .keep_all = TRUE) |>
+    select(interval, tstart, tend, offset)
+  
+  # Predict expected number of events
+  pred_data$expected_events = predict(pem_fit, newdata = pred_data, type = "response")
+  # Convert to hazard rate
+  pred_data$hazard = pred_data$expected_events / exp(pred_data$offset)
+  
+  # Create data frame with time and hazard
+  result = data.frame(
+    time = pred_data$tend,
+    hazard = pred_data$hazard,
+    config = label
+  )
+  
+  # Add time 0
+  result = rbind(
+    data.frame(time = 0, hazard = result$hazard[1], config = label),
+    result
+  )
+  
+  return(result)
+}
+
+# Fit all configurations
+haz_few_eq = fit_pem_hazard(sim_data, cut_points_few_eq, "Few intervals, equidistant")
+haz_many_eq = fit_pem_hazard(sim_data, cut_points_many_eq, "Many intervals, equidistant")
+haz_few_data = fit_pem_hazard(sim_data, cut_points_few_data, "Few intervals, data-driven")
+haz_many_data = fit_pem_hazard(sim_data, cut_points_many_data, "Many intervals, data-driven")
+
+# Create true hazard data frame (to overlay on all panels)
+true_haz_df = data.frame(
+  time = t_true,
+  hazard = h_true
+)
+
+# Combine all PEM estimates
+pem_data = bind_rows(
+  haz_few_eq,
+  haz_many_eq,
+  haz_few_data,
+  haz_many_data
+)
+
+# Create plot with facets
+p_pem_comparison = ggplot(pem_data, aes(x = time, y = hazard)) +
+  # True hazard (overlay on all panels)
+  geom_line(data = true_haz_df, 
+            linewidth = 1.2, color = "black", alpha = 0.7) +
+  # PEM estimates
+  geom_step(aes(color = config), linewidth = 0.8, alpha = 0.8) +
+  facet_wrap(~ config, nrow = 2, ncol = 2,
+             labeller = labeller(config = c(
+               "Few intervals, equidistant" = "(a) Few intervals, equidistant",
+               "Many intervals, equidistant" = "(b) Many intervals, equidistant",
+               "Few intervals, data-driven" = "(c) Few intervals, data-driven",
+               "Many intervals, data-driven" = "(d) Many intervals, data-driven"
+             ))) +
+  ylab("h(t)") +
+  xlab("time") +
+  scale_color_manual(
+    values = c(
+      "Few intervals, equidistant" = "steelblue",
+      "Many intervals, equidistant" = "darkgreen",
+      "Few intervals, data-driven" = "orange",
+      "Many intervals, data-driven" = "purple"
+    ),
+    name = "Configuration"
+  ) +
+  theme(legend.position = "bottom",
+        strip.text = element_text(size = 10)) +
+  xlim(c(0, max_time))
+
+ggsave("book/Figures/reductions/pem-interval-comparison.png", p_pem_comparison,
+       height = 6, width = 12, units = "in", dpi = 600)
+
+cat("\nFigure saved to book/Figures/reductions/pem-interval-comparison.png\n")
+
+
+
 

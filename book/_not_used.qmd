@@ -64,3 +64,172 @@ However, the resulting dependency between multiple data points from one subject 
 
 The distribution of event recurrences per subject is often right-skewed in real data sets, which implies that there are only few events past event number $e^*$.
 In practice, therefore, the data is often summarized such that we have event numbers $e = 1,\ldots, e^*_+$, where $e^*_+$ represents category "$e^*$ or higher".
+
+## transition probabilities
+
+Increasing the number of intervals to infinity or equivalently, reducing the interval size to infinitesimally small intervals $du$ where only one transition can be observed, leads to a product integral over the instantaneous transition probabilities $p_{\ell e}(u)$ (@eq-ms-instantaneous-trans-prob), such that
+<!--  -->
+$$
+\begin{aligned}
+\mathbf{P}(\zeta, \tau) & = \lim_{\du \rightarrow 0}\prod_{u \in (\zeta, \tau]}
+  \begin{pmatrix}
+    p_{00}(u) & \cdots & p_{0q}(u)\\
+    \vdots                  & \ddots & \vdots\\
+    p_{q0}(u)  & \cdots & p_{qq}(u)\\
+  \end{pmatrix}
+\end{aligned}
+$$ {#eq-ms-prodint}
+<!--  -->
+
+
+
+## parametric cause-specific CR
+
+
+<!-- FIXME: the below is a bit weird here, because it applies to any parametric model, not only PH -->
+Instead of using the Cox model, one could theoretically assume a parametric form for the baseline hazard and create a fully-parametric cause-specific model, where again the likelihood is calculated for each independent cause separately:
+
+$$
+\calL(\bstheta_e) = \prod^n_{i=1} h_e(t_i|\xx_i, \bstheta_e)^{\delta_{i;e}} S_e(t_i|\xx_i, \bstheta_e)
+$$
+
+where $\delta_{i;e}$ is the event indicator for cause $e$.
+Note that here $S_e(t_i|\xx_i, \bstheta_e) = \exp(-H_e(t_i|\xx_i, \bstheta_e))$ is the survival for event $e$, not the all-cause survival, and thus assumes that events from other causes are treated as censored.
+Once $\bstheta_e$ is estimated, for each cause, the hazard functions $h_e(\tau|\xx, \bstheta_e)$ are immediately available from the definition of the assumed distribution (for example the Weibull distribution) and estimates of the all-cause survival probability and CIF could be once again obtained using the relationships given in @sec-competing-risks.
+
+In practice, this parametric approach doesn't appear to be common, partly because in many applications assuming the same distribution for all causes may not be realistic and data-driven selection of different distributions for different causes would induce additional complexity.
+
+
+
+<!-- FIXME: add back in into partiotion based reduction chapter -->
+
+
+
+As mentioned before, the choice of interval boundaries $\mathcal{A}$ is important in context of partition based reductions. 
+This choice is also closely related to the choice of model class used for estimation (as will be illustrated below).
+
+A general trade-off is between the flexibility and the robustness of the interval-specific hazard estimates. 
+Larger number of intervals $J$ leads to more flexible hazard estimation but also potentially to small intervals with only few observations or events. 
+This can lead to large differences in hazard estimates between neighboring intervals (which is implausible in many use cases) and sensitivity to the placement of interval boundaries $\mathcal{A}$.
+This is illustrated in Figure @fig-pem-interval-comparison.
+
+![Comparison of piecewise exponential model (PEM) hazard estimation with different numbers of intervals $J$ and different placements of interval boundaries $\mathcal{A}$. The figure shows the true underlying hazard function (solid black line) together with PEM estimates using different configurations: (a) few intervals with equidistant boundaries, (b) many intervals with equidistant boundaries, (c) few intervals with data-driven boundaries, and (d) many intervals with data-driven boundaries. This illustrates the trade-off between flexibility and robustness, as well as the sensitivity to the choice of interval boundaries.](Figures/reductions/pem-interval-comparison.png){#fig-pem-interval-comparison fig-alt="Comparison of PEM hazard estimates with different interval configurations against the true underlying hazard function." width=100%}
+
+Therefore, the number and placement of interval boundaries can be viewed as a hyperparameter in the estimation process. 
+However the search space quickly becomes large, expensive to explore and doesn't necessarily solve the problem of large differences in neighboring (discrete) baseline hazards. 
+
+A more prorgrammatic approach is to use a sufficiently large number of intervals in order to allow enough flexibility and then use some form of regularization that smooths the baseline hazard estimates. Examples ... and ... present examples of such approaches. 
+
+
+### Example: Penalized spline regression {#sec-pam}
+
+... show estimtion of PAM and compare to PEM for different number of intervals. Mention big GAM methods by wood, runtime, ...
+
+mention limitation: baseline hazard is assumed to be smooth over entire follow-up. will oversmooth if there are break points. 
+
+
+
+
+
+### Example: Gradient boosted trees
+
+Recall from section @sec-surv-ml-models-boost-regr the definition of boosting. Such models can be used to estimate the GAM model from @sec-pam using univariate GAM models as base learners (reference mboost and friends XXX). However, we can also use trees as base learners, which is often preferred, especially in combination with the popular XGBoost implementation (@cheng2016xgboost).
+(Cite Bender 2021 XXX)
+
+Once again, the variable representing time $t_j$ is included as numeric variable in the model. A split w.r.t. to $t_j$ implies a change in the hazard rate before and after the split. Interactions between other features and $t_j$ are also learned automatically and allow time-varying effects and non-proportional hazards. 
+
+To apply gradient boosting to the piecewise exponential model, we need to specify the loss function and derive the corresponding gradients (pseudo-residuals) for the Poisson regression model with offset.
+
+Recall from @eq-pem-model that the model specification is
+$$\log(\mathbb{E}[\Delta_{ij}]) = \log(h_{ij}) + \log(t_{ij}) = g(\xx_i, t_j) + \log(t_{ij}),$$
+where $g(\xx_i, t_j)$ is the function to be learned and $\log(t_{ij})$ is the offset term.
+
+The negative log-likelihood for the Poisson model with offset is given by
+$$\begin{aligned}
+L(\delta_{ij}, g(\xx_i, t_j)) 
+& = -\log P(\Delta_{ij} = \delta_{ij})\\
+& = -\left[\delta_{ij}\log(\mu_{ij}) - \mu_{ij} - \log(\delta_{ij}!)\right]\\
+& = -\left[\delta_{ij}(\log(h_{ij}) + \log(t_{ij})) - h_{ij}t_{ij} - \log(\delta_{ij}!)\right]\\
+& = -\left[\delta_{ij}g(\xx_i, t_j) + \delta_{ij}\log(t_{ij}) - \exp(g(\xx_i, t_j))t_{ij} - \log(\delta_{ij}!)\right],
+\end{aligned}$$
+where $\mu_{ij} = \exp(g(\xx_i, t_j) + \log(t_{ij})) = \exp(g(\xx_i, t_j))t_{ij}$ is the expected number of events and the term $\log(\delta_{ij}!)$ is constant with respect to the parameters and can be ignored for optimization purposes.
+
+The gradient of the loss with respect to $g(\xx_i, t_j)$ is
+$$\frac{\partial L(\delta_{ij}, g(\xx_i, t_j))}{\partial g(\xx_i, t_j)} = -\delta_{ij} + \exp(g(\xx_i, t_j))t_{ij} = -\delta_{ij} + \mu_{ij}.$$
+
+Therefore, the negative gradient (pseudo-residual) at iteration $m$ for observation $(i,j)$ is
+$$r_{ijm} = -\frac{\partial L(\delta_{ij}, g_{m-1}(\xx_i, t_j))}{\partial g_{m-1}(\xx_i, t_j)} = \delta_{ij} - \exp(g_{m-1}(\xx_i, t_j))t_{ij} = \delta_{ij} - \hat{\mu}_{ij}^{(m-1)},$${#eq-poisson-pseudo-residual}
+where $g_{m-1}(\xx_i, t_j)$ is the current estimate of the log-hazard from the previous $m-1$ iterations and $\hat{\mu}_{ij}^{(m-1)} = \exp(g_{m-1}(\xx_i, t_j))t_{ij}$ is the predicted expected number of events.
+
+The pseudo-residual @eq-poisson-pseudo-residual represents the difference between the observed event indicator $\delta_{ij}$ and the predicted expected number of events $\hat{\mu}_{ij}^{(m-1)}$, which is the natural residual for Poisson regression.
+
+**Initial guess:** The initial guess $g_0(\xx_i, t_j)$ is typically set to a constant value. A common choice is to set $g_0(\xx_i, t_j) = \log(\bar{h})$, where $\bar{h}$ is the overall average hazard rate, estimated as
+$$\bar{h} = \frac{\sum_{i=1}^n \sum_{j=1}^{J_i} \delta_{ij}}{\sum_{i=1}^n \sum_{j=1}^{J_i} t_{ij}},$$
+which is the total number of events divided by the total time at risk. Alternatively, one can simply initialize $g_0(\xx_i, t_j) = 0$ for all observations, which corresponds to an initial hazard rate of $h_0 = 1$.
+
+**Update step:** At each iteration $m$, a regression tree $h_m$ is fitted to the pseudo-residuals $r_{ijm}$ using the features $(\xx_i, t_j)$ as predictors. The tree partitions the feature space and assigns a constant value to each leaf node. The model is then updated as
+$$g_m(\xx_i, t_j) = g_{m-1}(\xx_i, t_j) + \nu h_m(\xx_i, t_j),$${#eq-poisson-boost-update}
+where $\nu \in (0,1]$ is the shrinkage parameter (learning rate) that controls the step size of each update.
+
+The complete gradient boosting algorithm for Poisson regression with offset using tree base learners is given in Algorithm @alg-poisson-boost.
+
+**Algorithm:** Gradient Boosting for Poisson Regression with Offset {#alg-poisson-boost}
+
+1. **Initialize:** Set $g_0(\xx_i, t_j) = \log(\bar{h})$ for all $(i,j)$, where $\bar{h} = \frac{\sum_{i,j} \delta_{ij}}{\sum_{i,j} t_{ij}}$, or alternatively $g_0(\xx_i, t_j) = 0$.
+
+2. **For** $m = 1, \ldots, M$:
+   1. **Compute pseudo-residuals:** For each observation $(i,j)$ in the training data $\calD_{\mathcal{A}}$:
+      $$r_{ijm} = \delta_{ij} - \exp(g_{m-1}(\xx_i, t_j))t_{ij}$$
+   2. **Fit base learner:** Fit a regression tree $h_m$ to the pseudo-residuals:
+      $$h_m = \arg\min_{h} \sum_{(i,j) \in \calD_{\mathcal{A}}} (r_{ijm} - h(\xx_i, t_j))^2$$
+      The tree partitions the feature space based on $(\xx_i, t_j)$ and assigns constant values to each leaf node.
+   3. **Update model:** 
+      $$g_m(\xx_i, t_j) = g_{m-1}(\xx_i, t_j) + \nu h_m(\xx_i, t_j)$$
+      where $\nu$ is the shrinkage parameter.
+
+3. **Return:** Final model $\hat{g}(\xx_i, t_j) = g_M(\xx_i, t_j)$.
+
+**Prediction:** For new observations with features $\xx^*$ and time $t_j^*$, the predicted log-hazard is $\hat{g}(\xx^*, t_j^*) = g_M(\xx^*, t_j^*)$, and the predicted hazard rate is $\hat{h}(\xx^*, t_j^*) = \exp(\hat{g}(\xx^*, t_j^*))$.
+
+The algorithm iteratively improves the model by fitting trees to the residuals from the previous iteration. Each tree captures patterns in the data that were not well explained by the previous model, and the shrinkage parameter $\nu$ ensures that updates are gradual, reducing overfitting. The offset term $\log(t_{ij})$ is implicitly accounted for in the pseudo-residual calculation, as the predicted expected number of events $\hat{\mu}_{ij}^{(m-1)} = \exp(g_{m-1}(\xx_i, t_j))t_{ij}$ includes the time at risk $t_{ij}$. 
+
+## Conclusion
+
+:::: {.callout-warning icon=false}
+
+## Key takeaways
+
+* The pseudo-value based approach allows to estimate arbitrary quantities of interest conditional on covariates, as long as an univariate, unbiased estimator of the quantity of interest is available.
+* It avoids strong assumptions like the proportional hazards assumption or the accelerated failure time assumption, which can be violated in practice.
+* In context of machine learning, this approach can greatly simplify analyis of time-to-event data, as standard implementations can be used out-of-the-box without any additional modifications.
+* In contrast to many survival specific machine learning methods currently available, it can be applied used in complex settings, including competing risks and multi-state models.
+* Feature effects can ben interpreted directly as effects on the quantity of interest, rather than being expressed in terms of hazard ratios or other relative measures.
+::::
+
+:::: {.callout-important icon=false}
+
+## Limitations
+* Pseudo-values can take negative and positive values, thus direct applicatoin of regression algorithms might produce predictions outside the range of the target. Some methods, like deep learning, support the use of activation functions and custom loss functions, but other learners might need additional adaptation in order to map the predictions to the target space.
+* Interpretation of feature effects is only direct, if the response function is the identity function.
+* Calculating pseudo-values can be computationally expensive if predictions are needed at many time points $\tau$ and data set size $n$ is large.
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* @andersenPseudoobservationsSurvivalAnalysis2010 provides an overview of the pseudo-value approach and its application to various quantities of interest in survival analysis.
+* @johansen2021regressionmodels propose an extension of pseudo-value based regression for interval censored data using parametric univariate estimators.
+* @mogensen2013randomforestb use pseudo-values in combination with random forests for competing risks analysis.
+* @Zhao2020 propose a deep learning based approach for survival analysis using pseudo-values.
+
+::::
+
+
+
+### Example: Pooled Logistic Regression
+
+When the learner used to estimate the probabilities for an event at time $t_{(j)}$ is a logistic regression model, the method is known as pooled logistic regression (@dagostinoRelationPooledLogistic1990a). Pooled because rather than fitting one separate logistic regression model for each event time $t_{(j)}$, a single logistic regression model is fitted to the stacked data set, conditional on the interval information $t_j$ and potentially other features $\xx_{i}$.
+
+
