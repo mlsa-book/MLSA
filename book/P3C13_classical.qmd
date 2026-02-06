@@ -6,18 +6,18 @@ abstract: TODO (150-200 WORDS)
 {{< include _macros.tex >}}
 :::
 
-# Traditional Survival Models {#sec-models-classical}
+# Foundational Survival Models and Estimators {#sec-models-classical}
 
 {{< include _wip_minor.qmd >}}
 
-In a predictive setting it can be easy to dismiss 'traditional models' and favour testing of more modern 'machine learning' tools; this would be a mistake.
-Firstly, on low dimensional data (small number of variables), traditional methods often outperform machine learning models [@Burk2025; @Beaulac2020].
-Secondly, even on high-dimensional data, several papers have demonstrated that augmenting traditional models (@sec-classical-improving) can yield models that outperform machine learning alternatives [@Zhang2021; @Spooner2020].
-Finally, the majority of machine learning survival algorithms make use of these traditional models, for example by using non-parametric estimators (@sec-classical-nonpar) and/or assuming a proportional hazards form (@sec-classical-cox), as a central component to construct an algorithm around.
+In a predictive setting it can be easy to dismiss survival models that have been around for decades ("foundational models") and instead favor testing of more modern 'machine learning' tools; this would be a mistake.
+Firstly, on low dimensional data (small number of variables), foundational methods often outperform machine learning models [@Burk2025; @Beaulac2020].
+Secondly, even on high-dimensional data, several papers have demonstrated that augmenting foundational models (@sec-classical-improving) can yield models that outperform machine learning alternatives [@Zhang2021; @Spooner2020].
+Finally, the majority of machine learning survival algorithms make use of these foundational models, for example by using non-parametric estimators (@sec-classical-nonpar) and/or assuming a proportional hazards form (@sec-classical-cox), as a central component to construct an algorithm around.
 Therefore, a robust understanding of these models is imperative to fairly construct and evaluate machine learning survival models.
 This chapter begins with demonstrating non-parametric estimators as predictive tools, including a recap of some estimators in @sec-surv.
 Semi- and fully-parametric models are then introduced, most notably the Cox proportional hazards model and the accelerated failure time model.
-Finally, methods to improve traditional models through machine learning methodology is presented.
+Finally, methods to improve foundational models through machine learning methodology is presented.
 
 ## Non-Parametric Estimators {#sec-classical-nonpar}
 
@@ -25,7 +25,7 @@ Non-parametric estimators have already been introduced in @sec-surv-estimation-n
 
 ### Unconditional estimators
 
-Recall from @sec-surv-estimation-non-param the Kaplan-Meier and Nelson-Aalen estimators respectively defined by
+Recall from @sec-surv-estimation-non-param the Kaplan-Meier and Nelson-Aalen estimators respectively estimate the survival function and cumulative hazard function as
 
 $$
 S_{KM}(\tau) = \prod_{k:t_{(k)} \leq \tau}\left(1-\frac{d_{\tbk}}{\tbk}\right)
@@ -34,7 +34,7 @@ $$ {#eq-km-ml-two}
 and
 
 $$
-H_{NA}(\tau) = \sum_{k:\tbk\leq \tau} \frac{d_{\tbk}}{n_{\tbk}}.
+H_{NA}(\tau) = \sum_{k:\tbk\leq \tau} \frac{d_{\tbk}}{n_{\tbk}},
 $$
 
 where $d_{\tbk}$ and $n_{\tbk}$ are the number of events and observations at risk at the $k$th ordered event time, $\tbk$ respectively.
@@ -57,6 +57,7 @@ As well as unconditional estimators, which do not account for covariates, an alt
 $$
 S(\tau|\xx^*, \lambda) = \prod_{k:\tbk\leq \tau} \Big(1 - \frac{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i = \tbk, \delta_i = 1)}{\sum^n_{i=1} K(\xx^*,\xx_i|\lambda)\II(t_i \geq \tbk)}\Big)
 $$ {#eq-akritas}
+
 where $K$ is a kernel function, usually $K(x,y|\lambda) = \II(\lvert \hat{F}_X(x) - \hat{F}_X(y)\rvert < \lambda), \lambda \in (0, 1]$, $\hat{F}_X$ is the empirical distribution function of the data, and $\lambda$ is a hyper-parameter.
 The estimator can be interpreted as a conditional Kaplan-Meier estimator which is computed on a neighbourhood of subjects closest to $\xx^*$.
 In fact, if $\lambda = 1$ then $K(\cdot|\lambda) = 1$ and (@eq-akritas) is identical to (@eq-km-ml-two).
@@ -105,7 +106,7 @@ Equivalently:
 
 $$
 h_{PH}(\tau|x_i) = \exp(\beta(x_i - x_j))h_{PH}(\tau|x_j)
-$$ {#eq-hazratio-diff}
+$$
 
 So in the case where the covariate differs between subjects by $1$, the hazard ratio increases multiplicatively by $\exp(\beta)$.
 This yields an interpretable model, in which hazard ratios are constant over time and don't depend on $\tau$.
@@ -262,7 +263,7 @@ In cause-specific models we define the hazard for cause $e$ as:
 
 $$
 h_{e}(\tau|\xx_{e;i})= h_{e;0}(\tau)\exp(\eta_{e;i}),
-$${#eq-cause-specific-hazard-ph}
+$$
 
 where $h_{e;0}$ is a cause-specific baseline hazard and $\xx_{e;i}$ is a set of cause-specific covariates (although in practice often the same covariates are used for all causes), and $\eta_{e;i}$ is the cause-specific linear predictor:
 <!--  -->
@@ -334,7 +335,7 @@ Anyone that has been censored ($e = e_0$) before $\tau$ is removed from the risk
 The definition of the subdistribution risk (@eq-riskset-sd) is equivalent to defining the subdistribution hazard for cause $e$ as:
 <!--  -->
 $$
-h^{SD}_{e}(\tau) = \lim_{\dtau \to 0} \frac{P(\tau \leq Y \leq \tau + \dtau, E = e\ |\ Y \geq \tau \vee (E \neq e \wedge \Delta=1))}{\dtau}.
+h^{SD}_{e}(\tau) = \lim_{\dtau \to 0} \frac{P(\tau \leq Y < \tau + \dtau, E = e\ |\ Y \geq \tau \vee (E \neq e \wedge \Delta=1))}{\dtau}.
 $$ {#eq-hazard-sd}
 <!--  -->
 Fine and Gray [@Fine1999] proposed a proportional hazards formulation of the subdistribution hazard (@eq-hazard-sd) as
@@ -372,7 +373,7 @@ Instead of interpreting the subdistribution hazards directly, @Austin2017b recom
 
 $$
 H_{FG;e}(\tau|\xx_i)= H^{SD}_{e;0}(\tau)\exp(\eta_i) 
-$$ {#eq-fg-cum}
+$$
 
 where $H^{SD}_{e;0}$ is the cause-specific baseline cumulative hazard for cause $e$.
 Then using (@eq-surv-haz) to relate the survival and hazard functions and representing this in terms of the CIF:
@@ -393,7 +394,7 @@ Similarly to how the subdistribution hazard was created, estimation of $\hat{H}^
 
 $$
 \hat{H}^{SD}_{Bres;e}(\tau) = \sum_{k:\tbke \leq \tau} \frac{d_{\tbke}}{\sum_{j \in \calR_{e;\tbke}} w_{kj}\exp(\hat{\eta}_j)}
-$$ {#eq-fg-breslow}
+$$
 
 Use of the Fine-Gray model has to be carefully considered before model fitting.
 The subdistribution risk set definition, which includes competing events, treats all causes as non-terminal (even if realistically impossible), which means an observation could be considered at risk of the event of interest even after experiencing a terminal event (like death).
@@ -402,7 +403,6 @@ The cause-specific hazards approach for the estimation of the CIF (@sec-cr-notat
 
 The Fine-Gray model is most appropriate when one is only interested in analyzing one of the causes.
 In this case, interpretation of coefficients from a subdistribution model can be more intuitive as they represent the magnitude of the effect on the incidence, rather than the hazard, which is often of more interest, for example in clinical settings [@Austin2017b].
-
 
 ## Accelerated Failure Time {#sec-surv-models-param}
 
@@ -450,7 +450,7 @@ with respective hazard function
 
 $$
 h_{AFT}(\tau|\xx_i) = e^{-\eta_i} h_0(\tau e^{-\eta_i})
-$$ {#eq-aft-haz}
+$$
 
 Note three key differences compared to the PH model.
 Firstly, $\exp(-\eta_i)$ is modelled instead of $\exp(\eta_i)$, hence in a PH model $h_{PH}(\eta_i+1) > h_{PH}(\eta_i)$ whereas in an AFT model $h_{AFT}(\eta_i+1) < h_{AFT}(\eta_i)$.
@@ -491,6 +491,7 @@ $$
 
 As stated, AFTs are usually fully parametric, which means $S_0$ and $h_0$ are chosen according to some specific distribution.
 Common distribution choices include Weibull, Exponential, Log-logistic, and Log-Normal  [@Kalbfleisch2011; @Wang2017].
+The Weibull (and by extension Exponential) distribution is unique in that it can be parameterized as either a proportional hazards or AFT model, which means a Weibull AFT model may be suitable even when the proportional hazards assumption does not hold.
 The hazard function of the log-logistic distribution is plotted in @fig-logloghaz, note the hazard is non-monotonic, allowing non-PH representations to be modelled where the risk of an event may increase before decreasing, or vice versa.
 When distributions are well-specified and the PH assumption is violated, AFTs can outperform PH alternatives [@Patel2006; @Qi2009; @Zare2015].
 
@@ -656,10 +657,10 @@ Despite advantages, the model appears to be limited in common use which makes it
 
 In the same manner as other proportional hazards models, the Royston-Parmar model can be extended to competing risks by modelling cause-specific hazards, considering only one event at a time and censoring competing events [@Hinchliffe2013].
 
-## Improving traditional models {#sec-classical-improving}
+## Improving foundational models {#sec-classical-improving}
 
 A number of model-agnostic algorithms have been created to improve a model's predictive ability.
-When applied to traditional algorithms, these methods can be used to create powerful models that outperform other machine learning.
+When applied to foundational algorithms, these methods can be used to create powerful models that outperform other machine learning.
 As each could be the subject of a whole book, this section remains brief and just covers the general overview.
 These are split into methods for:
 
@@ -713,7 +714,7 @@ This section only looks at methods specific to survival analysis and does not co
 Embedded methods refers to those that are incorporated during model fitting.
 The vast majority of machine learning models incorporate embedded methods and thus reduce a dataset's size as part of the training process.
 In contrast, models that do not apply any form of feature selection will perform poorly when there is a large number of variables in a dataset.
-One model that straddles the line of 'traditional' and 'machine learning' methodology is the elastic Cox model, which incorporates the 'lasso' and 'ridge' regularization methods.
+One model that straddles the line of 'foundational' and 'machine learning' methodology is the elastic Cox model, which incorporates the 'lasso' and 'ridge' regularization methods.
 Given a generic learning algorithm, lasso and ridge regularization constrain the model coefficients subject to the $\cal{l}^1$-norm and $\cal{l}^2$-norm respectively.
 The Lasso-Cox [@Tibshirani1997] model fits the Cox model by estimating $\bsbeta$ as
 
@@ -754,7 +755,7 @@ where $\xx_{;j}$ is the $j$th variable in the data and $V$ is the resulting scor
 The filter measures the amount of variance in the feature and removes features that have little variation.
 
 Another common filter method is to train another model and make use of its embedded feature selection and pass these results to a simpler model.
-This allows a traditional model to be trained on relevant features without loss to interpretability or performance.
+This allows a foundational model to be trained on relevant features without loss to interpretability or performance.
 Common choices for models to use in the first step of the pipeline include random forests (@sec-ranfor) and gradient boosting machines (@sec-boost).
 
 ### Ensemble methods
@@ -820,6 +821,7 @@ Predictions for a new observation, $\xx^*$ are made by first predicting $(\hat{\
 
 In the above example, Cox models are used throughout.
 However, any machine learning models with the same prediction types can be stacked, including combinations of models.
+One particularly popular form of stacking in survival analysis is the 'SuperLearner' method [@vanderLaan2007], which constructs an ensemble by optimally weighting multiple candidate models based on cross-validated predictive performance.
 
 ## Conclusion
 
@@ -827,7 +829,7 @@ However, any machine learning models with the same prediction types can be stack
 
 ## Key takeaways
 
-* Traditional statistical models broadly fall into three categories: non-parametric estimators, semi-parametric models that include a baseline estimate, and fully-parametric estimates. Each has its own advantages and disadvantages.
+* Foundational statistical models broadly fall into three categories: non-parametric estimators, semi-parametric models that include a baseline estimate, and fully-parametric estimates. Each has its own advantages and disadvantages.
 * Non-parametric estimators are used throughout survival analysis, often as components in more complex machine learning models.
 * Proportional hazards and accelerated failure time models encode different assumptions but both are powerful tools for learning patterns from data and even in prediction problems.
 * The boundary between machine learning and statistical models is fuzzy, and simpler survival models can outperform more complex machine learning alternatives.
@@ -850,7 +852,7 @@ However, any machine learning models with the same prediction types can be stack
 ## Further reading
 
 * To learn more about hazard ratios from Cox models and complexities in interpretation, we recommend @Sashegyi2017 and @Spruance2004.
-* @Collett2014 and @KalbfleischPrentice1973 both provide comprehensive reading for traditional statistical models. The former is slightly less technical and covers extensions to multiple settings.
+* @Collett2014 and @KalbfleischPrentice1973 both provide comprehensive reading for foundational statistical models. The former is slightly less technical and covers extensions to multiple settings.
 * For more abstract feature selection algorithms that can be applied to any data (survival or otherwise), see @Chandrashekar2014 and @Guyon2003.
 * Kernel-based approaches have been suggested for smooth non-parametric estimates of the baseline hazard, these do not appear commonly used in practice but details can be found in @Gefeller1992 and @Muller1994.
 
