@@ -1,5 +1,5 @@
 ---
-abstract: TODO (150-200 WORDS)
+abstract: This chapter introduces reduction techniques for survival analysis, a general framework for solving complex survival prediction problems by transforming them into simpler survival problems or into regression or classification tasks. Reductions play a central role in enabling modern machine learning methods to be applied to time-to-event data, particularly when standard learning algorithms are not designed to handle censoring, truncation, or multiple event types. A unifying pipeline for survival reductions is presented, illustrating how survival data are transformed for model training and how predictions are post-processed to recover meaningful survival quantities. This chapter provides the conceptual foundation for the reduction techniques developed in the following chapters, which address a wide range of survival tasks, including survival probability estimation, full distributional prediction, competing risks, and multi-state settings.
 ---
 
 ::: {.content-visible when-format="html"}
@@ -8,44 +8,39 @@ abstract: TODO (150-200 WORDS)
 
 # Reduction Techniques for Survival Analysis {#sec-reduction-techniques}
 
-{{< include _wip_minor.qmd >}}
-
-
-In this part of the book we will introduce and formalize the concept of *reduction techniques* for survival analysis. 
+This part of the book introduces and formalizes the concept of *reduction* for survival analysis. 
 A reduction is defined as "a complex problem decomposed into simpler subproblems so that a solution to the subproblems gives a solution to the complex problem" [@beygelzimerLearningReductionsThat2016].
-Reduction techniques discussed here may introduce additional overhead, for example the need to perform a specific type of data pre-processing.
-However, they are still viewed as reductions as they reduce survival predictive problems to one or more regression and classification problems.
-Reduction techniques can therefore simplify the application of machine learning methods to survival analysis, particularly in situations where
+Reduction techniques are designed to simplify the application of machine learning methods to survival analysis, particularly when
 
-- the interface of a machine learning method of choice is not designed to handle complex survival data (for example it expects a one dimensional vector as target variable, whereas survival outcomes are defined as tuples of two or more elements).
-- novel machine learning methods are often developed for classification or regression but without adaptations to survival analysis
-- a particular extension of a machine learning method to survival analysis is restricted to a subset of relevant survival problems, often the single event, right-censored data setting.
+- the interface of a machine learning method of choice is not designed to handle complex survival data; for example, if it expects a one dimensional vector as target variable, whereas survival outcomes are defined as tuples of two or more elements.
+- a novel machine learning method has been developed for classification or regression but without an adaptation to survival analysis;
+- a machine learning method only exists for a restricted subset of survival analysis problems, most commonly, the single event, right-censored data setting.
 
-It should be emphasized that the reductions discussed in this part of the book go beyond the simplistic and often erroneous reductions that can unfortunately be seen in some literature; for example, treating the event indicator as a target for a classification task or directly using the observed event time as a target for a regression task whilst ignoring the censoring status [@Schwarzer2000]. 
-Instead, the reductions introduced here are valid methods for survival analysis that appropriately deal with censoring and/or truncation.
-The reductions introduced in this part of the book
+Survival analysis reductions encompass a wide range of methods, including transforming the event-history setting to single-event and vice versa; converting between survival, regression, and classification; and transforming the time horizon between continuous and discrete time.
 
-- do not make (strong) assumptions about the underlying distribution of event times, and thus have the same advantages as non-parametric (@sec-classical-nonpar) and semi-parametric methods (@sec-classical-cox),
-- are applicable to many survival tasks, including competing risks and multi-state settings (@sec-eha),
-- can predict different quantities of interest, including (discrete) hazards, survival probabilities and cumulative incidence functions conditional on features,
-- can use any off-the-shelf implementation of machine learning or deep learning methods for regression or classification (depending on the reduction technique),
-- can (explicitly) model time-varying effects and thus deal with non-proportional hazards.
+It is not uncommon to see poorly designed and mathematically invalid 'reduction' techniques in the literature.
+For example, treating the event indicator as a target for a classification task or directly using the observed event time as a target for a regression task whilst ignoring the censoring status [@Schwarzer2000]. 
+The reduction methods in this book are based on clear theory and are constructed so that the resulting predictions can be meaningfully interpreted for the intended prediction type.
+Furthermore, the reductions in the next chapters do not make (strong) assumptions about the underlying distribution of event times and thus have similar advantages as non-parametric (@sec-classical-nonpar) and semi-parametric methods (@sec-classical-cox).
+The included reductions are also those that are flexible and can be applied to many survival tasks, including competing risks and multi-state settings (@sec-eha), and can predict the most common survival prediction types (@sec-survtsk).
 
-The general concept of reduction techniques is depicted in @fig-reductions-pipeline .
-
- <!-- FIXME: When finalizing the figure below, check if there are actual differences to the figure in Piller et al., 2025 and how to properly cite. Also: Transformation box between prediction and survival prediction"-->
-
-![A general pipeline for reduction techniques in the context of survival analysis (close adaptation of @pillerReductionTechniquesSurvival2025).](Figures/reductions/sa-reductions-pipeline.drawio.png){#fig-reductions-pipeline fig-alt="Illustratoin of a general reduction pipeline in the context of survival analysis."}
-
-In the training phase, the data is transformed into a different format. 
-The specifics of the transformation will depend on the reduction technique and the survival task at hand.
-Once the data is transformed, the target variable becomes a one-dimensional vector of a regression or classification task (again depending on the reduction technique). 
+The general pipeline for survival reduction techniques is depicted in @fig-reductions-pipeline.
+In the training phase (@fig-reductions-pipeline, top), the data is transformed into a different format with the specifics of the transformation dependent on the reduction technique and survival task at hand.
+Once the data is transformed, the target variable becomes a one-dimensional vector for a regression or classification task, whilst encoding censored event-time information.
 At this stage, a standard machine learning model for regression or classification can be applied to the transformed data without any additional changes to the model or its implementation.
-
-In the prediction phase, if necessary, the test data is transformed into the same format as the training data (using the pre-specified or trained parameters of the data transformation during the training phase).
+In the prediction phase (@fig-reductions-pipeline, bottom), if necessary, the test data is transformed into the same format as the training data (using the pre-specified or trained parameters of the data transformation during the training phase).
 This yields a data set which can be passed to the previously learned regression or classification model to generate predictions. 
 Depending on the reduction technique and the quantity of interest, the predictions may need additional post-processing to obtain the desired survival quantity of interest.
 
-In the following chapters we introduce specific reduction techniques.
-We differentiate between reductions that primarily aim to estimate a specific quantity of interest (like the survival probability) at one or few time points of the follow up, in particular IPC-weighted classification (@sec-icpw-reduction) and pseudo-value based regression (@sec-pseudo-value-reduction), and partition-based reductions (@sec-partition-based-reductions) that aim to estimate the entire event time distribution, specifically the discrete-time approach (@sec-discrete-time-reduction), survival stacking (@sec-survival-stacking) and the piecewise exponential models (@sec-piecewise-constant-hazards). 
-Finally, @sec-reductions-eha introduces general concepts in order to apply machine learning methods to competing risks and multi-state tasks based on simpler single event learners.
+<!-- FIXME: When finalizing the figure below, check if there are actual differences to the figure in Piller et al., 2025 and how to properly cite. Also: Transformation box between prediction and survival prediction"-->
+
+![A general pipeline for reduction techniques in the context of survival analysis [close adaptation of @pillerReductionTechniquesSurvival2025].](Figures/reductions/sa-reductions-pipeline.drawio.png){#fig-reductions-pipeline fig-alt="A flow chart mapping an example survival reduction pipeline. Top: a survival task is passed to a training set which is transformed for a regression or classification task that can be passed to a regression or classification algorithm. Bottom: the survival task is now passed to a test set which is transformed using parameters found from the training stage. This transformation again allows use of regression or classification methods and the trained model makes predictions from this transformed data. These predictions may require a final transformation."}
+
+The following chapters introduce specific reduction techniques.
+The first reduction transforms the survival problem to binary classification to estimate survival probabilities at a set of fixed times (@sec-icpw-reduction).
+This applies to right-censored data only but is particularly useful when there are several time-points of interest, the dataset is very large, or computational resources are limited.
+The second reduction transforms the problem into a regression task (@sec-pseudo-value-reduction).
+Like the classification approach, it can estimate survival probabilities at fixed times, but may also be used to estimate many other important quantities across event-history analysis including the RMST and CIF.
+However this flexibility comes at a computationally cost, especially when many time points are considered or the dataset is large.
+In contrast, the partition-based reductions in @sec-partition-based-reductions aim to estimate the entire event time distribution rather than a handful of time points.
+Finally, @sec-reductions-eha introduces reductions that allow event history analysis to expressed in terms of single-event tasks, which allows many of the models in Part III to be applied to competing risks and multi-state settings.
