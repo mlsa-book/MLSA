@@ -1,5 +1,5 @@
 ---
-abstract: TODO (150-200 WORDS)
+abstract: This chapter introduces calibration measures for evaluating probabilistic predictions. Calibration assesses the population-level agreement between predicted survival distributions and observed outcomes, complementing discrimination metrics that evaluate individual-level ranking performance. We distinguish between **point calibration**, which evaluates predictions at specific time horizons, and **distributional calibration**, which assesses agreement across the entire predicted survival curve. Methods based on binary classification calibration are discussed but noted to be limited in the presence of censoring and when full distributional accuracy is required. The chapter discusses the point-calibration measure **event frequency calibration**, which compares observed and predicted numbers of events, and the distributional-calibration **D-calibration**, which evaluates whether predicted survival probabilities at observed event times follow the expected Uniform distribution. Graphical approaches, including comparison with Kaplan–Meier estimates, are described as flexible tools that extend naturally to settings with competing risks and alternative censoring mechanisms. The chapter highlights both the utility and limitations of calibration measures and emphasizes that calibration should be interpreted alongside discrimination and proper scoring rules to obtain a comprehensive assessment of model performance.
 ---
 
 ::: {.content-visible when-format="html"}
@@ -10,69 +10,89 @@ abstract: TODO (150-200 WORDS)
 
 {{< include _wip_minor.qmd >}}
 
-Calibration measures evaluate the 'average' quality of survival distribution predictions.
+Calibration measures evaluate the 'average' quality of probabilistic predictions, which in a survival context means assessing the quality of distribution predictions.
 In general there is a trade-off between discrimination and calibration.
 A model that makes perfect individual predictions (good discrimination) might be overfit to the data and make poor predictions on new, unseen data.
 Whereas a model that makes perfect population predictions (good calibration) might not be able to separate between individual observations.
-The literature around survival analysis calibration measures is scarce [@Rahman2017], potentially due to the complexity of even defining calibration in a survival context [@VanHouwelingen2000].
-Though this meaning does become clearer as specific metrics are introduced.
-As with other measure classes, only measures that can generalize beyond Cox PH models are included here but note that several calibration measures for re-calibrating PH models have been discussed in the literature [@Demler2015; @VanHouwelingen2000].
 
-Calibration measures can be grouped [@Andres2018] into those that evaluate distributions at a single time-point, '1-Calibration' or 'Point Calibration' measures, and those that evaluate distributions at all time-points 'distributional-calibration' or 'probabilistic calibration' measures.
-A point-calibration measure will evaluate a function of the predicted distribution at a single time-point whereas a probabilistic measure evaluates the distribution over a range of time-points; in both cases the evaluated quantity is compared to the observed outcome, $(t, \delta)$.
+The literature on calibration measures for survival analysis is comparatively limited [@Rahman2017], reflecting both conceptual and methodological challenges [@VanHouwelingen2000].
+Unlike metrics that evaluate predictions at the level of individual observations, calibration assesses the average agreement across the population.
+Whereas other measures can accommodate censoring through a combination of reweighting and dynamic restriction of the risk set, calibration requires a principled way to incorporate censored observations when estimating the population-level average.
+
+Most research into survival calibration measures appears to be for re-calibrating PH models [@Demler2015; @VanHouwelingen2000] however they are considered out of scope for this book, which focuses on measures that can generalize across all machine learning models.
+
+A particularly useful taxonomy of calibration measures separates them into point calibration and distributional calibration methods [@Andres2018].
+Let $\hat{S}_i$ be the survival function for the predicted distribution for individual $i$ and let $\calT$ be the set of observed time points.
+Point calibration measures evaluate calibration at a single time-point $\tau \in \calT$.
+The choice of time-point must be carefully chosen to ensure evaluation is assessing a meaningful quantity.
+Usually $\tau = t_i$, the observed event time, or if the final goal of interest is to predict survival probability at a particular time $\tau=\tau^*$ then point calibration measures would focus at this time point.
+In contrast, distributional calibration measures evaluate the predicted distribution across all observed times: $\hat{S}_i(\tau), \forall \tau \in \calT$.
+The former is advantageous if there is a meaningful time-point of interest and it is fine for the prediction to be unstable at other times.
+For example, if its important for the predicted survival curve to be most accurate around the true event time but the tails of the predicted curve may be far from the truth.
+In contrast, distributional calibration may be required if the end goal is to predict and interpret the full survival distribution and the curve needs to be consistently calibrated.
 
 ## Point Calibration {#sec-eval-distr-calib-point}
 
-Point calibration measures can be further divided into metrics that evaluate calibration at a single time-point (by reduction) and measures that evaluate an entire distribution by only considering the event time.
-The difference may sound subtle but it affects conclusions that can be drawn.
-In the first case, a calibration measure can only draw conclusions at that one time-point, whereas the second case can draw conclusions about the calibration of the entire distribution.
-This is the same caveat as using prediction error curves for scoring rules (@sec-pecs).
+Point calibration measures can be further divided into those that evaluate calibration at a single time-point those that consider calibration across the entire model.
+In the first case, a calibration measure can only draw conclusions at that single time-point, whereas the second can draw conclusions about the calibration of the entire distribution.
 
-### Calibration by Reduction
+### Classification calibration methods
 
-Point calibration measures are implicitly reduction methods as they use classification methods to evaluate a full distribution based on a single point only (@sec-car).
-For example, given a predicted survival function $\hatS$, one could calculate the survival function at a single time point, $\hatS{\tau}$ and then use probabilistic classification calibration measures.
-Using this approach one may employ common calibration methods such as the Hosmer–Lemeshow test [@Hosmer1980].
-Measuring calibration in this way can have significant drawbacks as a model may be well-calibrated at one time-point but poorly calibrated at all others [@Haider2020].
-To mitigate this, one could perform the Hosmer–Lemeshow test (or other applicable tests) multiple times with multiple testing correction at many (or all possible) time points, however this would be less efficient and more difficult to interpret than other measures discussed in this chapter.
+When a model is optimized to predict risk at a fixed set of time-points, then one could consider only assessing calibration at those discrete times.
+For example, given a predicted survival function $\hatS$, one could evaluate the survival function at a single time point, $\hatS{\tau}$, and then use standard classification calibration measures.
+One such approve is the Hosmer–Lemeshow test [@Hosmer1980], which compares predicted probabilities with observed event frequencies across risk strata.
 
-### Houwelingen's $\alpha$ {#sec-alpha}
+Although these methods are generally suboptimal for survival models, they are sometimes used when interest is restricted to a handful of time-points, hence brief inclusion in this book.
+
+First, even at a single time-point, censoring must be handle carefully.
+In binary classification, an observation is clearly an event or non-event but in survival analysis a censored individual does not fall neatly into one of these cases.
+
+Secondly, calibration at a single time point does not imply calibration at other times.
+In principle, could repeat a classification calibration test across multiple time points with multiple testing correction.
+However, this would be less efficient and more difficult to interpret than other measures discussed in this chapter.
+
+### Event frequency calibration {#sec-alpha}
 
 As opposed to evaluating distributions at one or more arbitrary time points, one could instead evaluate distribution predictions at meaningful times.
-van Houwelingen proposed several measures [@VanHouwelingen2000] for calibration but only one generalises to all probabilistic survival models, termed here 'Houwelingen's $\alpha$'.
-The measure assesses if the model correctly estimates the theoretical 'true' cumulative hazard function of the underlying data generating process, $H = \hatH$.
+van Houwelingen proposed several measures for calibration, which check if "observed data are consistent with the expected data from the [predicted] model" [@VanHouwelingen2000].
+Only one of the proposed measures generalizes to all survival models that make distribution predictions, termed here _event frequency calibration_.
+Event frequency calibration defines a model as well-calibrated if, across the entire test set, the total number of observed events is close to the total number of events predicted by the model.
 
-The statistic is derived by noting the closely related nature of survival analysis and counting processes.
-<!-- FIXME: Reference discrete/counting process chapter if we add it and (re)move below. -->
-In brief, for an observation $i$ one could define the counting process $N_i(\tau) = \II(T_i \leq \tau, \Delta_i = 1)$, which represents the number of events $i$ has experienced at $\tau$.
-Clearly in single-event survival analysis this will be $0$ before the event has been experienced or $1$ at or after the event.
-An important quantity in counting process is the 'intensity process', which is the instantaneous rate at which events occur *given* past information.
-This is related to, but distinct from the hazard rate.
-The core difference is that the intensity process incorporates real-world information via the individual risk indicator, $R_i(\tau) = \II(T_i \geq \tau)$.
-Hence the hazard and intensity are related via $\lambda_i(\tau) = R_i(\tau) h(\tau|\xx_i)$.
-The intensity process can itself be thought of as the expected number of events at $t$, which is $0$ if the event has already occurred at $R_i(\tau) = 0$ or equal to $h(\tau|\xx_i)$ otherwise [@dataapplied].
-Therefore the expected number of events between $[0, \tau]$ can be obtained by the cumulative intensity process 
+Formally, this result can be derived using counting process theory.
+A full derivation of the counting process formulation of survival analysis is provided in Appendix 2 of @dataapplied.
+The core theoretical relation underlying event frequency calibration is
 
 $$
-\Lambda_i(\tau) = \int^\tau_0 \lambda_i(s) \ ds = \int^\tau_0 R_i(s) \ h(s|\xx_i) \ ds = \int_0^{\min\{\tau, t_i\}} h(s|\xx_i) \ ds = H(\min\{\tau, t_i\}, \xx_i)
-$$ {#eq-intensity}
-
-A particularly useful quantity is the expected number of events for individual $i$ in $[0, t_i]$, which can be seen from (@eq-intensity) reduces to $H(t_i|\xx_i)$.
-In a perfect model one would expect $\hat{H}(t_i|\xx_i) = 1$ if $\delta_i = 1$ and $0$ otherwise.
-Hence summing over all observations, $\sum \hat{H}(t_i|\xx_i)$ gives the total number of expected events in the dataset.
-Houwelingen's $\alpha$ exploits this result to provide a simple method for assessing calibration by comparing the actual and expected number of events:
-
-$$
-H_\alpha(\bsdelta, \hat{\mathbf{H}}, \tt) = \frac{\sum_i \delta_i}{\sum_i \hatH(t_i|\xx_i)}
+\EE[\Delta_i] = \EE[H_i(T_i)],
 $$
 
-with standard error $SE(H_\alpha) = \exp(1/\sqrt{\sum_i \delta_i})$ [@VanHouwelingen2000].
-A slightly more useful metric is given by $H_\alpha(\bsdelta, \hat{\mathbf{H}}, \tt) - 1$ which is lower-bounded at $0$ and can therefore be minimized in automated tuning processes.
-A model is then well-calibrated if $H_\alpha = 0$.
+that is, for an observation $i$ with random outcome time $T_i$, the expectation of the cumulative hazard evaluated at that time-point equals the expected number of events for that individual.
 
-The next metrics we look at evaluate models across a spectrum of points to assess calibration over time.
+Hence, event frequency calibration tests if the estimated cumulative hazard satisfies
 
-## Probabilistic Calibration {#sec-calib-prob}
+$$
+L_{EF} := \frac{\sum_i \delta_i}{\sum_i \hat{H}_i(t_i)} \approx 1,
+$$
+
+where $\hat{H}_i(t_i)$ is the cumulative hazard function from the predicted probability distribution for observation $i$ evaluated at their observed outcome time $t_i$.
+
+For a loss that can be minimized, one may instead consider
+
+$$
+L_{EF^1} = \lvert 1 - \frac{\sum_i \delta_i}{\sum_i \hat{H}_i(t_i)} \rvert,
+$$
+
+or 
+
+$$
+L_{EF^2} = \left(1 - \frac{\sum_i \delta_i}{\sum_i \hat{H}_i(t_i)}\right)^2,
+$$
+
+if a smooth, differentiable function is preferred; both options are minimized at $0$.
+
+The next metrics evaluate models across a spectrum of points to assess calibration over time.
+
+## Distributional Calibration {#sec-calib-prob}
 
 Calibration over a range of time points may be assessed quantitatively or qualitatively, with graphical methods often favoured.
 Graphical methods compare the average predicted distribution to the expected distribution, which can be estimated with the Kaplan-Meier curve, discussed next.
@@ -80,12 +100,19 @@ Graphical methods compare the average predicted distribution to the expected dis
 ### Kaplan-Meier Comparison {#sec-calib-km}
 
 The simplest graphical comparison compares the average predicted survival curve to the Kaplan-Meier curve estimated on the testing data.
-Let $\hatS_1,...,\hatS_n$ be predicted survival functions, then the average predicted survival function is the mixture: $\bar{\hatS} = \mean[n]{\hatS_i(\tau)}$.
-This estimate can be plotted next to the Kaplan-Meier estimate of the survival distribution in a test dataset (i.e., the true data for model evaluation), allowing for visual comparison of how closely these curves align.
-An example is given in @fig-eval-calib, a Cox model (CPH), random survival forest, and relative risk tree, are all compared to the Kaplan-Meier estimator.
+Let $\hatS_1,...,\hatS_n$ be the survival functions from predicted survival distributions, then the average predicted survival function at time $\tau$ is the mixture,
+
+$$
+\bar{\hatS}(\tau) = \mean[n]{\hatS_i(\tau)}.
+$$
+
+For other classes of metrics, predictions are made for previously unseen covariates and the ground truth from the unseen data is compared to the predictions.
+For calibration metrics, this is similarly achieved by fitting the Kaplan-Meier estimator, $\KMS$, to the observed survival outcomes, $(\tt, \bsdelta)$, from the test data and treating this as the average ground truth.
+Plotting $\bar{\hatS}$ alongside $\KMS$ at all observed time-points provides a visual comparison of how closely these curves align.
+An example is given in @fig-eval-calib, a Cox proportional hazards model (CPH), random survival forest (RF), and relative risk tree (RRT), are all compared to the Kaplan-Meier estimator (KM).
 This figure highlights the advantages and disadvantages of this method.
 The relative risk tree is clearly poorly calibrated as it increasingly diverges from the Kaplan-Meier.
-In contrast, the Cox model and random forest cannot be directly compared to one another, as both models frequently overlap with each other and the Kaplan-Meier estimator.
+In contrast, the Cox PH and random forest cannot be directly compared to one another, as both models frequently overlap with each other and the Kaplan-Meier estimator.
 Hence it is possible to say that the Cox and forests models are better calibrated than the risk tree, however it is not possible to say which of those two is better calibrated and whether their distance from the Kaplan-Meier is significant or not at a given time (when not clearly overlapping).
 
 ![Comparing the calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the Kaplan-Meier estimate of the survival function calculated on a test set. The calibration of RRT notably decreases over time whereas RF and CPH are closer to the Kaplan-Meier curve.](Figures/evaluation/calibKM.png){#fig-eval-calib fig-alt="x-axis is labelled 'T' and ranges from 20 to 100. y-axis is labelled 'S(T)' and rages from 0.8 to 1. Four lines are plotted: CPH (red), KM (green), RF (blue), RRT (purple). The RRT line is quite flat across y=1. The other lines overlap multiple times from (20, 1) to (100, 0.8)."}
@@ -93,6 +120,11 @@ Hence it is possible to say that the Cox and forests models are better calibrate
 This method is useful for making broad statements such as "model X is clearly better calibrated than model Y" or "model X appears to make average predictions close to the Kaplan-Meier estimate", but that is the limit in terms of useful conclusions.
 One could refine this method for more fine-grained information by instead using predictions to create 'risk groups' that can be plotted against a stratified Kaplan-Meier [@Austin2020], however this method is harder to interpret and adds even more subjectivity around how many risk groups to create and how to create them [@Royston2013; @Austin2020].
 The next measure we consider includes a graphical method as well as a quantitative interpretation.
+
+As this approach depends on a non-parametric estimator to represent the ground truth, it can be naturally extended to other censoring and truncation settings by substituting the appropriate estimator.
+For example, replacing the Kaplan-Meier estimator with the non-parametric maximum likelihood estimator (@sec-surv-estimation-non-param) enables calibration when interval censoring is present, or using the left-truncated risk-set definition (@sec-non-param-lt) allows application to let-truncated data.
+Similarly, this approach can evaluate competing risks data by comparing predicted cumulative incidence functions (CIFs) for a particular event to the 'true' CIF estimated with the Aalen-Johanson estimator (@sec-aalen-johanson) [@Austin2022a; @Wolbers2009].
+However, interpretation becomes challenging in this setting as separate plots are required for each cause, making it difficult to assess overall calibration over multiple events.
 
 ### D-Calibration
 
@@ -152,13 +184,13 @@ In words, the number of events occurring at or before each quantile should be eq
 Therefore, one can plot $p$ on the x-axis and the right hand side of the above equation on the y-axis.
 A D-calibrated model should result in a straight line on $x = y$.
 This is visualized in @fig-eval-dcalib for the same models as in @fig-eval-calib.
-This figure supports the previous findings that the relative risk tree is poorly calibrated in contrast to the Cox model and random forest but again no direct comparison between the latter models is possible.
+This figure supports the previous findings that the relative risk tree is poorly calibrated in contrast to the Cox PH and random forest but again no direct comparison between the latter models is possible.
 
 ![Comparing the D-calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the expected distribution on y=x. As with @fig-eval-calib, the relative risk tree is clearly not D-calibrated (as supported by the figures in the bottom-right). The CPH and RF are closer to the y=x however neither follow it perfectly.](Figures/evaluation/calibD.png){#fig-eval-dcalib fig-alt="x-axis is labelled 'True (p)' and the y-axis is labelled 'Predicted', both range from 0 to 1. A box in the bottom right says 'DCal (p-values): CPH = 8.2 (0.51); RF = 10 (0.33); RRT = 170 (7e-32). There are four lines on the plot: a blue line (RRT) quickly ascends from (0,0) to (0.1,1) and then is flat; the red (CPH) and green (RF) lines are overlapping and run parallel but not on y=x. Finally a gray dashed line marks the y=x line."}
 
 Whilst D-calibration has the same problems as the Kaplan-Meier method with respect to visual comparison, at least in this case there are quantities to help draw more concrete solutions.
 For the models in @fig-eval-dcalib, it is clear that the relative risk tree is not D-calibrated with $p<0.01$ indicating the null hypothesis of D-calibration (predicted survival probabilities follow $\calU(0,1)$) can be comfortably rejected.
-Whilst the D-calibration for the Cox model is smaller than that of the random forest, the difference is unlikely to be significant, as is seen in the overlapping curves in the figure.
+Whilst the D-calibration for the Cox PH is smaller than that of the random forest, the difference is unlikely to be significant, as is seen in the overlapping curves in the figure.
 
 ## Extensions {#sec-calib-ext}
 
@@ -167,15 +199,39 @@ Whilst the D-calibration for the Cox model is smaller than that of the random fo
 Numerical methods have been proposed for calibration in a competing risk setting, including using pseudo-measures [@Schoop2011] and overall calibration ratios [@vanGeloven2022].
 However, these are complex to implement and interpret and therefore graphical methods are more often used in practice [@Monterrubio2024].
 
-As there is not a _single_ survival curve in the competing risks setting, instead one can estimate the 'true' CIF using the Aalen-Joahnson estimator (@sec-aalen-johanson) and plot this against the average prediction in the same way as in @sec-calib-km [@Austin2022a; @Wolbers2009].
 
-As discussed earlier in this chapter, interpreting and using calibration measures is complex enough in the single event setting.
-Extending this to multiple plots, one for each event, makes interpretation even more complex.
-Using scoring rules to capture calibration performance in the competing risks setting is likely to be more straightforward (@sec-rules-ext).
 
-### Other censoring and truncation types
 
-Using graphical plots is simplest for measuring calibration when left-censoring, interval-censoring, and/or truncation are involved.
-In these contexts, predicted survival functions can be compared to the 'true' survival probability estimated with the Kaplan-Meier (@sec-calib-km) by using non-parametric estimators that can incorporate other censoring and truncation types as required.
-For example the NPMLE for interval censoring and the left-truncated risk set definition for left-truncation, see @sec-surv-estimation-non-param for more.
+## Conclusion
 
+
+:::: {.callout-warning icon=false}
+
+## Key takeaways
+
+* Calibration measures assess the population-level agreement between predicted survival distributions and observed outcomes.
+* Graphical approaches provide an intuitive method to assess model calibration qualitatively. Moreover, as they often depend on non-parametric estimators, it is possible to incorporate different censoring and truncation mechanisms.
+* Event frequency calibration evaluates if the total number of observed and predicted events are roughly equal. This method is particularly informative when interpreted alongside scoring rules (@sec-rules), which capture both calibration and discrimination.
+* D-calibration assesses calibration over the entire predicted distribution by testing if predicted survival probabilities at observed event times follow a Uniform distribution. This method also supports interpretable graphical plots for qualitative assessment.
+
+::::
+
+:::: {.callout-important icon=false}
+
+## Limitations
+
+* By definition, good calibration does not imply good individual-level predictions. A model can be well calibrated on average while still having poor discrimination, so calibration measures should not be interpreted in isolation from other performance metrics.
+* The methodological literature on calibration for time-to-event models remains comparatively limited, particularly for modern machine learning methods.
+* The most common approaches are graphical only. Graphical comparisons alone do not support formal statistical comparison between models and can become difficult to interpret when multiple outcomes or competing risks are present.
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* A calibration measure based on the Akritas'goodness-of-fit-test was recently introduced in @Simonsen2025.
+* For calibration measures specifically focused on re-calibrating Cox PH models, see @Austin2020, @Demler2015, and @VanHouwelingen2000.
+* @Haider2020 review further calibration measures and suggest algorithms for estimating the Hosmer-Lemeshow test in a survival analysis setting.
+
+::::
