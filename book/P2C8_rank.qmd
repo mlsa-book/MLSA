@@ -1,5 +1,5 @@
 ---
-abstract: TODO (150-200 WORDS)
+abstract: This chapter introduces discrimination measures for survival models, focusing on how well a model ranks individuals by risk rather than how well it predicts absolute probabilities. It begins by formalizing concordance through the concepts of comparable and concordant pairs, leading to a general formulation of the time-independent C-index with optional weighting and a time cut-off. Several common weightings are described, including Harrell’s C and inverse probability of censoring weighted (IPCW) variants such as Uno’s C, with discussion of how censoring and the choice of the cutoff affects stability and interpretation. Practical guidance is provided for choosing and for avoiding "C-hacking". The chapter then moves to time-dependent discrimination, covering Antolini's C and AUC estimators based on dynamic case-control definitions. Finally, the chapter provides extensions to competing risks settings and also data involving other censoring and truncation types.
 ---
 
 ::: {.content-visible when-format="html"}
@@ -13,7 +13,7 @@ abstract: TODO (150-200 WORDS)
 This chapter discusses 'discrimination measures', which evaluate how well models separate observations into different risk groups.
 A model is said to have good discrimination if it correctly predicts that one observation is at higher risk of the event of interest than another, where the prediction is 'correct' if the observation predicted to be at higher risk does indeed experience the event sooner.
 
-In the survival setting, the 'risk' is taken to be the continuous ranking prediction.
+In the survival setting, the 'risk' is taken to be the continuous ranking prediction (and by extension the prognostic index prediction) introduced in @sec-survtsk.
 All discrimination measures are ranking measures, which means that the exact predicted value is irrelevant, only its relative ordering is required.
 For example given predictions $\{100,2,299.3\}$, only their rankings, $\{2,1,3\}$, are used by measures of discrimination.
 
@@ -49,7 +49,7 @@ These measures are referred to as time *independent* when $r_i,r_j$ is not a fun
 The time-dependent case is covered in @sec-eval-antolini.
 
 While various definitions of a 'Concordance index' (C-index) exist (discussed in the next section), they all represent a weighted proportion of the number of concordant pairs over the number of comparable pairs.
-As such, a C-index value will always be between $[0, 1]$ with $1$ indicating perfect separation, $0.5$ indicating no separation, and $0$ being separation in the 'wrong direction', i.e. all high risk observations being ranked lower than all low risk observations.
+As such, a C-index value will always be within $[0, 1]$ with $1$ indicating perfect separation, $0.5$ indicating no ability to separate low and high risk (equivalent to tossing a coin to estimate (@eq-cindex-prob)), and $0$ being separation in the 'wrong direction', i.e. all high risk observations being ranked lower than all low risk observations.
 
 Concordance measures may either be reported as a value in $[0,1]$, a percentage, or as 'discriminatory power', which refers to the percentage improvement of a model's discrimination above the baseline value of $0.5$.
 For example, if a model has a concordance of $0.8$ then its discriminatory power is $(0.8-0.5)/0.5 = 60\%$.
@@ -61,7 +61,7 @@ Representing measures as a percentage over a baseline is a common method to impr
 
 Common concordance indices in survival analysis can be expressed as a general measure:
 
-Let $\dvec{\hatr}{n}$ be predicted risks, $(\tt, \bsdelta) = ((t_1, \delta_1) \ (t_2, \delta_2) \cdots (t_n, \delta_n))^\trans$ be observed outcomes, let $W$ be some weighting function, and let $\tau$ be a cut-off time.
+Let $\dvec{\hatr}{n}$ be predicted risks, $(\tt, \bsdelta) = ((t_1, \delta_1) \ (t_2, \delta_2) \cdots (t_n, \delta_n))^\trans$ be observed times and event indicators, let $W$ be some weighting function, and let $\tau$ be a cut-off time.
 Then, the time-independent ('ind') *survival concordance index* is defined by,
 
 $$
@@ -72,9 +72,17 @@ The choice of $W$ specifies a particular variation of the c-index (see below).
 The use of the cut-off $\tau$ mitigates against decreased sample size (and therefore high variance) over time due to the removal of censored observations (see @fig-ipcw).
 For $\tau$ to be comparable across datasets, a common choice would be to set $\tau$ as the time at which 80\%, or perhaps 90\% of the data have been censored or experienced the event.
 
-There are multiple methods for dealing with tied predictions and times.
-Strictly, tied times are incomparable given the definition of 'comparable' given above and hence are usually ignored in the numerator.
-On the other hand, ties in the prediction are more problematic but a common method is to set a value of $0.5$ for observations when $r_i = r_j$ [@Therneau2020].
+In continuous time settings, it is rare to counter exact ties in observed event times, $t_i = t_j$, though the probability of this occurring as the time outcome is increasingly rounded or aggregated to lower precision.
+As model complexity increases, ties in predicted risks, $\hat{r}_i = \hat{r}_j$, also become less common but again may be more likely in simpler models, for example a Cox PH model (@sec-classical) with few coefficients.
+As such, it is important to define how such edge cases are handled as the definition of (@eq-cindex) explicitly excludes pairs with tied times or risks.
+
+Concordance indices assess if a model correctly ranks individuals according to their risk.
+When two individuals experience the event at the same time, there is no meaningful ordering to recover and therefore the pair does not contribute information about discriminatory ability and may reasonably be excluded from $C_{ind}$.
+In contrast, consider pairs with distinct event times but where the model did not separate the observations in terms of risk, $t_i \neq t_j \wedge \hat{r}_i = \hat{r}_j$.
+Assigning a score of $0$ could be problematic especially when the observed times are very close.
+Conversely, a score of $1$ may also be overly-optimistic, especially when the observed times are very fair.
+Therefore, it is common to treat such pairs as contributing $0.5$ to the numerator [@Therneau2020], essentially reflecting that the model is equivalent to a coin toss for that pair.
+
 Specific concordance indices can be constructed by assigning a weighting scheme for $W$ which generally depends on the Kaplan-Meier estimate of the survival function of the censoring distribution fit on training data, $\KMG$, or the Kaplan-Meier estimate for the survival function of the survival distribution fit on training data, $\KMS$, or both.
 Measures that use $\KMG$ are referred to as Inverse Probability of Censoring Weighted (IPCW) measures as the estimated censoring distribution is utilised to weight the measure in order to compensate for removed censored observations.
 This is visualised in @fig-ipcw where $\KMG$, $\KMG^{-2}$, and $\KMS$ are computed based on the `whas` dataset [@dataapplied].
@@ -93,9 +101,26 @@ All methods assume that censoring is conditionally-independent of the event give
 ### Choosing a C-index {#sec-eval-crank-choose}
 
 With multiple choices of weighting available, choosing a specific measure might seem daunting.
-Matters are only made worse by debate in the literature, reflecting uncertainty in measure choice and interpretation.
-In practice, when a suitable cut-of $\tau$ is chosen, all these weightings perform very similarly [@Rahman2017; @Schmid2012].
-For example, @tbl-ipcw uses the `whas` data again to compare Harrell's C with measures that include IPCW weighting, when no cutoff is applied (top row) and when a cutoff is applied when $\hat{G}(t)=0.6$ (grey line in @fig-ipcw).
+Matters are only made worse by significant debate in the literature, reflecting uncertainty in measure choice and interpretation.
+
+When $\tau$ is too small, the chosen measure is only calculated on early events and as such only provides an estimate that reflects short-term discrimination rather than overall model performance.
+In contrast, when $\tau$ is too large, then IPCW measures can be highly unstable [@Rahman2017; @Uno2011], for example the variance of Uno's C drastically increases with increased censoring [@Schmid2012].
+For non-IPCW measures (such as Harrell's C), when $\tau$ is too large the central estimate provided by the measure is heavily affected by the proportion of censoring though the variance may be more stable [@Rahman2017].
+
+If a suitable cut-of $\tau$ is chosen, all these weightings perform very similarly [@Rahman2017; @Schmid2012].
+In practice, given a suitable $\tau$, all C-index metrics provide an intuitive measure of discrimination and as such the choice of C-index is less important than the transparency in reporting.
+One may therefore prefer Harrell's C which estimates the familiar form of the concordance probability in @eq-cindex-prob.
+
+When there is no clear _a priori_ choice of $\tau$, a common rule of thumb is to set $\tau$ to be the time-point at which 80\% of the observations have experienced the event, which is the 80th order statistic from ordered outcome (event or censoring) times:
+
+$$
+t_{(1)} \leq t_{(2)} \leq ... \leq t_{(n)}; \quad \tau^* = t_{(\lceil 0.8n \rceil)}.
+$$
+
+Even with a suitable choice of $\tau$, the C-index will always be highly dependent on censoring within a dataset.
+Therefore, C-index values between experiments are not directly comparable, instead comparisons are limited to comparing model rankings, for example conclusions such as "model A outperformed model B with respect to Harrell's C in this experiment".
+
+To compare choices of weighting schemes, @tbl-ipcw uses the `whas` dataset to compare Harrell's C with measures that include IPCW weighting, when no cutoff is applied (top row) and when a cutoff is applied when $\hat{G}(t)=0.6$ (grey line in @fig-ipcw).
 The results are almost identical when the cutoff is applied but still not massively different without the cutoff.
 
 <!-- results below from _experiments.R -->
@@ -107,17 +132,15 @@ The results are almost identical when the cutoff is applied but still not massiv
 
 : Comparing C-index measures (calculated on the `whas` dataset using a Cox model with three-fold cross-validation) with no cut-off (top) and a cut-off when $\hat{G}(t)=0.6$ (bottom). First column is Harrell's C, second is the weighting $1/\hat{G}(t)$, third is Uno's C. {#tbl-ipcw}
 
-On the other hand, if a poor choice is selected for $\tau$ (cutting off too late) then IPCW measures can be highly unstable [@Rahman2017], for example the variance of Uno's C drastically increases with increased censoring [@Schmid2012].
-
-In practice, all C-index metrics provide an intuitive measure of discrimination and as such the choice of C-index is less important than the transparency in reporting.
-'C-hacking' [@Sonabend2022] is the deliberate, unethical procedure of calculating multiple C-indices and to selectively report one or more results to promote a particular model or result, whilst ignoring any negative findings.
+The number of choices of concordance indices, and the complexity around them, means that it is not uncommon to see 'C-hacking' in the literature [@Sonabend2022].
+C-hacking is the deliberate, unethical procedure of calculating multiple C-indices and to selectively report one or more results to promote a particular model or result, whilst ignoring any negative findings.
 For example, calculating Harrell's C and Uno's C but only reporting the measure that shows a particular model of interest is better than another (even if the other metric shows the reverse effect).
 To avoid 'C-hacking':
 
 i) the choice of C-index should be made before experiments have begun and the choice of C-index should be clearly reported;
-ii) when ranking predictions are composed (@sec-car) from distribution predictions, the composition method should be chosen and clearly described before experiments have begun.
+ii) transformations from distribution to ranking predictions (@sec-survtsk) should be chosen and clearly described before starting any experiments.
 
-As the C-index is highly dependent on censoring within a dataset, C-index values between experiments are not directly comparable, instead comparisons are limited to comparing model rankings, for example conclusions such as "model A outperformed model B with respect to Harrell's C in this experiment".
+
 
 ## Time-Dependent Measures {#sec-eval-crank-timedep}
 
@@ -246,37 +269,40 @@ Reviews of AUC measures have produced (sometimes markedly) different results [@B
 The primary advantage of these measures is to extend discrimination metrics to be time-dependent.
 However, it is unclear how to interpret a threshold of a linear predictor and moreover if this is even the 'correct' quantity to threshold, especially when survival distribution predictions are the more natural object to evaluate over time.
 
-## Extensions {#sec-rank-ext}
+## Extensions beyond single-event, right-censoring {#sec-rank-ext}
+
+The definitions of comparable and concordant pairs presented thus far implicitly assume a single-event survival setting with only right-censoring.
+In the competing risks setting, multiple distinct event types may occur with event-specific risk predictions.
+As such, the earlier notion of concordance cannot be directly applied without modification.
+In settings involving other censoring mechanisms or truncation, even the definition of a 'comparable' pair becomes less straightforward.
+Concordance measures therefore require careful adaptation in these contexts, discussed next.
 
 ### Competing risks
 
 Discrimination measures are usually extended to the competing risk setting by evaluating cause-specific probabilities individually and then potentially summing or averaging over cause-specific measures [@vanGeloven2022; @Lee2018a; @Bender2021; @Alberge2025].
 
-To recap formulae from @sec-eha, given $q$ possible events then the cause-specific hazard for an event is defined as $h_{e}$:
+To recap formulae from @sec-eha, the cause-specific hazard for event $e$ is defined as
 
 $$
-h_{e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}, \; e = 1, \dots, q.
+h_{e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}, \; e = 1, \dots, q,
 $$
 
-where $Y$ is the random variable representing the time-to-event and $E\in \{1,\ldots,k\}$ is the random variable with realizations $e$, which denotes one of $k$ competing events that can occur at event time $Y$.
+where $Y$ is the random variable representing the time-to-event and $E\in \{1,\ldots,q\}$ is the random variable with realizations $e$, which denotes one of $q$ competing events that can occur at time $Y$.
 
-In a single-event setting, a pair of observations, $(i,j)$, with outcomes $\{(t_i,\delta_i),(t_j,\delta_j)\}$, and predicted risk predictions, $r_i,r_j \in \Reals$, are called comparable if $t_i < t_j$ and $\delta_i = 1$; and concordant if also $r_i > r_j$.
-In a competing risks setting, for an event of interest $e$, the observations are [@vanGeloven2022]:
+In a single-event setting, a pair of observations, $(i,j)$, with outcomes $\{(t_i,\delta_i),(t_j,\delta_j)\}$, and predicted risks, $r_i,r_j \in \Reals$, are called comparable if $t_i < t_j$ and $\delta_i = 1$; they are concordant if additionally $r_i > r_j$.
+In the competing risks setting, comparability and concordance are defined at the cause-specific level for an event $e$ [@vanGeloven2022].
+Observations are called comparable if $t_i < t_j$ and $\delta_{ie} = 1$, Where $\delta_{ie}$ equals $1$ if observation $i$ experienced event $e$ and $0$ otherwise.
+Intuitively, if $\delta_{ie} = 0$ then either $i$ was censored, in which case cannot determine ordering for event $e$, or it experienced a different event, which is not informative for discrimination with respect to event $e$.
 
-* *Comparable* if $t_i < t_j$ and $\delta_{ie} = 1$; and
-* *Concordant* if $r_i > r_j$
-
-Where $\delta_{ie} := \II(Y_i \leq C_i \wedge E_i = e)$.
-
-The usual definition of concordance measures then follow given this additional conditioning on the event of interest $e$.
-In practice, given that competing risks models often estimate cause-specific hazard functions, it is a variation of Antolini's time-dependent concordance measure that suits the competing risks setting best.
-Hence for an event $e$, the measure is given by:
+The usual definition of a concordance index then follow with this additional conditioning on the event of interest $e$.
+In practice, as competing risks models often estimate cause-specific hazard functions, a variation of Antolini's time-dependent concordance measure may be most appropriate.
+For event event $e$, the measure is
 
 $$
 C(\hat{\mathbf{h}}_e, \tt, \bsdelta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, \hat{h}_{e_i}(t_i) > \hat{h}_{e_j}(t_i), t_i < \tau)\delta_{ie}}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_{ie}}
 $$
 
-where $\hat{\hh}_e = (\hath_{e_1} \ \hath_{e_2} \cdots \hath_{e_n})^\trans$ are cause specific hazards for individual observations risk of event $e$.
+where $\hat{\hh}_e = (\hath_{e_1} \ \hath_{e_2} \cdots \hath_{e_n})^\trans$ are the predicted cause-specific hazards for event $e$.
 
 ### Other censoring and truncation types
 
@@ -344,3 +370,36 @@ Interestingly, experiments have shown that naively applying Harrell's C (@eq-cin
 Whilst more complex IPC measures have been proposed, they do not seem to be in common usage anywhere whereas $C_N$ and $C_{LT}$ are both used in published research and software [@McGough2021; @pkgsurvival].
 As has been seen throughout this book, left-truncation research is still nascent.
 No evidence of methods for right-truncation could be found.
+
+
+## Conclusion
+
+
+:::: {.callout-warning icon=false}
+
+## Key takeaways
+
+* Discrimination measures evaluating relative risks predictions by assessing if a mode can separate correctly between observations who are at higher or lower risk of event.
+* The C-index is the most common concordance index, with several specific choices that handle censoring differently. In practice, Harrell's C is often a sensible first choice, provided a cut-off is applied to only evaluate the model up to a given time point.
+* Concordance measures offer some degree of flexibility over different patterns in the underlying dataset. For example, measures can be extended to capture changes over time, to handle competing risks, and some more complex censoring and truncation types.
+
+::::
+
+:::: {.callout-important icon=false}
+
+## Limitations
+
+* Concordance measures can change substantially with the censoring mechanism and length of follow-up. As a result, absolute values are often not comparable across datasets or studies.
+* Concordance measures often require choices to be made by the practitioner for stable result. These can include selecting a weighting scheme to handle censoring, a cut-off to evaluate the model up to, and handling of ties. Without careful selection, results from measures can vary widely between experiment iterations.
+* Concordance measure should rarely be used to evaluate prediction's on their own as there is often a trade-off between discrimination and calibration, which is discussed in the next chapter.
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* A recent paper explored a variant of Antolini's C in which the risk prediction is made with the hazard function instead of the survival function [@Gandy2025].
+* For a more detailed explanation of the time-dependent measures, see @Heagerty2000.
+
+::::
