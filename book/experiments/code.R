@@ -1495,5 +1495,29 @@ ggsave("book/Figures/reductions/pem-interval-comparison.png", p_pem_comparison,
 cat("\nFigure saved to book/Figures/reductions/pem-interval-comparison.png\n")
 
 
+### AUC
 
+x = c(0, seq.int(0, 1, 0.1))
+y_perfect = c(0,  rep(1, 11))   # perfect prediction
+y_guess   = c(0, seq.int(0, 1, 0.1))   # random guess (diagonal)
+y_good     = x^0.6
+y_better    = x^0.3
 
+df = data.frame(
+  x = rep(x, 4),
+  y = c(y_guess, y_perfect, y_good, y_better),
+  group = factor(rep(c("Random guess", "Perfect classifier", "Good model", "Better model"),
+                     each = length(x)))
+)
+
+g_auc = ggplot(df, aes(x = x, y = y, color = group)) +
+  geom_line(lwd = 1) +
+  geom_point() +
+  labs(
+    x = "False positive rate",
+    y = "True positive rate",
+    color = "Model"
+  )
+
+ggsave("book/Figures/evaluation/rocs.png", g_auc,
+       height = 5, width = 8, units = "in", dpi = 600)
