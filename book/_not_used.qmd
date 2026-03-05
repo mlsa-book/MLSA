@@ -233,3 +233,63 @@ The algorithm iteratively improves the model by fitting trees to the residuals f
 When the learner used to estimate the probabilities for an event at time $t_{(j)}$ is a logistic regression model, the method is known as pooled logistic regression (@dagostinoRelationPooledLogistic1990a). Pooled because rather than fitting one separate logistic regression model for each event time $t_{(j)}$, a single logistic regression model is fitted to the stacked data set, conditional on the interval information $t_j$ and potentially other features $\xx_{i}$.
 
 
+
+### Example: ICU Competing Risks {#sec-cr-example}
+
+We illustrate the reduction framework using the `sir.adm` dataset [@pkgmvna], previously introduced in @sec-competing-risks.
+The data contain 747 patients admitted to an intensive care unit (ICU) with three covariates: pneumonia status at admission (`pneu`), `age`, and `sex`.
+The competing events are discharge alive from the ICU ($e=1$) and death in the ICU ($e=2$), with 657 discharges, 76 deaths, and 14 censored observations (@tbl-surv-data-sir.adm).
+
+#### PAM approach
+
+Using the piecewise-exponential additive model (PAM) framework (@sec-piecewise-constant-hazards, @pkgpammtools), the reduction is carried out explicitly:
+
+1. Two cause-specific datasets are created by defining $\delta_{i,1} = \II(e_i = 1)$ (discharge) and $\delta_{i,2} = \II(e_i = 2)$ (death).
+Each dataset is then transformed to the piece-wise exponential data (PED) format using `as_ped()`.
+2. A PAM is fit to each PED using `mgcv::gam()` with a Poisson likelihood:
+    - Discharge: `ped_status ~ s(tend) + pneu + s(age) + sex`
+    - Death: `ped_status ~ s(tend) + pneu + s(age) + sex`
+3. The cause-specific hazard estimates are combined to obtain the all-cause survival probability (@eq-cr-allcause-surv) and the CIFs (@eq-cr-cif-estimate).
+
+@fig-cif-pam-sir shows the resulting CIF estimates for four covariate profiles defined by pneumonia status (yes/no) and age (40 vs. 75 years, male).
+As expected, patients with pneumonia and older patients have a higher cumulative incidence of death and a lower cumulative incidence of discharge.
+Note how the CIFs for discharge and death sum to approximately one at later time points (reflecting the fact that nearly all patients eventually experienced one of the two events).
+
+![PAM-based CIF estimates for the `sir.adm` data, stratified by four covariate profiles (pneumonia yes/no, age 40/75, male). Left panel: cumulative incidence of death. Right panel: cumulative incidence of discharge.](Figures/reductions/cif-pam-sir.png){#fig-cif-pam-sir fig-alt="PAM-based cumulative incidence function estimates for competing risks of discharge and death in ICU patients, showing higher death incidence for pneumonia and older age profiles." width=100%}
+
+
+#### Random survival forest approach
+
+Random survival forests (RSF) can handle competing risks natively.
+The implementation in the `randomForestSRC` package [@pkgrfsrc] constructs cause-specific cumulative hazard functions internally and combines them to produce CIF estimates.
+Thus, while the reduction steps are identical in principle, they are performed within the algorithm rather than by the analyst.
+
+@fig-cif-rfsrc-sir shows the RSF-based CIF estimates for the same four covariate profiles.
+The overall patterns are consistent with the PAM results, though the RSF estimates exhibit the characteristic step-function shape of tree-based methods.
+
+![RSF-based CIF estimates for the `sir.adm` data, stratified by four covariate profiles (pneumonia yes/no, age 40/75, male). Left panel: cumulative incidence of death. Right panel: cumulative incidence of discharge.](Figures/reductions/cif-rfsrc-sir.png){#fig-cif-rfsrc-sir fig-alt="Random survival forest-based cumulative incidence function estimates for competing risks of discharge and death in ICU patients." width=100%}
+
+
+#### Comparison
+
+@fig-cif-comparison-sir overlays the PAM and RSF estimates.
+Despite the fundamentally different modeling approaches --- smooth semi-parametric hazards (PAM) versus ensemble-based non-parametric hazards (RSF) --- the CIF estimates are broadly similar for all four profiles.
+This provides reassurance that both methods successfully capture the underlying competing risks structure, and highlights the modularity of the reduction approach: the choice of base learner for the cause-specific hazard models can be varied independently from the combination step.
+
+![Comparison of PAM-based (solid lines) and RSF-based (dashed lines) CIF estimates for the `sir.adm` data. Left panel: cumulative incidence of death. Right panel: cumulative incidence of discharge.](Figures/reductions/cif-comparison-sir.png){#fig-cif-comparison-sir fig-alt="Side-by-side comparison of PAM and random survival forest CIF estimates for competing risks in ICU patients, showing broadly similar estimates across methods." width=100%}
+
+
+### Discussion {#sec-cr-discussion}
+
+Several modeling choices arise within this reduction framework.
+
+**Separate vs. joint models.**
+The approach above fits fully separate models for each cause.
+An alternative is to fit a single *stacked* model that includes cause-by-covariate interactions, which allows sharing of information across causes (for example, a common baseline hazard structure or shared covariate effects).
+This can be advantageous when certain causes have few events, as the shared structure acts as a form of regularization.
+In partition-based reductions, interactions between a cause variable and the time variable $t_j$ will yield different baseline hazards for each cause.
+
+
+**Flexibility in learner choice.**
+Because the reduction treats each cause independently, the learner for each cause-specific model does not have to be the same.
+For instance, one might use a gradient boosting for cause $1$ and a random forest for cause $2$ (where complex interactions are suspected). This is however somewhat impractical as it introduces additional overhead when merging predictions from two different models.
