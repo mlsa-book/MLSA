@@ -1,5 +1,5 @@
 ---
-abstract: This chapter introduces discrimination measures for survival models, focusing on how well a model ranks individuals by risk rather than how well it predicts absolute probabilities. It begins by formalizing concordance through the concepts of comparable and concordant pairs, leading to a general formulation of the time-independent C-index with optional weighting and a time cut-off. Several common weightings are described, including Harrell’s C and inverse probability of censoring weighted (IPCW) variants such as Uno’s C, with discussion of how censoring and the choice of the cutoff affects stability and interpretation. Practical guidance is provided for choosing and for avoiding "C-hacking". The chapter then moves to time-dependent discrimination, covering Antolini's C and AUC estimators based on dynamic case-control definitions. Finally, the chapter provides extensions to competing risks settings and also data involving other censoring and truncation types.
+abstract: TODO
 ---
 
 ::: {.content-visible when-format="html"}
@@ -17,9 +17,9 @@ In the survival setting, the 'risk' is taken to be the continuous ranking predic
 All discrimination measures are ranking measures, which means that the exact predicted value is irrelevant, only its relative ordering is required.
 For example given predictions $\{100,2,299.3\}$, only their rankings, $\{2,1,3\}$, are used by measures of discrimination.
 
-These measures can be grouped into two categories: concordance indices (@sec-cindex), which assess a model's discrimination by comparing pairs of observations to determine if higher predicted risk corresponds to worse outcomes; and area-under-the-curve (AUC) measures, which evaluate discrimination by converting predicted risks into binary decisions at different cut-off values and assessing how well those decisions align with true positives (sensitivity) and true negatives (specificity).
+These measures can be grouped into two categories: concordance indices (@sec-cindex), which assess a model's discrimination by comparing pairs of observations to determine if higher predicted risk corresponds to worse outcomes; and area-under-the-curve (AUC) measures, which evaluate discrimination by converting predicted risks into binary decisions at different cut-off values and assessing how well those decisions align with true positives and true negatives.
 In binary classification, the AUC and concordance index are identical.
-However, in survival analysis there are multiple definitions of the concordance index, and sensitivity and specificity are also not uniquely defined due to censoring and the time-dependent nature of the outcome.
+However, in survival analysis there are multiple definitions of the concordance index, and the true positive and negative rates are also not uniquely defined due to censoring and the time-dependent nature of the outcome.
 These additional complexities require more careful treatment in the survival setting.
 
 ## Concordance Indices {#sec-cindex}
@@ -111,6 +111,117 @@ $$
 where $\dvec{\hatS}{n}$.
 A similar time-dependent measure was derived by @Gandy2025, which defines $\hat{r}_i := \hath_i(t_i)$ and $r_j := \hath_j(t_j)$ where $\hat{h}$ is the predicted hazard function.
 
+### Competing risks
+
+Discrimination measures in competing risks settings are typically defined at the cause-specific level, with overall measures being obtained through aggregating across event types if required [@Lee2018a; @Bender2021; @Alberge2025].
+
+A simplistic extension of concordance is based on defining a pair $(i,j)$ as comparable for event $e^*$ if
+
+$$
+t_i < t_j \wedge e_i = e^*,
+$$
+
+where $e_i \in \{0,...,q\}$ is the event experienced by observation $i$ and $e_i = 0$ indicates censoring.
+In words, observation $i$ and $j$ are comparable if $i$ experienced the event of interest before $j$ experienced any event or was censored.
+If $e_i \ne e^*$, then observation $i$ either experienced a competing event or was censored, neither scenario provides useful information about discrimination for event $e^*$, hence being excluded from forming a comparable pair.
+
+Recall from @sec-eha that the cause-specific hazard is
+
+$$
+h_{e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}, \; e = 1, \dots, q,
+$$
+
+A cause-specific concordance measure can be written as
+
+$$
+C(\hat{\mathbf{h}}_{e^*}, \tt, \bsdelta|\tau) = \frac{\sum_{i\neq j} \II(t_i < t_j, \hat{h}_{e^*_i}(t_i) > \hat{h}_{e^*_j}(t_i), t_i < \tau, e_i = e^*)}{\sum_{i\neq j}\II(t_i < t_j, t_i < \tau, e_i = e^*)},
+$$
+
+where $\hat{\hh}_{e^*} = (\hath_{e^*_1} \ \hath_{e^*_2} \cdots \hath_{e^*_n})^\trans$ are the predicted cause-specific hazards for event $e^*$.
+
+This measure evaluates if, among individuals still at risk at $t_i$, those with higher predicted risk of event $e^*$ tend to experience that event earlier.
+This approach only applies naturally to models that provide cause-specific hazard predictions but in many settings the cumulative incidence function (CIF) is a more common prediction target.
+
+@Wolbers2014 define a concordance measure based on the CIF.
+The key idea is to derive a pseudo-survival time for individuals that experience a competing event.
+For event $e^*$ and some observation $i$ with observed outcome time $t_i$, define
+
+$$
+t^{e^*}_i :=
+\begin{cases}
+t_i, & \text{ if } e_i \in \{0, e^*\},\\
+\infty, & \text{ if } e_i \in \{1, ...,q\} \setminus \{e^*\}
+\end{cases}.
+$$
+
+Under this definition, a pair $(i,j)$ is comparable for event $e^*$ if:
+
+$$
+e_i = e^* \wedge t^{e^*}_i < t^{e^*}_j.
+$$
+
+The full derivation of the estimator, which again makes use of IPCW, is mathematically complex and falls outside the scope of this book.
+For practical use, implementations can be found in currently-available popular open-source software for competing risk models.
+
+
+### Handling truncation
+
+As has been seen throughout this book, left-truncation research is still nascent.
+However, two concordance index estimators for left-truncated data have been proposed in the literature and implemented in software, whereas no comparable estimators could be found for right-truncated data [@McGough2021; @pkgsurvival].
+
+A simple approach applies (@eq-cindex) directly, ignoring the presence of left-truncation, yielding an estimator that converges in probability to
+
+$$
+P(r_i > r_j | t_i < t_j, t_i \geq t^L_i, t_j \geq t^L_j)
+$$ {#eq-cindex-lt-naive}
+
+where $t^L_i$ and $t^L_j$ denote the left-truncation times for observations $i$ and $j$ respectively (equal to $0$ if the observation is not left-truncated) [@Hartman2022].
+
+This method can introduce significant bias [@Hartman2022].
+The conditional on the right-hand side of (@eq-cindex-lt-naive),
+
+$$
+t_i < t_j \wedge t_i \geq t^L_i \wedge t_j \geq t^L_j,
+$$
+
+holds true even when observation $i$ experiences the event before observation $j$ becomes observable,
+
+$$
+t_i < t_j^L < t_j.
+$$
+
+In this situation, the comparison is not meaningful as observation $j$ could never have experienced the event before observation $i$ due to delayed entry, introducing a form of truncation bias discussed in @sec-intro.
+
+To avoid this bias, comparable pairs can be restricted to those whose observation intervals overlap.
+One way to enforce this is to condition on the left-truncation time of the observation that enters the study later [@Hartman2022]:
+
+$$
+P(r_i > r_j | t_i < t_j, t_i \geq t^L_i, t_i \geq t^L_j).
+$$ {#eq-cindex-lt-adjusted}
+
+Observe that $t_j \ge t_j^L$ in (@eq-cindex-lt-naive) is replaced by $t_i \ge t_j^L$ in (@eq-cindex-lt-adjusted), ensuring that the event time of observation $i$ occurs after the left-truncation time of observation $j$.
+A pair is therefore comparable if $t^L_j \le t_i < t_j$.
+An estimator for this quantity is
+
+$$
+C_{LT}(\hatrr, \tt, \bsdelta, \tt^L|\tau) = \frac{\sum_{i\neq j} \II(t_i < t_j, t_i \geq t^L_j, \hatr_i > \hatr_j, t_i < \tau)\delta_i}{\sum_{i\neq j}\II(t_i < t_j, t_i \geq t^L_j, t_i < \tau)\delta_i}.
+$$
+
+This estimator can be further extended to incorporate IPC weights to further reduce bias from left-truncation.
+However, estimating such weights in the presence of left-truncation is technically involved and in practice $C_{LT}$ is commonly used in research [@Therneau2020].
+
+### Interval censoring
+
+Concordance indices are designed to evaluate how well a model discriminates between two risk groups.
+This is a substantial challenge when there is interval censoring as the 'true' ranks of observations are unknown.
+To see this, let $(i,j)$ be two observations with interval censoring times $(l_i, r_i), (l_j, r_j)$ respectively.
+Pairing these observations can yield one of six combinations as visualized in @fig-eval-intervals.
+Only the first two combinations result in non-overlapping intervals where it is clear when observation $i$ or $j$ experiences the event first.
+For all other cases, conditional probabilities have to be substituted or imputation used to estimate when the event might occur within the interval to then determine ranking [@Tsouprou2015; @Wu2023].
+After such estimation, interpretation of any metric is difficult, as it is unclear if the original prediction is being evaluated or the estimation that went into the evaluation measure.
+
+![Combinations of overlapping intervals for observations $(i,j)$ with interval censoring times $(l_i, r_i), (l_j, r_j)$ respectively. The first two combinations result in non-overlapping intervals as $r_i < l_j$ in the first case and $r_j < l_i$ in the second case. For all other combinations, the intervals are overlapping and it cannot be determined which observation actually experienced the event first.](Figures/evaluation/intervals.png){#fig-eval-intervals fig-alt="Six panels representing combinations of the intervals $[l_i, r_i]$ and $[l_j, r_j]$. Those intervals are: 1) $l_i < r_i < l_j < r_j$, 2) $l_j < r_j < l_i < r_i$, 3) $l_j < l_i < r_i < r_j$, 4) $l_i < l_j < r_j < r_i$, 5) $l_j < l_i < r_j < r_i$, 6) $l_i < l_j < r_i < r_j$."}
+
 ### Choosing a C-index {#sec-eval-crank-choose}
 
 With multiple choices of weighting available, choosing a specific measure might seem daunting.
@@ -155,11 +266,12 @@ ii) transformations from distribution to ranking predictions (@sec-survtsk) shou
 
 ## Area Under the Curve {#sec-auc}
 
-The area under the curve (AUC) measure specifically refers to the area under the curve obtained by plotting the true positive rate (sensitivity) against the false positive rate (one minus true negative rate, or specificity) across different decision thresholds.
+The area under the curve (AUC) measure specifically refers to the area under the curve obtained by plotting the true positive rate against the false positive rate (one minus true negative rate) across different decision thresholds.
 This measure is sometimes referred to as the AUROC as the plot of true positive rate against false positive rate is known as the receiver operating characteristic (ROC) curve, hence area under the ROC.
-In binary classification, the area under the curve can be interpreted as the probability that a randomly selected positive case receives a higher predicted probability than a randomly selected negative case, which makes its interpretation identical to the concordance index in the same setting [@Uno2011].
+In binary classification, the area under the curve can be interpreted as the probability that a randomly selected positive observation receives a higher predicted probability than a randomly selected negative observation; this is the same interpretation as the concordance index in the binary classification setting [@Uno2011].
 
-To elucidate this, consider the binary classification problem of predicting whether it will rain or not tomorrow, this leads to four possible outcomes which can be visualized in a confusion matrix:
+To elucidate the AUC, consider the binary classification problem of predicting whether it will rain tomorrow.
+This leads to four possible deterministic outcomes which can be visualized in a confusion matrix (@tbl-confusion-classif).
 
 ||||
 |----|----|-----|
@@ -167,7 +279,9 @@ To elucidate this, consider the binary classification problem of predicting whet
 | Predicted rain | True positive (TP) | False positive (FP) |
 | Predicted no rain | False negative (FN) | True negative (TN) |
 
-Given many different predictions and outcomes, one can count the total number of true positives (TPs) and so on and then define the sensitivity (TPR) and specificity (TNR) as:
+: Binary classification confusion matrix for the deterministic task: will it rain tomorrow? {#tbl-confusion-classif}
+
+Across an entire dataset, one can count the total number of true positives (TPs) and so on and then define the true positive rate (TPR) and true negative rate (TNR) as:
 
 $$
 \mathrm{TPR} = \frac{\mathrm{TPs}}{\mathrm{TPs} + \mathrm{FNs}}, \quad \mathrm{TNR} = \frac{\mathrm{TNs}}{\mathrm{TNs} + \mathrm{FPs}}, \quad \mathrm{FPR} = 1 - \mathrm{TNR}.
@@ -187,26 +301,29 @@ $$
 The receiver operating characteristic curve plots the true positive rate against the false positive rate for all possible threshold values.
 The AUC is the area under this curve and is in the range $[0,1]$ with larger values preferred.
 In @fig-eval-rocs, a perfect classifier is shown in the blue line, which hugs the top-left corner of the graph.
-This optimal curve corresponds to a model for which there exists a threshold at which all positive cases are correctly identified (TPR = 1) and no negative cases are incorrectly classified (FPR = 0).
+This optimal curve corresponds to a model for which there exists a threshold at which all positive labels are correctly identified (TPR = 1) and no negative labels are incorrectly classified (FPR = 0).
 In practice, achieving perfect separation is rare, and different thresholds produce different trade-offs between true positive and false positive rates.
 Hence performance is considered across multiple thresholds.
 The purple curve running along $y=x$ represents a random guess classifier ('a coin toss') where at every threshold there is an equal rate of true positives and false positives.
 The other two curves represent models that are better than a random guess but don't reach the performance of the optimal classifier.
 
-![ROC Curves for a classification example. Red is a decision tree with good discrimination as it 'hugs' the top-left corner. Blue is a featureless baseline with no discrimination as it sits on $y = x$.](Figures/evaluation/rocs.png){#fig-eval-rocs fig-alt="Image shows graph with '1 - Specificity' on the x-axis from 0 to 1 and 'Sensitivity' on the y-axis from 0 to 1. There is a blue line from the bottom left (0,0) to the top right (1,1) of the graph and a red line that forms a curve from (0,0) to around (0.2,0.8) then (1,1)."}
+![ROC Curves for a binary classification example. The blue curve is a perfect classifier that 'hugs' the top-left corner, the purple line on y=x is equivalent to a random guess, the red and green curves represent two models, with the red one performing slightly better.](Figures/evaluation/rocs.png){#fig-eval-rocs fig-alt="Image shows graph with 'False positive rate' on the x-axis from 0 to 1 and 'True positive rate' on the y-axis from 0 to 1. There is a purple line from the bottom left (0,0) to the top right (1,1) of the graph representing the random guess. There is a blue line from (0,0), (0,1), (1,0) which represents the optimal model. There is a green curve that runs just above the purple line and then a red curve that's just about the green curve, indicating better performance."}
 
 ### True positives and negatives in survival analysis
 
 To apply the AUC in a survival analysis setting, one must define a true positive and true negative.
 This has two complications, firstly determining _if_ an observation outcome is considered 'positive' or 'negative' and secondly determining _when_ an outcome is positive or negative.
+Following terminology from medical statistics, it is common to term an observation a 'case' if they experienced the event of interest or a 'control' otherwise.
 Let $\tau$ be a time point of interest and let $i$ be an observation with outcome $(t_i, \delta_i)$, then there are three possible cases:
 
-1. The observation has experienced the event by $\tau$, in which case they are a 'positive' -- $t_i \le \tau \wedge \delta_i = 1$;
-2. The observation has not experienced any outcome by $\tau$ and are considered a 'negative' -- $t_i > \tau$;
-3. The observation has been censored by $\tau$ and are neither a 'positive' nor 'negative' -- $t_i \le \tau \wedge \delta_i = 0$.
+1. The observation has experienced the event by $\tau$, in which case they are a 'case' -- $t_i \le \tau \wedge \delta_i = 1$;
+2. The observation has not experienced any outcome by $\tau$ and is considered a 'control' -- $t_i > \tau$;
+3. The observation has been censored by $\tau$ and are neither a 'case' nor 'control' -- $t_i \le \tau \wedge \delta_i = 0$.
 
-Similarly to the probabilistic classification case, in a survival analysis setting one must assign a continuous relative risk prediction into a class label (positive or negative).
-Let $\hat{r}_i$ be a risk prediction for observation $i$ with usual interpretation that higher values yield higher risk, and let $\alpha$ be a cut-off to threshold the prediction, then the confusion matrix for relative risk predictions is presented in @tbl-confusion-survival.
+Similarly to the probabilistic classification case, in a survival analysis setting one must assign a continuous relative risk prediction into a class label (case or control).
+Let $\hat{r}_i$ be a risk prediction for observation $i$ with usual interpretation that higher values yield higher risk, and let $\alpha$ be a cut-off to threshold the prediction, such that $\hat{r}_i \ge \alpha$ assigns the 'case' label, otherwise 'control'.
+The confusion matrix for relative risk predictions is presented in @tbl-confusion-survival.
+
 
 ||||
 |----|----|-----|
@@ -220,25 +337,25 @@ With these definitions, one can define the TPR and TNR for survival analysis as
 
 $$
 \mathrm{TPR}_S(\tau|\alpha) = \frac{\sum_i \II(\hat{r}_i \ge \alpha, t_i \le \tau, \delta_i = 1)}{\sum_i \II(t_i \le \tau, \delta_i = 1)},
-$$ {@eq-tpr}
+$$ {#eq-tpr}
 
 and
 
 $$
 \mathrm{TNR}_S(\tau|\alpha) = \frac{\sum_i \II(\hat{r}_i < \alpha, t_i > \tau)}{\sum_i \II(t_i > \tau)}.
-$$ {@eq-tnr}
+$$ {#eq-tnr}
 
-These equations depend on the chosen time $\tau$ and hence yield a measure that is time-dependent.
-It does not only capture if the model correctly separates observations into those that do and do not experience the event, but additionally assesses if the model has captured that the time at which events occur also contains valuable information.
+These equations depend on the chosen time $\tau$ and threshold $\alpha$, thereby defining a time-dependent measure that is sensitive to the magnitude of the predicted risk.
+In contrast, the concordance indices introduced earlier only compare the pairwise ordering of survival times and risk predictions and ignore the scale of the predicted risk scores.
 
-Similarly to the issues faced by Harrell's C, (@eq-tpr) simply discards censored observations, which could lead to bias in the measure.
-As with prior measures, this can be corrected via IPC weighting [@Uno2011]:
+Similarly to the issues faced by Harrell's C, (@eq-tpr) discards censored observations, which could lead to bias in the measure.
+As with prior measures, this can be corrected via IPC weighting [@Uno2007]:
 
 $$
 \mathrm{TPR}_{S^*}(\tau|\alpha) = \frac{\sum_i \II(\hat{r}_i \ge \alpha, t_i \le \tau, \delta_i = 1)[\KMG(t_i)]^{-1}}{\sum_i \II(t_i \le \tau, \delta_i = 1)[\KMG(t_i)]^{-1}}.
-$$ {@eq-tpr-ipcw}
+$$ {#eq-tpr-ipcw}
 
-This weighting is not required in (@eq-tnr), which includes all observations who have yet to experience an outcome (event or censoring).
+This weighting is not required in (@eq-tnr), which includes observations that have been fully observed up until $\tau$.
 
 The equations (@eq-tnr) and (@eq-tpr-ipcw) are derived from earlier work by @Heagerty2005, which relied on additional modelling assumptions and did not incorporate IPCW.
 In practice, (@eq-tnr) and (@eq-tpr-ipcw) are straightforward to estimate and yield time-dependent AUC measures that allow model performance to be evaluated at multiple time-points.
@@ -254,111 +371,61 @@ Popular choices of weights include the density of events over time, a non-parame
 
 A number of time-dependent AUC methods have been derived including by [@Chambless2006; @Song2008; @Hung2010].
 Various surveys on these measures have produced different results [@Blanche2012; @Li2018; @Kamarudin2017] with no clear consensus on how and when these measures should be used.
-Moreover, @Uno2011 appears to favour the pairwise methods found in concordance indices, dismissing their early AUC work in @Uno2005.
+Moreover, @Uno2011 appears to favour the pairwise methods found in concordance indices, dismissing their earlier AUC work in @Uno2007.
 The primary advantage of these measures is to extend discrimination metrics to be time-dependent and AUC plots over time can be visually appealing to understand where models perform better or worse.
 However, for a single time-independent measure, one might prefer the concordance index discussed earlier, and for a single, interpretable time-dependent measure, Antolini's C might remain more interpretable.
 
-## Extensions beyond single-event, right-censoring {#sec-rank-ext}
-
-The definitions of comparable and concordant pairs presented thus far implicitly assume a single-event survival setting with only right-censoring.
-In the competing risks setting, multiple distinct event types may occur with event-specific risk predictions.
-As such, the earlier notion of concordance cannot be directly applied without modification.
-In settings involving other censoring mechanisms or truncation, even the definition of a 'comparable' pair becomes less straightforward.
-Concordance measures therefore require careful adaptation in these contexts, discussed next.
-
 ### Competing risks
 
-Discrimination measures are usually extended to the competing risk setting by evaluating cause-specific probabilities individually and then potentially summing or averaging over cause-specific measures [@vanGeloven2022; @Lee2018a; @Bender2021; @Alberge2025].
+In a competing risks setting, the definitions of true positive rate and true negative rate must be adapted to handle multiple event types.
+In contrast to concordance indices, AUC measures are defined at the individual level and not pairwise, which simplifies extension to competing risks.
+However, it remains necessary to still clearly define what constitutes cases, controls, and correct or incorrect predictions.
 
-To recap formulae from @sec-eha, the cause-specific hazard for event $e$ is defined as
-
-$$
-h_{e}(\tau) = \lim_{\Delta \tau \to 0} \frac{P(\tau \leq Y \leq \tau + \Delta \tau, E = e\ |\ Y \geq \tau)}{\Delta \tau}, \; e = 1, \dots, q,
-$$
-
-where $Y$ is the random variable representing the time-to-event and $E\in \{1,\ldots,q\}$ is the random variable with realizations $e$, which denotes one of $q$ competing events that can occur at time $Y$.
-
-In a single-event setting, a pair of observations, $(i,j)$, with outcomes $\{(t_i,\delta_i),(t_j,\delta_j)\}$, and predicted risks, $r_i,r_j \in \Reals$, are called comparable if $t_i < t_j$ and $\delta_i = 1$; they are concordant if additionally $r_i > r_j$.
-In the competing risks setting, comparability and concordance are defined at the cause-specific level for an event $e$ [@vanGeloven2022].
-Observations are called comparable if $t_i < t_j$ and $\delta_{ie} = 1$, Where $\delta_{ie}$ equals $1$ if observation $i$ experienced event $e$ and $0$ otherwise.
-Intuitively, if $\delta_{ie} = 0$ then either $i$ was censored, in which case cannot determine ordering for event $e$, or it experienced a different event, which is not informative for discrimination with respect to event $e$.
-
-The usual definition of a concordance index then follow with this additional conditioning on the event of interest $e$.
-In practice, as competing risks models often estimate cause-specific hazard functions, a variation of Antolini's time-dependent concordance measure may be most appropriate.
-For event event $e$, the measure is
+For event $e^*$, it is natural to define an observation $i$ as a case if they experienced the event of interest by time $\tau$:
 
 $$
-C(\hat{\mathbf{h}}_e, \tt, \bsdelta|\tau) = \frac{\sum_{i\neq j} W(t_i)\II(t_i < t_j, \hat{h}_{e_i}(t_i) > \hat{h}_{e_j}(t_i), t_i < \tau)\delta_{ie}}{\sum_{i\neq j}W(t_i)\II(t_i < t_j, t_i < \tau)\delta_{ie}}
-$$
+\operatorname{Case}(\tau)^{e^*}_i := t_i \le \tau \wedge e_i = e^*.
+$$ 
 
-where $\hat{\hh}_e = (\hath_{e_1} \ \hath_{e_2} \cdots \hath_{e_n})^\trans$ are the predicted cause-specific hazards for event $e$.
-
-### Other censoring and truncation types
-
-AUC and concordance indices are designed to rank observations, or at least evaluate how well a model discriminates between two risk groups.
-This is a substantial challenge when there is interval censoring in the data as the 'true' ranks of observations are unknown.
-Let $i,j$ be two observations with interval censoring times $(l_i, r_j), (l_j, r_j)$ respectively.
-Given valid combinations (r > l) then these observations may coincide with one of six combinations:
-
-1. $l_i < r_i < l_j < r_j$
-2. $l_i < l_j < r_i < r_j$
-3. $l_i < l_j < r_j < r_i$
-4. $l_j < r_j < l_i < r_i$
-5. $l_j < l_i < r_j < r_i$
-6. $l_j < l_i < r_i < r_j$
-
-Of these, only case (1) and (4) can be used in a standard concordance index as the intervals are non-overlapping.
-For all other cases, conditional probabilities have to be substituted or imputation used to estimate when in an interval the event takes place [@Tsouprou2015; @Wu2023].
-After such estimation, interpretation of any metric is difficult, as it's unclear if the original prediction is being evaluated or the guesswork that went into the evaluation measure.
-In this case it is likely better to use more straightforward methods that do not require these extra steps.
-
-When it comes to time-dependent AUC measures, the TNR and TPR can be extended to accommodate interval-censoring, by updating the equations to only include contributions from observations when the event is guaranteed to have occurred ($r_i \leq \tau$) or not ($l_i > \tau$) [@Li2011]:
+Two separate definitions have been proposed for controls [@vanGeloven2022].
+The first defines a control as an observation that has not experienced any event at $\tau$:
 
 $$
-TNR_D(\hatrr, N | \alpha, \tau) = P(\hatr_i \leq \alpha | l_i > \tau)
+\operatorname{Control}_{1;i}^{e^*}(\tau) := t_i > \tau.
+$$ 
+
+The second defines a control as an observation that has not experienced the event of interest by time $\tau$ but may have experienced a competing event:
+
+$$
+\operatorname{Control}_{2;i}^{e^*}(\tau) := t_i > \tau \vee (t_i \le \tau \wedge e_i \in \{1,...,q\} \setminus \{e^*\}).
+$$ 
+
+Once cases and controls are defined, time-dependent true positive rate and true negative rate can be constructed with inverse probability of censoring weighting.
+However, again the derivation of this estimator is complex and is omitted here.
+
+### Interval censoring
+
+Defining the TPR and TNR equations for interval censoring is straightforward although actually estimating these quantities is far more complex.
+Let $i$ be an observation with interval censoring times $(l_i, r_i)$.
+Theoretically, one could condition (@eq-tpr) and (@eq-tnr) to only include a contribution from observation $i$ when it is guaranteed the event must or must not have occurred [@Li2011].
+
+At $\tau < l_i$, the event has definitely not occurred so an observation is clearly a control:
+
+$$
+\operatorname{Control}^{IC}_i(\tau) := \tau < l_i.
 $$
 
-and
+When only left-censoring is present in the data, then $l_i = 0$ and as such there is no coherent definition of a case for left-censored observations (in analogy to there being no definition of a control for right-censored observations).
+
+On the other hand, if $\tau > r_i$ then the event has definitely occurred and so an observation must be a case:
 
 $$
-TPR_C(\hatrr, N | \alpha, \tau) = P(\hatr_i > \alpha | r_i \leq \tau)
+\operatorname{Case}^{IC}_i(\tau) := \tau > r_i.
 $$
 
-In the presence of interval censoring, estimation depends on more complex estimators such as the nonparametric maximum likelihood estimator, which can be challenging to fit and splines could be used instead [@Wu2020].
+Fpr all time-points within the interval window, $l_i \le \tau \le r_i$, it is unknown if an observation is a case or control.
+Estimating these probabilities requires complex estimators such as the nonparametric maximum likelihood estimator, which can be challenging to fit and splines have been suggested instead [@Wu2020].
 However, splines themselves require modelling and any metric that requires modelling to estimate introduces significant difficulties in its interpretation.
-As a more simplistic (yet sometimes realistic on average) alternative, one could impute the outcome time as the midpoint between the interval margins, $t_i = (l_i + r_i)/2$ [@Gadda2016].
-
-As left-censoring is a specialised case of interval-censoring (with $l_i = 0$) the above formulae can be used to handle left-censored data as well.
-
-### Truncation
-
-When only right-censoring is present, the objective of concordance measures is to estimate the probability that the ranking of two observations' risk is correctly specified (@eq-cindex-prob).
-The naive method to deal with left-truncation is to simply ignore it and use @eq-cindex as usual.
-Doing so yields an estimator, $C_N$, that converges in probability to
-
-$$
-P(r_i > r_j | \delta_i, t_i < t_j, t_i \geq t^L_i, t_j \geq t^L_j)
-$$ {#eq-cindex-lt-naive}
-
-where $t^L_i, t^L_j$ are the left-truncation times for $i$ and $j$ respectively (which are $0$ if the observation is not left-truncated).
-This is considered a 'naive' estimator as it may introduce bias [@Hartman2022], to see why this is the case consider that the right-hand-side of @eq-cindex-lt-naive is true in one of two cases (ignoring ties):
-
-1. $t_i < t_j^L < t_j$;
-2. $t_j^L < t_i < t_j$.
-
-In the first case, $j$ enters the study after $i$ has experienced the outcome and the observations never overlap in the data at the same time 
-@Hartman2022 demonstrate that evaluating discrimination in the presence of these 'nonoverlapping intervals' creates bias if truncation is dependent on the predictors (for the same reason, methods for estimation need to be adapted as well).
-Therefore, the data should be further restricted to overlapping intervals, yielding the estimator
-
-$$
-C_{LT}(\hatrr, \tt, \bsdelta, \tt^L|\tau) = \frac{\sum_{i\neq j} \II(t_i < t_j, \hatr_i > \hatr_j, t_i < \tau, t_i \geq t^L_j)\delta_i}{\sum_{i\neq j}\II(t_i < t_j, t_i < \tau, t_i \geq t^L_j)\delta_i}
-$$
-
-In contrast to @eq-cindex, no generic weighting term is included, which is due to the complexity of estimating IPC weights in the context of left-truncation [@Therneau2020].
-Interestingly, experiments have shown that naively applying Harrell's C (@eq-cindex with $W=1$) may be a better estimator than $C_{LT}$ with lower bias [@Hartman2022].
-Whilst more complex IPC measures have been proposed, they do not seem to be in common usage anywhere whereas $C_N$ and $C_{LT}$ are both used in published research and software [@McGough2021; @pkgsurvival].
-As has been seen throughout this book, left-truncation research is still nascent.
-No evidence of methods for right-truncation could be found.
 
 
 ## Conclusion
