@@ -1,84 +1,23 @@
 ---
-abstract: TODO (150-200 WORDS)
+abstract: This chapter discusses evaluation of distance measures for evaluating the distance between survival time predictions and the ground truth. The chapter explains why such evaluations are fundamentally problematic in the presence of censoring.
 ---
 
 ::: {.content-visible when-format="html"}
 {{< include _macros.tex >}}
 :::
 
-# Survival Time Measures {#sec-eval-det}
+# Distance Measures {#sec-eval-det}
 
-{{< include _wip_minor.qmd >}}
+As discussed in @sec-survtsk, evaluating the distance between survival time point predictions and the ground truth event times is fundamentally problematic when censoring is present.
+In particular, there is no principled way to define a metric that accurately reflects the average discrepancy between predicted survival times and all event times.
+<!--  -->
+Restricting evaluation to uncensored observations and applying standard regression measures such as the mean absolute error (MAE) can introduce substantial bias [@Wang2017].
+Moreover, @Qi2023 show that naïvely applying the MAE to survival data can induce model performance rankings that are inconsistent with those obtained from the oracle MAE computed using fully observed event times; this remains true even when using inverse probability of censoring–weighted variants of the MAE.
+A pseudo-observation–based approach has been shown, under controlled simulation settings, to induce the same model rankings as the oracle MAE [@Qi2023].
+However, this approach is not intended to, nor does it, recover a meaningful measure of absolute distance between predicted survival times and the ground truth event times.
 
-When it comes to evaluating survival time predictions, there are few measures available at our disposal.
-As a result of survival time predictions being uncommon compared to other prediction types (@sec-survtsk), there are limited survival time evaluation measures in the literature.
-The most common approach [@Wang2017] is to use regression measures by ignoring censored observations and potentially adding some IPC weighting.
-
-## Uncensored distance measures
-
-Survival time measures are often referred to as 'distance' measures as they measure the distance between the true, $(t, \delta=1)$, and predicted, $\hatt$, values.
-These are presented in turn with brief descriptions of their interpretation.
-The measures below can be inflated using an IPC weighting by dividing by $\KMG(t_i)$.
-However, evidence suggests that adding this weighting does not improve the measure with respect to ranking if one model is better than another [@Qi2023].
-
-For all measures define $d := \sum_i \delta_i$, which is the number of uncensored observations in the dataset.
-
-**Censoring-ignored mean absolute error, $MAE_C$**
-
-In regression, the mean absolute error (MAE) is a popular measure because it is intuitive to understand as it measures the absolute difference between true and predicted outcomes; hence intuitively one can understand that a model predicting a height of 175cm is clearly better than one predicting a height of 180cm, for a person with true height of 174cm.
-
-$$
-MAE_C(\hattt, \tt, \bsdelta) = \frac{1}{d} \sum^d_{i=1} \delta_i|t_i - \hatt_i|
-$$
-
-**Censoring-ignored mean squared error**
-
-In comparison to MAE, the mean squared error (MSE), computes the squared differences between true and predicted values.
-While the MAE provides a smooth, linear, 'penalty' for increasingly poor predictions (i.e., the difference between an error of predicting 2 vs. 5 is still 3), but the square in the MSE means that larger errors are quickly magnified (so the difference in the above example is 9).
-By taking the mean over all predictions, the effect of this inflation is to increase the MSE value as larger mistakes are made.
-
-$$
-MSE_C(\hattt, \tt, \bsdelta) = \frac{1}{d}\sum^d_{i=1}\delta_i(t_i - \hatt_i)^2
-$$
-
-**Censoring-ignored root mean squared error**
-
-Finally, the root mean squared error (RMSE), is simply the square root of the MSE.
-This allows interpretation on the original scale (as opposed to the squared scale produced by the MSE).
-Given the inflation effect for the MSE, the RMSE will be larger than the MAE as increasingly poor predictions are made; it is common practice for the MAE and RMSE to be reported together.
-
-$$
-RMSE_C(\hattt, \tt, \bsdelta) = \sqrt{MSE_C(\hattt, \tt, \bsdelta)}
-$$
-
-Note that these equations *completely* remove censored observations from the dataset under evaluation.
-This is in contrast to how IPC is used in the C-index (@sec-eval-crank-conc) and various scoring rules (@sec-rules), where censored observations are at least partially included in the calculation.
-By failing to include censored observations at all, these measures are only evaluating survival models on a (potentially biased) sample of the overall test data, and hence can never be fairly used to estimate the model's performance on new data.
-
-## Over- and under-predictions
-
-The distance measures just discussed assume that the error for an over-prediction ($\hatt > t$) should be equal to an under-prediction ($\hatt < t$).
-That is, they assume it is 'as bad' if a model predicts an outcome time being 10 years longer than the truth compared to being 10 years shorter.
-In the survival setting, this assumption is often invalid as it is generally preferred for models to be overly cautious, hence to predict negative events to happen sooner (e.g., predict a life-support machine fails after three years not five if the truth is actually four) and to predict positive events to happen later (e.g., predict a patient recovers after four years not two if the truth is actually three).
-A simple method to incorporate this imbalance between over- and under-predictions is to add a weighting factor to any of the above measures, for example the $MAE_C$ might become
-
-$$
-MAE_C(\hattt, \tt, \bsdelta, \lambda, \mu, \phi) = \frac{1}{d} \sum^m_{i=1} \delta_i|(t_i - \hatt_i) [\lambda\II(t_i>\hatt_i) + \mu\II(t_i<\hatt_i) + \phi\II(t_i=\hatt_i)]|
-$$
-
-where $\lambda, \mu, \phi$ are any Real number to be used to weight over-, under-, and exact-predictions, and $d$ is as above.
-The choice of these are highly context dependent and could even be tuned (@sec-ml-opt).
-
-## Extensions
-
-### Competing risks
-
-In a competing risks setting, there is no obvious metric to evaluate survival time predictions, primarily because there is no meaningful interpretation for an 'all-cause survival time' or a 'cause-specific survival time'.
-If an observation could realistically experience one of multiple, mutually-exclusive events, then predicting the time to one particular event has no inherent meaning without first attaching a probability of the event taking place (i.e., the CIF), hence evaluating this probability is a more sensible approach for evaluating a competing risks model's predictive performance.
-
-### Other censoring and truncation types
-Given the above measures simply remove censored observations, the same measures can be easily applied to datasets with left-censoring and interval-censoring -- with the same caveats applied.
-To handle truncation, the formulae above can be extended to remove truncated events, which will introduce the same biases as removing censored events.
+Given these limitations, this book recommends avoiding distance-based evaluation of survival time predictions.
+Instead, discrimination-based measures (@sec-eval-crank) may be used to evaluate survival time predictions whilst being clear this is an evaluation of the relative risk of event only and not an attempt to quantify the distance between predictions and truth.
 
 ## Conclusion
 
@@ -86,16 +25,8 @@ To handle truncation, the formulae above can be extended to remove truncated eve
 
 ## Key takeaways
 
-* There are few measures for evaluating survival time predictions, likely due this being a less popular survival task;
-* Simple analogues to regression measures can be created by removing censored observations and optionally adding an IPC weighting;
-* Weighting measures to account for over- and under-predictions may be useful in real-world settings.
-
-::::
-
-:::: {.callout-tip icon=false}
-
-## Further reading
-
-* @Qi2023 survey MAE-based survival losses, including a hinge loss introduced by @Chapfuwa2018, as well as losses based on surrogate values including mean residual lifetime [@Haider2020] and pseudo-observations. This is effectively the same as using the MAE to evaluate imputed censored predictions (@sec-redux-regr). 
+* Survival time point predictions should not evaluated using standard distance-based error measures in a principled way when censoring is present.
+* Existing approaches can support relative comparison of models but do not resolve the fundamental ambiguity of unobserved event times.
+* As a result, discrimination-based evaluation should be preferred, with careful interpretation of what is, and is not, being evaluated.
 
 ::::

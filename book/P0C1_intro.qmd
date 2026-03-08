@@ -1,5 +1,5 @@
 ---
-abstract: TODO (150-200 WORDS)
+abstract: This chapter introduces the foundations of machine learning survival analysis and motivates why time-to-event data require methods beyond standard regression and classification. Survival analysis is framed as a general paradigm for modeling the timing of events that may be incompletely observed due to censoring, with applications spanning medicine, engineering, and economics. The chapter begins to clarify key distinctions between survival analysis, event history analysis, and conventional supervised learning (regression and classification). In addition, the chapter starts to outline the prediction tasks that appear throughout the book including predicting survival distributions, time-to-event, and relative risks. Particular attention is given to censoring, truncation, competing risks, and common biases such as delayed entry and immortal time bias. The chapter concludes with a start-to-finish overview of a machine learning survival analysis workflow, providing a conceptual roadmap that sets the stage for the methodological developments in the remainder of the book.
 ---
 
 ::: {.content-visible when-format="html"}
@@ -8,175 +8,245 @@ abstract: TODO (150-200 WORDS)
 
 # Introduction {#sec-intro}
 
-{{< include _wip.qmd >}}
+{{< include _wip_minor.qmd >}}
 
-There are many books dedicated to regression and classification as machine learning problems but tthe 'bibles' of machine learning focus almost entirely on regression and classification (@Bishop2006; @Hastie2001; @Hastie2013).
-There are also excellent books dedicated to survival analysis, such as @Collett2014 and @KalbfleischPrentice1973, but without the inclusion of machine learning models.
+In the broadest sense, survival analysis is concerned with predicting the time until an event occurs.
+This definition will be refined in this chapter and Part I.
 Survival analysis has important applications to fields that directly impact day-to-day life, including healthcare, finance, and engineering.
-Using regression and classification models to solve problems based on survival datasets can lead to biased results, which in turn may have negative consequences.
-This book is intended to bridge the gap between survival analysis and machine learning to increase accessibility and to demystify the combined field of 'machine learning survival analysis'.
+Machine learning techniques can identify patterns and make predictions on unseen data, even in very large datasets with many covariates and/or large sample sizes.
+Despite this, the canonical machine learning texts focus almost entirely on regression and classification [@Bishop2006; @Hastie2001; @Hastie2013].
+There are also excellent books dedicated to survival analysis, such as @Collett2014 and @Kalbfleisch1980, but they do not include modern machine learning algorithms such as random forests, neural networks or gradient boosting machines.
+To-date, the most comprehensive treatment for the combined fields is a light-touch but comprehensive survey in @Wang2017.
+Using regression or classification models to solve problems based on survival datasets can lead to biased results as they poorly capture 'censored' observations -- those subjects that do not experience the event of interest within an observation window.
+This book is intended to bridge the gap between survival analysis and machine learning to formalize and demystify the combined field of 'machine learning survival analysis'.
 
-## Defining Machine Learning Survival Analysis
+This book is focused entirely on survival predictions for observations given some variables ('supervised learning'), this book does not cover in-sample estimation, predicting 'remaining lifetime' for censored observations, nor pattern recognition methods such as clustering.
 
-The purpose of this book is to formalise the use of machine learning in survival analysis, which we refer to as 'machine learning survival analysis'.
-This chapter highlights the importance of survival analysis and what makes predictions in a survival setting ('survival predictions') stand out from other areas such as regression and classification.
-We begin with some examples and then introduce the most important concepts that make machine learning survival analysis unique.
+## Defining Machine Learning Survival Analysis {#sec-intro-def}
 
-### Waiting for a bus
+This chapter highlights the importance of survival analysis and why predictions in a survival setting differ from regression and classification.
+Some motivating examples are first provided and then important concepts for survival analysis and machine learning are introduced.
 
-It is likely that you are making or using some form of survival predictions daily.
-For example, estimating when a bus will arrive at your stop after it leaves the previous one, is a survival prediction.
-On first glance, many would call this a regression problem, as regression is tasked with making continuous predictions.
-However, unless you are reading this from a country that has a perfect public transport system, then it is likely you are not making this prediction based simply on all previous bus arrival times, but also with the knowledge that your bus might break down before it reaches you.
-In survival analysis, we would refer to the act of a bus breaking down and not reaching its destination as a 'censoring event'.
-An observation (in this case a bus) is *censored* when the event of interest (in this case, arriving at your bus stop) does not occur (in this case due to breakdown), this is illustrated in @fig-bus.
-Survival analysis is unique as observations that are censored are still considered to be valuable data points to train a model on.
-Instead of dismissing these broken down buses, models that make survival predictions ('survival models') instead use all data up until the point of censoring.
-In other words, whilst your bus did not arrive, you do at least know that it had travelled two minutes (the 'censoring time') from its previous stop before you received an alert that it broke down, which is valuable information.
+### Survival analysis
 
-### Allocating resources
+The term survival analysis highlights the field's close relation to medical statistics and in particular predicting survival times (the time until death).
+However, this is certainly not the only application of the field.
+In engineering, the field is often referred to as _reliability analysis_, as a common task is predicting the reliability of a component in a machine, for example predicting when an engine in a plane needs to be replaced.
+In economics, the term _duration analysis_ is often found, and in other areas _failure-time analysis_ may also be used.
 
-The previous example covered a common use case of survival analysis, which is estimating survival times, i.e., the time at which an event of interest will occur.
-In practice, survival models usually estimate the survival time *distribution* which predicts the probability of the event over a period of time, this is more informative than just predicting a single time as the model can also attribute uncertainty to that prediction.
-Another common survival problem is to rank observations (often patients) or separate them into risk groups, usually for allocating scarce resources.
-As another example that occurs daily, take the process of triaging patients in an emergency department.
-A patient presents with a set of symptoms, and is then triaged, which means their symptoms are assessed and used to determine how urgently they need to receive help (or if they can be dismissed from hospital).
-Triaging patients is once again a survival prediction.
-In this case, the event of interest is an increase in severity from initial symptoms to a more serious display of illness.
-Reasons for censoring might include the patient leaving the hospital.
-In this example, the survival prediction is to estimate the risk of the event occurring relative to other patients, i.e., when a new patient is triaged, how do their symptoms compare to patients who have already been through the triage process?
-Are they at a higher risk and should therefore be seen by a clinician sooner?
-Or can they afford to wait longer than those who have already been waiting a long time?
+In @sec-surv, 'survival analysis' is introduced to specifically refer to the case when the event of interest can occur exactly once, for example, predicting when a patient may die after diagnosis of Stage IV non-small cell lung cancer.
+In @sec-eha, 'event history analysis' is defined, which is a generalization of survival analysis to the case when one or more events can occur one or more times, for example, predicting when a patient will have relapses of multiple sclerosis.
+To align with common practice, the term 'survival analysis' is used throughout the book and context will make clear when the more general event history methods apply.
 
-### 'Survival' analysis
+One of the key aims in this book is to highlight the ubiquitous nature of survival analysis and to encourage more machine learning practitioners to use survival analysis when appropriate.
+Machine learning practitioners are likely familiar with regression and classification.
+However, there are many cases when survival analysis should be used instead, for example at your local bus stop...
 
-While the term survival analysis does highlight the closely related nature of the field with medical statistics and in particular predicting survival times (i.e., the time until death), this is certainly not the only application of the field (as we have already seen in the bus example).
-In engineering, the field is often referred to as 'reliability analysis', as a common task is predicting the reliability of a component in a machine, for example predicting when an engine in a plane needs to be replaced.
-In economics, the term 'duration analysis' is often found, and in other areas 'failure-time analysis' may also be used.
-This book uses 'survival analysis' throughout as this appears to be the most common term, however the term is used in this book to specifically refer to the case when the event of interest can occur exactly once (e.g., death).
-In @sec-surv, 'event history analysis' is defined, which is a generalisation of survival analysis to the case when one or more events can occur multiple times.
+#### Waiting for a bus {.unnumbered .unlisted}
 
-One of our key aims in this book is to highlight the ubiquitous nature of survival analysis and to encourage more machine learning practitioners to use survival analysis when appropriate.
-Machine learning practitioners are likely familiar with regression and classification, which are the subjects of popular machine learning books (some listed above) however there will be  cases when survival analysis should be used instead.
-The previous bus example gives one such case, where regression may appear sensible on the surface however this would not succeed in handling censored data.
-Another common example where survival analysis should be used but is not is to make 'T-year' probability predictions.
-These predictions are commonly found when discussing severe illnesses, for example statements such as "the five-year survival rate of cancer is p%."
-On the surface this may seem like a probabilistic classification problem, but once again modelling in this way would ignore censoring, for example due to some patients being lost to follow-up.
-Understanding censoring in all its many forms, is the first step to identifying a survival analysis problem, the second is knowing what to predict.
+Every day you are making survival predictions.
+For example, by guessing how long it will take before a bus arrives at your stop.
+At first glance, this might appear to be a regression problem, as regression is tasked with making continuous predictions.
+However, regression analysis assumes the outcome is always observed.
+In this example, a regression model would assume you are predicting when the bus will arrive based on the knowledge you have about how long it usually takes to arrive.
+In reality, that is unlikely to be the true dataset you have built in your mind.
+It is possible that on many occasions after waiting five minutes you decide to walk instead.
+On that day, these five minutes are your _observation period_, the period for which you are monitoring observations (bus arrivals).
+In principle, even if your exact bus broke down or was diverted, eventually a bus on your route will arrive at that stop.
+However, by leaving the bus stop, you no longer know when it will arrive, you just know it took at least five minutes.
+In this example, five minutes is known as the _censoring time_, it represents the amount of time that was observed without the event taking place.
+
+A defining characteristic of survival analysis is that censored observations are used for model training, not dismissed as missing data.
+In other words, whilst your bus did not arrive, it is still a learning opportunity to know it took at least five minutes.
+
+@fig-bus illustrates these concepts, where the bottom, red bus arrives two minutes after leaving the previous stop.
+Whereas it took the top, blue bus four minutes between leaving the previous bus stop and breaking down.
+
+![Demonstrating censoring across two days of waiting at the bus stop. On the first day, the person stops waiting for their bus at five minutes so the bus is 'censored' at this time, the true arrival time is unknown but is greater than five minutes. On the second day, the bus is known to arrive after two minutes.](Figures/introduction/bus.png){#fig-bus fig-alt="Two cartoon buses are pictured over a number line from 0 to 5. The top, purple bus has a line from '0' to '5' then an icon of a person walking and then the line continues to a tick sign which is past the final number '5' and without a number below it, representing an unknown arrival time. The bottom, green bus has a line from '0' to '2' with a check mark at the end indicating successful arrival."}
+
+#### Hospital prioritization {.unnumbered .unlisted}
+
+As well as survival distribution predictions, another common task in survival analysis is to rank observations or separate them into risk groups, for example to allocate resources.
+Take the example of prioritizing when patients are seen an emergency department.
+A patient presents with a set of symptoms and is compared to all other patients arriving at the emergency department.
+Their symptoms are assessed to understand how urgently they need to receive help and how their level of risk compares to others.
+This is again a survival prediction where the event of interest is escalation of care, and reasons for censoring might include the patient leaving before being seen.
+As will be seen in @sec-survtsk, risk rankings are mathematically tied to survival distributions.
+
+#### T-year survival probabilities {.unnumbered .unlisted}
+
+The bus example highlighted the relationship between survival analysis and regression.
+This example examines the close connection to classification.
+Support an elderly man is diagnosed with prostate cancer, the oncologist might tell him (in some softer words) "the ten-year survival rate of cancer in 75-year old males is 67.5\%".
+This initially appears as a probabilistic classification problem as the clinician is implicitly saying "if we look at who did or did not die from prostate cancer (the outcome), given a sample of similar people (the covariates), then approximately 67.5\% survived".
+But in the real-world, data is rarely this clean and there will be many patients in a dataset for whom it is unknown if they did or not die from their cancer 10 years from diagnosis.
+Perhaps because they moved abroad, died of another cause, or simply stopped turning up for appointments -- each of these is a censoring event.
+Once again, using techniques from survival analysis would allow more precise modelling of these censored observations.
+In fact, one can actually use a combination of classification and survival analysis methods through reductions and this will be returned to in @sec-discrete-time-reduction.
 
 ### Machine learning survival analysis {#sec-intro-mlsa}
 
-Machine learning is the field of Statistics primarily concerned with building models to either predict outputs from inputs or to learn relationships from data [@Hastie2001].
-This book is limited to the former case, or more specifically supervised learning, as this is the field in which the vast majority of survival problems live.
+Machine learning is an interdisciplinary field primarily concerned with building models that learn structure from data, for example to predict outputs from inputs or to identify patterns within observed data [@Hastie2001].
+Defining if a model should be called 'machine learning' is surprisingly difficult; there is no clear boundary separating 'classical' statistical estimators from what are now often labelled machine learning methods.
+This book defines _machine learning_ in a pragmatic sense to denote statistical models whose parameters or structure are learned from data by optimizing an explicit objective function and whose success is judged by empirical performance on new data.
+This definition tightly couples the concept of machine learning with the need for robust evaluation (Part II).
+This definition allows for a range of models (Part III) to be considered machine learning, such as simple linear regression.
+In fact, in @sec-classical we will describe how the performance of these apparently 'simple' models can compare very favorably to more modern machine learning algorithms - hence their inclusion in this book.
 
-Defining if a model is 'machine learning' is surprisingly difficult, with terms such as 'iterative' and 'loss optimization' being frequently used in often clunky definitions.
-This book defines machine learning models as those that:
-
-1. Require intensive model fitting procedures such as recursion or iteration;
-2. Are flexible in that they have hyper-parameters that can be tuned (@sec-ml);
-3. Trained using some form of loss optimization;
-4. Are 'black boxes' without simple closed-form expressions that can be easily interpreted;
-5. Aim to minimize the difference between predictions and ground truth whilst placing minimal assumptions on the underlying data form.
-
-However, there are other models, which one might think of as a 'traditional statistical' models (@sec-classical), that can also be used for machine learning.
-These 'traditional' models are low-complexity models that are either non-parametric or have a simple closed-form expression with parameters that can be fit with maximum likelihood estimation (or an analogous method).
-Whilst these traditional models are usually fast to train and are highly interpretable, they can be inflexible and may make unreasonable assumptions as they assume underlying probability distributions to model data.
-Augmenting these models with certain methods, leads to powerful models that can also be considered 'machine learning' tools; hence their inclusion in this book.
-
+This book focuses on the supervised learning setting, where the goal is to predict outcomes from labelled training data.
 Relative to other areas of supervised learning, development in survival analysis has been slow, as will be seen when discussing models in Part III.
-Despite this, development of models has converged on three primary tasks of interest, or 'survival problems', which are defined by the type of prediction the model makes.
-The formal definition of a machine learning survival analysis task is provided in @sec-ml, but informally one is encountering a survival problem if training a model on data where censoring is present in order to predict one of (@sec-survtsk):
+Despite this, development of models has converged on three primary tasks of interest, or _survival problems_, which are defined by the type of prediction the model makes.
+The mathematical definition of a machine learning survival analysis task is provided in @sec-survtsk.
+Generally, one is encountering a survival problem if training a model on data where censoring is present in order to predict one of:
 
-i. A 'relative risk': The risk of an event taking place.
-i. A 'survival time': The time at which the event will take place.
-i. A 'survival distribution': The probability distribution of the event times, i.e., the probability of the event occurring over time.
+i. A _survival distribution_: The probability distribution over event times (the bus example above).
+i. A _relative risk_: The risk of an event taking place compared to other observations in the same sample (the hospital example above).
+i. A _survival time_: The time at which the event will take place.
 
-This presents a key difference between survival analysis and other machine learning areas.
-There are three separate objects that can be predicted, and not all models can predict each one.
-Moreover, each prediction type serves a different purpose and you may require deploying multiple models to serve each one.
-As an example, an engineer is unlikely to care the exact time at which a plane engine fails, but they might greatly value knowing when the probability of failure increases above 50\% -- a survival distribution prediction.
-Returning to the triage example, a physician cannot process a survival distribution prediction to make urgent decisions, but they could assign limited resources if it is clear that one patient is at far greater risk than another -- a relative risk prediction.
+Each prediction type serves a different purpose and you may require training multiple models to optimally estimate each prediction type.
+However, as will be seen in @sec-survtsk, there are mathematical methods to transform these tasks between one another.
+As an example, an engineer is unlikely to care about the exact time at which a plane engine fails, but they might greatly value knowing when the probability of failure increases above 5\% -- a survival distribution prediction.
+Returning to the hospital example, a physician cannot process a survival distribution prediction to make urgent decisions, but they could assign limited resources if it is clear that one patient is at substantially greater risk than another -- a relative risk prediction.
 
-Another important difference that separates survival analysis from other statistical settings, is the focus on less common forms of distribution defining functions.
-A distribution defining function is a function that uniquely defines a probability distribution, most commonly the probability density function (pdf) and cumulative distribution function (cdf).
-In the context of survival analysis, the pdf at time $t$ is the likelihood of an event taking place at $t$, *independently of any past knowledge*, and the cdf is the probability that the event has *already* taken place at $t$, which is the opposite of the usual survival prediction of interest.
-Hence, survival analysis predictions usually focus on predicting the *survival function*, which is simply one minus the cdf, and the *hazard function*, which is the likelihood of the event occurring at $t$ *given* that the observation has survived to at least time $t$.
+When it comes to making distribution predictions, survival analysis stands out again.
+Common _distribution defining functions_, functions that uniquely define a probability distribution, are the probability density function (PDF) and cumulative distribution function (CDF).
+In survival settings, interpreting the PDF can be counter-intuitive as it is an unconditional quantity that does not account for whether the event has or has not already occurred.
+The CDF is the probability that the event has 'already' taken place at $t$, which is opposite to the usual survival prediction: whether the event 'will' take place.
+Therefore, survival analysis focuses instead on predicting the *survival function*, which is simply one minus the CDF, and the *hazard function*, which is the conditional rate of the event occurring at $t$ given that the observation has survived up to $t$.
 
-These functions are formally defined in @sec-surv and are visualized in @fig-distrfunctions assuming a Gompertz distribution, which is often chosen to model adult lifespans.
+These functions are formally defined in @sec-surv and are visualized in @fig-distrfunctions with a Gompertz distribution, which is often chosen to model adult lifespans.
 The figure demonstrates the utility of the survival and hazard functions for survival analysis.
-The survival function (bottom right) is a decreasing function from one to zero, at a given time point, $t$, this is interpreted as the probability of surviving until time point, $t$, or more generally the probability that the event of interest has not yet occurred.
+The survival function (bottom right) is a decreasing function from one to zero.
+This is the probability of surviving until a given time, $t$, or equivalently the probability that the event of interest has not yet occurred.
 The hazard function (top right), starts at zero and is not upper-bounded at one as it is a conditional probability.
-Even though the pdf peaks just before 0.5, the hazard function continues to increase as it is conditioned on not having experienced the event, hence the risk of event just continues to increase.
+Even though the PDF peaks just before 0.5, the hazard function continues to increase as it is conditioned on not having experienced the event, hence the risk of event continues to increase.
 
 ![Probability density (top left), hazard (top right), cumulative density (bottom left), and survival (bottom right) functions of a Gompertz(1, 2) distribution.](Figures/introduction/gompertz.png){#fig-distrfunctions fig-alt="Four line graphs. The density plot increases from (0,1) to (0.4, 1.25) and then decreases to (1.5, 0). The hazard smoothly increases from (0, 0) to (1.5, 20). The cumulative density smoothly increases from (0,1) to (1.5, 1) and the survival function is the reverse shape to the cumulative density from (0, 1) to (1.5, 0)."}
 
-Instead of duplicating content from machine learning or survival analysis books, this book primarily focuses on defining the suitability of different methods and models depending on the availability data.
-For example, when might you consider a neural network instead of a Cox Proportional Hazards model?
-When might you use a random forest instead of a support vector machine?
-Is a discrimination-booted gradient boosting machine more appropriate than other objectives?
-Can you even use a machine learning model if you have left-censored multi-state data (we will define these terms later)?
-
-From fitting a model to evaluating its predictions, knowing the different prediction types is vital to interpretation of results, these will be formalised in @sec-surv.
-
 ## Censoring and Truncation
 
-As already discussed, censoring is the defining feature of survival analysis.
-As well censoring, some survival problems may also deal with 'truncation', which can be thought of as a stricter form of censoring.
-In general terms, truncation is the process of *fully* excluding data whereas censoring is the process of *partially* excluding data.
-In survival analysis, data is measured over time and censoring or truncation apply to the survival time outcome.
-The precise definitions of different types of censoring and truncation are provided in @sec-surv, for now we just provide a non-technical summary of the most common form of both to highlight how prominent they are.
+As already discussed, censoring is a defining feature of survival analysis.
+In addition to censoring, survival data can include _truncation_, which means portions of follow-up time are excluded.
+The precise definitions of different types of censoring and truncation are provided in @sec-surv, non-technical summaries of the most common forms of censoring and truncation are provided below.
 
-The most common form of censoring is right-censoring (@fig-intro-censoring, middle), this occurs when the true survival time is 'to the right of', i.e., larger than (if you imagine a number line), the observed censoring time.
-The examples above are all forms of right-censoring.
-A canonical example of right-censoring is as follows: if a medical study lasts five years and patients are censored if they are alive at the end of the study, then all patients alive at five years are right-censored as their true survival time must be greater than five years.
+The most common form of censoring is right-censoring (@fig-intro-censoring, second row), this occurs when the true survival time is greater than ('to the right of,' if you imagine a number line) the observed censoring time.
+The examples in @sec-intro-def are all forms of right-censoring.
+Left-censoring is recorded when the event of interest is less than ('to the left of') the observed censoring time.
+@sec-surv provides an example of someone telling an interviewer that they started using a phone (the event of interest) before the interview, but they do not remember when.
+If the time-to-event outcome is "age at first phone use" then a 23-year-old who is using a phone but cannot remember when they started, is left-censored at '23'.
+Right- and left-censoring can occur completely independently of the outcome of interest, or they may directly affect the outcome of interest, in which case the censoring event is known as a _competing risk_ (@sec-eha).
+For example, if you are waiting for a bus and decide to walk after five minutes, the bus arrival time is censored as you no longer observe when it will arrive, but your decision to walk does not impact the bus in any way, it's eventual arrival time is unchanged.
+In contrast, if the bus broke down, then this breakdown would be a competing risk as it directly affects its probability of arriving.
+Handling competing risks forms a large part of this book.
 
-In contrast, the most common form of truncation is left-truncation, which can occur in a few different situations and results in data before the truncation time either being partially or fully removed (@fig-intro-censoring, bottom).
-The examples below look at partial left-truncation, complete truncation, and using partial truncation to fix biases.
+Left-truncation is the more common form of truncation and involves data before the truncation time being excluded.
+Left-censoring occurs because the event of interest has already happened but not known when.
+Left-truncation occurs because a portion of data that occurred before the study start is removed but the event of interest has not yet occurred.
+Another way to look at it is to note that truncation times affect enrollment into a study whereas censoring affects outcome observation.
 
-**Example 1: Partial left-truncation**
-Say a study begins in 2024 to predict the time until death for a patient diagnosed with tuberculosis (TB) treated with a novel treatment.
-The study consists of many individuals, however some of these already had TB before 2024.
-Left-truncation would occur if the study excludes data about the individuals who had TB before 2024, i.e., treated them as if they were diagnosed with TB on entry to the study - this is partial left-truncation.
-Excluding this data would bias the results, especially if the novel treatment is most effective for people in the early-stages of the disease.
-One common way to account for this bias would be to record the *initial* date of diagnosis and the date the treatment began.
+The examples below consider how left-truncation can both cause and fix biases.
 
-**Example 2: Complete left-truncation**
-Consider researchers exploring if survival models can be used to more accurately predict the exact day a pregnant person will give birth, with abortion and miscarriage treated as competing risks.
-Unfortunately, there will be cases of miscarriage occurring before a person finds out they are pregnant, which means data about their pregnancy will never be collected.
-The first, more obvious, consequence of this omission is that the true number of miscarriages will be underestimated.
+**Example 1: Delayed entry**
+Say a study looks at predicting the time until death for a patient diagnosed with tuberculosis (TB) treated with a novel treatment.
+The study design uses a convenience sample that means some individuals had TB from the study start and others did not.
+Left-truncation is present if individuals had TB before the study start.
+If one were to ignore left truncation, these patients would be treated as if they were diagnosed with TB on entry to the study, which could bias estimates to shorter survival times (@fig-intro-censoring, third row).
+However, it would also be wrong to exclude this data as that would induce _survivorship bias_: individuals with more aggressive strains are systematically excluded and thus biasing analysis to longer survival times.
+A common way to account for this bias would be to model the data such that the observation period is reset to time of diagnosis and not the study entry.
+Specialized methods introduced in @sec-surv should also be used.
+
+**Example 2: Selection bias**
+Consider researchers predicting the probability of miscarriage over time for pregnant people.
+There will be cases of miscarriage occurring before a person finds out they are pregnant, which means data about their pregnancy will never be collected (@fig-intro-censoring, fourth row).
+The first consequence of this omission is that the true number of miscarriages will be underestimated.
 The second consequence is that the time until miscarriage outcome will be overestimated, as earlier miscarriages are not recorded so the outcome time is skewed towards later ones.
-To demonstrate why this is problematic, if someone discovers they are pregnant early and this new model is used to predict the outcome of their pregnancy, then even if it correctly predicts they have a miscarriage, it is likely to predict this happens later than it actually does, which could have an effect on any potential treatment (physical and/or mental) that may need to be allocated.
-The bias in this example is particularly hard to address as the data is completely truncated - the subjects are omitted without the researchers being aware of them.
+If a model were trained on this bias data then it is likely to predict the risk of miscarriage being lower than it actually is and occurring later in time.
 
-![Censoring and truncation. Top row: no censoring or truncation, a patient is diagnosed with a disease, enrolled in a study, and dies during the observed period, their survival time is known. Middle: right censoring, a patient is diagnosed and enrolled in a study, they leave the study either due it ending or for some other reason, this is recorded as their censoring time and they die at some unknown later time to the right of the censoring time. Right: left truncation, a patient is diagnosed with a disease but not enrolled to a study until some time afterwards, their data before this time has not been collected and is completely unknown, they then die during the study period.](Figures/introduction/censoring.png){#fig-intro-censoring fig-alt="TODO"}
+Whilst both the previous examples involve left-truncation, the mishandling of truncation in the first example results in an analytical bias by mishandling delayed entry and can be fixed using modelling methods.
+The second example is an unavoidable structural bias (pregnancies/miscarriages are unobserved not just censored) and requires gathering more data or conducting sensitivity analyses.
 
 **Example 3: Immortal time bias**
-Immortal time bias occurs when an observation in the data is guaranteed to survive a period of time (hence being 'immortal' in that time) by virtue of the study design.
-For example, say a randomised controlled trial is conducted to test if a novel chemotherapy treatment improves survival rates from a given cancer.
+Immortal time bias occurs when an observation in the data is guaranteed to survive a period of time (hence being 'immortal' in that time) by virtue of the study design (@fig-intro-censoring, bottom row).
+For example, say a randomized controlled trial is conducted to test if a novel chemotherapy treatment improves survival rates from a given cancer.
 The trial is split into two arms, one for existing treatments and one for the novel treatment, and a patient is eligible for the novel treatment only if they have been living with cancer for two years and no other treatment has been shown to work.
 Finally, patients are enrolled into the study from the date of diagnosis.
 This dataset now includes immortal time bias as patients can only be in the novel treatment arm if they have already survived two years, whereas patients in the other arm have no such restriction.
-Hence, even if the novel treatment has no benefit, patients in the novel arm are guaranteed to have a better survival outcome (from diagnosis) as they would not have been included if they died before two years, whereas patients may die (even if by chance) in the control arm before this time (@fig-intro-immortal).
-To control for this bias, one could improve the study design by considering the time to death given two years of surviving and therefore partially left-truncating data before this time.
-Or, one could determine eligibility at the time of diagnosis by randomly assigning patients to each group but only starting the novel treatment at two years.
-Detecting immortal time bias is hugely important, especially in randomised controlled trials to ensure novel treatments are not oversold.
+This conditioning on survival is mathematically equivalent to left-truncating the treatment arm at the eligibility time (essentially resetting 'time zero' to date of treatment), while not applying the same truncation to the control arm.
 
-Censoring is a mechanism applied at the data collection stage in order to yield more useful results by recording as much data as possible.
+Hence, even if the novel treatment has no benefit, patients in the novel arm are guaranteed to have a better survival outcome (from diagnosis) as they would not have been included if they died before two years, whereas patients may die (even if by chance) in the control arm before this time (@fig-intro-censoring).
+To control for this bias, one could apply the same truncation rule to both arms of the study, meaning setting 'two years' as the new study start time.
+Alternatively, patients could be randomly assigned to a treatment group at enrollment with observation throughout the initial two year period, even before treatment is provided.
+Detecting immortal time bias is vital, especially in randomized controlled trials to ensure novel treatments are not oversold.
+
+Right-truncation is rare as it requires very specific, data collection methods.
+For example, if studying death from disease using a retrospective dataset, then right-truncation would occur if the dataset was sampled to only include observations who die; excluding observations that survived beyond the observation period.
+
+Censoring is a mechanism to yield more useful results by recording as much data as possible.
 Truncation is due to the study design and may either create or remove biases in data collection/curation.
 The first Part of this book will continue to demystify the concepts of censoring, truncation, and prediction types.
 
-![Immortal time bias. Top row: a patient is in the control group and ineligible for treatment, they are observed from the date of enrolment and die during the study period. Bottom row: a patient is in the treatment group and is observed once the treatment is administered, therefore they are guaranteed to survive until the treatment is provided, skewing results towards longer survival times.](Figures/introduction/immortal.png){#fig-intro-immortal fig-alt="TODO"}
+![Common forms of censoring and truncation with biases. First row (fully observed patient): a patient is diagnosed with a disease and immediately enrolled into study and observed to die during the study period. Second row (right censoring): a patient is diagnosed with a disease and immediately enrolled into study but they drop-out before they die, their true survival time is unknown. Third row (left truncation, delayed entry): a patient is diagnosed before they enter the study but enrolled at a later time, they are erroneously treated as if they were diagnosed on the date of enrolment. Fourth row (left truncation selection bias): a patient dies before they enter the study and are never observed. Fifth row (immortal time bias): a patient is diagnosed with a disease and immediately enrolled into study. However, in contrast to the patient in the top row in the control group who can die at any point from enrolment, the patient in the treatment group (bottom row) cannot die between enrolment and treatment (otherwise they could not have entered the treatment group).](Figures/introduction/censoring.png){#fig-intro-censoring fig-alt="TODO"}
 
 ## Start to finish {#sec-mlsa}
 
-## Reproducibility
+To help make the concepts in this book less abstract, this section outlines what you may consider when undertaking machine learning survival analysis.
+There are many different ways to break down such an analysis and the following presents one such possibility:
 
-This book includes simulations and figures generated in $\Rstats$, the code for any figures or experiments in this book are freely available at [https://github.com/mlsa-book/MLSA](https://github.com/mlsa-book/MLSA) under an MIT license and all content on this website is available under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+1. Establish the research question
+2. Gather relevant data
+3. Describe the outcome
+4. Identify censoring/truncation in the data and describe strategies for handling them
+5. Describe the prediction type
+6. Select metrics based on the data
+7. Select models based on the data and metrics
+8. Split data for model training
+9. Evaluate your model
 
-:::: {.callout-tip icon=false}
+A hypothetical example is given below, it is adapted from @Dennis2020.
+Terms and methods below will be defined throughout the rest of this book.
 
-## Further reading
+**1. Research question**
+Say that we are looking to predict the 30-day survival distribution for a patient with Type 2 diabetes being admitted to a critical care setting in England, UK for COVID-19.
 
-* [@Wang2017] provides a light-touch but comprehensive survey of machine learning models for survival analysis.
+**2. Data**
+This is clearly a retrospective study as the pandemic is in the past but there are many datasets with relevant information, such as the COVID-19 Hospitalisation in English Surveillance System (CHESS) dataset.
+To reduce biases that could arise from data collection (such as left-truncation biases), a fixed date of interest is set: 1 March 2020 to 27 July 2020.
 
-::::
+**3. Outcome**
+The outcome of interest is 30-day in-hospital all-cause mortality, which is the risk of dying from any cause within 30 days of being admitted to hospital, meaning it can occur at most once (@sec-surv).
+Other potential outcomes include: discharge, loss to follow-up, patient survives to 30 days.
+
+**4. Censoring/truncation**
+The study is focused on admissions during the observation period, thus excludes patients diagnosed with COVID-19 before 1 March 2020.
+Immortal time bias and survivorship bias are avoided by defining study entry as hospital admission and using a fixed 30-day observation window, with inclusion/exclusion into the study not dependent on any outcomes, treatment, patient age, illness length.
+Loss to follow-up is assumed to be a random, independent right-censoring event.
+Surviving to 30 days is an administrative right-censoring event (@sec-surv) -- which means the reason for censoring is due to the observation window closing and not the patient (as in the bus example above).
+Discharge is a competing risk as once a patient is discharged (@sec-eha), they are no longer at risk of 'in-hospital' mortality.
+
+**5. Prediction types**
+As the goal is survival probability over time, the survival task is to predict a probability distribution over the 30-day horizon (@sec-survtsk).
+
+**6. Metrics**
+The task is to evaluate survival distribution predictions, whilst accounting for competing risks.
+Proper scoring rules (@sec-rules) are ideal for evaluating distribution predictions and the right-censored logloss is one example of a scoring rule that can be extended to evaluate predictions when competing risks are present.
+
+**7. Models**
+The sample of interest from the CHESS dataset has over 20,000 observations with relatively few features.
+This means that traditional survival models (@sec-classical) can be considered alongside more modern alternatives.
+Given the focus on survival distribution predictions, one might start by considering a Fine and Gray model with optional boosting to improve predictions (@sec-boost).
+Additionally, cause-specific random survival forests with log-rank splitting might also be worth exploring (@sec-ranfor).
+
+**8. Data splitting**
+Given the size of the dataset, a simple hold-out splitting strategy might suffice (@sec-ml).
+For example with a random subset of 15,000 observations to develop models and the rest used to evaluate model predictions.
+As the rate of censoring is unlikely to be too small or large (can be confirmed with exploratory analysis), stratified sampling of the data is not required.
+
+**9. Evaluation**
+Finally, with all the above in place, the models can be trained on the same training data and then evaluated using the metrics outlined above.
+Once the optimal model has been found, it can be retrained on the complete dataset for feature analysis or deployment.
+
+## Reproducibility and online book
+
+An online open-access (CC BY-NC-SA 4.0) version of this book is available for free at [mlsabook.com](mlsabook.com).
+This book includes simulations and figures generated in $\Rstats$, the code for any figures or experiments in this book are freely available at [https://github.com/mlsa-book/MLSA](https://github.com/mlsa-book/MLSA) under an MIT license.
+
