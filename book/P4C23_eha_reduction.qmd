@@ -1,0 +1,118 @@
+---
+abstract: TODO (150-200 WORDS)
+---
+
+::: {.content-visible when-format="html"}
+{{< include _macros.tex >}}
+:::
+
+# Reductions for Event-History Analysis {#sec-reductions-eha}
+
+{{< include _wip.qmd >}}
+
+@sec-eha introduced event-history analysis, showing that more complex time-to-event settings --- competing risks and multi-state models --- can be characterized by cause-specific or transition-specific hazards.
+In particular, the cumulative incidence function (CIF) was shown to depend on *all* cause-specific hazards (@eq-cif), and transition probabilities in multi-state models were expressed via the product integral over *all* transition-specific hazards (@eq-ms-prodint-cumu-hazards).
+
+This chapter leverages these relationships to formulate event-history analysis as a *reduction* to multiple single-event hazard estimation problems.
+The key insight is simple: for each cause (or transition), events of other types are treated as censored, yielding a standard single-event survival analysis problem.
+Any method from the previous chapters that provides cause-specific hazard estimates - including partition based reductions(@sec-partition-based-reductions) --- can then be applied to estimate each cause-specific hazard.
+The individual estimates are subsequently combined to obtain quantities of interest such as CIFs or transition probabilities.
+This reduction principle fits naturally into the general reduction pipeline (@fig-reductions-pipeline).
+
+
+## Competing Risks via Cause-Specific Hazards {#sec-cr-reduction}
+
+Recall the competing risks setting from @sec-competing-risks: subjects start in an initial state $0$ and may transition to one of $q$ absorbing states $e \in \{1,\ldots,q\}$.
+The data consists of $(t_i, e_i, \xx_i)$ where $t_i$ is the observed time, $e_i \in \{0, 1, \ldots, q\}$ indicates the event type ($e_i = 0$ for censoring), and $\xx_i$ are covariates.
+
+The reduction to single-event hazard estimation proceeds as follows:
+
+1. **Create cause-specific datasets.** For each cause $e \in \{1,\ldots,q\}$, create a modified dataset $\calD_e$ in which only events of type $e$ are considered as events; all other event types $e' \neq e$ are treated as censored.
+Formally, define
+$$
+\delta_{i,e} = \II(e_i = e)
+$$
+and set $(t_i, \delta_{i,e}, \xx_i)$ as the observation for subject $i$ in dataset $\calD_e$.
+This is valid because the cause-specific hazard $h_e(\tau|\xx)$ (@eq-cause-specific-hazard) quantifies the instantaneous risk of event $e$ among subjects still in state $0$, regardless of how competing events are handled after they leave the risk set.
+
+2. **Fit single-event hazard models.** Apply any learner capable of estimating a hazard function to each $\calD_e$, yielding cause-specific hazard estimates $\hath_e(\tau|\xx)$ (or equivalently, cause-specific cumulative hazard estimates $\hatH_e(\tau|\xx)$).
+
+3. **Compute the all-cause survival probability.** Combine the cause-specific cumulative hazards via (@eq-all-cause-surv-prob):
+$$
+\hatS(\tau|\xx) = \exp\left(-\sum_{e=1}^{q} \hatH_e(\tau|\xx)\right).
+$$ {#eq-cr-allcause-surv}
+
+4. **Compute CIFs.** The cumulative incidence function for cause $e$ follows from the discrete approximation of (@eq-cif):
+$$
+\hatF_e(\tau|\xx) = \sum_{k: t_{(k)} \leq \tau} \hatS(t_{(k-1)}|\xx) \cdot \Delta\hatH_e(t_{(k)}|\xx),
+$$ {#eq-cr-cif-estimate}
+where $\Delta\hatH_e(t_{(k)}|\xx) = \hatH_e(t_{(k)}|\xx) - \hatH_e(t_{(k-1)}|\xx)$ is the increment of the cause-specific cumulative hazard in interval $(t_{(k-1)}, t_{(k)}]$.
+
+This procedure is a direct analogue of the Aalen-Johansen estimator (@eq-aalen-johanson), but with the non-parametric hazard estimates replaced by model-based estimates that can incorporate covariate effects.
+
+The combination step (steps 3 and 4) is essential and distinguishes this approach from a naive analysis.
+As demonstrated in @sec-cens-vs-cr, simply fitting a single-event model for cause $e$ (treating all other events as censored) and computing $1 - \hatS_e(\tau|\xx)$ does *not* yield a valid CIF.
+The quantity $1 - \hatS_e(\tau|\xx) = 1 - \exp(-\hatH_e(\tau|\xx))$ represents the marginal probability of event $e$ in a hypothetical world where other events cannot occur --- a so-called *net probability* --- which generally overestimates the CIF.
+The CIF, on the other hand, is the probability of observing event $e$ by time $\tau$ in the presence of all competing events (@eq-cif), and its computation requires the all-cause survival probability $\hatS(\tau|\xx)$, which in turn depends on all cause-specific hazards.
+
+**Separate vs. joint models.**
+The approach above fits fully separate models for each cause.
+An alternative is to fit a single *stacked* model that includes cause-by-covariate interactions, which allows sharing of information across causes (for example, a common baseline hazard structure or shared covariate effects).
+This can be advantageous when certain causes have few events, as the shared structure acts as a form of regularization.
+In partition-based reductions, interactions between a cause variable and the time variable $t_j$ will yield different baseline hazards for each cause.
+
+
+
+## Multi-State Models {#sec-ms-reduction}
+
+The reduction principle extends naturally to multi-state models (@sec-multi-state).
+Recall that a multi-state process is characterized by transition-specific hazards $h_{\ell e}(\tau|\xx)$ (@eq-ms-transition-hazards), where $\ell$ is the origin state and $e$ the destination state.
+Transition probabilities are obtained from these hazards via the product integral (@eq-ms-prodint-cumu-hazards):
+<!--  -->
+$$
+\mathbf{P}(\zeta, \tau|\xx) = \mathscr{P}_{u \in (\zeta, \tau]}(\mathbf{I} + d\mathbf{H}(u|\xx)),
+$$
+<!--  -->
+which is approximated in practice by the finite matrix product (@eq-ms-prodint-approx):
+<!--  -->
+$$
+\mathbf{P}(\zeta, \tau|\xx) \approx \prod_{j=1}^{J}(\mathbf{I} + \Delta\hat{\mathbf{H}}_{\ell e}(t_{j}|\xx)).
+$$
+<!--  -->
+
+The reduction follows the same logic as for competing risks, but applied to each possible transition:
+
+1. For each transition $\ell \to e$, create a dataset of subjects who entered state $\ell$ (with their entry times as left-truncation times), treating the transition $\ell \to e$ as the event and all other transitions from $\ell$ as censoring.
+2. Fit a single-event hazard model to each transition-specific dataset, accounting for left-truncation.
+3. Combine the transition-specific hazard estimates via the matrix product to obtain transition probabilities.
+
+Compared to competing risks, two additional complexities arise.
+
+**Left-truncation.**
+In the competing risks setting, all subjects usually start in the initial state at time $0$.
+In a multi-state process, subjects enter the risk set for a transition $\ell \to e$ at the time they enter state $\ell$, which can differ across subjects.
+As discussed in @sec-multi-state for the `prothr` data, a subject may only enter an intermediate state (and thus become at risk for transitions from that state) at some later time point.
+This constitutes *internal* or *process-induced* left-truncation and must be handled appropriately by the hazard estimation method.
+
+## Conclusion
+
+:::: {.callout-warning icon=false}
+
+## Key takeaways
+
+* Event-history analysis (competing risks, multi-state models) reduces to fitting multiple single-event hazard models --- one per cause or transition.
+* Any ML method that can estimate (cause-specific or transition-specific) hazards can serve as the base learner in this framework.
+* CIFs and transition probabilities are obtained by *combining* the individual hazard estimates via the Aalen-Johansen estimator or product integral approximation.
+* The combination step is essential: naively computing $1 - \hatS_e(\tau|\xx)$ from a single cause-specific model does *not* yield a valid CIF (@sec-cens-vs-cr).
+* The choice of base learner is modular --- different methods, or same method with differing complexity, can be used for different causes or transitions.
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* @beyersmann.competing.2012 provide a comprehensive and accessible introduction to competing risks and multi-state models.
+* @Bender2021 present a general machine learning framework for survival analysis that includes event-history extensions based on PEMs.
+
+::::
