@@ -685,20 +685,53 @@ $$ {#eq-km-censoring}
 where $t_{(\ell)},l=1,\ldots,g$ are the unique, ordered censoring times.
 In this book, $\KMG$ specifically refers to the Kaplan-Meier estimator fit to the observed censoring times $(t_i, 1-\delta_i)$ from some training data.
 
-
 ### Inverse probability of censoring weights (IPCW) {#sec-surv-ipcw}
 
-The inverse probability of censoring (IPC) weights are defined as
+A fundamental concept in survival analysis is inverse probability of censoring (IPC) weighting.
+As the name suggests, these weights are defined as the inverse of the probability of remaining censored.
+IPC weighting is most commonly used to adjust for bias introduced by right-censoring by upweighting observations that remain under observation at later time points.
+
+For an observation $i$ with covariates $\xx_i$, the IPC weight at time $\tau$ is given by
 
 $$
-w(\tau|\mathbf{x}) = \frac{1}{S(\tau|\mathbf{x})}
+w(\tau|\xx_i) = \frac{1}{S_C(\tau|\xx_i)},
 $$ {#eq-ipcw}
 
-When no relationship between the censoring time and the covariates is assumed, the IPC weights are in most cases estimated by plugging in the Kaplan-Meier estimate of @eq-km-censoring into @eq-ipcw, such that 
+where $S_C(\tau)$ is the survival function of the censoring time, that is, the probability that the observation is uncensored up until $\tau$.
+It is common to assume that censoring is independent of the covariates.
+Under this assumption, the censoring distribution is usually estimated with the Kaplan-Meier estimator (@sec-surv-km-censoring).
+The IPC weights are then obtained by plugging (@eq-km-censoring) into (@eq-ipcw):
 
 $$
-\hat{w}(\tau) = \frac{1}{\KMG(\tau)}
+\hat{w}(\tau) = \frac{1}{\KMG(\tau)}.
 $$ {#eq-ipcw-km}
+
+To illustrate the utility of IPC weights, consider their role in weighting contributions to a loss function.
+Specific losses are introduced in Part II; for now, let $L_i$ be a modified version of the log-loss found in classification:
+
+$$
+L_{NL}(\xx_i, \delta_i, t_i) = \frac{-\delta_i \log(\hat{f}(t_i|\xx_i))}{\KMG(t_i)}.
+$$
+
+This loss is not commonly used in practice but is useful for illustration.
+The loss excludes censored observations as their true event times are unknown.
+For uncensored observations, the negative log-likelihood of the predicted probability density function (PDF) is evaluated at the true event time.
+The intuition is that the density should be highest at this time, resulting in a lower loss.
+IPC weights are evaluated at individual event times and hence, observations with events at later times receive larger weights, as the probability of remaining uncensored decreases over time.
+This is illustrated in @tbl-ipcw-ex, which compares the unweighted and IPC-weighted loss contributions.
+
+| $t_i$ | $\delta_i$ | $\hat{G}(t_i)$ | $1 / \hat{G}(t_i)$ | $-\delta_i \log(\hat{f}(t_i \mid \mathbf{x}_i))$ | $L_{NL}(\mathbf{x}_i, \delta_i, t_i)$ |
+|---|---|---|---|---|---|
+| 2      | 1            | 0.90                 | 1.11                                     | 0.50                                             | 0.56                                   |
+| 5      | 1            | 0.70                 | 1.43                                     | 0.50                                             | 0.71                                   |
+| 8      | 1            | 0.40                 | 2.50                                     | 0.50                                             | 1.25                                   |
+| 6      | 0            | 0.60                 | 1.67                                     | 0.00                                             | 0.00                                   |
+
+: Demonstrating IPCW for the negative log-likelihood function. The contribution to the loss (final column) is largest for observations with events at later times. {#tbl-ipcw-ex}
+
+This example highlights that later event times contribute more heavily to the loss after weighting, compensating for the increased likelihood of censoring.
+At later time points, a model optimizing this loss places greater emphasis on the remaining uncensored observations.
+
 
 ## Conclusion
 
