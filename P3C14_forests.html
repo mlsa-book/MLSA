@@ -2,7 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.8.27">
+<meta name="generator" content="quarto-1.9.36">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
@@ -10,6 +10,9 @@
 
 <title>11&nbsp; Random Forests – Machine Learning in Survival Analysis</title>
 <style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
 div.columns{display: flex; gap: min(4vw, 1.5em);}
@@ -25,7 +28,6 @@ ul.task-list li input[type="checkbox"] {
 div.csl-bib-body { }
 div.csl-entry {
   clear: both;
-  margin-bottom: 0em;
 }
 .hanging-indent div.csl-entry {
   margin-left:2em;
@@ -55,15 +57,14 @@ div.csl-indent {
 <link href="./P3C13_classical.html" rel="prev">
 <script src="site_libs/quarto-html/quarto.js" type="module"></script>
 <script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
-<script src="site_libs/quarto-html/axe/axe-check.js" type="module"></script>
 <script src="site_libs/quarto-html/popper.min.js"></script>
 <script src="site_libs/quarto-html/tippy.umd.min.js"></script>
 <script src="site_libs/quarto-html/anchor.min.js"></script>
 <link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
-<link href="site_libs/quarto-html/quarto-syntax-highlighting-14d2473a982606de670f0038afa36c2b.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-d350c7185185dab00f6904e97b3f80f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="site_libs/bootstrap/bootstrap.min.js"></script>
 <link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="site_libs/bootstrap/bootstrap-e35eb2fb8e5e96dfec46bd5a8b82abce.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="site_libs/bootstrap/bootstrap-67ee446969feba61b1427592acfcc1de.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script id="quarto-search-options" type="application/json">{
   "location": "sidebar",
   "copy-button": false,
@@ -93,7 +94,7 @@ div.csl-indent {
 }</script>
 
   <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
 
 <script type="text/javascript">
 const typesetMath = (el) => {
@@ -464,7 +465,7 @@ L^b_{xy}(j,c_j) := \{(\mathbf{x}_i,y_i)|x_{i;j} \boldsymbol{\geq} c_j, i = 1,...
 <section id="random-forests" class="level3" data-number="11.1.2">
 <h3 data-number="11.1.2" class="anchored" data-anchor-id="random-forests"><span class="header-section-number">11.1.2</span> Random Forests</h3>
 <p>Decision trees often overfit the training data, hence they have high variance, perform poorly on new data, and are not robust to even small changes in the original training data. Moreover, important variables can end up being ignored as only subsets of dominant variables are selected for splitting.</p>
-<p>To counter these problems, <em>random forests</em> are designed to improve prediction accuracy and decrease variance. Random forests utilise bootstrap aggregation, or <em>bagging</em> <span class="citation" data-cites="Breiman1996a">(<a href="P5C26_references.html#ref-Breiman1996a" role="doc-biblioref">Leo Breiman 1996</a>)</span>, to aggregate many decision trees. Bagging is a relatively simple algorithm, as follows:</p>
+<p>To counter these problems, <em>random forests</em> are designed to improve prediction accuracy and decrease variance. Random forests utilise bootstrap aggregation, or <em>bagging</em> <span class="citation" data-cites="Breiman1996a">(<a href="P5C26_references.html#ref-Breiman1996a" role="doc-biblioref">Breiman 1996</a>)</span>, to aggregate many decision trees. Bagging is a relatively simple algorithm, as follows:</p>
 <ol type="1">
 <li><strong>For</strong> <span class="math inline">\(b = 1,...,B\)</span>:</li>
 <li><span class="math inline">\(D_b \gets \text{ Randomly sample with replacement } \mathcal{D}_{train}\)</span></li>
@@ -488,10 +489,10 @@ L^b_{xy}(j,c_j) := \{(\mathbf{x}_i,y_i)|x_{i;j} \boldsymbol{\geq} c_j, i = 1,...
 <p>Unlike other machine learning methods that may require complex changes to underlying algorithms, random forests can be relatively simply adapted to <em>random survival forests</em> by updating the splitting rules and terminal node predictions to those that can handle censoring and can make survival predictions. This chapter is therefore focused on outlining different choices of splitting rules and terminal node predictions, which can then be flexibly combined into different models.</p>
 <section id="splitting-rules" class="level3" data-number="11.2.1">
 <h3 data-number="11.2.1" class="anchored" data-anchor-id="splitting-rules"><span class="header-section-number">11.2.1</span> Splitting Rules</h3>
-<p>Survival trees and RSFs have been studied for the past four decades and whilst there are many possible splitting rules <span class="citation" data-cites="Bou-Hamad2011">(<a href="P5C26_references.html#ref-Bou-Hamad2011" role="doc-biblioref">Bou-Hamad, Larocque, and Ben-Ameur 2011</a>)</span>, only two broad classes are commonly utilised (as judged by number of available implementations, e.g., <span class="citation" data-cites="pkgsksurvival">Pölsterl (<a href="P5C26_references.html#ref-pkgsksurvival" role="doc-biblioref">2020</a>)</span>; <span class="citation" data-cites="pkgranger">Wright and Ziegler (<a href="P5C26_references.html#ref-pkgranger" role="doc-biblioref">2017</a>)</span>; <span class="citation" data-cites="Ishwaran2011">H. Ishwaran et al. (<a href="P5C26_references.html#ref-Ishwaran2011" role="doc-biblioref">2011</a>)</span>). The first class rely on hypothesis tests, and primarily the log-rank test, to maximise dissimilarity between splits, the second class utilises likelihood-based measures. The first is discussed in more detail as this is common in practice and is relatively straightforward to implement and understand, moreover it has been demonstrated to outperform other splitting rules <span class="citation" data-cites="Bou-Hamad2011">(<a href="P5C26_references.html#ref-Bou-Hamad2011" role="doc-biblioref">Bou-Hamad, Larocque, and Ben-Ameur 2011</a>)</span>. Likelihood rules are more complex and require assumptions that may not be realistic, these are discussed briefly.</p>
+<p>Survival trees and RSFs have been studied for the past four decades and whilst there are many possible splitting rules <span class="citation" data-cites="Bou-Hamad2011">(<a href="P5C26_references.html#ref-Bou-Hamad2011" role="doc-biblioref">Bou-Hamad et al. 2011</a>)</span>, only two broad classes are commonly utilised (as judged by number of available implementations, e.g., <span class="citation" data-cites="pkgsksurvival">Pölsterl (<a href="P5C26_references.html#ref-pkgsksurvival" role="doc-biblioref">2020</a>)</span>; <span class="citation" data-cites="pkgranger">Wright and Ziegler (<a href="P5C26_references.html#ref-pkgranger" role="doc-biblioref">2017</a>)</span>; <span class="citation" data-cites="Ishwaran2011">Ishwaran et al. (<a href="P5C26_references.html#ref-Ishwaran2011" role="doc-biblioref">2011</a>)</span>). The first class rely on hypothesis tests, and primarily the log-rank test, to maximise dissimilarity between splits, the second class utilises likelihood-based measures. The first is discussed in more detail as this is common in practice and is relatively straightforward to implement and understand, moreover it has been demonstrated to outperform other splitting rules <span class="citation" data-cites="Bou-Hamad2011">(<a href="P5C26_references.html#ref-Bou-Hamad2011" role="doc-biblioref">Bou-Hamad et al. 2011</a>)</span>. Likelihood rules are more complex and require assumptions that may not be realistic, these are discussed briefly.</p>
 <section id="hypothesis-tests" class="level4 unnumbered unlisted">
 <h4 class="unnumbered unlisted anchored" data-anchor-id="hypothesis-tests">Hypothesis Tests</h4>
-<p>The log-rank test statistic has been widely utilized as a splitting-rule for survival analysis <span class="citation" data-cites="Ciampi1986 Ishwaran2008 LeBlanc1993 Segal1988">(<a href="P5C26_references.html#ref-Ciampi1986" role="doc-biblioref">Ciampi et al. 1986</a>; <a href="P5C26_references.html#ref-Ishwaran2008" role="doc-biblioref">B. H. Ishwaran et al. 2008</a>; <a href="P5C26_references.html#ref-LeBlanc1993" role="doc-biblioref">LeBlanc and Crowley 1993</a>; <a href="P5C26_references.html#ref-Segal1988" role="doc-biblioref">Segal 1988</a>)</span>. The log-rank test compares the survival distributions of two groups under the null-hypothesis that both groups have the same underlying risk of (immediate) events, with the hazard function used to compare underlying risk.</p>
+<p>The log-rank test statistic has been widely utilized as a splitting-rule for survival analysis <span class="citation" data-cites="Ciampi1986 Ishwaran2008 LeBlanc1993 Segal1988">(<a href="P5C26_references.html#ref-Ciampi1986" role="doc-biblioref">Ciampi et al. 1986</a>; <a href="P5C26_references.html#ref-Ishwaran2008" role="doc-biblioref">Ishwaran et al. 2008</a>; <a href="P5C26_references.html#ref-LeBlanc1993" role="doc-biblioref">LeBlanc and Crowley 1993</a>; <a href="P5C26_references.html#ref-Segal1988" role="doc-biblioref">Segal 1988</a>)</span>. The log-rank test compares the survival distributions of two groups under the null-hypothesis that both groups have the same underlying risk of (immediate) events, with the hazard function used to compare underlying risk.</p>
 <p>Let <span class="math inline">\(L^a\)</span> and <span class="math inline">\(L^b\)</span> be two leaves and let <span class="math inline">\(h^a,h^b\)</span> be the (theoretical, true) hazard functions in the two leaves respectively and let <span class="math inline">\(i \in L\)</span> be a shorthand for the indices of the observations in leaf <span class="math inline">\(L\)</span> so that <span class="math inline">\(i = 1,\ldots,|L|\)</span>. Define:</p>
 <ul>
 <li><span class="math inline">\(n_\tau^a\)</span>, the number of observations at risk at <span class="math inline">\(\tau\)</span> in leaf <span class="math inline">\(a\)</span></li>
@@ -537,13 +538,13 @@ Figure&nbsp;11.2: Panel (a) is the Kaplan-Meier estimator fit on the complete <c
 </figcaption>
 </figure>
 </div>
-<p>The log-rank <em>score</em> rule <span class="citation" data-cites="Hothorn2003">(<a href="P5C26_references.html#ref-Hothorn2003" role="doc-biblioref">Hothorn and Lausen 2003</a>)</span> is a standardized version of the log-rank rule that could be considered as a splitting rule, though simulation studies have demonstrated non-significant improvements in predictive performance when comparing the two <span class="citation" data-cites="Ishwaran2008">(<a href="P5C26_references.html#ref-Ishwaran2008" role="doc-biblioref">B. H. Ishwaran et al. 2008</a>)</span>. Alternative dissimiliarity measures and tests have also been suggested as splitting rules, including modified Kolmogorov-Smirnov test and Gehan-Wilcoxon tests <span class="citation" data-cites="Ciampi1988">(<a href="P5C26_references.html#ref-Ciampi1988" role="doc-biblioref">Ciampi et al. 1988</a>)</span>. Simulation studies have demonstrated that both of these may have higher power and produce ‘better’ results than the log-rank statistic <span class="citation" data-cites="Fleming1980">(<a href="P5C26_references.html#ref-Fleming1980" role="doc-biblioref">Fleming et al. 1980</a>)</span>, however neither appears to be commonly used.</p>
+<p>The log-rank <em>score</em> rule <span class="citation" data-cites="Hothorn2003">(<a href="P5C26_references.html#ref-Hothorn2003" role="doc-biblioref">Hothorn and Lausen 2003</a>)</span> is a standardized version of the log-rank rule that could be considered as a splitting rule, though simulation studies have demonstrated non-significant improvements in predictive performance when comparing the two <span class="citation" data-cites="Ishwaran2008">(<a href="P5C26_references.html#ref-Ishwaran2008" role="doc-biblioref">Ishwaran et al. 2008</a>)</span>. Alternative dissimiliarity measures and tests have also been suggested as splitting rules, including modified Kolmogorov-Smirnov test and Gehan-Wilcoxon tests <span class="citation" data-cites="Ciampi1988">(<a href="P5C26_references.html#ref-Ciampi1988" role="doc-biblioref">Ciampi et al. 1988</a>)</span>. Simulation studies have demonstrated that both of these may have higher power and produce ‘better’ results than the log-rank statistic <span class="citation" data-cites="Fleming1980">(<a href="P5C26_references.html#ref-Fleming1980" role="doc-biblioref">Fleming et al. 1980</a>)</span>, however neither appears to be commonly used.</p>
 <p>In a competing risk setting, Gray’s test <span class="citation" data-cites="Gray1988">(<a href="P5C26_references.html#ref-Gray1988" role="doc-biblioref">Gray 1988</a>)</span> can be used instead of the log-rank test, as it compares cumulative incidence functions rather than all-cause hazards. Similarly to the log-rank test, Gray’s test also compares survival distributions using hypothesis tests to determine if there are significant differences between the groups, thus making it a suitable option to build competing risk RSFs.</p>
 </section>
 <section id="alternative-splitting-rules" class="level4 unnumbered unlisted">
 <h4 class="unnumbered unlisted anchored" data-anchor-id="alternative-splitting-rules">Alternative Splitting Rules</h4>
 <p>A common alternative to the log-rank test is to instead use <em>likelihood ratio</em>, or <em>deviance</em>, statistics. When building RSFs, the likelihood-ratio statistic can be used to test if the model fit is improved or worsened with each split, thus providing a way to partition data. However, as discussed in <a href="P1C4_survival.html#sec-surv-estimation-param" class="quarto-xref"><span>Section 3.5.1</span></a>, there are many different likelihoods that can be assumed for survival data, and there is no obvious way to determine if one is more sensible than another. Furthermore the choice of likelihood must fit the underlying model assumptions. For example, one could assume the data fits the proportional hazards assumption and in each split one could calculate the likelihood-ratio using the Cox PH partial likelihood. Alternatively, a parametric form could be assumed and a likelihood proposed by <span class="citation" data-cites="LeBlanc1992">LeBlanc and Crowley (<a href="P5C26_references.html#ref-LeBlanc1992" role="doc-biblioref">1992</a>)</span> may be calculated to test model fit. While potentially useful, these methods are implemented in very few off-shelf software packages, thus empirical comparisons to other splitting rules are lacking.</p>
-<p>Other rules have also been studied including comparison of residuals <span class="citation" data-cites="Therneau1990">(<a href="P5C26_references.html#ref-Therneau1990" role="doc-biblioref">Therneau, Grambsch, and Fleming 1990</a>)</span>, scoring rules <span class="citation" data-cites="pkgrfsrc">(<a href="P5C26_references.html#ref-pkgrfsrc" role="doc-biblioref">H. Ishwaran and Kogalur 2018</a>)</span>, distance metrics <span class="citation" data-cites="Gordon1985">(<a href="P5C26_references.html#ref-Gordon1985" role="doc-biblioref">Gordon and Olshen 1985</a>)</span>, and concordance metrics <span class="citation" data-cites="Schmid2016">(<a href="P5C26_references.html#ref-Schmid2016" role="doc-biblioref">Schmid, Wright, and Ziegler 2016</a>)</span>. Experiments have shown different splitting rules may perform better or worse depending on the underlying data <span class="citation" data-cites="Schmid2016">(<a href="P5C26_references.html#ref-Schmid2016" role="doc-biblioref">Schmid, Wright, and Ziegler 2016</a>)</span>, hence one could even consider treating the splitting rule as a hyper-parameter for tuning. However, if there is a clear goal in prediction, then the choice of splitting rule can be informed by the prediction type. For example, if the goal is to maximise separation, then a log-rank splitting rule to maximise homogeneity in terminal nodes is a natural starting point. Whereas if the goal is to accurately rank observations, then a concordance splitting rule may be optimal.</p>
+<p>Other rules have also been studied including comparison of residuals <span class="citation" data-cites="Therneau1990">(<a href="P5C26_references.html#ref-Therneau1990" role="doc-biblioref">Therneau et al. 1990</a>)</span>, scoring rules <span class="citation" data-cites="pkgrfsrc">(<a href="P5C26_references.html#ref-pkgrfsrc" role="doc-biblioref">Ishwaran and Kogalur 2018</a>)</span>, distance metrics <span class="citation" data-cites="Gordon1985">(<a href="P5C26_references.html#ref-Gordon1985" role="doc-biblioref">Gordon and Olshen 1985</a>)</span>, and concordance metrics <span class="citation" data-cites="Schmid2016">(<a href="P5C26_references.html#ref-Schmid2016" role="doc-biblioref">Schmid et al. 2016</a>)</span>. Experiments have shown different splitting rules may perform better or worse depending on the underlying data <span class="citation" data-cites="Schmid2016">(<a href="P5C26_references.html#ref-Schmid2016" role="doc-biblioref">Schmid et al. 2016</a>)</span>, hence one could even consider treating the splitting rule as a hyper-parameter for tuning. However, if there is a clear goal in prediction, then the choice of splitting rule can be informed by the prediction type. For example, if the goal is to maximise separation, then a log-rank splitting rule to maximise homogeneity in terminal nodes is a natural starting point. Whereas if the goal is to accurately rank observations, then a concordance splitting rule may be optimal.</p>
 </section>
 </section>
 <section id="sec-surv-ml-models-ranfor-nodes" class="level3" data-number="11.2.2">
@@ -551,7 +552,7 @@ Figure&nbsp;11.2: Panel (a) is the Kaplan-Meier estimator fit on the complete <c
 <p>As in the regression setting, the usual strategy for predictions is to create a simple estimate based on the training data that lands in the terminal nodes. However, as seen throughout this book, the choice of estimator in the survival setting depends on the prediction task of interest, which are now considered in turn. First, note that all terminal node predictions can only yield useful results if there are a sufficient number of uncensored observations in each terminal node. Hence, a common RSF stopping rule is the minimum number of <em>uncensored</em> observations per leaf, meaning a leaf is not split if that would result in too few uncensored observations in the resulting leaves.</p>
 <section id="probabilistic-predictions" class="level4 unnumbered unlisted">
 <h4 class="unnumbered unlisted anchored" data-anchor-id="probabilistic-predictions">Probabilistic Predictions</h4>
-<p>Starting with the most common survival prediction type, the algorithm requires a simple estimate for the underlying survival distribution in each of the terminal nodes, which can be estimated using the Kaplan-Meier or Nelson-Aalen methods <span class="citation" data-cites="Hothorn2004 Ishwaran2008 LeBlanc1993 Segal1988">(<a href="P5C26_references.html#ref-Hothorn2004" role="doc-biblioref">Hothorn et al. 2004</a>; <a href="P5C26_references.html#ref-Ishwaran2008" role="doc-biblioref">B. H. Ishwaran et al. 2008</a>; <a href="P5C26_references.html#ref-LeBlanc1993" role="doc-biblioref">LeBlanc and Crowley 1993</a>; <a href="P5C26_references.html#ref-Segal1988" role="doc-biblioref">Segal 1988</a>)</span>.</p>
+<p>Starting with the most common survival prediction type, the algorithm requires a simple estimate for the underlying survival distribution in each of the terminal nodes, which can be estimated using the Kaplan-Meier or Nelson-Aalen methods <span class="citation" data-cites="Hothorn2004 Ishwaran2008 LeBlanc1993 Segal1988">(<a href="P5C26_references.html#ref-Hothorn2004" role="doc-biblioref">Hothorn et al. 2004</a>; <a href="P5C26_references.html#ref-Ishwaran2008" role="doc-biblioref">Ishwaran et al. 2008</a>; <a href="P5C26_references.html#ref-LeBlanc1993" role="doc-biblioref">LeBlanc and Crowley 1993</a>; <a href="P5C26_references.html#ref-Segal1988" role="doc-biblioref">Segal 1988</a>)</span>.</p>
 <!-- FIXME: REF KM DEFINITION ABOVE -->
 <p>Denote <span class="math inline">\(b\)</span> as a decision tree and <span class="math inline">\(L^{b(h)}\)</span> as the terminal node <span class="math inline">\(h\)</span> in tree <span class="math inline">\(b\)</span>. Then the predicted survival function and cumulative hazard for a new observation <span class="math inline">\(\mathbf{x}^*\)</span> is,</p>
 <p><span id="eq-surv-kaplan"><span class="math display">\[
@@ -601,7 +602,7 @@ Figure&nbsp;11.4: Bootstrapping Kaplan-Meier estimators across three decision tr
 <section id="deterministic-predictions" class="level4 unnumbered unlisted">
 <h4 class="unnumbered unlisted anchored" data-anchor-id="deterministic-predictions">Deterministic Predictions</h4>
 <p>As discussed in <a href="P2C11_time.html" class="quarto-xref"><span>Chapter 9</span></a>, predicting and evaluating survival times is a complex and fairly under-researched area. For RSFs, there is an inclination to estimate survival times based on the mean or median survival times of observations in terminal nodes, however this would lead to biased estimations. Therefore, research has tended to focus on relative risk predictions.</p>
-<p>As discussed, relative risks are arbitrary values where only the resulting rank matters when comparing observations. In RSFs, each terminal node should be as homogeneous as possible, hence within a terminal node, the risk between observations should be the same. The most common method to estimate average risk appears to be a transformation from the Nelson-Aalen method <span class="citation" data-cites="Ishwaran2008">(<a href="P5C26_references.html#ref-Ishwaran2008" role="doc-biblioref">B. H. Ishwaran et al. 2008</a>)</span>, which exploits results from counting process to provide a measure of expected mortality <span class="citation" data-cites="dataapplied">(<a href="P5C26_references.html#ref-dataapplied" role="doc-biblioref">Hosmer Jr, Lemeshow, and May 2011</a>)</span> – the same result is used in the event frequency calibration measure discussed in <a href="P2C9_calib.html#sec-alpha" class="quarto-xref"><span>Section 7.1.2</span></a>. Given new data, <span class="math inline">\(\mathbf{x}^*\)</span>, falling into terminal node <span class="math inline">\(b(h)\)</span>, the relative risk prediction is the sum of the predicted cumulative hazard, <span class="math inline">\(\hat{H}_{b(h)}\)</span>, computed at each observation’s observed outcome time:</p>
+<p>As discussed, relative risks are arbitrary values where only the resulting rank matters when comparing observations. In RSFs, each terminal node should be as homogeneous as possible, hence within a terminal node, the risk between observations should be the same. The most common method to estimate average risk appears to be a transformation from the Nelson-Aalen method <span class="citation" data-cites="Ishwaran2008">(<a href="P5C26_references.html#ref-Ishwaran2008" role="doc-biblioref">Ishwaran et al. 2008</a>)</span>, which exploits results from counting process to provide a measure of expected mortality <span class="citation" data-cites="dataapplied">(<a href="P5C26_references.html#ref-dataapplied" role="doc-biblioref">Hosmer Jr et al. 2011</a>)</span> – the same result is used in the event frequency calibration measure discussed in <a href="P2C9_calib.html#sec-alpha" class="quarto-xref"><span>Section 7.1.2</span></a>. Given new data, <span class="math inline">\(\mathbf{x}^*\)</span>, falling into terminal node <span class="math inline">\(b(h)\)</span>, the relative risk prediction is the sum of the predicted cumulative hazard, <span class="math inline">\(\hat{H}_{b(h)}\)</span>, computed at each observation’s observed outcome time:</p>
 <p><span class="math display">\[
 \phi_{b(h)}(\mathbf{x}^*) = \sum_{i=1}^m \hat{H}_{b(h)}(t_i|\mathbf{x}^*)
 \]</span></p>
@@ -609,7 +610,7 @@ Figure&nbsp;11.4: Bootstrapping Kaplan-Meier estimators across three decision tr
 <p><span class="math display">\[
 \phi_{Boot}(\mathbf{x}^*) = \frac{1}{B} \sum^B_{b=1} \phi_{b(h)}(\mathbf{x}^*)
 \]</span></p>
-<p>More complex methods have also been proposed that are based on the likelihood-based splitting rule and assume a PH model form <span class="citation" data-cites="Ishwaran2004 LeBlanc1992">(<a href="P5C26_references.html#ref-Ishwaran2004" role="doc-biblioref">H. Ishwaran et al. 2004</a>; <a href="P5C26_references.html#ref-LeBlanc1992" role="doc-biblioref">LeBlanc and Crowley 1992</a>)</span>. However, these do not appear to be in wide-spread usage.</p>
+<p>More complex methods have also been proposed that are based on the likelihood-based splitting rule and assume a PH model form <span class="citation" data-cites="Ishwaran2004 LeBlanc1992">(<a href="P5C26_references.html#ref-Ishwaran2004" role="doc-biblioref">Ishwaran et al. 2004</a>; <a href="P5C26_references.html#ref-LeBlanc1992" role="doc-biblioref">LeBlanc and Crowley 1992</a>)</span>. However, these do not appear to be in wide-spread usage.</p>
 </section>
 </section>
 </section>
@@ -627,7 +628,7 @@ Figure&nbsp;11.4: Bootstrapping Kaplan-Meier estimators across three decision tr
 <div class="callout-body-container callout-body">
 <ul>
 <li>Random forests are a highly flexible algorithm that allow the various components to be adapted and altered without major changes to the underlying algorithm. This allows random survival forests (RSFs) to be readily available ‘off-shelf’ in many open-source packages;</li>
-<li>RSFs have in-built variable selection methods that mean they tend to perform well on high-dimensional data, routinely outperforming other models <span class="citation" data-cites="Herrmann2020">(<a href="P5C26_references.html#ref-Burk2024" role="doc-biblioref"><strong>Burk2024?</strong></a>)</span>;</li>
+<li>RSFs have in-built variable selection methods that mean they tend to perform well on high-dimensional data, routinely outperforming other models <span class="citation" data-cites="Herrmann2020">Burk et al. (<a href="P5C26_references.html#ref-Burk2024" role="doc-biblioref">2024</a>)</span>;</li>
 <li>Despite having many potential hyper-parameters to tune, all are intuitive and many can even be ignored as sensible defaults exist in most off-shelf software implementations.</li>
 </ul>
 </div>
@@ -660,8 +661,8 @@ Figure&nbsp;11.4: Bootstrapping Kaplan-Meier estimators across three decision tr
 </div>
 <div class="callout-body-container callout-body">
 <ul>
-<li>A comprehensive review of random survival forests (RSFs) is provided in Bou-Hamad (2011) <span class="citation" data-cites="Bou-Hamad2011">(<a href="P5C26_references.html#ref-Bou-Hamad2011" role="doc-biblioref">Bou-Hamad, Larocque, and Ben-Ameur 2011</a>)</span>, which includes extensions to time-varying covariates and different censoring types.</li>
-<li>The discussion of decision trees omitted many methods for growing and pruning trees, if you are interest in those technical details see <span class="citation" data-cites="Breiman1984">L. Breiman et al. (<a href="P5C26_references.html#ref-Breiman1984" role="doc-biblioref">1984</a>)</span>.</li>
+<li>A comprehensive review of random survival forests (RSFs) is provided in Bou-Hamad (2011) <span class="citation" data-cites="Bou-Hamad2011">(<a href="P5C26_references.html#ref-Bou-Hamad2011" role="doc-biblioref">Bou-Hamad et al. 2011</a>)</span>, which includes extensions to time-varying covariates and different censoring types.</li>
+<li>The discussion of decision trees omitted many methods for growing and pruning trees, if you are interest in those technical details see <span class="citation" data-cites="Breiman1984">Breiman et al. (<a href="P5C26_references.html#ref-Breiman1984" role="doc-biblioref">1984</a>)</span>.</li>
 <li>RSFs have been shown to perform well in benchmark experiments on high-dimensional data, see <span class="citation" data-cites="Herrmann2020">Herrmann et al. (<a href="P5C26_references.html#ref-Herrmann2020" role="doc-biblioref">2021</a>)</span> and <span class="citation" data-cites="Spooner2020">Spooner et al. (<a href="P5C26_references.html#ref-Spooner2020" role="doc-biblioref">2020</a>)</span> for examples.</li>
 <li>This chapter considered the most ‘traditional’ forms of RSFs. Conditional inference forests are popular in the regression setting and whilst they are under-researched in survival, see <span class="citation" data-cites="Hothorn2005">Hothorn et al. (<a href="P5C26_references.html#ref-Hothorn2005" role="doc-biblioref">2005</a>)</span> for literature on the topic. A more recent method that seems to perform well is the (accelerated) oblique random survival forest discussed in <span class="citation" data-cites="Jaeger2024">(<a href="P5C26_references.html#ref-Jaeger2024" role="doc-biblioref"><strong>Jaeger2024?</strong></a>)</span>.</li>
 </ul>
@@ -669,7 +670,7 @@ Figure&nbsp;11.4: Bootstrapping Kaplan-Meier estimators across three decision tr
 </div>
 
 
-<div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="0" role="list" style="display: none">
+<div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
 <div id="ref-Bland2004" class="csl-entry" role="listitem">
 Bland, J Martin, and Douglas G. Altman. 2004. <span>“<span class="nocase">The logrank test</span>.”</span> <em>BMJ (Clinical Research Ed.)</em> 328 (7447): 1073. <a href="https://doi.org/10.1136/bmj.328.7447.1073">https://doi.org/10.1136/bmj.328.7447.1073</a>.
 </div>
@@ -681,6 +682,9 @@ Breiman, Leo. 1996. <span>“<span>Bagging Predictors</span>.”</span> <em>Mach
 </div>
 <div id="ref-Breiman1984" class="csl-entry" role="listitem">
 Breiman, L, J Friedman, C J Stone, and R A Olshen. 1984. <em><span class="nocase">Classification and Regression Trees</span></em>. The Wadsworth and Brooks-Cole Statistics-Probability Series. Taylor &amp; Francis. <a href="https://books.google.co.uk/books?id=JwQx-WOmSyQC">https://books.google.co.uk/books?id=JwQx-WOmSyQC</a>.
+</div>
+<div id="ref-Burk2024" class="csl-entry" role="listitem">
+Burk, Lukas, John Zobolas, Bernd Bischl, Andreas Bender, Marvin N. Wright, and Raphael Sonabend. 2024. <em><span class="nocase">A Large-Scale Neutral Comparison Study of Survival Models on Low-Dimensional Data</span></em>. June. <a href="http://arxiv.org/abs/2406.04098">http://arxiv.org/abs/2406.04098</a>.
 </div>
 <div id="ref-Ciampi1988" class="csl-entry" role="listitem">
 Ciampi, Antonio, Sheilah A Hogg, Steve McKinney, and Johanne Thiffault. 1988. <span>“<span class="nocase">RECPAM: a computer program for recursive partition and amalgamation for censored survival data and other situations frequently occurring in biostatistics. I. Methods and program features</span>.”</span> <em>Computer Methods and Programs in Biomedicine</em> 26 (3): 239–56. https://doi.org/<a href="https://doi.org/10.1016/0169-2607(88)90004-1">https://doi.org/10.1016/0169-2607(88)90004-1</a>.
@@ -722,19 +726,19 @@ Ishwaran, By Hemant, Udaya B Kogalur, Eugene H Blackstone, and Michael S Lauer. 
 Ishwaran, Hemant, Eugene H Blackstone, Claire E Pothier, and Michael S Lauer. 2004. <span>“<span class="nocase">Relative Risk Forests for Exercise Heart Rate Recovery as a Predictor of Mortality</span>.”</span> <em>Journal of the American Statistical Association</em> 99 (467): 591–600. <a href="https://doi.org/10.1198/016214504000000638">https://doi.org/10.1198/016214504000000638</a>.
 </div>
 <div id="ref-pkgrfsrc" class="csl-entry" role="listitem">
-Ishwaran, Hemant, and Udaya B Kogalur. 2018. <span>“<span class="nocase">randomForestSRC</span>.”</span> <a href="https://cran.r-project.org/package=randomForestSRC">https://cran.r-project.org/package=randomForestSRC</a>.
+Ishwaran, Hemant, and Udaya B Kogalur. 2018. <em><span class="nocase">randomForestSRC</span></em>. <a href="https://cran.r-project.org/package=randomForestSRC">https://cran.r-project.org/package=randomForestSRC</a>.
 </div>
 <div id="ref-Ishwaran2011" class="csl-entry" role="listitem">
 Ishwaran, Hemant, Udaya B. Kogalur, Xi Chen, and Andy J. Minn. 2011. <span>“Random Survival Forests for High-Dimensional Data.”</span> <em>Statistical Analysis and Data Mining: The ASA Data Science Journal</em> 4 (1): 115–32. https://doi.org/<a href="https://doi.org/10.1002/sam.10103">https://doi.org/10.1002/sam.10103</a>.
 </div>
 <div id="ref-Hastie2013" class="csl-entry" role="listitem">
-James, Gareth, Daniela Witten, Trevor Hastie, and Robert Tibshirani. 2013. <em><span class="nocase">An introduction to statistical learning</span></em>. Vol. 112. New York: Springer.
+James, Gareth, Daniela Witten, Trevor Hastie, and Robert Tibshirani. 2013. <em><span class="nocase">An introduction to statistical learning</span></em>. Vol. 112. Springer.
 </div>
 <div id="ref-LeBlanc1992" class="csl-entry" role="listitem">
 LeBlanc, Michael, and John Crowley. 1992. <span>“<span class="nocase">Relative Risk Trees for Censored Survival Data</span>.”</span> <em>Biometrics</em> 48 (2): 411–25. <a href="https://doi.org/10.2307/2532300">https://doi.org/10.2307/2532300</a>.
 </div>
 <div id="ref-LeBlanc1993" class="csl-entry" role="listitem">
-———. 1993. <span>“<span class="nocase">Survival Trees by Goodness of Split</span>.”</span> <em>Journal of the American Statistical Association</em> 88 (422): 457–67. <a href="https://doi.org/10.2307/2290325">https://doi.org/10.2307/2290325</a>.
+LeBlanc, Michael, and John Crowley. 1993. <span>“<span class="nocase">Survival Trees by Goodness of Split</span>.”</span> <em>Journal of the American Statistical Association</em> 88 (422): 457–67. <a href="https://doi.org/10.2307/2290325">https://doi.org/10.2307/2290325</a>.
 </div>
 <div id="ref-pkgsksurvival" class="csl-entry" role="listitem">
 Pölsterl, Sebastian. 2020. <span>“<span class="nocase">scikit-survival: A Library for Time-to-Event Analysis Built on Top of scikit-learn</span>.”</span> <em>Journal of Machine Learning Research</em> 21 (212): 1–6. <a href="http://jmlr.org/papers/v21/20-729.html">http://jmlr.org/papers/v21/20-729.html</a>.
@@ -746,10 +750,10 @@ Schmid, Matthias, Marvin Wright, and Andreas Ziegler. 2016. <span>“On the Use 
 Segal, Mark Robert. 1988. <span>“<span class="nocase">Regression Trees for Censored Data</span>.”</span> <em>Biometrics</em> 44 (1): 35–47.
 </div>
 <div id="ref-Spooner2020" class="csl-entry" role="listitem">
-Spooner, Annette, Emily Chen, Arcot Sowmya, Perminder Sachdev, Nicole A Kochan, Julian Trollor, and Henry Brodaty. 2020. <span>“<span class="nocase">A comparison of machine learning methods for survival analysis of high-dimensional clinical data for dementia prediction</span>.”</span> <em>Scientific Reports</em> 10 (1): 20410. <a href="https://doi.org/10.1038/s41598-020-77220-w">https://doi.org/10.1038/s41598-020-77220-w</a>.
+Spooner, Annette, Emily Chen, Arcot Sowmya, et al. 2020. <span>“<span class="nocase">A comparison of machine learning methods for survival analysis of high-dimensional clinical data for dementia prediction</span>.”</span> <em>Scientific Reports</em> 10 (1): 20410. <a href="https://doi.org/10.1038/s41598-020-77220-w">https://doi.org/10.1038/s41598-020-77220-w</a>.
 </div>
 <div id="ref-pkgsurvival" class="csl-entry" role="listitem">
-Therneau, Terry M. 2015. <span>“<span class="nocase">A Package for Survival Analysis in S</span>.”</span> <a href="https://cran.r-project.org/package=survival">https://cran.r-project.org/package=survival</a>.
+Therneau, Terry M. 2015. <em><span class="nocase">A Package for Survival Analysis in S</span></em>. <a href="https://cran.r-project.org/package=survival">https://cran.r-project.org/package=survival</a>.
 </div>
 <div id="ref-Therneau1990" class="csl-entry" role="listitem">
 Therneau, Terry M., Patricia M. Grambsch, and Thomas R. Fleming. 1990. <span>“<span class="nocase">Martingale-based residuals for survival models</span>.”</span> <em>Biometrika</em> 77 (1): 147–60. <a href="https://doi.org/10.1093/biomet/77.1.147">https://doi.org/10.1093/biomet/77.1.147</a>.
