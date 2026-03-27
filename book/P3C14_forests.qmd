@@ -51,19 +51,23 @@ The goal in each partition is to find two resulting leaves/nodes that have the g
 The splitting rule provides a way to measure the homogeneity within the resulting nodes.
 In regression, the most common splitting rule is to select a variable and cut-off (a threshold on the variable at which to separate observations) that minimises the mean squared error in the two potential resulting leaves.
 
-For all decision tree and random forest algorithms going forward, let $L \subseteq \{1,\ldots,n\}$ denote the set of observation indices in a leaf, with mean outcome $\bar{y}_L = \frac{1}{|L|}\sum_{i \in L} y_i$.
+For all decision tree and random forest algorithms going forward, let $L \subseteq \{1,\ldots,n\}$ denote the set of observation indices in a leaf, with mean outcome
+
+$$
+\bar{y}_L = \frac{1}{|L|}\sum_{i \in L} y_i.
+$$
 
 Let $j = 1,\ldots,p$ index the features and let $c_j$ be a possible cutoff value for feature $j$. Define
 
 $$
 \begin{split}
-L^l(j,c_j) := \{i : x_{i;j} < c_j\} \\
-L^r(j,c_j) := \{i : x_{i;j} \geq c_j\}
+L^l(j,c_j) := \{i : x_{i;j} < c_j\}, \\
+L^r(j,c_j) := \{i : x_{i;j} \geq c_j\},
 \end{split}
 $$
 
 as the two leaves resulting from partitioning feature $j$ at cutoff $c_j$. To simplify notation, let $L^l, L^r$ denote $L^l(j,c_j)$ and $L^r(j,c_j)$ respectively.
-A split is then determined by the arguments $(j^*, c^*_{j^*})$ minimizing the residual sum of squares across both leaves [@Hastie2013],
+The optimal split is determined by the arguments $(j^*, c^*_{j^*})$ that minimize the residual sum of squares across both leaves [@Hastie2013],
 
 $$
 (j^*, c_{j^*}^*) = \argmin_{j, c_j} \sum_{i \in L^l} (y_i - \bar{y}_{L^l})^2 + \sum_{i \in L^r} (y_i - \bar{y}_{L^r})^2.
@@ -151,37 +155,37 @@ The log-rank test compares the survival distributions of two groups under the nu
 Let $L^l$ and $L^r$ be two leaves, and as before $i \in L$ indexes the observations in leaf $L$.
 Define:
 
-* $n_\tau^l$, the number of observations at risk at $\tau$ in leaf $l$
+* $n_\tau^l$, the number of observations at risk at $\tau$ in leaf $L^l$
 
 $$
-n_\tau^l = \sum_{i \in L^l} \II(t_i \geq \tau)
+n_\tau^l = \sum_{i \in L^l} \II(t_i \geq \tau);
 $$
 
-* $o^l_{\tau}$, the observed number of events in leaf $l$ at $\tau$
+* $o^l_{\tau}$, the observed number of events at $\tau$ in leaf $L^l$ 
 
 $$
-o^l_{\tau} = \sum_{i \in L^l} \II(t_i = \tau, \delta_i = 1)
+o^l_{\tau} = \sum_{i \in L^l} \II(t_i = \tau, \delta_i = 1);
 $$
 
-* $n_\tau = n_\tau^l + n_\tau^r$, the number of observations at risk at $\tau$ in both leaves
-* $o_\tau = o^l_{\tau} + o^r_{\tau}$, the observed number of events at $\tau$ in both leaves
+* $n_\tau = n_\tau^l + n_\tau^r$, the number of observations at risk at $\tau$ in both leaves;
+* $o_\tau = o^l_{\tau} + o^r_{\tau}$, the observed number of events at $\tau$ in both leaves.
 
 Recall $\tbk$ is the $k$th ordered event time.
 The log-rank test evaluates if hazard functions are equal in both leaves, $H_0: h^l = h^r$, with test statistic [@Segal1988],
 
 $$
 LR(L^l) = \frac{\sum_{k=1}^m (o^l_{\tbk} - e^l_{\tbk})}{\sqrt{\sum_{k=1}^m v_{\tbk}^l}}
-$$
+$$ {#eq-log-rank}
 
 where:
 
-* $e^l_{\tau}$ is the expected number of events in leaf $l$ at $\tau$
+* $e^l_{\tau}$ is the expected number of events in leaf $L^l$ at $\tau$
 
 $$
 e^l_{\tau} := \frac{n_\tau^l o_\tau}{n_\tau}
 $$
 
-* $v^l_\tau$ is the variance of the number of events in leaf $l$ at $\tau$
+* $v^l_\tau$ is the variance of the number of events in leaf $L^l$ at $\tau$
 
 $$
 v^l_{\tau} := e^l_{\tau} \Big(\frac{n_\tau - o_\tau}{n_\tau}\Big)\Big(\frac{n_\tau - n^l_\tau}{n_\tau - 1}\Big)
@@ -236,13 +240,14 @@ Then the predicted survival function and cumulative hazard for $\xx^*$ are,
 
 $$
 \hat{S}_{b}(\tau|\xx^*) = \prod_{k:t^*_{(k)} \leq \tau} \left(1-\frac{d_{t^*_{(k)}}}{n_{t^*_{(k)}}}\right)
-$$ {#eq-surv-kaplan}
+$$ {#eq-rsf-surv-kaplan}
 
 $$
 \hatH_{b}(\tau|\xx^*) = \sum_{k:t^*_{(k)} \leq \tau} \frac{d_{t^*_{(k)}}}{n_{t^*_{(k)}}}
-$$ {#eq-surv-nelson}
+$$ {#eq-rsf-surv-nelson}
 
 where $d_{t^*_{(k)}}$ and $n_{t^*_{(k)}}$ are the observed number of events and the number of observations at risk at $t^*_{(k)}$, both computed from observations in $L_b(\xx^*)$.
+Direct calculation of the cumulative hazard using (@eq-rsf-surv-nelson) avoids $log(0)$ errors which could occur if transforming from the Kaplan-Meier estimates in (@eq-rsf-surv-kaplan).
 See @fig-surv-ranfor-lung for an example using the `lung` dataset [@pkgsurvival].
 
 <!-- TODO: figure below uses p-value splitting, which was not explained earlier. -->
@@ -250,7 +255,6 @@ See @fig-surv-ranfor-lung for an example using the `lung` dataset [@pkgsurvival]
 ![Survival tree trained on the `lung` dataset from the $\Rstats$ package **survival**. The terminal node predictions are survival curves.](Figures/forests/lung.png){#fig-surv-ranfor-lung fig-alt="Decision tree with two splits, the first is 'ph.ecog' with a p-value of <0.001, when ph.ecog > 1 a terminal prediction is made, otherwise the data is split at 'sex' with - = 0.015. Terminal node predictions are plots of survival functions."}
 
 The bootstrapped prediction is the cumulative hazard function or survival function averaged over individual trees.
-Note that understanding what these bootstrapped functions represents depends on how they are calculated.
 By definition, a mixture of $n$ distributions with cumulative distribution functions $F_i, i = 1,...,n$ is given by
 
 $$
@@ -270,7 +274,6 @@ $$
 \hatH_{Boot}(\tau|\xx^*) = \sum^B_{b=1} w_b\hat{H}_b(\tau|\xx^*),
 $$ {#eq-surv-nelson-boot}
 
-where again the Nelson-Aalen estimator should be used instead of transformation from the survival function to avoid $-log(0)$ errors.
 
 In other censoring and truncation settings, the estimator in the final node can be replaced by the nonparametric maximum likelihood estimator or left-truncated risk set (@sec-surv-estimation-non-param).
 
@@ -284,71 +287,94 @@ The aggregated survival probability is calculated at event times points across t
 ### Competing Risks {#sec-surv-ranfor-cr}
 
 The RSF framework extends to competing risks (@sec-competing-risks) in a natural way, replacing the single-event Kaplan-Meier and Nelson-Aalen estimators in the terminal nodes with the Aalen-Johansen CIF estimator (@sec-aalen-johanson; @Ishwaran2014CR).
-The key insight is that both the splitting rule and the terminal node estimator must be adapted to account for the presence of multiple event types.
+Both the splitting rule and the terminal node estimator must be adapted to account for the presence of multiple event types.
 
-#### Splitting Rules {.unnumbered .unlisted}
+#### Adapting the log-rank test {.unnumbered .unlisted}
 
 The standard log-rank test compares cause-specific hazards across candidate splits, which is not the quantity of primary interest in the competing risks setting.
 Two adaptations have been proposed [@Ishwaran2014CR].
 
-The first uses Gray's test [@Gray1988], which tests $H_0: F_e^l = F_e^r$, i.e.\ equal CIFs in the two candidate daughter nodes.
-Gray's test targets the *subdistribution hazard* $\tilde{h}_e(\tau) = -\frac{d}{d\tau}\log(1 - F_e(\tau))$, the hazard of a pseudo-population that keeps competing-event subjects permanently in the risk set.
+The first uses Gray's test [@Gray1988], which evaluates if the CIFs are equal in the candidate nodes, $H_0: F_q^l = F_q^r$ for some event $q = 1 \ldots Q$.
+Gray's test targets the *subdistribution hazard*, which is the hazard of a pseudo-population that keeps competing-event subjects permanently in the risk set (discussed in more detail in @sec-classical for the Fine-Gray model),
+
+$$
+\tilde{h}_q(\tau) = -\frac{d}{d\tau}\log(1 - F_q(\tau)).
+$$
+
+
 This is operationalized by augmenting the standard risk set with observations who already experienced a competing event:
+
 $$
-\tilde{n}_{e,t_{(k)}} = n_{t_{(k)}} + \sum_{j:\, t_{(j)} < t_{(k)}} \sum_{e' \neq e} d_{e',t_{(j)}},
+\tilde{n}_{q,t_{(k)}} = n_{t_{(k)}} + \sum_{j:\, t_{(j)} < t_{(k)}} \sum_{q' \neq q} d_{q',t_{(j)}},
 $$
-reflecting the assumption that, had those individuals not experienced a competing event, they would remain at risk of event $e$.
-The test statistic is then computed analogously to the log-rank statistic but using $\tilde{n}_{e,t_{(k)}}$ in place of $n_{t_{(k)}}$, and aggregating over all causes.
+
+reflecting the assumption that, had those individuals not experienced a competing event, they would remain at risk of event $q$.
+The test statistic is then computed analogously to the log-rank statistic but using $\tilde{n}_{q,t_{(k)}}$ in place of $n_{t_{(k)}}$, and aggregating over all causes.
+
+<!-- FIXME: ANDREAS
+  - ABOVE: WHAT ABOUT OBSERVED AND EXPECTED?
+  - BELOW: WHICH IS THE 'STANDARD' AT-RISK SET, DO YOU MEAN FOR CR OR WITHOUT CR?
+-->
 
 The second approach computes a single weighted statistic by combining cause-specific log-rank contributions across all causes.
-For each cause $e$, competing events of other causes are treated as censored, so the at-risk set is the standard one, and the cause-specific log-rank statistic $LR_e(L^l)$ is computed exactly as in $LR(L^l)$ above, with $o^l_{e,\tbk}$ and $e^l_{e,\tbk}$ denoting the observed and expected cause-$e$ events in $L^l$ at $\tbk$.
+For each cause $q$, competing events of other causes are treated as censored, so the at-risk set is the standard one, and the cause-specific log-rank statistic $LR_q(L^l)$ is computed exactly as in $LR(L^l)$ in (@eq-log-rank), with $o^l_{q,\tbk}$ and $e^l_{q,\tbk}$ denoting the observed and expected cause-$q$ events in leaf $L^l$ at $\tbk$.
 These per-cause statistics are then combined into a single weighted statistic,
+
 $$
-LR_{CR}(L^l) = \frac{\left| \sum_{e=1}^q w_e \sum_{k} (o^l_{e,\tbk} - e^l_{e,\tbk}) \right|}{\sqrt{\sum_{e=1}^q w_e^2 \sum_{k} v^l_{e,\tbk}}},
+LR_{CR}(L^l) = \frac{\left| \sum_{q=1}^Q w_q \sum_{k} (o^l_{q,\tbk} - e^l_{q,\tbk}) \right|}{\sqrt{\sum_{q=1}^Q w_q^2 \sum_{k} v^l_{q,\tbk}}},
 $$
-where the inner sums are over all event times $\tbk$ in the node being split, $v^l_{e,\tbk}$ is the hypergeometric variance for cause $e$ at $\tbk$, and $w_e$ are cause weights (default $w_e = 1/q$).
-Setting $w_e = 1$ for one cause and $w_{e'} = 0$ otherwise reduces this to a standard single-cause log-rank test, making splits focus entirely on separating that cause's hazard.
+
+where the inner sums are over all event times $\tbk$ in the node being split, $v^l_{q,\tbk}$ is the hypergeometric variance for cause $q$ at $\tbk$, and $w_q$ are cause weights (usually $w_q = 1/Q$).
+Setting $w_q = 1$ for one cause and $w_{q'} = 0$ otherwise reduces this to a standard single-cause log-rank test, making splits focus entirely on separating that cause's hazard.
 
 #### Terminal Node Estimator {.unnumbered .unlisted}
 
-Within each terminal node $L_b(\xx^*)$, the Aalen-Johansen estimator is used to estimate the CIF for each cause $e \in \{1, \ldots, q\}$.
-Let $t^*_{(1)} < \ldots < t^*_{(m)}$ be the ordered event times (of any cause) within $L_b(\xx^*)$, and let $d_{e,t^*_{(k)}}$ and $n_{t^*_{(k)}}$ denote the number of cause-$e$ events and the number at risk at $t^*_{(k)}$, both computed from observations in $L_b(\xx^*)$.
-The cause-specific discrete hazard (@eq-cs-discrete-hazard) within the node is $\hat{h}^d_{e,b}(t^*_{(k)}) = d_{e,t^*_{(k)}} / n_{t^*_{(k)}}$, the all-cause survival in the node is
+Within each terminal node $L_b(\xx^*)$, the Aalen-Johansen estimator is used to estimate the CIF for each cause $q \in \{1, \ldots, Q\}$.
+
+<!-- FIXME: ANDREAS - SHOULD NUMBER AT RISK HAVE 'q' SUBSET? -->
+
+Let $t^*_{(1)} < \ldots < t^*_{(m)}$ be the ordered event times (of any cause) within $L_b(\xx^*)$, and let $d_{q,t^*_{(k)}}$ and $n_{t^*_{(k)}}$ denote the number of cause-$q$ events and the number at risk at $t^*_{(k)}$, both computed from observations in $L_b(\xx^*)$.
+The cause-specific discrete hazard (@sec-aalen-johanson) within the node is $\hat{h}^d_{q,b}(t^*_{(k)}) = d_{q,t^*_{(k)}} / n_{t^*_{(k)}}$, the all-cause survival in the node is
+
 $$
-\hat{S}_b(\tau|\xx^*) = \prod_{k: t^*_{(k)} \leq \tau} \left(1 - \sum_{e=1}^q \hat{h}^d_{e,b}(t^*_{(k)})\right),
+\hat{S}_b(\tau|\xx^*) = \prod_{k: t^*_{(k)} \leq \tau} \left(1 - \sum_{q=1}^Q \hat{h}^d_{q,b}(t^*_{(k)})\right),
 $$
-and the CIF for cause $e$ is the discrete Aalen-Johansen estimator (@eq-aalen-johanson)
+
+and the CIF for cause $q$ is the discrete Aalen-Johansen estimator,
+
 $$
-\hat{F}_{e,b}(\tau|\xx^*) = \sum_{k: t^*_{(k)} \leq \tau} \hat{S}_b(t^*_{(k-1)}|\xx^*) \cdot \hat{h}^d_{e,b}(t^*_{(k)}),
+\hat{F}_{q,b}(\tau|\xx^*) = \sum_{k: t^*_{(k)} \leq \tau} \hat{S}_b(t^*_{(k-1)}|\xx^*) \hat{h}^d_{q,b}(t^*_{(k)}),
 $$ {#eq-surv-ranfor-cr-cif}
-where $t^*_{(0)} = 0$ so $\hat{S}_b(t^*_{(0)}|\xx^*) = 1$, accumulating weighted cause-specific hazard increments over time (cf. @eq-cif).
+
+with $t^*_{(0)} = 0$.
 
 #### Ensemble CIF {.unnumbered .unlisted}
 
 The ensemble CIF is the weighted average of the per-tree Aalen-Johansen estimates:
 $$
-\hat{F}_{e,Boot}(\tau|\xx^*) = \sum_{b=1}^B w_b\hat{F}_{e,b}(\tau|\xx^*).
+\hat{F}_{q,Boot}(\tau|\xx^*) = \sum_{b=1}^B w_b\hat{F}_{q,b}(\tau|\xx^*).
 $$ {#eq-surv-ranfor-boot-cif}
 
 As with the single-event case (@eq-surv-kaplan-boot), averaging the CIF directly is justified because the CIF is itself a probability and the ensemble represents a mixture of the per-tree distributions.
-The constraint $\sum_{e=1}^q \hat{F}_{e,Boot}(\tau|\xx^*) \leq 1$ is preserved, since it holds for each tree's Aalen-Johansen estimate and is maintained under convex combination.
+The constraint $\sum_{q=1}^Q \hat{F}_{q,Boot}(\tau|\xx^*) \leq 1$ is preserved, since it holds for each tree's Aalen-Johansen estimate and is maintained under convex combination.
 
-#### Deterministic Predictions {.unnumbered .unlisted}
+### Relative risks predictions
 
 As discussed in @sec-eval-det, predicting and evaluating survival times is a complex and fairly under-researched area.
 For RSFs, there is an inclination to estimate survival times based on the mean or median survival times of observations in terminal nodes, however this would lead to biased estimations.
 Therefore, research has tended to focus on relative risk predictions.
 
 As discussed, relative risks are arbitrary values where only the resulting rank matters when comparing observations.
-In RSFs, each terminal node should be as homogeneous as possible, hence within a terminal node, the risk between observations should be the same.
-The most common method to estimate average risk appears to be a transformation from the Nelson-Aalen method [@Ishwaran2008], which exploits results from counting process to provide a measure of expected mortality [@dataapplied] -- the same result is used in the event frequency calibration measure discussed in @sec-alpha.
-Given new data $\xx^*$ falling into terminal node $L_b(\xx^*)$, the relative risk prediction is the sum of the predicted cumulative hazard $\hatH_b(\cdot|\xx^*)$ (computed with the Nelson-Aalen estimator) evaluated at the observed outcome time of each observation $i \in L_b(\xx^*)$:
+In RSFs, each terminal node should be as homogeneous as possible, with predictions within a terminal node being identical.
+The most common method to estimate the average risk appears to be a transformation from the Nelson-Aalen method [@Ishwaran2008], which exploits results from counting process to provide a measure of expected mortality [@dataapplied] -- the same result is used in the event frequency calibration measure discussed in @sec-alpha.
+The logic is that the resulting estimation is interpreted as the number of expected events in $L_b(\xx^*)$ and it is natural to assume a terminal node with more expected events represents a higher risk group.
+
+Given new data $\xx^*$ falling into terminal node $L_b(\xx^*)$, the relative risk prediction is the sum of the predicted cumulative hazard $\hatH_b(\cdot|\xx^*)$ over the observed times in that node:
 
 $$
-\phi_b(\xx^*) = \sum_{i \in L_b(\xx^*)} \hatH_b(t_i|\xx^*)
+\phi_b(\xx^*) = \sum_{i \in L_b(\xx^*)} \hatH_b(t_i|\xx^*).
 $$
 
-This is interpreted as the number of expected events in $L_b(\xx^*)$, with the assumption that a terminal node with more expected events represents a higher risk group.
 The bootstrapped risk prediction is the weighted average over all trees:
 
 $$
@@ -360,11 +386,11 @@ More complex methods have also been proposed using likelihood-based splitting ru
 In the competing risks setting @Ishwaran2014 propose a similar metric using the predicted CIFs:
 
 $$
-\phi_{e;b(h)}(\xx^*) = \int^{\tau^*}_0 \hat{F}_{e;b(h)}(\tau|\xx^*) \ d\tau,
+\phi_{q;b}(\xx^*) = \int^{\tau^*}_0 \hat{F}_{q;b}(\tau|\xx^*) \ d\tau,
 $$
 
 where $\tau^*$ is suggested to be the end of the study period.
-$\phi_{e;Boot}(\xx^*)$ is computed as in (@eq-phi-boot).
+$\phi_{q;Boot}(\xx^*)$ is computed as in (@eq-phi-boot).
 
 ## Conclusion
 
