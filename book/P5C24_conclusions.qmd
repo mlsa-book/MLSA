@@ -2,90 +2,29 @@
 {{< include _macros.tex >}}
 :::
 
-# FAQs and Outlook {#sec-conclusions}
+# What's next for machine learning survival analysis?
 
-{{< include _soon.qmd >}}
+Thank you for reading our book.
+What remains is to reflect on what the future may hold for machine learning survival analysis.
 
-## Common problems in survival analysis {#sec-conclusions-faq}
+It is tempting to point to currently popular topics in machine learning as the next frontier for survival analysis, such as large language models (LLMs).
+Indeed, recent work has explored the use of LLMs to extract data from Kaplan-Meier curves, to generate or interrogate survival plots for model checking (such as assessing the proportional hazards assumption), and to assist in the development of parametric survival models by first inferring underlying event-time distributions.
+Whilst these directions may be interesting, they do not address the more fundamental question of when machine learning methods are genuinely useful in survival analysis.
 
-### Data cleaning
+Survival analysis is often applied in high-stakes domains such as engineering (component reliability), finance (customer churn), and healthcare (patient survival or treatment effectiveness).
+In such settings, many practitioners continue to rely on relatively simple models, prioritizing inference and interpretability over predictive accuracy [e.g., @Gorrod2019].
+This helps to explain why machine learning methods are not yet widely adopted in applied survival analysis.
+Moreover, even when prediction is the primary goal, it has been repeatedly shown that machine learning models can be out-performed by the Cox PH model in real-world settings [e.g., @Burk2025; @Zhang2021; @Beaulac2020].
 
-#### Events at t=0 {.unnumbered .unlisted}
+Machine learning approaches are most useful in settings where less complex methods struggle.
+One common advantage is the ability to model high-dimensional data or complex, highly non-linear relationships, where flexible learners can capture structure that is difficult to specify or estimate parametrically.
+A further advantage is the ability of machine learning methods to handle competing risks in a flexible and scalable manner, either directly through an algorithm's 'native' methodology or via reductions.
+The Fine-Gray model is perhaps the most widely-used competing risks model; however, as discussed in this book, it has well-known limitations.
+In contrast, machine learning frameworks can often accommodate competing risks more naturally and with fewer modelling restrictions.
 
-Throughout this book we have defined survival times taking values in the non-negative Reals (zero inclusive) $\NNReals$.
-In practice, model implementations assume time is over the positive Reals (zero exclusive).
-One must therefore consider how to deal with subjects that experience the outcome at $0$. 
-There is no established best practice for dealing with this case as the answer may be data-dependent.
-Possible choices include:
+Finally, while machine learning methods may still be outperformed by classical models, even in high-dimensional settings [@Spooner2020], this typically occurs when available features are weak or uninformative.
+When high-dimensional features are genuinely useful (such as being clinically meaningful in healthcare) then machine learning methods become essential for capturing complex patterns and for supporting large-scale inference through tools such as feature importance.
+In these settings, rather than merely offering alternative models, machine learning enables analyses that would otherwise be difficult or impractical to carry out with other statistical approaches.
 
-1. Deleting all data where the outcome occurs at $t=0$, this may be appropriate if it only happens in a small number of observations and therefore deletion is unlikely to bias predictions;
-2. Update the survival time to the next smallest observed survival time. For example, if the first observation to experience the event after $t=0$ happens at $t=0.1$, then set $0.1$ as the survival time for any observation experiencing the event at $t=0$. Note this method will not be appropriate when data is over a long period, for example if measuring time over years, then there could be a substantial difference between $t=0$ and $t=1$;
-3. Update the survival time to a very small value $\epsilon$ that makes sense given the context of the data, e.g., $\epsilon = 0.0001$.
+As such, knowing how and when to apply machine learning to survival analysis is an important and valuable skill, provided these methods are used thoughtfully and with a clear understanding of their strengths and weaknesses; an understanding we hope this book has provided.
 
-#### Continuous v Discrete Time {.unnumbered .unlisted}
-
-We defined survival tasks throughout this book assuming continuous time predictions in $\NNReals$.
-In practice, many outcomes in survival analysis are recorded on a discrete scale, such as in medical statistics where outcomes are observed on a yearly, daily, monthly, hourly, etc. basis.
-Whilst discrete-time survival analysis exists for this purpose (@sec-discrete), software implementations overwhelming use theory from the 'continuous-time setting.
-There has not been a lot of research into whether discrete-time methods outperform continuous-time methods when correctly applied to discrete data, however available experiments do not indicate that discrete methods outperform their continuous counterparts [@Suresh2022].
-Therefore it is recommended to use available software implementations, even when data is recorded on a discrete scale.
-
-### Evaluation and prediction {#sec-conclusions-faq-eval}
-
-* Which time points to make predictions for?
-*
-
-### Choosing models and measures  {#sec-conclusions-choosing}
-
-#### Choosing models {.unnumbered .unlisted}
-
-In contrast to measure selection, selecting models is more straightforward and the same heuristics from regression and classification largely apply to survival analysis.
-Firstly, for low-dimensional data, many experiments have demonstrated that machine learning may not improve upon more standard statistical methods [@Christodoulou2019] and the same holds for survival analysis [@Burk2024].
-Therefore the cost that comes with using machine learning -- lower interpretability, longer training time -- is unlikely to provide any performance benefits when a dataset has relatively few covariates.
-In settings where machine learning is more useful, then the choice largely falls into the four model classes discussed in this book: random forests, support vector machines, boosting, and neural networks (deep learning).
-If you have access to sufficient computational resources, then it is always worthwhile including at least one model from each class in a benchmark experiment, as models perform differently depending on the data type.
-However, without significant resources, the rules-of-thumb below can provide a starting point for smaller experiments.
-
-Random survival forests and boosting methods are both good all-purpose methods that can handle different censoring types and competing risks settings. In single-event settings both have been shown to perform well on high-dimensional data, outperforming other model classes [@Spooner2020].
-Forests require less tuning than boosting methods and the choice of hyperparameters is often more intuitive.
-Therefore, we generally recommend forests as the first choice for high-dimensional data.
-Given more resources, boosting methods such as *xgboost* are powerful to improve the predictive performance of traditional survival models.
-Survival support vector machines do not appear to work well in practice and to-date we have not seen any real-world use of SSVMs, therefore we generally do not recommend use of SVMs without robust training and testing first.
-
-Neural networks are incredibly data-dependent.
-Moreover, given a huge increase in research into this area [@Wiegrebe2024], there are no clear heuristics for recommending when to use neural networks and then which particular algorithms to use.
-With enough fine-tuning we have found that neural networks can work well but still without outperforming other methods.
-Where neural networks may shine is going beyond tabular data to incorporate other modalities, but again this area of research for survival analysis is still nascent.
-
-#### Choosing measures {.unnumbered .unlisted}
-
-There are many survival measures to choose from and selecting the right one for the task might seem daunting.
-We have put together a few heuristics to support decision making.
-Evaluation should always be according to the goals of analysis, which means using discrimination measures to evaluate rankings, calibration measures to evaluate average performance, and scoring rules to evaluate overall performance and distribution predictions.
-
-For discrimination measures, we recommend Harrell's and Uno's C.
-Whilst others can assess time-dependent trends, these are also captured in scoring rules.
-In practice the choice of measure matters less than ensuring your reporting is transparent and honest [@Therneau2020; @Sonabend2021].
-
-To assess a single model's calibration, graphical comparisons to the Kaplan-Meier provide a useful and interpretable method to quickly see if a model is a good fit to the data (@sec-calib-km).
-When choosing between models, we recommend D-calibration, which can be meaningful optimized and thus used for comparison.
-
-When picking scoring rules, we recommend using both the ISBS and RCLL.
-If a model outperforms another with respect to both measures then that can be a strong indicator of performance.
-When reporting scoring rules, we recommend the ERV representation which provides a meaningful interpretation as 'performance increase over baseline'.
-
-Given the lack of research, if you are interested in survival time predictions then treat evaluation with caution and check for new developments in the literature.
-
-For automated model optimization, we recommend tuning with a scoring rule, which should capture discrimination and calibration simultaneously [@Rindt2022; @Yanagisawa2023; FIXME ECML].
-Though if you are only ever using a model for ranking, then we recommend tuning with Uno's C.
-Whilst it does have higher variance compared to other concordance measures [@Rahman2017; @Schmid2012], it performs better than Harrell's C as censoring increases [@Rahman2017].
-
-#### Interpreting survival models {.unnumbered .unlisted}
-
-Interpreting models is increasingly important as we rely on more complex 'black-box' models [@Molnar2019].
-Classic methods that test if a model is fit well to data, such as the AIC and BIC, have been extended to survival models however are limited in application to the traditional survival models discussed in @sec-models-classical [@Liang2008; @VolinskyRaftery2000].
-As a more flexible alternative, any of the calibration measures in @sec-eval-distr-calib can be used to evaluate a model's fit to data.
-To assess algorithmic fairness, the majority of measures discussed in Part II can be used to detect bias in a survival context [@Sonabend2022a].
-Gold-standard interpretability methods such as SHAP and LIME [@Molnar2019] can be extended to survival analysis off-shelf [@Langbein2024], and time-dependent extensions also exist to observe the impact of variables on the survival probability over time [@Krzyziński2023; @Langbein2024].
-
-## What's next for machine learning survival analysis?
