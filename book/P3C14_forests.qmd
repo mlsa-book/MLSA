@@ -12,7 +12,7 @@ abstract: TODO (150-200 WORDS)
 
 Random forests are a composite (or ensemble) algorithm built by fitting many simpler component models, decision trees, and then averaging their predictions.
 Due to their built-in feature selection capabilities, random forests are commonly used in high-dimensional settings when the number of variables far exceeds the number of observations (rows).
-They are also popular due to build-in feature importance measures which facilitate interpretability.
+Despite being black-boxes, especially as the number of trees increases, random forests have natural feature importance measures which make them one of the more interpretable machine learning algorithms.
 Random survival forests therefore remain a popular and well-performing model in the survival setting, both for predictive modeling and pattern recognition.
 
 ## Random Forests for Regression
@@ -23,7 +23,7 @@ This section will start by discussing decision trees and will then introduce the
 
 ### Decision Trees
 
-*Decision trees* are machine learning models that are comparatively easy to implement in software and are highly interpretable.
+*Decision trees* are machine learning models that are comparatively simple to implement in software and are highly interpretable.
 The decision tree algorithm takes an input, a dataset, selects a variable that is used to partition the data according to some *splitting rule* into distinct non-overlapping datasets or *nodes* or *leaves*, and repeats this step for the resulting partitions, or *branches*, until some criterion has been reached.
 The final nodes are referred to as *terminal nodes*.
 
@@ -199,7 +199,7 @@ v^l_{\tau} := e^l_{\tau} \Big(\frac{n_\tau - o_\tau}{n_\tau}\Big)\Big(\frac{n_\t
 $$
 
 These results follow from the assumption that, under equal hazards in both leaves, the number of events at each unique event time follows a Hypergeometric distribution. 
-Under $H_0$, $LR(L^l)^2$ follows a $\chi^2$ distribution with one degree of freedom, so the squared statistic is commonly reported alongside the corresponding $p$-value.
+Under $H_0$, $LR(L^l)^2$ follows a $\chi^2$ distribution with one degree of freedom and the log-rank statistic is commonly reported alongside its corresponding $p$-value.
 In the two group setting,  $LR(L^l) = LR(L^r)$, hence it is sufficient to compute the statistic for one of the leaves.
 
 
@@ -221,9 +221,8 @@ A splitting rule is simply a way to measure if performance increases after data 
 Therefore, there are many statistics that could be used for this purpose [@pkgrfsrc; @Gordon1985; @Schmid2016], including many of the metrics referenced in Part II.
 Like many other aspects of modelling, experiments have shown that the choice of splitting rules is data dependent [@Schmid2016].
 When using loss-based splitting rules, the most sensible approach is to align the splitting rule with the prediction problem.
-<!-- TODO: the sentence below reads awkwardly because it starts with goal is maximizing separation (between nodes) but ends up with maximizing homogeneity in terminal nodes -->
-For example, if the goal is to maximize separation, then a log-rank splitting rule to maximize homogeneity in terminal nodes is a natural starting point.
-Whereas if the goal is to accurately rank observations, then a concordance splitting rule may be optimal (@sec-cindex).
+The log-rank splitting rule is commonly used when the goal is to maximize homogeneity within each node - for example to most accurately estimate the within-node survival distribution.
+However, if the goal were to optimize the ranking of observations, then a concordance splitting rule may be optimal (@sec-cindex).
 
 An alternative to log-rank statistics and loss-based rules is to instead use *likelihood ratio*, or *deviance*, statistics [@LeBlanc1992].
 The likelihood-ratio statistic can be used as a splitting rule to test if the model fit to the data is improved or worsened with each split.
@@ -243,7 +242,7 @@ Hence, a common RSF stopping rule is the minimum number of *uncensored* observat
 
 Starting with the most common survival prediction type, the algorithm requires a simple estimate for the underlying survival distribution in each of the terminal nodes, which can be estimated using the Kaplan-Meier or Nelson-Aalen methods [@Hothorn2004; @Ishwaran2008; @LeBlanc1993; @Segal1988].
 
-<!-- TODO: REF KM DEFINITION ABOVE -->
+<!-- TODO: REF KM DEFINITION ABOVE; DEPENDS ON #150 -->
 
 Let $b \in \{1,\ldots,B\}$ index the trees in a forest, let $L_b(\xx^*)$ denote the terminal node in tree $b$ that observation $\xx^*$ falls into, and let $t^*_{(1)} < \ldots < t^*_{(m)}$ be the ordered event times within $L_b(\xx^*)$.
 Then the predicted survival function and cumulative hazard for $\xx^*$ are,
@@ -260,7 +259,7 @@ where $d_{t^*_{(k)}}$ and $n_{t^*_{(k)}}$ are the observed number of events and 
 Direct calculation of the cumulative hazard using (@eq-rsf-surv-nelson) avoids $log(0)$ errors which could occur if transforming from the Kaplan-Meier estimates in (@eq-rsf-surv-kaplan).
 See @fig-surv-ranfor-lung for an example using the `lung` dataset [@pkgsurvival].
 
-<!-- TODO: figure below uses p-value splitting, which was not explained earlier. -->
+<!-- TODO: update figure below with same style as above -->
 
 ![Survival tree trained on the `lung` dataset from the $\Rstats$ package **survival**. The terminal node predictions are survival curves.](Figures/forests/lung.png){#fig-surv-ranfor-lung fig-alt="Decision tree with two splits, the first is 'ph.ecog' with a p-value of <0.001, when ph.ecog > 1 a terminal prediction is made, otherwise the data is split at 'sex' with - = 0.015. Terminal node predictions are plots of survival functions."}
 
@@ -298,14 +297,15 @@ The aggregated survival probability is calculated at event times points across t
 
 The RSF framework extends to competing risks (@sec-competing-risks) in a natural way, replacing the single-event Kaplan-Meier and Nelson-Aalen estimators in the terminal nodes with the Aalen-Johansen CIF estimator (@sec-aalen-johanson; @Ishwaran2014).
 Both the splitting rule and the terminal node estimator must be adapted to account for the presence of multiple event types.
-Following @Ishwaran2014, we distinguish between *cause-specific* splitting rules, which target a single cause $q$, and *composite* splitting rules, which aggregate information across all $Q$ causes.
-
-Cause-specific rules are appropriate when the primary interest is in one particular cause.
-The **generalized log-rank** rule tests $H_0: h_q^l = h_q^r$: it treats competing events as censored and selects features that best separate the cause-$q$ hazard between the two candidate nodes.
-**Gray's test** instead tests $H_0: F_q^l = F_q^r$: it uses an augmented risk set and selects features that best separate the cause-$q$ CIF.
-Composite rules are appropriate when the goal is to predict all cause-specific hazards or CIFs simultaneously; they produce a single splitting statistic by taking a variance-weighted sum of the per-cause statistics across all $Q$ causes.
+Following @Ishwaran2014, we distinguish between *cause-specific* and _composite_ splitting rules.
+Cause-specific rules target a single cause $q$ and are appropriate when the primary interest is in one particular cause.
+Composite rules aggregate information across all $Q$ causes and are appropriate when the goal is to predict all cause-specific hazards or CIFs simultaneously.
+Composite rules produce a single splitting statistic by taking a variance-weighted sum of the per-cause statistics across all $Q$ causes.
 
 #### Cause-specific splitting rules {.unnumbered .unlisted}
+
+Two common cause-specific splitting rules are the generalized log-rank rule and Gray's test.
+The *generalized log-rank* rule tests $H_0: h_q^l = h_q^r$, where $h_q$ is the hazard for cause $q$ whereas *Gray's test* tests $H_0: F_q^l = F_q^r$, where $F_q$ is the CIF for cause $q$.
 
 **Generalized log-rank.**
 The cause-$q$ log-rank statistic treats competing events as censored, so that the risk set for cause $q$ consist of all subjects still at risk for any event, with the number of subjects at risk denoted by $n_{\tbk}$.
@@ -378,7 +378,13 @@ $$
 $$
 
 Weighting by the per-cause variance $\hat{\sigma}_q^2$ (or $\tilde{\sigma}_q^2$) gives more influence to causes with more observed events.
-Substituting $LR_q = \sum_k w_q({\tbk})(o^l_{q,{\tbk}} - e^l_{q,{\tbk}})/\hat{\sigma}_q^2$ shows that both composite statistics reduce to a weighted pooled observed-minus-expected numerator divided by the square root of the total weighted variance across all causes.
+Substituting
+
+$$
+LR_q = \sum_k w_q({\tbk})(o^l_{q,{\tbk}} - e^l_{q,{\tbk}})/\hat{\sigma}_q^2,
+$$
+
+shows that both composite statistics reduce to a weighted pooled observed-minus-expected numerator divided by the square root of the total weighted variance across all causes.
 
 #### Terminal Node Estimator {.unnumbered .unlisted}
 
