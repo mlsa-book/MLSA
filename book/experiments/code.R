@@ -1520,6 +1520,32 @@ ggsave("book/Figures/reductions/pem-interval-comparison.png", p_pem_comparison,
 
 cat("\nFigure saved to book/Figures/reductions/pem-interval-comparison.png\n")
 
+### AUC
+x = c(0, seq.int(0, 1, 0.1))
+y_perfect = c(0,  rep(1, 11))   # perfect prediction
+y_guess   = c(0, seq.int(0, 1, 0.1))   # random guess (diagonal)
+y_good     = x^0.6
+y_better    = x^0.3
+
+df = data.frame(
+  x = rep(x, 4),
+  y = c(y_guess, y_perfect, y_good, y_better),
+  group = factor(rep(c("Random guess", "Perfect classifier", "Good model", "Better model"),
+                     each = length(x)))
+)
+
+g_auc = ggplot(df, aes(x = x, y = y, color = group)) +
+  geom_line(lwd = 1) +
+  geom_point() +
+  labs(
+    x = "False positive rate",
+    y = "True positive rate",
+    color = "Model"
+  )
+
+ggsave("book/Figures/evaluation/rocs.png", g_auc,
+       height = 5, width = 8, units = "in", dpi = 600)
+
 ## Survtsk chapter RMST comparison
 yi = c(1,0.8,0.75,0.75,0.7,rep(0.6, 5))
 yj = c(1,0.9,0.85,0.6,0.5,rep(0, 5))
@@ -1552,3 +1578,37 @@ p_rmst_survtsk <- (p1 + p2) + plot_layout(guides = "collect")
 
 ggsave("book/Figures/survtsk/rmst.png", p_rmst_survtsk,
        height = 4, width = 9, units = "in", dpi = 600)
+
+## C-index interval censoring
+cases <- tibble::tribble(
+  ~case, ~obs, ~l, ~r,
+  "1. li < ri < lj < rj", "i", 1, 2,
+  "1. li < ri < lj < rj", "j", 3, 4,
+
+  "2. lj < rj < li < ri", "i", 3, 4,
+  "2. lj < rj < li < ri", "j", 1, 2,
+
+  "3. lj < li < ri < rj", "i", 2, 3,
+  "3. lj < li < ri < rj", "j", 1, 4,
+
+  "4. li < lj < rj < ri", "i", 1, 4,
+  "4. li < lj < rj < ri", "j", 2, 3,
+
+  "5. lj < li < rj < ri", "i", 2, 4,
+  "5. lj < li < rj < ri", "j", 1, 3,
+
+  "6. li < lj < ri < rj", "i", 1, 3,
+  "6. li < lj < ri < rj", "j", 2, 4
+) %>%
+  mutate(y = ifelse(obs == "i", 2, 1))
+
+g_intervals = ggplot(cases) +
+  geom_segment(aes(x = l, xend = r, y = y, yend = y, lty = obs),
+               linewidth = 1) +
+  facet_wrap(~case, ncol = 2) +
+  scale_y_continuous(breaks = c(1,2), labels = c("j","i")) +
+  labs(x = "Time", y = "") +
+  theme(text = element_text(size = 18), legend.position = "n", axis.text.y = element_text(size = 20), axis.text.x = element_text(size = 16))
+
+ggsave("book/Figures/evaluation/intervals.png", g_intervals,
+      height = 6, width = 8, units = "in", dpi = 600)
