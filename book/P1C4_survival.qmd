@@ -13,15 +13,15 @@ abstract: TODO (150-200 WORDS)
 
 *Survival Analysis* is concerned with data where the outcome is the time until an event takes place (a 'time-to-event').
 Because the collection of such data takes place in the temporal domain (it takes time to observe a duration), the event of interest is often unobservable, for example because it did not occur by the end of the data collection period.
-In survival analysis terminology this is referred to as *censoring*.
+In survival analysis terminology this is referred to as *right-censoring*, one of several censoring mechanisms introduced below.
 
 This chapter defines basic terminology and mathematical definitions in survival analysis, which are used throughout this book.
 Building upon this chapter, @sec-eha introduces event-history analysis, which is a generalization to settings with multiple, potentially competing or recurrent events, including multi-state outcomes.
 Concluding this part of the book, @sec-survtsk defines different prediction tasks in survival analysis.
 
-While these definitions and concepts are not new to survival analysis, it is imperative they are understood to build successful models.
-Evaluation functions (Part II) can identify if one model is better suited than another to minimize a given objective function, however they cannot identify if the objective function itself was specified correctly, which depends on the assumptions about the data generating process.
-Evaluating models with the wrong objective function yields meaningless results.
+These definitions and concepts are standard in survival analysis, but we present them explicitly here because precise familiarity with them is essential for building successful models.
+Evaluation functions (Part II) can identify if one model is better suited than another to minimize a given objective function, however they cannot identify whether the objective function itself is correctly specified, because that specification depends on assumptions about the data-generating process — for example the type(s) of censoring/truncation present, whether the censoring time $C$ is independent of the event time $Y$ (marginally or conditionally on covariates $X$), and whether competing events are present.
+Misstating these assumptions yields a mismatched estimand and evaluation against it produces meaningless results.
 Hence, it is of utmost importance for machine learning practitioners to be able identify and specify the survival problem present in their data correctly to ensure models are correctly fit and evaluated.
 
 ## Quantifying the Distribution of Event Times {#sec-distributions}
@@ -47,7 +47,7 @@ $$
 S_Y(\tau) = P(Y > \tau) = \int^\infty_\tau f_Y(u) \ \du,
 $$ {#eq-surv-prob}
 
-which is the probability that an event has not occurred by $\tau \geq 0$ and thus the complement of the cdf: $S_Y(\tau) = 1-F_Y(\tau)$. By definition, $S_Y(0)=1$ and $S(\tau)\rightarrow 0$ for $\tau \rightarrow \infty$.
+which is the probability that an event has not occurred by $\tau \geq 0$ and thus the complement of the cdf: $S_Y(\tau) = 1-F_Y(\tau)$. By definition, $S_Y(0)=1$ and $S(\tau)\rightarrow 0$ for $\tau \rightarrow \infty$ (but see @sec-proper-Y).
 
 The hazard function is given by
 $$
@@ -60,6 +60,12 @@ $$ {#eq-continuous-hazard}
 
 where $\dtau$ denotes a time-interval. The hazard rate is often interpreted as the instantaneous risk of observing an event at $\tau$, given that the event has not been observed before $\tau$.
 This is not a probability and $h_Y$ can be greater than one.
+
+Two points deserve emphasis.
+First, the hazard is a **rate per unit time**: its numerical value depends on the scale on which $\tau$ is measured.
+A hazard of $0.01$ on a daily scale equals $3.65$ on an annual scale for the same underlying process. 
+Second, hazards — not survival or density functions — are the natural modelling target in survival analysis because censoring affects them locally: at a given $\tau$, only subjects still at risk contribute, so the hazard can be estimated from locally available information even when $S(\tau)$ is not directly observed at every $\tau$.
+For a book-length treatment of the hazard rate and its uses, see @rinneHazardRateTheory2014.
 
 The cumulative hazard function (chf) can be derived from the hazard function by
 $$
@@ -82,8 +88,14 @@ $$ {#eq-surv-haz}
 
 Unless necessary to avoid confusion, subscripts are dropped from $S_Y, h_Y$ etc. going forward and instead these functions are referred to as $S$, $h$ (and so on).
 
-Usual regression techniques cannot be used to estimate these quantities as $Y$ is only partially observed, due to different types of censoring and truncation (see @sec-data-rc, @sec-types-of-censoring, @sec-truncation).
+#### Proper vs. improper event times {#sec-proper-Y .unnumbered .unlisted}
 
+The formal definitions above take $Y$ to be a **proper** random variable, i.e. $S_Y(\tau) \to 0$ as $\tau \to \infty$.
+Many real-world events are *improper* at the population level — not every newborn develops cancer, not every patient relapses — so $S_Y(\infty) = \pi_0 > 0$ for some "cure" or immune fraction $\pi_0$.
+For the predictive targets in this book this is rarely an obstacle: predictions live on a finite horizon $[0, \tau^*]$ on which $S(\tau)$ and $h(\tau)$ are well-defined regardless of properness of $Y$.
+The one quantity that is genuinely sensitive to properness is the *mean* survival time $\EE[Y] = \int_0^\infty S_Y(u)\,\du$, which diverges for improper $Y$; the **restricted mean survival time** (RMST) $\int_0^{\tau^*} S_Y(u)\,\du$ is often used as a finite-horizon replacement (@sec-survtsk-time).
+When the cure fraction itself is the quantity of interest, the framework here extends to **cure models** [@Maller1996; @Lambert2007], which we do not cover in detail.
+Informal phrasings later in the chapter such as "the event may occur later in life" should be read as "later than the observation window", not as an assertion that $Y$ is proper.
 
 
 ### Discrete Time {#sec-distributions-discrete}
@@ -142,6 +154,12 @@ S^d_{\tilde{Y}}(j) = P(Y > a_{j}) = S_Y(a_{j})
 $$
 <!--  -->
 
+#### Definitions of discrete-time cumulative hazard {.unnumbered .unlisted}
+Before moving on, we note that the discrete-time cumulative hazard $H^d_{\tilde{Y}}(\tau)$ is defined two ways in the literature.
+The additive form (@eq-discrete-cumu-hazard) is the conventional choice, and the one used in this book. Under this definition, the continuous-time identity $S(\tau) = \exp(-H(\tau))$ no longer holds, and survival is recovered through the product (@eq-discrete-surv-prob) instead.
+An alternative convention defines $H^d_{\tilde{Y}}(\tau) := -\log S^d_{\tilde{Y}}(\tau) = -\sum_{k=1}^{\tau}\log\bigl(1 - h^d_{\tilde{Y}}(k)\bigr)$ to preserve $S = \exp(-H)$ exactly.
+The two coincide in the small-hazard limit, where $-\log(1 - h^d(k)) \approx h^d(k)$, and both converge to the continuous-time integral $H(\tau) = \int_0^\tau h(u)\,\du$ as the discretisation is refined; for a unified product-integral treatment, see @aalen2008survivalevent [§3.2.4].
+
 
 ## Single-event, right-censored data {#sec-data-rc}
 
@@ -164,10 +182,24 @@ Instead, the observable variables are defined by
 Together $(T,\Delta)$ is referred to as the *survival outcome* or *survival tuple* and they form the dependent variables.
 The survival outcome provides a concise mechanism for representing the outcome time and indicating which outcome (event or censoring) took place.
 
-A *survival dataset* is a $n \times p$, real-valued matrix defined by $\calD = ((\xx_1, \ t_1, \ \delta_1) \cdots (\xx_n,t_n,\delta_n))^\trans$, where $(t_i,\delta_i)$ are realizations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i;1} \ x_{i;2} \cdots x_{i;p})^\trans$ of features.
+A *survival dataset* is a $n \times p$, real-valued matrix defined by $\calD = ((\xx_1, t_1, \delta_1), \ldots, (\xx_n, t_n, \delta_n))^\trans$, where $(t_i,\delta_i)$ are realizations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i;1}, x_{i;2}, \ldots, x_{i;p})^\trans$ of features.
+
+@tbl-surv-data-tumor exemplifies an observed survival dataset, a subset of the `tumor` data  [@pkgpammtools], which contains the time until death in days after operation ($\delta_i=1$ if death occurred at the outcome time $t_i$ and $\delta_i = 0$ otherwise).
+
+| **id** ($i$) | **age** $(\xx_{;1})$ | **sex** $(\xx_{;2})$ | **complications** $(\xx_{;3})$ | **days** ($\tt$) | **status** ($\bsdelta$) |
+|---:|---:|:------|:-------------|----:|------:|
+|  1|  71|female |no            | 1217|      1|
+|  2|  70|male   |no            |  519|      0|
+|  3|  67|female |yes           | 2414|      0|
+|  4|  58|male   |no            |  397|      1|
+|  5|  39|female |yes           | 1217|      0|
+|  6|  59|female |no            |  268|      1|
+
+: Subset of the `tumor`  [@pkgpammtools] time-to-event dataset.
+Rows are individual observations (ID), $\xx_{;j}$ columns are features, $t$ is observed time-to-event, $\delta$ is the event indicator. {#tbl-surv-data-tumor}
 
 In this book, we will often refer to the unique, ordered event times.
-For example, given survival data, $(t_1=6, \delta_1=0), (t_2=1, \delta_2=1), (t_3=10,\delta_3=1), (t_4=5,\delta_4=0), (t_5 =10,\delta_5=1)$ the ordered unique event times are $(t_{(1)},  t_{(2)}) = (1,10)$ as the censored observations are removed, as are duplicated times.
+For example, given survival data, $(t_1=6, \delta_1=0)$, $(t_2=1, \delta_2=1)$, $(t_3=10,\delta_3=1)$, $(t_4=5,\delta_4=0)$, $(t_5 =10,\delta_5=1)$ the ordered unique event times are $(t_{(1)},  t_{(2)}) = (1,10)$ as the censored observations are removed, as are duplicated times.
 
 Let $m\leq n$ be the number of unique, observed event times.
 We define the **unique, ordered event times** simply as
@@ -211,25 +243,11 @@ In practice, ties are often observed due to finite measurement precision, such t
 The quantities $\calR_\tau$, $n_\tau$, and $d_\tau$ underlie many models and measures in survival analysis.
 Several non-parametric and semi-parametric methods (@sec-models-classical) like the Kaplan-Meier estimator (see @sec-surv-km) are based on the ratio $d_\tau / n_\tau$.
 
-@tbl-surv-data-tumor exemplifies an observed survival dataset, a subset of the `tumor` data  [@pkgpammtools], which contains the time until death in days after operation ($\delta_i=1$ if death occurred at the outcome time $t_i$ and $\delta_i = 0$ otherwise).
-
-In this example, the above quantities would be:
+Applied to the `tumor` example in @tbl-surv-data-tumor, these quantities are:
 
 * $\calR_{\tau = 1217} = \{1, 3, 5\}$ (these subjects' outcome times are greater or equal to $\tau = 1217$ so they are at risk for the event at this time)
 * $n_{\tau = 1217} = |\calR_{1217}| = 3$
 * $d_{\tau = 1217} = 1$: As only $i = 1$ experienced the event (and not censoring) at this time.
-
-| **id** ($i$) | **age** $(\xx_{;1})$ | **sex** $(\xx_{;2})$ | **complications** $(\xx_{;3})$ | **days** ($\tt$) | **status** ($\bsdelta$) |
-|---:|---:|:------|:-------------|----:|------:|
-|  1|  71|female |no            | 1217|      1|
-|  2|  70|male   |no            |  519|      0|
-|  3|  67|female |yes           | 2414|      0|
-|  4|  58|male   |no            |  397|      1|
-|  5|  39|female |yes           | 1217|      0|
-|  6|  59|female |no            |  268|      1|
-
-: Subset of the `tumor`  [@pkgpammtools] time-to-event dataset.
-Rows are individual observations (ID), $\xx_{;j}$ columns are features, $t$ is observed time-to-event, $\delta$ is the event indicator. {#tbl-surv-data-tumor}
 
 ## Types of Censoring {#sec-types-of-censoring}
 
@@ -255,6 +273,9 @@ In the latter case, a separate censoring event, such as drop-out is observed. --
 Right-censoring can be further divided into Type-I, Type-II and random censoring.
 Type-I, or *administrative*, censoring occurs at the fixed, pre-defined end of an observation period $\tau_u$, in which case the outcome is given by $(T_i = \min(Y_i, \tau_u), \Delta_i = \II(Y_i \leq \tau_u))$.
 Censored observations are therefore represented as $(\tau_u, 0)$.
+
+In practice, $\tau_u$ is often subject-dependent, $\tau_{u,i}$: with **staggered entry** (subjects enter the study at different calendar times) and a fixed calendar end-date, each subject's administrative censoring time is the difference between study closure and their entry.
+Conditional on the observed entry time, $\tau_{u,i}$ is deterministic and known, so the mechanism is still classified as Type-I (sometimes **generalized Type-I**); treated unconditionally — entry as a random recruitment process — $\tau_{u,i}$ inherits that randomness and behaves as random censoring.
 Type-II censoring also occurs when the observation period ends.
 However, in this case the study ends when a pre-defined number of subjects experienced the event of interest and hence $\tau_u$ is random.
 
@@ -322,7 +343,7 @@ From the example above, it is clear, that right- and left-censoring are special 
 However, if only right- or left-censoring is present, the likelihood and estimation simplifies (see @sec-surv-estimation).
 Also note that in case of left- and interval-censoring the event is known to have occurred, while for right-censoring the event didn't occur during time under observation.
 For left- and right-censoring one might be tempted to consider it an event $\delta_i = 1$ without exact time, while right-censoring would be consider a non-event $\delta_i = 0$.
-However, technically it is assumed that the event will always occur, if we wait long enough (for right-censored data in the interval $(t_i, \infty]$).
+For right-censored observations the true event time lies somewhere in $(t_i, \infty]$; as discussed in @sec-distributions-continuous, this implicitly assumes a proper $Y$, with the improper case handled by cure models.
 Censoring therefore means having imprecise information about the time of event rather than information about the event occurring or not occurring.
 
 ## Dependent vs. Informative Censoring {.unnumbered .unlisted}
