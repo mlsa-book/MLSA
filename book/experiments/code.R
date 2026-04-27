@@ -269,15 +269,17 @@ p_km = ggplot(bkm, aes(x = time, y = estimate)) +
   geom_segment(data=df_med, aes(x=x, xend=xend, y=y, yend=yend), lty = 3)+
   ylim(c(0, 1)) +
   ylab("S(t)") +
-  xlab("time")
+  xlab("days") +
+  theme_bw()
 p_km
 ggsave("book/Figures/survival/km-tumor.png", p_km, height=3, units="in", dpi=600)
 
-# stratified KM wrt complications
+# stratified KM wrt age group
 tumor = tumor |>
-  mutate(age_bin = factor(age < 50, levels = c(TRUE, FALSE), labels = c("age < 50", "age >= 50")))
+  mutate(age_bin = factor(age < 50, levels = c(TRUE, FALSE), labels = c("< 50", "≥ 50")))
 km_age_bin = survfit(Surv(days, status)~age_bin, data = tumor)
-bkm_age_bin = broom::tidy(km_age_bin)
+bkm_age_bin = broom::tidy(km_age_bin) |>
+  mutate(age = sub("age_bin=", "", strata))
 med_km_age_bin = as.numeric(median(km_age_bin))
 df_age_bin = data.frame(
   x = c(0, med_km_age_bin[2]), # Starting x-coordinates
@@ -287,12 +289,14 @@ df_age_bin = data.frame(
 )
 
 p_km_age_bin = ggplot(bkm_age_bin, aes(x = time, y = estimate)) +
-  geom_step(aes(col = strata)) +
+  geom_step(aes(col = age)) +
   geom_segment(data=df_age_bin, aes(x=x, xend=xend, y=y, yend=yend), lty = 3)+
   geom_hline(yintercept =  .5, lty = 3) +
   ylim(c(0, 1)) +
   ylab("S(t)") +
-  xlab("time")
+  xlab("days") +
+  scale_color_discrete(name = "age") +
+  theme_bw()
 p_km_age_bin
 ggsave("book/Figures/survival/km-age-bin-tumor.png", p_km_age_bin, height=3, units="in", dpi=600)
 

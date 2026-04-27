@@ -301,14 +301,10 @@ The first case represents an exactly observed event time, the second case the fa
 The third case is referred to as left-censoring, we know the event occurred before the interview, but don't know when.
 The fourth case is an example of interval-censoring, as we know the event occurred within some age span, but not the exact age.
 
-Interval- and left-censoring often occur in medical contexts.
-For example, some guidelines suggest annual screenings for skin cancer (starting from a certain age).
-However, the initial age at which individuals do screenings and regularity of check ups varies widely.
-If cancer was detected between two screenings, the observation is interval-censored.
-If cancer is detected at first screening, the observation is left-censored (unless the 'age' of the cancer can be narrowed down based on size and other characteristics, in which case it would become interval-censored).
-Also of note, particularly in a medical context, is that interval censoring may be safely ignored depending on the time scale being modelled.
-Say a patient is screened in February and March 2025 and cancer is detected in the second screening, then they are technically interval censored as (February 2025, March 2025).
-However, if this data is modelled at an annual scale, then their outcome is known to be [2025] and they are not considered censored.
+Interval-censoring is pervasive in medicine wherever events are detectable only at follow-up visits.
+For example, in HIV cohort studies the exact time of seroconversion is unknown; it lies in the interval between the last negative test and the first positive test [@Zhigang2010].
+Whether interval-censoring must be handled explicitly depends on the modelling time scale: if the chosen resolution is coarser than the typical interval width (e.g. annual rather than monthly), interval-censored observations effectively become exactly-observed events at that scale.
+Otherwise interval-censoring requires dedicated estimators (see @sec-surv-estimation).
 
 ### Censoring Notation {.unnumbered .unlisted}
 
@@ -323,7 +319,7 @@ Then the event time of subject $i$ is
 * interval-censored $Y_i \in (L_i = l_i, R_i = r_i]$, $l_i < r_i \leq t_i$
 * exactly observed if $Y_i \in (L_i = t_i, R_i = t_i]$
 
-In the cancer screening example from above it holds that $r_i=t_i$ and $l_i$ the last check-up before $r_i$.
+In the HIV seroconversion example above, $r_i$ is the time of the first positive test and $l_i$ the time of the last negative test before $r_i$.
 In the phone use example, the participants might specify any age range between $0$ and $t_i$.
 
 To make this more concrete, consider phone use example data, where $t_i$ is the age at interview.
@@ -380,10 +376,14 @@ This will usually introduce bias that needs to be accounted for.
 
 ### Left-truncation {#sec-left-truncation}
 
-Left-truncation often occurs when inclusion into a study is conditional on the occurrence of another event.
-Left-truncation plays an important role when modeling recurrent events or multi-state data (@sec-eha), thus the concept will be introduced in more detail.
+Left-truncation often arises when inclusion into a study is conditional on the occurrence of another event, and plays an important role when modeling recurrent events or multi-state data (@sec-eha), thus the concept is introduced in more detail.
 
-By example, consider a study from the 18th century [@brostrom.influence.1987], when childhood and maternal mortality were relatively high.
+Importantly, left-truncation has two defining consequences for the observed data: (i) subjects whose event occurs *before* study entry never enter the dataset, so the sample is systematically biased toward longer event times; and (ii) subjects who *do* enter the dataset are followed from their subject-specific entry time $t_i^L$ rather than from $t = 0$ (*delayed entry*).
+Ignoring either point leads to biased estimators (possible fixes are discussed in @sec-surv-estimation-param and @sec-non-param-lt).
+
+
+
+For illustration, consider a study from the 18th century [@brostrom.influence.1987], when childhood and maternal mortality were relatively high.
 The goal of the study was to establish the effect of a mother's death on the survival of the infant.
 Since each death was reported to the authorities, an infant was added to the study if and when their mother died.
 To create a matched cohort, two other infants, whose mothers were alive, were matched into the study based on their age and other relevant features.
@@ -434,21 +434,23 @@ However, parametric methods can be employed (see @sec-surv-estimation) and gener
 While details about estimation will be given later, when different models are introduced in Part III and Part IV of the book, it is worthwhile discussing some general concepts here, namely parametric and non-parametric approaches.
 
 ### Parametric estimation {#sec-surv-estimation-param}
-Consider for now uncensored data $(t_i, \delta_i=1), i=1,\ldots,n$.
-A standard approach would be to assume a suitable distribution for the event times $t_i \stackrel{iid}{\sim} F_Y(\boldsymbol{\theta}), \bstheta=(\theta_1,\theta_2,\ldots)^\top$, and define the likelihood of the data as
+Consider for now uncensored data $(t_i, \delta_i=1), i=1,\ldots,n$, where $t_i$ is the observed realization of the random variable $Y_i$.
+A standard parametric approach assumes $Y_i \stackrel{iid}{\sim} F_Y$ for $i=1,\ldots,n$, where $F_Y$ is a suitable parametric family with finite-dimensional parameter $\bstheta \in \Theta \subseteq \Reals^d$.
+When the parameter dependence matters explicitly (e.g. inside a likelihood), we write the cdf, density, and survival function evaluated at $\tau$ as $F_Y(\tau\mid\bstheta)$, $f_Y(\tau\mid\bstheta)$, and $S_Y(\tau\mid\bstheta)$.
+The likelihood of the data is then
 <!--  -->
 $$
 \calL(\bstheta) = \prod_{i=1}^{n}f_Y(t_i|\bstheta)
 $$ {#eq-likelihood}
 
-<!--  -->
-where $f_Y$ is the pdf of $F_Y$.
-
-The model parameters can then be obtained by maximizing the likelihood such that
+The corresponding estimation principle is **maximum likelihood estimation (MLE)**: parameters are chosen to maximise the probability of the observed data under the model,
 
 $$
-\hat{\bstheta} = \argmax_{\bstheta} \calL(\bstheta)
+\hat{\bstheta} = \argmax_{\bstheta} \calL(\bstheta).
 $$
+
+In machine learning, models are typically trained by *minimising a loss function*, and the two views coincide: the negative log-likelihood $-\log \calL(\bstheta)$ is the loss of an MLE-trained probabilistic model.
+Most survival-specific losses introduced later in this book are (weighted or censored) variants of a log-likelihood, so reading any of them as "training-time MLE under a particular censoring/truncation pattern" is usually a productive mental model.
 
 However, in the presence of censoring @eq-likelihood is incorrect, as the exact event time is only known for some subjects.
 For example, for right-censored data ($\delta_i = 0$) we only know that the event occurred after observed censoring time $t_i$.
@@ -467,6 +469,7 @@ $$
 $$ {#eq-right-censoring-likelihood}
 
 where the last equality follows from @eq-continuous-hazard.
+Equivalently, training a model on right-censored data by minimising the negative log of @eq-right-censoring-likelihood is the MLE view of the same objective.
 
 Similar adjustments to the likelihood can be made for other types of censoring and in the presence of truncation.
 Following @Klein2003, we can define the individual likelihood contributions for the different types of censoring as
@@ -511,8 +514,8 @@ A common principle for such techniques is to partition the follow-up into interv
 Once the respective hazard estimates are obtained, estimates of other quantities, for example the survival probability, can be derived based on the relationship given in @sec-distributions-continuous or @sec-distributions-discrete.
 
 #### Kaplan-Meier estimator {#sec-surv-km}
-The Kaplan-Meier estimator [@Kaplan1958], a simple, non-parametric estimator for the survival function (@eq-surv-prob), is an example for this principle.
-While it is usually used for continuous time, its construction can be motivated from a discrete time persepective. 
+The **Kaplan-Meier (KM) estimator** [@Kaplan1958] is the standard non-parametric estimator of the survival function (@eq-surv-prob) under **independent right-censoring**.
+The construction below is a concrete instance of the hazard-to-survival principle and can be motivated from a discrete-time perspective.
 Recall from @sec-data-rc the definition of unique, ordered, event time $t_{(k)}, k=1,\ldots,m$ (@eq-unique-ordered-event-times). 
 Define $\tilde{Y} = t_{(k)} \Leftrightarrow Y \in (t_{(k-1)},t_{(k)}]$ as discrete time representation of $Y$.
 Using the quantities introduced in @sec-data-rc,the discrete time hazard @eq-discrete-hazard is estimated as the ratio of the number of events occurring at $t_{(k)}$, to the number of subjects at risk at $t_{(k)}$: 
