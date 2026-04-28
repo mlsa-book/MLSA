@@ -250,7 +250,7 @@ Strictly speaking, prothrombin level is only assessed at scheduled follow-up vis
 The analyses that follow ignore this interval structure and treat the transition times as exactly observed -- the standard simplification in this example.
 Accounting for the interval-censoring would require NPMLE-type methods along the lines of @sec-surv-estimation-non-param.
 
-@tbl-ms-data-prothr shows a subset of the data set and contains for each subject (`id`)one row for each transition for which the subject was at risk for.
+@tbl-ms-data-prothr shows a subset of the data and contains, for each subject (`id`), one row per transition for which the subject was at risk.
 In this example, this includes transitions that were possible, but didn't happen (counterfactual transitions).
 The columns `from` and `to` indicate the initial state and the possible end state.
 `tstart` indicates the time at which the subject entered the risk set for said transitions and `tstop` the time point at which the subjects exited the `from` state (or were censored for any transition).
@@ -259,7 +259,7 @@ This is necessary, as all possible transitions are listed, so we need an indicat
 If `status=0` for all possible transitions, the subject is censored for further transitions.
 Finally, `treatment` indicates whether a patient was assigned the treatment or placebo group.
 
-Concretely, subject `id=1` already had abnormal prothrombin levels at the beginning of the trial, thus started in state $1$ with possible transitions $1\rightarrow 0$ and $1 \rightarrow 2$.
+Subject `id=1` already had abnormal prothrombin levels at the beginning of the trial, thus started in state $1$ with possible transitions $1\rightarrow 0$ and $1 \rightarrow 2$.
 In this case, the patient died, thus transition $1\rightarrow 2$ was realized after 151 days, while the transition $1 \rightarrow 0$ is a 'counterfactual' transition that could have happened in the time-span between `tstart=0` and `tend=151`, but didn't.
 Patient `id=8` also started in state $1$, but made a back transition to normal prothrombin levels after 211 days at which time they entered the risk set for transitions $0\rightarrow 1$ and $0\rightarrow 2$.
 Neither of the transitions occurred, as `status=0` for both transitions, which means the subject remained in status $0$ until the end of their follow-up at 2770 days (that is was right-censored at 2770 days).
@@ -522,13 +522,18 @@ For users who wish to commit only to state-occupancy estimates, the same AJ pipe
 ### Application to liver cirrhosis patients
 
 For illustration, consider again the `prothr` data set (@tbl-ms-data-prothr), with possible transitions summarized in @fig-multi-state-prothr-states.
-In contrast to the illness-death model in @fig-illness-death, back transitions are possible and some subjects already start in the "abnormal" state at the beginning of the study.
+In contrast to the illness-death model in @fig-illness-death, back transitions are possible and some subjects already start in the abnormal-prothrombin state at the beginning of the study.
 
+The estimands of interest are the transition probabilities $\hat{P}_{\ell e}(0, \tau)$ for starting state $\ell \in \{0, 1\}$ and end state $e \in \{0, 1, 2\}$, computed separately for the prednisone and placebo arms via the Aalen-Johansen estimator (@eq-ms-aj-trans-prob).
+Stratifying by treatment treats each arm as a homogeneous Markov sub-population; this is a coarse but standard simplification, and serves as a baseline before the regression-based methods of Part III, where subject-level features refine the estimates.
 
-@fig-multi-state-prothr shows the transition probabilities for the four possible transitions over time for subjects who received treatment and placebo, respectively.
-In this example back-transitions are possible, therefore, in contrast to the cumulative incidence functions in the competing risks setting, transition probabilities (to transient states) are not monotonously increasing over time.
-While the probabilities to transition from normal or abnormal state to death ($0 \rightarrow 2$, $1 \rightarrow 2$)  increase over time for both groups, probabilities for transitions between the transient states (normal to abnormal and vice versa) increase in the beginning but eventually decreases over time. Overall, prednisone doesn't appear to have a strong protective effect.
-Although there appears to be a reduction in $0 \rightarrow 2$ transitions  and an increase in $1\rightarrow 0$ transitions  between time points $1000$ and $3000$, this effect doesn't seem to persist until the end of the follow up.
+@fig-multi-state-prothr shows these probabilities for both arms.
+In contrast to the cumulative incidence functions of the competing-risks setting (@sec-aalen-johanson), the curves targeting *transient* states (such as $\ell \rightarrow 0$ and $\ell \rightarrow 1$) are not monotonically increasing in $\tau$.
+The reason is structural rather than specific to this data: the absorbing-state mass $P_{\ell 2}(0, \tau)$ grows monotonically with $\tau$ and the row-sum constraint @eq-ms-trans-prob-row-sums forces the transient-state probabilities to give up mass to compensate.
+
+For substantive interpretation, the curves for $0 \rightarrow 2$ and $1 \rightarrow 2$ (death) increase monotonically over follow-up in both arms, as expected for absorbing-state probabilities.
+Between roughly $1000$ and $3000$ days the prednisone arm shows a modest reduction in the $0 \rightarrow 2$ transition probability and an increase in the back-transition $1\rightarrow 0$ relative to placebo, but the gap narrows again towards the end of follow-up.
+The overall conclusion is that prednisone does not appear to confer a strong, persistent protective effect at this resolution; meaningful inference about treatment effects would require accompanying uncertainty bands and is beyond the descriptive scope of this stratified Aalen-Johansen analysis.
 
 ![Estimated transition probabilities for the different transitions of the prothrombin data example .](Figures/survival/multi-state-prothr.png){#fig-multi-state-prothr fig-alt="Transition probabilities for the prothrombin data example."}
 
