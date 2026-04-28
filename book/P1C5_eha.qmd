@@ -43,15 +43,17 @@ Note that the concepts discussed in @sec-types-of-censoring and @sec-truncation 
 
 ## A process point of view
 
-In order to formalize the different settings more conveniently, we introduce the stochastic process
+In @sec-surv, a subject is characterised by a single random variable $Y \in \NNReals$ — the time until *the* event of interest (defined in @sec-data-rc). That works well when exactly one event is possible. Once there are multiple possible events (death by heart disease vs. cancer), recurrences (relapses, hospital re-admissions), or intermediate states (healthy → ill → recovered), a single scalar random variable no longer captures the data-generating process: we need to know **which state the subject is in at every moment in time**.
+
+A *state* is a mutually exclusive classification of subjects at a given time point. In the simplest single-event setting, there are two states: "no event yet" (encoded as $0$) and "event has occurred" (encoded as $1$). In a competing-risks setting with $q$ possible events, the states are $\{0, 1, \ldots, q\}$ with $0$ meaning initial state (often "no event yet") and $e \in \{1, \ldots, q\}$ indicating that event of type $e$ has occurred.
+
+We formalise this as a stochastic process
 <!--  -->
 $$
 E(\tau) \in \{0,\ldots, q\},\ \tau \geq 0,
 $$ {#eq-state-process}
 <!--  -->
-which indicates the state that is occupied at time $\tau$.
-
-Using this notation in the single-event setting we get $E(\tau) \in \{0,1\}$ such that the hazard @eq-continuous-hazard could be written as
+that records the state occupied at time $\tau$. In the single-event case ($q = 1$), $E$ and the $Y$ of @sec-surv carry the same information: $E(\tau) = 1 \iff Y \leq \tau$. In particular, $\{Y \in [\tau, \tau + \dtau) \mid Y \geq \tau\}$ and $\{E(\tau + \dtau) = 1 \mid E(\tau-) = 0\}$ describe the same outcome — "the event occurs in the next instant" and "the process jumps from state $0$ to state $1$ in the next instant" — so the two expressions for the hazard are equivalent:
 <!--  -->
 $$
 \begin{aligned}
@@ -63,28 +65,27 @@ $${#eq-continuous-hazard-process}
 <!--  -->
 where $\tau-$ indicates the time point immediately before $\tau$.
 
-
-This notation doesn't yield many advantages in the single-event setting, but will shorten notation later on, particularly in the multi-state setting. While not further pursued here beyond notational convenience, we refer to @aalen2008survivalevent for an excellent treatment of event-history analysis derived from the point of view of stochastic processes.
+The process-valued formulation seems over-engineered in the single-event case but is less verbose when there are multiple states and transitions, as we will see in @sec-competing-risks and @sec-multi-state. For a thorough stochastic-process treatment of event-history analysis, see @aalen2008survivalevent.
 
 
 ## Competing Risks {#sec-competing-risks}
 
-In contrast to single-event survival analysis, competing risks are concerned with the time to the first of multiple, mutually exclusive events.
+In @sec-surv we assumed a single event of interest, with all other reasons a subject might leave the observation window lumped into right-censoring. **Competing risks** arise when several mutually exclusive events can end observation, and ignoring this structure — treating competing events as censoring — biases survival and hazard estimates (often substantially, as illustrated in @sec-cens-vs-cr). Canonical medical examples are cause-specific mortality (death by cancer vs. heart disease vs. other causes) and ICU outcomes (death in ICU vs. discharge alive); the defining feature is that once any one of the $q$ events occurs, the others can no longer occur. This section introduces the notation for competing risks, the non-parametric Aalen-Johansen estimator, and a worked comparison with the "censor-the-competing-event" approach on the ICU example below.
 
 @tbl-surv-data-sir.adm. shows an excerpt of the `sir.adm` data [@pkgmvna] of patients on an intensive care unit (ICU).
 Time under observation (`time`) could end in one of three outcomes: $1$ (discharge alive), $2$ (death on ICU) or $0$ (neither discharge nor death at the end of follow-up, which constitutes right-censoring at the end of study).
 The interest was in how pneumonia status (`pneumonia`) at admission to the ICU affects mortality.
 
-| `time`| `status`| `pneumonia`|
-|----:|------:|----:|
-|    8|      0|    no|
-|    8|      0|    no|
-|   31|      1|    yes|
-|    5|      1|    no|
-|    9|      2|    no|
-|    5|      2|    no|
+| `id` | `time`| `status`| `pneumonia`|
+|---:|----:|------:|----:|
+| 1 |    8|      0|    no|
+| 2 |    8|      0|    no|
+| 3 |   31|      1|    yes|
+| 4 |    5|      1|    no|
+| 5 |    9|      2|    no|
+| 6 |    5|      2|    no|
 : Subset of the `sir.adm` dataset [@pkgmvna].
-Each row represent one subject,`time` is the time under observation, `status` indicates the outcome observed ($0$: censored at the end of the study, $1$: discharged alive from the ICU, $2$: death in the ICU). `pneumonia` indicates whether a subject already had pneumonia at ICU admission. {#tbl-surv-data-sir.adm}
+Each row represents one subject identified by `id`. `time` is the time under observation, `status` indicates the outcome observed ($0$: censored at the end of the study, $1$: discharged alive from the ICU, $2$: death in the ICU). `pneumonia` indicates whether a subject already had pneumonia at ICU admission. {#tbl-surv-data-sir.adm}
 
 Contrast this data to the `tumor` data example in @sec-surv-km. There, patients were followed even after hospital discharge, thus loss to follow-up could be considered reasonably independent of the event of interest (death).
 In this study, follow-up stopped once patients were discharged. As discharged patients are healthier compared to the ones who remain on ICU, assuming independence between the time until discharge and time until death is unrealistic.
@@ -169,12 +170,14 @@ Many estimation procedures for the CIF take this approach, consequently referred
 
 ### Non-parametric estimators {#sec-aalen-johanson}
 
-Non-parametric estimators for the cause-specific (cumulative) hazard (@eq-cause-specific-cumu-hazard) in the competing risks setting are derived analogously to the single event case  (@sec-surv-estimation-non-param). The non-parametric estimate for the CIF is obtained by plugging in the non-parametric estimates of $S(t)$ and $h(t)$ into (@eq-cif) as follows.
+Estimating the CIF (@eq-cif) for cause $e$ requires estimates of two ingredients: the all-cause survival function $S(t)$ and the cause-specific hazard $h_e(t)$.
+The strategy is to construct a non-parametric estimator for each ingredient and then combine them by *plugging in* into @eq-cif.
+Both ingredients are direct analogues of the single-event constructions in @sec-surv-estimation-non-param.
 
-First, recall from @sec-data-rc the definitions of the unique ordered event times $t_{(k)}, k=1\ldots,m$, the risk-set at time $t_{(k)}$, $\calR_{t_{(k)}}$, the number of events, $d_{t_{(k)}}$, and number of observations at risk $n_{t_{(k)}}$.
-Assume partitioning of the follow-up into $m$ disjoint intervals $(t_{(k-1)}, t_{(k)}],k=1,\ldots,m$, such that $Y\in (t_{(k-1)}, t_{(k)}] \Leftrightarrow \tilde{Y}=t_{(k)}$, with $\tilde{Y}$ defined as in @sec-distributions-discrete.
+We re-use the discretisation from the single-event case: recall from @sec-data-rc the unique ordered event times $t_{(k)},\, k=1,\ldots,m$, the risk set $\calR_{t_{(k)}}$, and the number at risk $n_{t_{(k)}}$.
+Assume the follow-up is partitioned into $m$ disjoint intervals $(t_{(k-1)}, t_{(k)}],\, k=1,\ldots,m$, such that $Y \in (t_{(k-1)}, t_{(k)}] \Leftrightarrow \tilde{Y}=t_{(k)}$, with $\tilde{Y}$ defined as in @sec-distributions-discrete.
 
-An estimate for the *cause-specific* hazard is derived by updating the numerator in @eq-disc-haz-non-param to $d_{e,t_{(k)}}$ (the number of events of type $e$ at time $t_{(k)}$):
+The *cause-specific* discrete hazard is the obvious analogue of @eq-disc-haz-non-param, with the numerator restricted to events of type $e$ -- that is, $d_{e,t_{(k)}}$, the number of events of type $e$ observed at $t_{(k)}$:
 <!--  -->
 $$
 h^d_{e}(t_{(k)}) := \frac{d_{e,t_{(k)}}}{n_{t_{(k)}}},\ e \in \{1, \ldots, q\}.
@@ -182,7 +185,7 @@ $$ {#eq-cs-discrete-hazard}
 <!--  -->
 
 
-Finally, the Aalen-Johansen (AJ) estimator (@aalenEmpiricalTransitionMatrix1978) for the CIF is obtained by plugging in the Kaplan-Meier estimate (@eq-km) for the all-cause survival probability (probability that none of the competing events occurred) and the cause-specific hazard (@eq-cs-discrete-hazard) for cause $e$ into (@eq-cif):
+Plugging the Kaplan-Meier estimate (@eq-km) for the all-cause survival probability (the probability that none of the competing events has occurred) together with the cause-specific discrete hazard (@eq-cs-discrete-hazard) into @eq-cif yields the Aalen-Johansen (AJ) estimator (@aalenEmpiricalTransitionMatrix1978) for the CIF of cause $e$:
 <!--  -->
 $$
 F_{AJ,e}(\tau) = \sum_{k:t_{(k)}\leq \tau} \hat{S}_{KM}(\tau-)\hat{h}^d_e(\tau)=  \sum_{k:t_{(k)}\leq \tau} \hat{S}_{KM}(t_{(k-1)})\frac{d_{e,t_{(k)}}}{n_{t_{(k)}}}
@@ -243,6 +246,10 @@ Death (state $2$) constitutes an absorbing state.
 
 The goal of the trial was to investigate if treatment (prednisone) slows down or reverses disease progression (transitions $0 \rightarrow 1$ and $1 \rightarrow 0$) and reduces mortality (transitions $0 \rightarrow 2$ and $1 \rightarrow 2$).
 
+Strictly speaking, prothrombin level is only assessed at scheduled follow-up visits, so the transitions between state $0$ (normal) and state $1$ (abnormal) are *interval-censored*: at visit $k$ we observe the new status, but not the exact time at which the change occurred between visits $k-1$ and $k$.
+The analyses that follow ignore this interval structure and treat the transition times as exactly observed -- the standard simplification in this example.
+Accounting for the interval-censoring would require NPMLE-type methods along the lines of @sec-surv-estimation-non-param.
+
 @tbl-ms-data-prothr shows a subset of the data set and contains for each subject (`id`)one row for each transition for which the subject was at risk for.
 In this example, this includes transitions that were possible, but didn't happen (counterfactual transitions).
 The columns `from` and `to` indicate the initial state and the possible end state.
@@ -294,6 +301,10 @@ $$ {#eq-ms-transition-hazards}
 
 Transition hazards @eq-ms-transition-hazards indicate the instantaneous risk to enter state $e$ at time $\tau$ given occupation of state $\ell$  at $\tau-$, which is the instant before $\tau$.
 
+Throughout we take $\ell \neq e$ in the transition hazard $h_{\ell e}(\tau)$: a transition is by definition a move out of the current state.
+The diagonal case $\ell = e$ appears only at the level of transition probabilities (see @eq-ms-trans-prob-mat), where $P_{\ell\ell}(\zeta, \tau)$ is the probability of occupying state $\ell$ at both $\zeta$ and $\tau$ (which, in processes with back-transitions, also includes paths that leave $\ell$ and return).
+Furthermore, not every pair $(\ell, e)$ corresponds to a realisable transition: the state diagram of the specific process (e.g.\ @fig-multi-state-prothr-states for `prothr`) determines which transitions are possible a priori, and the hazards of impossible transitions are identically zero.
+
 Analogous to the competing risks setting, we can define the transition specific cumulative hazards
 
 $$
@@ -302,9 +313,15 @@ $$ {#eq-ms-cumu-hazard}
 
 
 The probability to transition from state $\ell$ to $e$ between two time-points depends on all transitions possible from $\ell$ and potentially the transitions that have taken place in the past.
-Thus, other quantities of interest in the multi-state setting are the transition probabilities $P_{\ell e}(\zeta, \tau):= P(E(\tau) = e|E(\zeta) = \ell)$, that is the probability to transition from state $\ell$ to state $e$ between time points $\zeta < \tau$.
-Implicitly, this notation assumes that the process is Markovian: the transition probability depends only on the state at $\zeta$ and not any additional past states.
-Extensions do exist that relax this assumption, for example by including information about the past, but are not relevant for now.
+A natural quantity of interest in the multi-state setting are the transition probabilities $P_{\ell e}(\zeta, \tau):= P(E(\tau) = e \mid E(\zeta) = \ell)$, that is, the probability to be in state $e$ at $\tau$ given occupation of state $\ell$ at $\zeta < \tau$.
+
+Throughout the remainder of @sec-multi-state we assume the multi-state process is *Markov*: the transition intensity at time $\tau$ depends only on the current state $E(\tau-)$, not on the full state history $\{E(u) : u < \tau\}$.
+Under this assumption, @eq-ms-transition-hazards is unambiguous, and the transition probability $P_{\ell e}(\zeta,\tau)$ is fully determined by the cumulative transition hazards between $\zeta$ and $\tau$.
+The transition-probability matrix @eq-ms-trans-prob-mat and its non-parametric Aalen-Johansen estimator (@eq-ms-aj-trans-prob) are then consistent.
+
+Relaxing the Markov assumption leads to *semi-Markov* and general *non-Markov* models, where the conditioning set must include past sojourn times or full state history -- see @aalen2008survivalevent and @beyersmann.competing.2012 for entry points.
+We do not pursue these extensions here.
+However, the marginal *state-occupancy* probabilities $P(E(\tau)=e)$ remain consistently estimable from the same Aalen-Johansen machinery even without the Markov assumption; this is taken up in @sec-ms-state-occupancy.
 
 Transition probabilities of a multi-state process are often summarized in a matrix
 <!--  -->
@@ -474,6 +491,32 @@ $$
 \mathbf{P}(\zeta, \tau) = \prod_{j=1}^{J}\big(\mathbf{I} + \triangle\mathbf{H}_{NA,\ell e}(t_{(j)})\big).
 $$ {#eq-ms-aj-trans-prob}
 <!--  -->
+
+
+### State occupancy probabilities {#sec-ms-state-occupancy}
+
+The pairwise transition probabilities $P_{\ell e}(\zeta, \tau)$ defined above condition on a specific entry-state $\ell$ at a specific time $\zeta$ and rely on the Markov assumption.
+A closely related but conceptually distinct target is the *state-occupancy probability*
+<!--  -->
+$$
+P_e(\tau) := P(E(\tau) = e) = \sum_{\ell=0}^{q} P(E(0) = \ell)\, P_{\ell e}(0, \tau),
+$$ {#eq-ms-state-occupancy}
+<!--  -->
+the marginal probability that a subject occupies state $e$ at time $\tau$, averaged over the initial-state distribution $P(E(0)=\ell)$.
+
+State-occupancy probabilities are arguably the more natural target for many prediction tasks: questions of the form *"what is the probability that the subject is alive in normal-prothrombin state at $\tau = 365$ days?"* are directly answered by $P_e(\tau)$, not by a pairwise transition probability conditioned on a fixed entry-state.
+
+A practically important property is that the Aalen-Johansen plug-in (@eq-ms-aj-trans-prob), applied with the empirical initial-state distribution rather than conditioned on a fixed $\ell$, remains a consistent estimator of $P_e(\tau)$ *even when the underlying process is not Markov* [@aalen2008survivalevent].
+The pairwise transition probabilities $P_{\ell e}(\zeta, \tau)$, by contrast, lose their interpretation under non-Markov dynamics.
+
+Concretely, given the AJ estimate $\widehat{\mathbf{P}}(0, \tau)$ and the empirical initial-state distribution $\hat{\pi}_\ell = n_\ell^{(0)}/n$ (where $n_\ell^{(0)}$ is the number of subjects observed in state $\ell$ at $\tau=0$), the state-occupancy estimator is
+<!--  -->
+$$
+\hat{P}_e(\tau) = \sum_{\ell=0}^{q} \hat{\pi}_\ell\, \widehat{P}_{\ell e}(0, \tau).
+$$ {#eq-ms-state-occupancy-est}
+<!--  -->
+The remainder of this section and the application below report the pairwise transition probabilities under the Markov assumption.
+For users who wish to commit only to state-occupancy estimates, the same AJ pipeline applies; the additional step is the marginalisation in @eq-ms-state-occupancy-est.
 
 
 ### Application to liver cirrhosis patients
