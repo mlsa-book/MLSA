@@ -642,47 +642,57 @@ It is clear that the survival probabilities were underestimated in both groups, 
 
 
 #### Interval-censoring {.unnumbered .unlisted}
-For interval-censoring, the Kaplan-Meier estimator is replaced by the nonparametric maximum likelihood estimator (NPMLE) [@Zhigang2010], which estimates the likelihood function under the assumption of left- or interval-censored data as in @sec-surv-estimation-param.
-The most common algorithm to compute this is the iterative Turnbull algorithm [@Turnbull1974].
-The intuition behind this algorithm is that an observation, $i$, should only contribute to the estimation at a given time-point, $\tau$, if the event could have happened in the censoring interval, $\tau \in (L_i, R_i]$.
+For interval-censored data, the Kaplan-Meier estimator is replaced by the nonparametric maximum likelihood estimator (NPMLE) [@Zhigang2010; @Sun2006]. The NPMLE maximises the likelihood derived in @sec-surv-estimation-param under interval-censoring without assuming a parametric form for $S_Y$.
 
-In summary [@Giolo2004]:
+Closed-form maximisation is not available; the standard tool is Turnbull's iterative *self-consistency algorithm* [@Turnbull1976], a special case of the EM algorithm in which the unobserved exact event times are the latent data. The intuition is that an observation $i$ should only contribute to the estimated probability of an event at a candidate time $\tau$ if its interval $(L_i, R_i]$ could plausibly have contained that event — exactly the condition $\tau \in (L_i, R_i]$.
 
-Let $\tbk, k = 1,...,m$ be the ordered times at which to evaluate the NPMLE.
-
-1. Make an initial guess for $\hatS^0(\tbk), k = 1,...,m$.
-
-Where $\hatS^0$ is the initial guess. 
-Let $\hatS^j$ be the estimated survival function at iteration $j$.
-
-1. **While** $\quad \lvert \hatS^j(\tbk) - \hatS^{j-1}(\tbk) \rvert > \epsilon, \forall k = 1,...,m \quad$ **Do:**
-
-a. Compute the probability of an event at each time-point:
-
+**Defining the time grid.** Interval-censored data does not provide observed event times. Instead, we construct a grid of *candidate* event times from the data's interval endpoints. Pool all observed left and right endpoints,
 $$
-p_{\tbk} = \hatS^{j-1}(t_{(k-1)}) - \hatS^{j-1}(\tbk), \quad k = 1,...,m
+\{0\} \cup \{L_1, R_1, \ldots, L_n, R_n\},
 $$
+sort, drop duplicates, and call the resulting ordered values $0 = \tau_0 < \tau_1 < \cdots < \tau_m$. The candidate event times $\tau_k, k = 1,\ldots,m$ are the right endpoints of the partition intervals $(\tau_{k-1}, \tau_k]$. The NPMLE is a step function on this grid; only intervals $(\tau_{k-1}, \tau_k]$ contained in some observation interval $(L_i, R_i]$ can carry positive mass (the *innermost intervals* of @Peto1973 and @Turnbull1976), and the algorithm below assigns zero mass to the rest automatically, so the pooled grid above can be used directly without first identifying the innermost intervals. Note that the $\tau_k$ are *constructed* grid points and are a different object from the observed ordered event times $t_{(k)}$ (@eq-unique-ordered-event-times) used for the right-censored Kaplan-Meier estimator in @sec-surv-km.
 
-b. Estimate the number of events at each time-point:
-
+For each subject $i$ and grid index $k$, define the indicator
 $$
-d_{\tbk} = \sum^n_{i=1} \frac{w_{ik}p_{\tbk}}{\sum^m_{l=1} w_{il}p_{t_{(l)}}}, \quad k = 1,...,m
-$$
+w_{ik} = \mathbb{I}\bigl((\tau_{k-1}, \tau_k] \subseteq (L_i, R_i]\bigr),
+$$ {#eq-turnbull-w}
+which records whether the event for subject $i$ could have occurred in the $k$-th grid interval. Right-censored observations have $R_i = \infty$, so $w_{ik} = 1$ for all $k$ with $\tau_{k-1} \geq L_i$.
 
-Where $w_{ik} = 1$ if the interval $(t_{(k-1)}, \tbk]$ is contained within $(L_i, R_i]$, and $w_{ik} = 0$ otherwise; and $L_i, R_i$ are the left- and right-censoring times for observations $i = 1,...,n$.
+**Worked example.** Consider three subjects with intervals $(0, 5]$, $(2, 8]$ and $(4, 10]$. Pooling the endpoints gives $\{0, 2, 4, 5, 8, 10\}$, hence $\tau_0 = 0,\ \tau_1 = 2,\ \tau_2 = 4,\ \tau_3 = 5,\ \tau_4 = 8,\ \tau_5 = 10$ (so $m = 5$). The indicator matrix is
 
-c. Compute the cumulative number of events at or after $\tbk$:
+| subject $i$ | $(L_i, R_i]$ | $w_{i,1}$ | $w_{i,2}$ | $w_{i,3}$ | $w_{i,4}$ | $w_{i,5}$ |
+|---|---|---|---|---|---|---|
+| 1 | $(0, 5]$  | 1 | 1 | 1 | 0 | 0 |
+| 2 | $(2, 8]$  | 0 | 1 | 1 | 1 | 0 |
+| 3 | $(4, 10]$ | 0 | 0 | 1 | 1 | 1 |
 
-$$
-n_{\tbk} = \sum^m_{l=k} d_{t_{(l)}}, \quad k = 1,...,m
-$$
+Reading the matrix: subject 1's event could fall in any of the first three grid intervals (which are all contained in $(0, 5]$); the third grid interval $(4, 5]$ is the only one in which any of the three subjects' events could fall.
 
-This serves a similar role to the usual 'number at risk' formula.
+**Initial guess.** Following @Turnbull1974 and @Giolo2004, a convenient starting estimate $\hatS^{0}$ is the Kaplan-Meier estimator (@eq-km) computed by treating each $R_i$ as an event time if $R_i < \infty$ and as right-censored otherwise; this *right-endpoint Kaplan-Meier* coincides with the usual Kaplan-Meier when no observation is interval- or left-censored. A flat starting value, $\hatS^{0}(\tau_k) = 1 - k/m$, also works and is the choice in some software [e.g. @pkgicenReg]; the iterates converge to the same limit.
 
-d. Calculate $\hatS^j$ using the Kaplan-Meier formula (@eq-km), substituting the values in Steps 2b and 2c.
+::: {.callout-note icon=false}
 
-@Giolo2004 suggest using the Kaplan-Meier to find the initial guess in Step 1 and to use $\epsilon = 10^{-3}$.
-A similar algorithm can be used for left-censored data.
+## Algorithm 2 (Turnbull NPMLE for interval-censored data)
+
+**Inputs:** observed intervals $\{(L_i, R_i] : i = 1,\ldots,n\}$; tolerance $\epsilon$ (default $10^{-3}$).
+
+1. Construct the grid $\tau_0 < \cdots < \tau_m$ from the pooled endpoints, the indicators $w_{ik}$ from @eq-turnbull-w, and an initial estimate $\hatS^{0}(\tau_k), k = 0, \ldots, m$ as described above.
+2. **For** $j = 1, 2, \ldots$ **until convergence:**
+3. \ \ \ \ \ For $k = 1, \ldots, m$, compute the current probability mass on the $k$-th grid interval $(\tau_{k-1}, \tau_k]$:
+$$p_{\tau_k}^{(j)} = \hatS^{j-1}(\tau_{k-1}) - \hatS^{j-1}(\tau_k).$$ {#eq-turnbull-p}
+4. \ \ \ \ \ For $k = 1, \ldots, m$, compute the expected number of events in $(\tau_{k-1}, \tau_k]$ under the current estimate:
+$$d_{\tau_k}^{(j)} = \sum_{i=1}^{n} \frac{w_{ik}\, p_{\tau_k}^{(j)}}{\sum_{l=1}^{m} w_{il}\, p_{\tau_l}^{(j)}}.$$ {#eq-turnbull-d}
+5. \ \ \ \ \ Compute the corresponding number "still at risk just before $\tau_k$":
+$$n_{\tau_k}^{(j)} = \sum_{l=k}^{m} d_{\tau_l}^{(j)}.$$ {#eq-turnbull-n}
+6. \ \ \ \ \ Plug $d_{\tau_k}^{(j)}$ and $n_{\tau_k}^{(j)}$ into the Kaplan-Meier formula (@eq-km) to obtain $\hatS^{j}$.
+7. \ \ \ \ \ **If** $\max_{k}\bigl|\hatS^{j}(\tau_k) - \hatS^{j-1}(\tau_k)\bigr| < \epsilon$, **stop**.
+8. **Return** $\hatS^{j}$.
+
+The estimator is constant on each grid interval $(\tau_{k-1}, \tau_k]$. For plotting it is conventional to display jumps at the right endpoints $\tau_k$; some authors instead place each jump at the midpoint $(\tau_{k-1} + \tau_k)/2$ to reflect the underlying uncertainty about exact event timing — both are valid presentations of the same estimator.
+
+::::
+
+A close variant of this algorithm handles purely left- or doubly-censored data; see @Klein2003 [§5.2] for a fully worked example on the time-to-first-marijuana-use data set of @Turnbull1974.
 
 
 ## Estimation of the censoring distribution {#sec-censoring-distribution}
