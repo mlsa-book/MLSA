@@ -26,14 +26,14 @@ If you have any questions about licensing, just [open an issue](https://github.c
 Whilst this book remains a work in progress you can cite it as
 
 ```
-Sonabend. R, Bender. A. (2025). Machine Learning in Survival Analysis.
+Sonabend. R, Bender. A. (2026). Machine Learning in Survival Analysis.
 https://www.mlsabook.com.
 
-@book{MLSA2025,
+@book{MLSA2026,
     title = {Machine Learning in Survival Analysis},
     editor = {Raphael Sonabend, Andreas Bender},
     url = {https://www.mlsabook.com},
-    year = {2025}
+    year = {2026}
 }
 ```
 
@@ -46,54 +46,64 @@ Before you contribute, please read our [code of conduct](https://github.com/mlsa
 
 ## Biographies {.unnumbered}
 
-Dr Raphael Sonabend-Friend is an Associate Director at the National Institute for Health and Care Excellence (NICE) and the CEO and Co-Founder of OSPO Now.
+Dr. Raphael Sonabend-Friend is an Associate Director at the National Institute for Health and Care Excellence (NICE) and the CEO and Co-Founder of OSPO Now.
 Raphael holds a PhD focussed on the accessible and transparent use of machine learning for survival analysis.
 Raphael has over a decade of experience in the healthcare sector, including with large philanthropies, small local charities, governmental bodies, and private sector consulting for UK and international organisations.
 Raphael has created and maintained several software packages for survival analysis and machine learning, including `mlr3proba`, `survivalmodels`, and `SurvivalAnalysis.jl`.
 Raphael co-edited and co-authored *Applied Machine Learning Using mlr3 in R* [@Bischl2024].
 
-Dr Andreas Bender is a Senior Lecturer at the Department of Statistics, Head of the Machine Learning Consulting Unit (MLCU) at the Munich Center for Machine Learning (MCML), LMU Munich, and founder of the Open Science Initiative in Statistics at LMU Munich.
+Dr. Andreas Bender is a Senior Lecturer at the Department of Statistics, Head of the Machine Learning Consulting Unit (MLCU) at the Munich Center for Machine Learning (MCML), LMU Munich, and founder of the Open Science Initiative in Statistics at LMU Munich.
 (Machine Learning) Survival Analysis is one of Andreas' main research areas.
-Andreas created several open-source packages and activelycontributes to survival-related software, including `pammtools` for piecewise exponential additive mixed models and `mlr3proba` for machine learning survival analysis.
+Andreas created several open-source packages and actively contributes to survival-related software, including `pammtools` for piecewise exponential additive mixed models and `mlr3proba` for machine learning survival analysis.
 
 # Preface
 
-Time-to-event data — that is data where the outcome of interest is defined by the time until an event occurs — arises across nearly every quantitative field, from medicine and public health to engineering, economics, and finance.
-At first glance, this might be considered a standard regression problem with a non-negative outcome (time-to-event cannot be negative).
-However, as put succinctly by Terry M. Therneau, "it takes time to observe time" [@Therneau2024], meaning: while we wait for the event to occur, things happen. 
-Most commonly, subjects might drop out of the study, or the event does not occur before the end of the observation window.
-Such partial observation, called _censoring_, is one defining feature of survival analysis and the reason it is mathematically distinct from standard regression or classification.
-Rather than discarding censored subjects or treating them as missing, survival analysis makes full use of the information they carry — we know the event had not occurred by the last time we looked, and that fact alone is informative.
-More generally, because observation takes place in the temporal domain, _what_ is observed — and whether it is observed at all — depends on many factors: how study start and end are defined (observation window), the inclusion criteria, the occurrence of other events that may preclude observation of the event of interest, and how precisely the time to event can be measured.
+Time-to-event data refers to data where the outcome of interest is defined by the time until an event occurs.
+This sort of data arises across almost all domains, from medicine and public health to engineering, economics, and finance.
+At first glance, analysis of time-to-event data might appear to be a standard regression problem with a non-negative outcome (as the time taken until an event must be positive).
+However, as stated by Dr. Terry Therneau, "it takes time to observe time" [@Therneau2024], which means that at the time of an analysis not all observations in the dataset will have experienced the event.
+Moreover, some observations will never experience the event, even outside of the observation window; for example being lost to follow-up (simply uncontactable)
+Instead of discarding these observations who do not experience the event, they are instead referred to as _censored_.
+Censoring is one defining feature of survival analysis and the reason it is mathematically distinct from standard regression or classification.
+Survival analysis makes full use of the censoring information by modelling for all observations: i) if the observation experienced the event or was censored; ii) the time until the event or censoring.
 
 For illustration, consider two examples:
 
-**Stage IV lung cancer.**
-In a randomised trial of a new therapy for advanced non-small cell lung cancer, patients are followed from randomisation until death.
-Many die during the trial and their event time is fully observed; others are still alive when the trial closes, and their survival time is right-censored at the end of the observation window.
-A regression trained only on the deaths would overestimate mortality and throw away information about the survivors; survival analysis uses both groups in a single coherent model.
-Typical questions include: what fraction of patients on the new therapy survive five years?
-How does mortality risk under the new therapy compare with the control arm?
-For a given patient, what is their expected survival time?
+**Stage IV lung cancer**<br>
+In a five-year randomized trial of a new therapy for advanced non-small cell lung cancer, patients are observed from randomization into the study until the study end and it is recorded if a patient dies within the observation window.
+Those that die during the trial are said to have experienced the event of interest and their event time is fully observed.
+For the patients alive at the end of the trial, their survival time is censored at the end of the observation window.
+Practically speaking, they are said to have survived at least five years, but no further assumptions are made about their time of death.
 
-**Unemployment durations.**
-In a study of the labour market, workers are followed from the start of an unemployment spell until they leave it.
-A worker may exit unemployment in several mutually exclusive ways — into a full-time job, a part-time job, or out of the labour force entirely — and each exit may have very different determinants.
-This is what we will later refer to as a _competing risks_ setting.
-Workers still unemployed at the end of the study window are right-censored.
-The questions of interest mirror the medical trial: how long until re-employment?
-Which workers are at greatest risk of long-term unemployment?
-What is the probability of re-employment within one year?
+A regression model trained only on the deaths would overestimate mortality and throw away information about the survivors.
+Alternatively, a regression model that treats deaths and censoring as equal would also overestimate mortality (though skewing towards study end if the treatment is successful).
+Survival analysis uses both groups in a single coherent model.
+Typical questions from a survival analysis include:
 
-These two examples — one medical, one economic — share the structural features that motivate survival analysis.
-The same structure appears in predictive maintenance, credit risk, customer churn, hardware reliability, and many other areas; application-specific names ("reliability analysis" in engineering, "duration analysis" in economics) differ, but the underlying mathematics is the same.
-Survival analysis has a rich statistical tradition [@Collett2014; @Klein2003; @Kalbfleisch1980] developed precisely to  correctly handle partially observed (censored) data, possibly subject to (temporal) sampling bias (truncation).
+1. What fraction of patients on the new therapy survive three years?
+2. How does mortality risk under the new therapy compare with the control arm?
+3. For a given patient, what is the probability of them being alive after two years?
 
+**Unemployment durations**<br>
+In a study of the labour market, workers are followed throughout a period of individual unemployment.
+A worker may exit unemployment in several mutually exclusive ways: 1) into a full-time job; 2) into one or more part-time jobs; or 3) out of the labor force entirely; each exit may have very different determinants.
+Workers still unemployed (but in the labor force) at the end are censored.
+Later this setting will be introduced as _competing risks_ and it introduces new challenges, such as adapting models to handle non-independent events.
+Despite this extra challenge, the questions of interest mirror the medical trial:
+
+1. How long until re-employment?
+2. Which workers are at greatest risk of long-term unemployment?
+3. What is the probability of re-employment within one year?
+
+These two examples, medical and economic, share the structural features that motivate survival analysis, which also appears across component maintenance, credit risk, customer churn, and many more.
+Application-specific names ("reliability analysis" in engineering, "duration analysis" in economics) differ but the underlying mathematics is identical.
+Survival analysis has been developed over a long period to correctly handle partially observed (censored) data, which may be subject to (temporal) sampling bias (known as truncation) [@Collett2014; @Kalbfleisch1980; @Klein2003].
+
+**Scope**<br>
 This book focuses entirely on _predictive_ survival analysis (which we refer to simply as 'survival analysis'), i.e. forward-looking predictions for new subjects.
 This is in contrast to inference methods, which examine model parameters to learn information about a given dataset or model.
 This book also does not cover using the discussed models to predict the remaining lifetime for in-sample censored observations.
-Bayesian methods are also not included as these remain nascent in the machine learning survival analysis setting; future editions will endeavour to include these methods.
-Unsupervised methods such as clustering are likewise outside the scope of this book.
+Bayesian and unsupervised methods are excluded as these remain nascent in the machine learning survival analysis setting; future editions will endeavour to include these methods.
 Predictive survival analysis is applied across a wide variety of industries, for example:
 
 * Manufacturing: Predict the time to equipment failure;
@@ -101,33 +111,30 @@ Predictive survival analysis is applied across a wide variety of industries, for
 * Healthcare: Predict a patient's survival time after infection with meningitis;
 * Finance: Predict the time until a customer defaults on a loan;
 * Marketing: Predict the risk of a customer churning;
-* E-commerce: Predict the time until next purchase for personalized marketing;
+* E-commerce: Predict the time until next purchase for personalized marketing.
 
+Despite its importance in many real-world settings, adaptation of machine learning in survival analysis has lagged behind predictive modeling for classification and regression.
+Partly this is due to the fact that analysis of time-to-event data is neither part of the canonical survival analysis or machine learning curriculum.
+The former often focuses on univariate, non-parametric techniques or simple linear models, traditionally due to sector-wide requirements for interpretability and uncertainty quantification (particularly in healthcare domains).
+Machine learning literature focuses on regression and classification which cover the majority of predictive use cases.
+In recent years there has been increasing overlap between survival analysis and machine learning, but in our experience there is still a substantial gap in the knowledge and skills required to combine the two fields. 
+This books aims to further bridge the gap by introducing the key fundamental concepts of both fields before combining them to what we refer to as _machine learning survival analysis_.
 
-Despite its importance in many real-world settings, adaptation of machine learning in survival analysis has lagged behind  predictive modeling for classification and regression. Partly this is due to the fact that analysis of time-to-event data is not part of the canonical machine learning curriculum while (bio)statisticians commonly focus on (univariate) non-parametric methods and regression techniques, traditionally due to requirements regarding interpretability and uncertainty quantification.
-In recent years there has been increasing overlap between these two groups and fields of research, but in our experience there is still a substantial gap in the knowledge and skills required to combine machine learning and survival analysis. 
-This books aims to forther bridge the gap by introducing the key fundamental concepts of both fields before combining them to what we refer to as _Machine Learning Survival Analysis_.
-
-
-**A note from Raphael**:
-I wrote my PhD thesis about machine learning applications to survival analysis because I was interested in understanding why more researchers were not using machine learning models for survival analysis.
-Since then, I feel that little has changed, even with the rapid rise of generative AI.
-The field continues to lag behind but now with more challenges than ever.
-Over the years, I've had the pleasure to work with, and advise, researchers across different sectors, including pharmaceutical companies, governmental agencies, funding organizations, and research institutions.
-I hope that this book continues to help researchers discover machine learning survival analysis and to navigate the nuances and complexities it presents.
-
-**A note from Andreas**:
-
+The rapid rise of generative artificial intelligence (genAI) with tools such as ChatGPT, Gemini, and Claude, may lead readers to question the value of traditional machine learning methods.
+This is especially true in survival analysis where the slower adoption of machine learning means the field could leapfrog to genAI approaches.
+However, genAI is a sub-field of machine learning and the approaches in this book directly apply to newer methods.
+This is especially true for the underlying theory (Part I), evaluation (Part II) and reductions (Part IV).
+Moreover, when prompting genAI tools to solve a survival analysis problem, practically they almost always write code that leverages machine learning models, therefore understanding these models (Part II) is vital to ensure model explainability.
 
 ## Overview of the book
 
 This book is intended to fill a gap in the literature by providing a comprehensive introduction to machine learning in the survival setting.
 If you are interested in machine learning or survival analysis separately, then you might consider @Hastie2013; @Hastie2001; or @Bishop2006 for machine learning and @Collett2014 or @Kalbfleisch1980 for survival analysis.
-This book serves as a complement to the above works and introduces common machine learning terminology from simpler settings such as regression and classification, but without diving into the detail found in other sources.
-This book is centred on the intersection of the two areas and defining the suitability of different methods and models depending on the availabile data.
-
-A particular focus of the book is to introduce the different concepts and terminology necessary to correctly specify the machine learning survival analysis task. For example, it is necessary to identify the presence of the different types of censoring and truncation as well as potentially competing risks and other complications arising from time-to-event data. Failure to do so will lead to bias, useless results and leaves the analysis essentially 'dead on arrival'.
-We therefore hope that this book will provide a comprehensive knowledge base for sucessful _machine learning survival analysis_.
+This book serves as a complement to the above works and introduces machine learning terminology from settings such as regression and classification, but without replicating the detail found in other sources.
+Instead, the primary focus is the intersection of the above two areas and defining the suitability of different methods and models depending on the available data.
+A particular aim is to introduce the different concepts and terminology necessary to correctly specify the machine learning survival analysis task.
+For example, before developing any models, it is necessary to identify the presence of different types of censoring and truncation as well as potentially competing risks and other complexities that could arise from time-to-event data.
+Failure to do so will lead to bias and potentially meaningless results.
 
 This book may be useful for Master's or PhD students who are specializing in machine learning in survival analysis, machine learning engineers looking to solve problems involving partially observed time-to-event data, or practitioners familiar with survival analysis but without machine learning knowledge.
 The book can be read cover-to-cover, but we believe it will also be useful as a reference book for you to dip into as required.
@@ -137,7 +144,7 @@ Following the introduction, this book is structured in four parts:
 **Part I: Machine Learning and Survival Analysis**<br>
 Part I opens with a brief overview of machine learning, introducing key concepts that are universal to any application of machine learning, regardless of the specific setting.
 It then turns to the basic terminology and concepts of survival analysis, followed by more advanced concepts in the more general 'event history analysis' setting, which encompasses competing risks and multi-state models.
-This Part concludes by unifying terminology between machine learning and survival analysis to define what it means to have different survival prediction problems and a 'machine learning survival analysis' task.
+This Part concludes by unifying terminology between machine learning and survival analysis to define what it means to have different survival prediction problems and a machine learning survival analysis task.
 
 **Part II: Evaluation**<br>
 The second part of the book discusses model evaluation.
@@ -164,8 +171,7 @@ In this way, readers are well-equipped to independently follow papers that intro
 The final Part introduces reduction techniques, which are methods to transform survival tasks to more standard regression or classification tasks.
 Practitioners who are comfortable with machine learning in general but not necessarily survival analysis may find this Part of the book most useful for quickly implementing familiar models within the survival analysis domain.
 
-The book's final chapter lists common practical problems that occur when running survival analysis experiments, as well as solutions that we have found useful.
-We additionally provide our outlook on survival analysis and where we think the field may be heading.
+The book's final chapter provides our outlook on survival analysis and where we think the field may be heading.
 
 ### Reproducibility
 
