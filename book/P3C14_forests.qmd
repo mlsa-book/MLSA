@@ -1,5 +1,5 @@
 ---
-abstract: TODO (150-200 WORDS)
+abstract: "This chapter introduces random forests as an ensemble learning method and outlines their extension to survival analysis through random survival forests (RSFs). It begins by describing decision trees, focusing on their key components: splitting rules, stopping criteria, and terminal node predictions. While decision trees are interpretable and capable of capturing non-linear effects and interactions, they suffer from high variance and instability. Random forests address these limitations by combining many trees trained on bootstrapped samples with additional randomness introduced through feature subsampling, resulting in improved predictive performance and robustness. The chapter then extends these ideas to censored data. In RSFs, standard regression splitting rules are replaced with survival-specific criteria, most commonly the log-rank test, to account for time-to-event outcomes. Terminal node predictions are adapted to estimate survival quantities such as survival functions and cumulative hazards using nonparametric estimators. The framework further generalizes to competing risks through appropriate modifications to splitting rules and node estimators. Finally, the chapter discusses relative risk prediction and practical considerations, emphasizing the flexibility and strong empirical performance of RSFs in high-dimensional survival settings."
 ---
 
 ::: {.content-visible when-format="html"}
@@ -11,9 +11,9 @@ abstract: TODO (150-200 WORDS)
 {{< include _wip_minor.qmd >}}
 
 Random forests are a composite (or ensemble) algorithm built by fitting many simpler component models, decision trees, and then averaging their predictions.
-Owing to their built-in variable importance measures, random forests are commonly used in high-dimensional settings when the number of variables far exceeds the number of observations (rows).
-High-dimensional datasets are common in survival analysis, especially when considering omics, genetic, and financial data.
-It is therefore no surprise that random survival forests remain a popular and well-performing model in the survival setting, both for predictive modeling and pattern recognition.
+Due to their built-in feature selection capabilities, random forests are commonly used in high-dimensional settings when the number of variables far exceeds the number of observations (rows).
+Despite being black-boxes, especially as the number of trees increases, random forests have natural feature importance measures which make them one of the more interpretable machine learning algorithms.
+Random survival forests therefore remain a popular and well-performing model in the survival setting, both for predictive modeling and pattern recognition.
 
 ## Random Forests for Regression
 
@@ -23,7 +23,7 @@ This section will start by discussing decision trees and will then introduce the
 
 ### Decision Trees
 
-*Decision trees* are a (relatively) simple machine learning model that are comparatively easy to implement in software and are highly interpretable.
+*Decision trees* are machine learning models that are comparatively simple to implement in software and are highly interpretable.
 The decision tree algorithm takes an input, a dataset, selects a variable that is used to partition the data according to some *splitting rule* into distinct non-overlapping datasets or *nodes* or *leaves*, and repeats this step for the resulting partitions, or *branches*, until some criterion has been reached.
 The final nodes are referred to as *terminal nodes*.
 
@@ -47,23 +47,28 @@ To understand how random forests work, it is worth looking a bit more into the m
 #### Splitting and Stopping Rules {.unnumbered .unlisted}
 
 Precisely how the data partitions/splits are derived and which variables are utilised is determined by the *splitting rule*.
-The goal in each partition is to find two resulting leaves/nodes that have the greatest difference between them and thus the maximal homogeneity within each leaf, hence with each split, the data in each node should become increasingly similar.
-The splitting rule provides a way to measure the homogeneity within the resulting nodes.
+The goal in each partition is to find two resulting leaves/nodes that have the greatest difference between them and thus the maximal homogeneity within each leaf. 
+Hence with each split, the data in each node should become increasingly similar.
+The splitting rule provides a way to measure the difference between nodes or the homogeneity within the resulting nodes.
 In regression, the most common splitting rule is to select a variable and cut-off (a threshold on the variable at which to separate observations) that minimises the mean squared error in the two potential resulting leaves.
 
-For all decision tree and random forest algorithms going forward, let $L \subseteq \{1,\ldots,n\}$ denote the set of observation indices in a leaf, with mean outcome $\bar{y}_L = \frac{1}{|L|}\sum_{i \in L} y_i$.
+For all decision tree and random forest algorithms going forward, let $L \subseteq \{1,\ldots,n\}$ denote the set of observation indices in a leaf, with mean outcome
+
+$$
+\bar{y}_L = \frac{1}{|L|}\sum_{i \in L} y_i.
+$$
 
 Let $j = 1,\ldots,p$ index the features and let $c_j$ be a possible cutoff value for feature $j$. Define
 
 $$
 \begin{split}
-L^l(j,c_j) := \{i : x_{i,j} < c_j\} \\
-L^r(j,c_j) := \{i : x_{i,j} \geq c_j\}
+L^l(j,c_j) := \{i : x_{i,j} < c_j\}, \\
+L^r(j,c_j) := \{i : x_{i,j} \geq c_j\},
 \end{split}
 $$
 
 as the two leaves resulting from partitioning feature $j$ at cutoff $c_j$. To simplify notation, let $L^l, L^r$ denote $L^l(j,c_j)$ and $L^r(j,c_j)$ respectively.
-A split is then determined by the arguments $(j^*, c^*_{j^*})$ minimizing the residual sum of squares across both leaves [@Hastie2013],
+The optimal split is determined by the arguments $(j^*, c^*_{j^*})$ that minimize the residual sum of squares across both leaves [@Hastie2013],
 
 $$
 (j^*, c_{j^*}^*) = \argmin_{j, c_j} \sum_{i \in L^l} (y_i - \bar{y}_{L^l})^2 + \sum_{i \in L^r} (y_i - \bar{y}_{L^r})^2.
@@ -74,8 +79,8 @@ This method is repeated from the first leaf to the last such that observations a
 Leaves are repeatedly split until a *stopping rule* has been triggered -- a criterion that tells the algorithm to stop partitioning data.
 The stopping rule is usually a condition on the number of observations in each leaf such that leaves will continue to be split until some minimum number of observations has been reached in a leaf.
 Other conditions may be on the depth of the tree (as in @fig-surv-ranfor which is restricted to a maximum depth of 2), which corresponds to the number of levels of splitting.
-Stopping rules are often used together, for example by setting a maximum tree depth *and* determining a minimum number of observations per leaf.
-Deciding the number of minimum observations and/or the maximum depth can be performed with automated hyper-parameter optimisation.
+Stopping rules are often used together, for example by setting a maximum tree depth *and* prespecifying a minimum number of observations per leaf.
+Deciding the number of minimum observations and/or the maximum depth can be performed with automated hyper-parameter optimisation [@bischl2023hpo].
 
 #### Terminal Node Predictions {.unnumbered .unlisted}
 
@@ -88,6 +93,10 @@ In regression, this is commonly the sample mean of the training outcome data.
 Returning to @fig-surv-ranfor, say a new data point is \{transmission = Manual, fuel = Diesel, year = 2015\}, then in the first split the left branch is taken as 'transmission = Manual', in the second split the right branch is taken as 'year' $= 2015 \geq 2014$, hence the new data point lands in the second terminal leaf and is predicted to sell for $7,600.
 The 'fuel' variable is ignored as it is only considered for automatic vehicles.
 As the final predictions are simple statistics based on training data, all potential predictions can be saved in the original trained model and no complex computations are required in the prediction algorithm.
+@fig-surv-ranfor-pred illustrates this prediction path through the tree.
+
+![Prediction path through the regression tree from @fig-surv-ranfor for a new observation with transmission = Manual, fuel = Diesel, year = 2015. The active path (solid teal arrows) leads through the 'transmission = Manual' split and the 'year $\geq$ 2014' split to the terminal node predicting a sale price of \$7.6K (amber border). Inactive branches are shown in grey with dashed lines. The 'fuel' variable is not used on this path, as fuel type is only evaluated for automatic vehicles.](Figures/forests/cars-prediction-path.png){#fig-surv-ranfor-pred fig-alt="Decision tree from Figure 11.1 with a prediction path highlighted for a new observation with transmission equals Manual, fuel equals Diesel, and year equals 2015. Solid teal arrows trace the active path: the root node splits on transmission type, taking the Manual branch; the second node splits on registration year, taking the year greater than or equal to 2014 branch. The terminal node predicting 7.6 thousand dollars is highlighted with an amber border and labelled Prediction. All other branches are greyed out with dashed lines. An annotation box in the top-left lists the observation features, with fuel marked as not used on this path. A legend in the top-right identifies active path, inactive path, and prediction node."}
+
 
 ### Random Forests
 
@@ -95,16 +104,16 @@ Decision trees often overfit the training data, hence they have high variance, p
 Moreover, important variables can end up being ignored as only subsets of dominant variables are selected for splitting.
 
 To counter these problems, *random forests* are designed to improve prediction accuracy and decrease variance.
-Random forests utilise bootstrap aggregation, or *bagging*  [@Breiman1996a], to aggregate many decision trees.
-Bagging is a relatively simple algorithm, as follows:
+Random forests utilise bootstrap aggregation, or *bagging*  [@Breiman1996a], to aggregate many decision trees as follows:
 
 1. **For** $b = 1,\ldots,B$:
-2. \ \ \ \ \ $D_b \gets \text{ Randomly sample with replacement } \dtrain$
+2. \ \ \ \ \ $D_b \gets \text{ Randomly sample with replacement from } \dtrain$
 3. \ \ \ \ \ $\hatg_b \gets \text{ Train a decision tree on } D_b$
 4. **end For**
 5. **return** $\{\hatg_b\}^B_{b=1}$
 
-Step 2 is known as *bootstrapping*, which is the process of sampling a dataset *with* replacement; in contrast to more standard subsampling where data is sampled *without* replacement.
+Step 2 is known as *bootstrapping*, which is the process of sampling a dataset *with* replacement. 
+In random forest implementations this is more common than standard subsampling where data is sampled *without* replacement.
 Commonly, the bootstrapped sample size is the same as the original.
 However, as the same value may be sampled multiple times, on average the resulting data only contains around 63.2\% unique observations [@Efron1997].
 Randomness is further injected to decorrelate the trees by randomly subsetting the candidates of features to consider at each split of a tree.
@@ -133,15 +142,15 @@ Finally, random forests are less prone to overfitting and this can be relatively
 
 ## Random Survival Forests
 
-Unlike other machine learning methods that may require complex changes to underlying algorithms, random forests can be relatively simply adapted to *random survival forests* by updating the splitting rules and terminal node predictions to those that can handle censoring and can make survival predictions.
+Random forests can be adapted to *random survival forests* by updating the splitting rules and terminal node predictions to those that can handle censoring and can make survival predictions.
 This chapter is therefore focused on outlining different choices of splitting rules and terminal node predictions, which can then be flexibly combined into different models.
 
 ### Splitting Rules
 
 Survival trees and RSFs have been studied for the past four decades and whilst there are many possible splitting rules [@Bou-Hamad2011], only two broad classes are commonly utilized [as judged by number of available implementations, e.g., @pkgsksurvival; @pkgranger; @Ishwaran2011].
 The first class rely on the log-rank test to maximize dissimilarity between splits, the second class utilizes likelihood-based measures.
-The first is discussed in more detail as this is common in practice and is relatively straightforward to implement and understand, moreover it has been demonstrated to outperform other splitting rules [@Bou-Hamad2011].
-Likelihood rules are more complex and require assumptions that may not be realistic, these are discussed briefly.
+The first is discussed in more detail as this is common in practice and is relatively straightforward to implement and understand.
+Likelihood rules are more complex and may require assumptions that are not realistic (for example distributional assumptions), these are discussed briefly.
 
 #### Log-rank test {.unnumbered .unlisted}
 
@@ -151,44 +160,48 @@ The log-rank test compares the survival distributions of two groups under the nu
 Let $L^l$ and $L^r$ be two leaves, and as before $i \in L$ indexes the observations in leaf $L$.
 Define:
 
-* $n_\tau^l$, the number of observations at risk at $\tau$ in leaf $l$
+* $n_\tau^l$, the number of observations at risk at time point $\tau$ in leaf $L^l$
+
+<!-- TODO: Update all sums over i ∈ L throughout this chapter to include a multiplicity weight k_i (number of times observation i was selected in bootstrap sample b), with i indexing unique observations only. Affects: n_τ^l and o_τ^l here, o^l_{q,tbk} in the CR section (lines ~312, ~336), and the relative risk sum (line ~409). Also decide scope: general RF regression sums (lines ~58, ~74) may need the same treatment. -->
 
 $$
-n_\tau^l = \sum_{i \in L^l} \II(t_i \geq \tau)
+n_\tau^l = \sum_{i \in L^l} \II(t_i \geq \tau);
 $$
 
-* $o^l_{\tau}$, the observed number of events in leaf $l$ at $\tau$
+* $o^l_{\tau}$, the observed number of events at time point $\tau$ in leaf $L^l$ 
 
 $$
-o^l_{\tau} = \sum_{i \in L^l} \II(t_i = \tau, \delta_i = 1)
+o^l_{\tau} = \sum_{i \in L^l} \II(t_i = \tau, \delta_i = 1);
 $$
 
-* $n_\tau = n_\tau^l + n_\tau^r$, the number of observations at risk at $\tau$ in both leaves
-* $o_\tau = o^l_{\tau} + o^r_{\tau}$, the observed number of events at $\tau$ in both leaves
+* $n_\tau = n_\tau^l + n_\tau^r$, the number of observations at risk at $\tau$ in both leaves;
+* $o_\tau = o^l_{\tau} + o^r_{\tau}$, the observed number of events at $\tau$ in both leaves.
 
 Recall $\tbk$ is the $k$th ordered event time.
 The log-rank test evaluates if hazard functions are equal in both leaves, $H_0: h^l = h^r$, with test statistic [@Segal1988],
 
 $$
 LR(L^l) = \frac{\sum_{k=1}^m (o^l_{\tbk} - e^l_{\tbk})}{\sqrt{\sum_{k=1}^m v_{\tbk}^l}}
-$$
+$$ {#eq-log-rank}
 
 where:
 
-* $e^l_{\tau}$ is the expected number of events in leaf $l$ at $\tau$
+* $e^l_{\tau}$ is the expected number of events in leaf $L^l$ at $\tau$
 
 $$
 e^l_{\tau} := \frac{n_\tau^l o_\tau}{n_\tau}
 $$
 
-* $v^l_\tau$ is the variance of the number of events in leaf $l$ at $\tau$
+* $v^l_\tau$ is the variance of the number of events in leaf $L^l$ at $\tau$
 
 $$
 v^l_{\tau} := e^l_{\tau} \Big(\frac{n_\tau - o_\tau}{n_\tau}\Big)\Big(\frac{n_\tau - n^l_\tau}{n_\tau - 1}\Big)
 $$
 
-These results follow from the assumption that, under equal hazards in both leaves, the number of events at each unique event time follows a Hypergeometric distribution.
-The same statistic results if $L^r$ is instead considered.
+These results follow from the assumption that, under equal hazards in both leaves, the number of events at each unique event time follows a Hypergeometric distribution. 
+Under $H_0$, $LR(L^l)^2$ follows a $\chi^2$ distribution with one degree of freedom and the log-rank statistic is commonly reported alongside its corresponding $p$-value.
+In the two group setting,  $LR(L^l) = LR(L^r)$, hence it is sufficient to compute the statistic for one of the leaves.
+
 
 The higher the log-rank statistic, the greater the dissimilarity between the two groups (@fig-surv-ranfor-logrank), thereby making it a sensible splitting rule for survival, moreover it has been shown that it works well for splitting censored data  [@LeBlanc1993].
 Additionally, the log-rank test requires no knowledge about the shape of the survival curves or distribution of the outcomes in either group  [@Bland2004], making it ideal for an automated process that requires no user intervention.
@@ -205,13 +218,13 @@ The former computes the weighted difference between cause-specific Nelson-Aalen 
 #### Alternative Splitting Rules {.unnumbered .unlisted}
 
 A splitting rule is simply a way to measure if performance increases after data splitting.
-Therefore, there are many statistics that could be used for this purpose, including many of the metrics referenced in Part II [@pkgrfsrc; @Gordon1985; @Schmid2016].
+Therefore, there are many statistics that could be used for this purpose [@pkgrfsrc; @Gordon1985; @Schmid2016], including many of the metrics referenced in Part II.
 Like many other aspects of modelling, experiments have shown that the choice of splitting rules is data dependent [@Schmid2016].
 When using loss-based splitting rules, the most sensible approach is to align the splitting rule with the prediction problem.
-For example, if the goal is to maximize separation, then a log-rank splitting rule to maximize homogeneity in terminal nodes is a natural starting point.
-Whereas if the goal is to accurately rank observations, then a concordance splitting rule may be optimal (@sec-cindex).
+The log-rank splitting rule is commonly used when the goal is to maximize homogeneity within each node - for example to most accurately estimate the within-node survival distribution.
+However, if the goal were to optimize the ranking of observations, then a concordance splitting rule may be optimal (@sec-cindex).
 
-An alternative to hypothesis testing and loss-based rules is to instead use *likelihood ratio*, or *deviance*, statistics [@LeBlanc1992].
+An alternative to log-rank statistics and loss-based rules is to instead use *likelihood ratio*, or *deviance*, statistics [@LeBlanc1992].
 The likelihood-ratio statistic can be used as a splitting rule to test if the model fit to the data is improved or worsened with each split.
 This approach can be tricky as one must assume a parametric form for the data and select the likelihood (@sec-surv-estimation-param) that best fits this form, however it does allow for taking into account different forms of censoring and truncation. 
 Theoretically likelihood splitting rules could lead to a model that is a better fit for the data.
@@ -229,28 +242,26 @@ Hence, a common RSF stopping rule is the minimum number of *uncensored* observat
 
 Starting with the most common survival prediction type, the algorithm requires a simple estimate for the underlying survival distribution in each of the terminal nodes, which can be estimated using the Kaplan-Meier or Nelson-Aalen methods [@Hothorn2004; @Ishwaran2008; @LeBlanc1993; @Segal1988].
 
-<!-- FIXME: REF KM DEFINITION ABOVE -->
+<!-- TODO: REF KM DEFINITION ABOVE; DEPENDS ON #150 -->
 
-Let $b \in \{1,\ldots,B\}$ index the trees, let $L_b(\xx^*)$ denote the terminal node in tree $b$ that observation $\xx^*$ falls into, and let $t^*_{(1)} < \ldots < t^*_{(m)}$ be the ordered event times within $L_b(\xx^*)$.
+Let $b \in \{1,\ldots,B\}$ index the trees in a forest, let $L_b(\xx^*)$ denote the terminal node in tree $b$ that observation $\xx^*$ falls into, and let $t^*_{(1)} < \ldots < t^*_{(m)}$ be the ordered event times within $L_b(\xx^*)$.
 Then the predicted survival function and cumulative hazard for $\xx^*$ are,
 
 $$
 \hat{S}_{b}(\tau|\xx^*) = \prod_{k:t^*_{(k)} \leq \tau} \left(1-\frac{d_{t^*_{(k)}}}{n_{t^*_{(k)}}}\right)
-$$ {#eq-surv-kaplan}
+$$ {#eq-rsf-surv-kaplan}
 
 $$
 \hatH_{b}(\tau|\xx^*) = \sum_{k:t^*_{(k)} \leq \tau} \frac{d_{t^*_{(k)}}}{n_{t^*_{(k)}}}
-$$ {#eq-surv-nelson}
+$$ {#eq-rsf-surv-nelson}
 
 where $d_{t^*_{(k)}}$ and $n_{t^*_{(k)}}$ are the observed number of events and the number of observations at risk at $t^*_{(k)}$, both computed from observations in $L_b(\xx^*)$.
+Direct calculation of the cumulative hazard using (@eq-rsf-surv-nelson) avoids $log(0)$ errors which could occur if transforming from the Kaplan-Meier estimates in (@eq-rsf-surv-kaplan).
 See @fig-surv-ranfor-lung for an example using the `lung` dataset [@pkgsurvival].
-
-<!-- TODO: figure below uses p-value splitting, which was not explained earlier. -->
 
 ![Survival tree trained on the `lung` dataset from the $\Rstats$ package **survival**. The terminal node predictions are survival curves.](Figures/forests/lung.png){#fig-surv-ranfor-lung fig-alt="Decision tree with two splits, the first is 'ph.ecog' with a p-value of <0.001, when ph.ecog > 1 a terminal prediction is made, otherwise the data is split at 'sex' with - = 0.015. Terminal node predictions are plots of survival functions."}
 
 The bootstrapped prediction is the cumulative hazard function or survival function averaged over individual trees.
-Note that understanding what these bootstrapped functions represents depends on how they are calculated.
 By definition, a mixture of $n$ distributions with cumulative distribution functions $F_i, i = 1,...,n$ is given by
 
 $$
@@ -270,85 +281,156 @@ $$
 \hatH_{Boot}(\tau|\xx^*) = \sum^B_{b=1} w_b\hat{H}_b(\tau|\xx^*),
 $$ {#eq-surv-nelson-boot}
 
-where again the Nelson-Aalen estimator should be used instead of transformation from the survival function to avoid $-log(0)$ errors.
 
 In other censoring and truncation settings, the estimator in the final node can be replaced by the nonparametric maximum likelihood estimator or left-truncated risk set (@sec-surv-estimation-non-param).
 
 Another practical consideration is how to average the survival probabilities over the decision trees as each individual Kaplan-Meier estimate may be defined on different time points.
 This is overcome by recognizing that the Kaplan-Meier estimator is a step function: between event times, the survival probability is constant and equal to the last observed value.
 @fig-surv-ranfor-bootstrap demonstrates this process for three decision trees, where panel (a) shows the estimates within three terminal nodes (red, green, blue). 
-The aggregated survival probability is calculated at event times points across terminal nodes (dashed lines in panels b-c), and the average is computed by evaluating each step function at those time points and averaging (panel d).
+The aggregated survival probability is calculated at event times points across terminal nodes (dashed lines in panels b-c), and the aggregate is computed by evaluating each step function at those time points and averaging (panel d).
 
 ![Bootstrapping Kaplan-Meier estimators across three decision trees (red, blue, green). Panel a) shows the individual estimates, b) shows the time points to aggregate the trees over, c) is the predicted survival probability from each tree at all event times, and d) is the average survival probabilities connected by a step function.](Figures/forests/bootstrap.png){#fig-surv-ranfor-bootstrap fig-alt="Four panels with 't' on x-axis and 'S(t)' on y-axis. Panel a) shows three survival functions as piece-wise linearly decreasing step functions. Panel (b) shows the same but with vertical dotted lines added at all time-points. Panel (c) shows dots at each of the intersections between the vertical lines and the plotted decision trees. Panel (d) shows a single line with dots which are the average of the points in panel (c)."}
 
 ### Competing Risks {#sec-surv-ranfor-cr}
 
-The RSF framework extends to competing risks (@sec-competing-risks) in a natural way, replacing the single-event Kaplan-Meier and Nelson-Aalen estimators in the terminal nodes with the Aalen-Johansen CIF estimator (@sec-aalen-johanson; @Ishwaran2014CR).
-The key insight is that both the splitting rule and the terminal node estimator must be adapted to account for the presence of multiple event types.
+The RSF framework extends to competing risks (@sec-competing-risks) in a natural way, replacing the single-event Kaplan-Meier and Nelson-Aalen estimators in the terminal nodes with the Aalen-Johansen CIF estimator (@sec-aalen-johanson; @Ishwaran2014).
+Both the splitting rule and the terminal node estimator must be adapted to account for the presence of multiple event types.
+Following @Ishwaran2014, we distinguish between *cause-specific* and _composite_ splitting rules.
+Cause-specific rules target a single cause $q$ and are appropriate when the primary interest is in one particular cause.
+Composite rules aggregate information across all $Q$ causes and are appropriate when the goal is to predict all cause-specific hazards or CIFs simultaneously.
+Composite rules produce a single splitting statistic by taking a variance-weighted sum of the per-cause statistics across all $Q$ causes.
 
-#### Splitting Rules {.unnumbered .unlisted}
+#### Cause-specific splitting rules {.unnumbered .unlisted}
 
-The standard log-rank test compares cause-specific hazards across candidate splits, which is not the quantity of primary interest in the competing risks setting.
-Two adaptations have been proposed [@Ishwaran2014CR].
+Two common cause-specific splitting rules are the generalized log-rank rule and Gray's test.
+The *generalized log-rank* rule tests $H_0: h_q^l = h_q^r$, where $h_q$ is the hazard for cause $q$ whereas *Gray's test* tests $H_0: F_q^l = F_q^r$, where $F_q$ is the CIF for cause $q$.
 
-The first uses Gray's test [@Gray1988], which tests $H_0: F_e^l = F_e^r$, i.e.\ equal CIFs in the two candidate daughter nodes.
-Gray's test targets the *subdistribution hazard* $\tilde{h}_e(\tau) = -\frac{d}{d\tau}\log(1 - F_e(\tau))$, the hazard of a pseudo-population that keeps competing-event subjects permanently in the risk set.
-This is operationalized by augmenting the standard risk set with observations who already experienced a competing event:
-$$
-\tilde{n}_{e,t_{(k)}} = n_{t_{(k)}} + \sum_{j:\, t_{(j)} < t_{(k)}} \sum_{e' \neq e} d_{e',t_{(j)}},
-$$
-reflecting the assumption that, had those individuals not experienced a competing event, they would remain at risk of event $e$.
-The test statistic is then computed analogously to the log-rank statistic but using $\tilde{n}_{e,t_{(k)}}$ in place of $n_{t_{(k)}}$, and aggregating over all causes.
+**Generalized log-rank.**
+The cause-$q$ log-rank statistic treats competing events as censored, so that the risk set for cause $q$ consist of all subjects still at risk for any event, with the number of subjects at risk denoted by $n_{\tbk}$.
+The observed cause-$q$ events in $L^l$ at $\tbk$ are
 
-The second approach computes a single weighted statistic by combining cause-specific log-rank contributions across all causes.
-For each cause $e$, competing events of other causes are treated as censored, so the at-risk set is the standard one, and the cause-specific log-rank statistic $LR_e(L^l)$ is computed exactly as in $LR(L^l)$ above, with $o^l_{e,\tbk}$ and $e^l_{e,\tbk}$ denoting the observed and expected cause-$e$ events in $L^l$ at $\tbk$.
-These per-cause statistics are then combined into a single weighted statistic,
 $$
-LR_{CR}(L^l) = \frac{\left| \sum_{e=1}^q w_e \sum_{k} (o^l_{e,\tbk} - e^l_{e,\tbk}) \right|}{\sqrt{\sum_{e=1}^q w_e^2 \sum_{k} v^l_{e,\tbk}}},
+o^l_{q,{\tbk}} = \sum_{i \in L^l} \II(t_i = \tbk,\, \delta_i = q),
+$$ {#eq-cr-obs}
+
+and the expected count under the null of equal cause-$q$ hazards in both leaves is
+
 $$
-where the inner sums are over all event times $\tbk$ in the node being split, $v^l_{e,\tbk}$ is the hypergeometric variance for cause $e$ at $\tbk$, and $w_e$ are cause weights (default $w_e = 1/q$).
-Setting $w_e = 1$ for one cause and $w_{e'} = 0$ otherwise reduces this to a standard single-cause log-rank test, making splits focus entirely on separating that cause's hazard.
+e^l_{q,{\tbk}} = \frac{n^l_{\tbk} \cdot o_{q,{\tbk}}}{n_{\tbk}},
+$$ {#eq-cr-exp}
+
+where $o_{q,{\tbk}}$ and $n_{\tbk}$ are the corresponding totals over both leaves.
+The per-cause statistic is then
+
+$$
+LR_q(L^l) = \frac{\sum_k w_q({\tbk})\,(o^l_{q,{\tbk}} - e^l_{q,{\tbk}})}{\sqrt{\sum_k w_q({\tbk})^2\, v^l_{q,{\tbk}}}},
+$$ {#eq-lr-cause-q}
+
+where $v^l_{q,{\tbk}}$ is the hypergeometric variance for cause $q$ at $\tbk$, and $w_q(\tbk) > 0$ are time-dependent weights that can be used to up-weight differences at the beginning or end of follow-up [@Harrington1982].
+
+**Gray's test.**
+While the generalized log-rank rule detects variables that affect the cause-$q$ hazard
+Gray's test [@Gray1988] instead targets differences in the cause $q$ CIFs by testing$H_0: F_q^l = F_q^r$, thus selecting variables based on their direct effect on the cause-$q$ CIF.
+
+Following @Ishwaran2014, the splitting statistic is obtained by substituting a modified, *augmented* risk set into (@eq-cr-exp) in place of $n_{t_{(k)}}$.
+The augmented risk set retains subjects who experienced a competing event, as they remain at risk under the subdistribution hazard perspective used by the Fine-Gray model (@sec-classical-ph-cr).
+Precisely, a competing-event subject should be retained at time $t$ only if their *counterfactual* censoring time — when they would have been censored had the competing event not occurred — exceeds $t$.
+Since this counterfactual censoring time is never observed, the standard practical approximation adds all competing-event subjects observed before $t_{(k)}$ back into the risk set [@Fine1999]:
+
+$$
+\tilde{n}_{q,t_{(k)}} = n_{t_{(k)}} + \sum_{j:\, t_{(j)} < t_{(k)}} \sum_{q' \neq q} d_{q',t_{(j)}}.
+$$
+
+The observed cause-$q$ events are unchanged:
+
+$$
+o^l_{q,t_{(k)}} = \sum_{i \in L^l} \II(t_i = t_{(k)},\, \delta_i = q).
+$$
+
+The expected count replaces $n_{t_{(k)}}$ with $\tilde{n}_{q,t_{(k)}}$ (and $n^l_{t_{(k)}}$ with $\tilde{n}^l_{q,t_{(k)}}$) in (@eq-cr-exp):
+
+$$
+\tilde{e}^l_{q,t_{(k)}} = \frac{\tilde{n}^l_{q,t_{(k)}} \cdot o_{q,t_{(k)}}}{\tilde{n}_{q,t_{(k)}}}.
+$$
+
+and $\tilde{v}^l_{q,t_{(k)}}$ is the hypergeometric variance (@eq-lr-cause-q) with $\tilde{n}_{q,t_{(k)}}$ in place of $n_{t_{(k)}}$.
+The per-cause Gray statistic is then
+
+$$
+\widetilde{LR}_q(L^l) = \frac{\sum_{k} w_q(t_{(k)})\,(o^l_{q,t_{(k)}} - \tilde{e}^l_{q,t_{(k)}})}{\sqrt{\sum_{k} w_q(t_{(k)})^2\,\tilde{v}^l_{q,t_{(k)}}}}.
+$$
+
+#### Composite splitting rules {.unnumbered .unlisted}
+
+When no single cause is of primary interest, the per-cause statistics are aggregated by taking a variance-weighted sum across all $Q$ causes [@Ishwaran2014].
+The composite log-rank statistic aggregates the per-cause statistics (@eq-lr-cause-q) across all $Q$ causes:
+
+$$
+LR_{CR}(L^l) = \frac{\sum_{q=1}^Q \hat{\sigma}_q^2 \, LR_q(L^l)}{\sqrt{\sum_{q=1}^Q \hat{\sigma}_q^2}}, \qquad \hat{\sigma}_q^2 = \sum_k w_q({\tbk})^2\, v^l_{q,{\tbk}},
+$$
+
+and the composite Gray statistic is
+
+$$
+\widetilde{LR}(L^l) = \frac{\sum_{q=1}^Q \tilde{\sigma}_q^2 \, \widetilde{LR}_q(L^l)}{\sqrt{\sum_{q=1}^Q \tilde{\sigma}_q^2}}, \qquad \tilde{\sigma}_q^2 = \sum_k w_q(t_{(k)})^2\,\tilde{v}^l_{q,t_{(k)}}.
+$$
+
+Weighting by the per-cause variance $\hat{\sigma}_q^2$ (or $\tilde{\sigma}_q^2$) gives more influence to causes with more observed events.
+Substituting
+
+$$
+LR_q = \sum_k w_q({\tbk})(o^l_{q,{\tbk}} - e^l_{q,{\tbk}})/\hat{\sigma}_q^2,
+$$
+
+shows that both composite statistics reduce to a weighted pooled observed-minus-expected numerator divided by the square root of the total weighted variance across all causes.
 
 #### Terminal Node Estimator {.unnumbered .unlisted}
 
-Within each terminal node $L_b(\xx^*)$, the Aalen-Johansen estimator is used to estimate the CIF for each cause $e \in \{1, \ldots, q\}$.
-Let $t^*_{(1)} < \ldots < t^*_{(m)}$ be the ordered event times (of any cause) within $L_b(\xx^*)$, and let $d_{e,t^*_{(k)}}$ and $n_{t^*_{(k)}}$ denote the number of cause-$e$ events and the number at risk at $t^*_{(k)}$, both computed from observations in $L_b(\xx^*)$.
-The cause-specific discrete hazard (@eq-cs-discrete-hazard) within the node is $\hat{h}^d_{e,b}(t^*_{(k)}) = d_{e,t^*_{(k)}} / n_{t^*_{(k)}}$, the all-cause survival in the node is
+
+Within each terminal node $L_b(\xx^*)$, the Aalen-Johansen estimator is used to estimate the CIF for each cause $q \in \{1, \ldots, Q\}$.
+
+Let $t^*_{(1)} < \ldots < t^*_{(m)}$ be the ordered event times (of any cause) within $L_b(\xx^*)$, and let $d_{q,t^*_{(k)}}$ and $n_{t^*_{(k)}}$ denote the number of cause-$q$ events and the number at risk at $t^*_{(k)}$, both computed from observations in $L_b(\xx^*)$.
+The cause-specific discrete hazard (@sec-aalen-johanson) within the node is $\hat{h}^d_{q,b}(t^*_{(k)}) = d_{q,t^*_{(k)}} / n_{t^*_{(k)}}$, the all-cause survival in the node is
+
 $$
-\hat{S}_b(\tau|\xx^*) = \prod_{k: t^*_{(k)} \leq \tau} \left(1 - \sum_{e=1}^q \hat{h}^d_{e,b}(t^*_{(k)})\right),
+\hat{S}_b(\tau|\xx^*) = \prod_{k: t^*_{(k)} \leq \tau} \left(1 - \sum_{q=1}^Q \hat{h}^d_{q,b}(t^*_{(k)})\right),
 $$
-and the CIF for cause $e$ is the discrete Aalen-Johansen estimator (@eq-aalen-johanson)
+
+and the CIF for cause $q$ is the discrete Aalen-Johansen estimator,
+
 $$
-\hat{F}_{e,b}(\tau|\xx^*) = \sum_{k: t^*_{(k)} \leq \tau} \hat{S}_b(t^*_{(k-1)}|\xx^*) \cdot \hat{h}^d_{e,b}(t^*_{(k)}),
+\hat{F}_{q,b}(\tau|\xx^*) = \sum_{k: t^*_{(k)} \leq \tau} \hat{S}_b(t^*_{(k-1)}|\xx^*) \hat{h}^d_{q,b}(t^*_{(k)}),
 $$ {#eq-surv-ranfor-cr-cif}
-where $t^*_{(0)} = 0$ so $\hat{S}_b(t^*_{(0)}|\xx^*) = 1$, accumulating weighted cause-specific hazard increments over time (cf. @eq-cif).
+
+with $t^*_{(0)} = 0$.
 
 #### Ensemble CIF {.unnumbered .unlisted}
 
 The ensemble CIF is the weighted average of the per-tree Aalen-Johansen estimates:
 $$
-\hat{F}_{e,Boot}(\tau|\xx^*) = \sum_{b=1}^B w_b\hat{F}_{e,b}(\tau|\xx^*).
+\hat{F}_{q,Boot}(\tau|\xx^*) = \sum_{b=1}^B w_b\hat{F}_{q,b}(\tau|\xx^*).
 $$ {#eq-surv-ranfor-boot-cif}
 
 As with the single-event case (@eq-surv-kaplan-boot), averaging the CIF directly is justified because the CIF is itself a probability and the ensemble represents a mixture of the per-tree distributions.
-The constraint $\sum_{e=1}^q \hat{F}_{e,Boot}(\tau|\xx^*) \leq 1$ is preserved, since it holds for each tree's Aalen-Johansen estimate and is maintained under convex combination.
+The constraint $\sum_{q=1}^Q \hat{F}_{q,Boot}(\tau|\xx^*) \leq 1$ is preserved, since it holds for each tree's Aalen-Johansen estimate and is maintained under convex combination.
 
-#### Deterministic Predictions {.unnumbered .unlisted}
+### Relative risks predictions
 
 As discussed in @sec-eval-det, predicting and evaluating survival times is a complex and fairly under-researched area.
 For RSFs, there is an inclination to estimate survival times based on the mean or median survival times of observations in terminal nodes, however this would lead to biased estimations.
 Therefore, research has tended to focus on relative risk predictions.
 
 As discussed, relative risks are arbitrary values where only the resulting rank matters when comparing observations.
-In RSFs, each terminal node should be as homogeneous as possible, hence within a terminal node, the risk between observations should be the same.
-The most common method to estimate average risk appears to be a transformation from the Nelson-Aalen method [@Ishwaran2008], which exploits results from counting process to provide a measure of expected mortality [@dataapplied] -- the same result is used in the event frequency calibration measure discussed in @sec-alpha.
-Given new data $\xx^*$ falling into terminal node $L_b(\xx^*)$, the relative risk prediction is the sum of the predicted cumulative hazard $\hatH_b(\cdot|\xx^*)$ (computed with the Nelson-Aalen estimator) evaluated at the observed outcome time of each observation $i \in L_b(\xx^*)$:
+In RSFs, each terminal node should be as homogeneous as possible, with predictions within a terminal node being identical.
+The most common method to estimate the average risk appears to be a transformation from the Nelson-Aalen method [@Ishwaran2008], which exploits results from counting process to provide a measure of expected mortality [@dataapplied] -- the same result is used in the event frequency calibration measure discussed in @sec-alpha.
+The logic is that the resulting estimation is interpreted as the number of expected events in $L_b(\xx^*)$ and it is natural to assume a terminal node with more expected events represents a higher risk group.
+
+Given new data $\xx^*$ falling into terminal node $L_b(\xx^*)$, the relative risk prediction is the sum of the predicted cumulative hazard $\hatH_b(\cdot|\xx^*)$ over the observed times in that node:
 
 $$
-\phi_b(\xx^*) = \sum_{i \in L_b(\xx^*)} \hatH_b(t_i|\xx^*)
+\phi_b(\xx^*) = \sum_{i \in L_b(\xx^*)} \hatH_b(t_i|\xx^*).
 $$
 
-This is interpreted as the number of expected events in $L_b(\xx^*)$, with the assumption that a terminal node with more expected events represents a higher risk group.
 The bootstrapped risk prediction is the weighted average over all trees:
 
 $$
@@ -360,11 +442,11 @@ More complex methods have also been proposed using likelihood-based splitting ru
 In the competing risks setting @Ishwaran2014 propose a similar metric using the predicted CIFs:
 
 $$
-\phi_{e;b(h)}(\xx^*) = \int^{\tau^*}_0 \hat{F}_{e;b(h)}(\tau|\xx^*) \ d\tau,
+\phi_{q;b}(\xx^*) = \int^{\tau^*}_0 \hat{F}_{q;b}(\tau|\xx^*) \ d\tau,
 $$
 
 where $\tau^*$ is suggested to be the end of the study period.
-$\phi_{e;Boot}(\xx^*)$ is computed as in (@eq-phi-boot).
+$\phi_{q;Boot}(\xx^*)$ is computed as in (@eq-phi-boot).
 
 ## Conclusion
 
@@ -374,7 +456,7 @@ $\phi_{e;Boot}(\xx^*)$ is computed as in (@eq-phi-boot).
 ## Key takeaways
 
 * Random forests are a highly flexible algorithm that allow the various components to be adapted and altered without major changes to the underlying algorithm. This allows random survival forests (RSFs) to be readily available 'off-shelf' in many open-source packages;
-* RSFs have in-built variable selection methods that mean they tend to perform well on high-dimensional data, routinely outperforming other models [@Herrmann2020, @Spooner2020, @Burk2024];
+* RSFs have in-built variable selection and tend to perform well on high-dimensional data, routinely outperforming other models [@Herrmann2020, @Spooner2020, @Burk2024];
 * Despite having many potential hyper-parameters to tune, all are intuitive and many can even be ignored as sensible defaults exist in most off-shelf software implementations.
 
 ::::
