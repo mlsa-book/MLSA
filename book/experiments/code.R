@@ -488,6 +488,8 @@ set.seed(241206)
 ### table
 data(sir.adm, package = "mvna")
 tab_sir = sir.adm |> group_by(status) |> sample_n(2) |>
+  ungroup() |>
+  mutate(id = row_number()) |>
   select(id, time, status, pneu)
 tab_sir |> knitr::kable()
 
