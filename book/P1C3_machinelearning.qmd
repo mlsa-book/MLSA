@@ -14,7 +14,7 @@ This chapter covers core concepts in machine learning.
 It is not intended as a general or comprehensive introduction and does not cover mathematical theory or the practical implementation of machine learning models in software.
 Instead, the purpose is to introduce key concepts and provide basic intuition for a general machine learning workflow, while also establishing a shared vocabulary and conceptual framework that will be used throughout the remainder of the book.
 
-In particular, the focus of this chapter is on machine learning concepts including tasks (introduced in a survival context in @sec-survtsk), learners, loss functions, resampling, and evaluation, which are essential for understanding how survival analysis problems can be formulated and evaluated using machine learning.
+In particular, the focus of this chapter is on machine learning concepts including tasks, learners, loss functions, resampling, and evaluation, which are essential for understanding how survival analysis problems can be formulated and evaluated using machine learning.
 Many excellent resources (several freely-available) already provide in-depth treatments of machine learning models and algorithms, and duplication of that material is deliberately avoided here.
 References are provided at the end of this chapter for readers seeking a broader or more technical introduction to machine learning.
 
@@ -52,7 +52,7 @@ The dataset described by columns: 'age', 'weight', 'height', 'sex', 'diagnosis',
 
 As this book is focused on supervised learning, only the first three of these is covered in this chapter and beyond.
 The specification of a task is vital for interpreting predictions from a model and its subsequent performance.
-This is particularly true when separating between deterministic and probabilistic predictions, as discussed later in the chapter.
+This is particularly true when separating between determinisitc and probabilistic predictions, as discussed later in the chapter.
 
 Formally, let $\xx \in \calX \subseteq \Reals^{n \times p}$ be a matrix with $p$ features for $n$ observations and let $y \in \calY$ be a vector of labels (or *outcomes* or *targets*) for all observations.
 A dataset is then given by $\calD = ((\xx_1, y_1) , . . . , (\xx_n, y_n))$ where it is assumed $\calD \iid (\mathbb{P}_{xy})^n$ for some unknown distribution $\mathbb{P}$.
@@ -89,7 +89,7 @@ The terms *algorithm*, *learner*, and *model* are often conflated in machine lea
 A *learner* is a description of a learning algorithm, prediction algorithm, parameters, and hyperparameters.
 The *learning algorithm* is a mathematical strategy to estimate the unknown mapping from features to outcome as represented by a task, $f: \calX \rightarrow \calY$.
 During *training*, data, $\calD$, is fed into the learning algorithm and induces the *model* $\hat{f}$.
-Whereas the learner defines the algorithm for training and prediction, the model is the result of training the algorithm on data.
+Whereas the learner defines the framework for training and prediction, the model is the specific instantiation of this framework after training on data.
 
 After training the model, new data, $\xx^*$, can be fed to the *prediction algorithm*, which is a mathematical strategy that uses the model to make predictions $\hatyy = \hatf(\xx^*)$.
 Algorithms can vary from simple linear equations with coefficients to estimate, to complex iterative procedures that differ considerably between training and predicting.
@@ -130,36 +130,29 @@ A **prediction**, can then be made by passing new data $x^* \in \calX$ to the fi
 
 ## Evaluating and benchmarking {#sec-ml-eval}
 
-A central component of machine learning best practice is rigorous, empirical model evaluation.
-Building a complex model does not guarantee strong predictive performance.
-Moreover testing performance on a single dataset only provides very limited insight into how  model will generalize to new data.
-This issue is especially pronounced in modern pre-trained generative AI models, where there is often an implicit assumption by users that these models will perform well across a wide range of domains without task-specific validation.
-Trusting a model's performance requires two elements: firstly, quantifying performance using appropriate and interpretable measures; secondly, clearly specifying what exactly is being assessed and how.
-
-### Evaluation
-
 To understand if a model is 'good', its predictions are evaluated with a *loss function*.
 Loss functions assign a score to the discrepancy between predictions and true values, $L: \calY \times \calY \rightarrow \ExtReals$.
-Given data, $(\XX^*, \yy^*)$, and a trained model, $\hatf$, the loss is given by $L(\hatf(\XX^*), \yy^*) = L(\hatyy, \yy^*)$.
-However, for a model to be _truly_ useful, it should perform well _in general_, meaning it should perform well on new, previously unseen data, rather than just the data encountered during training and development.
-A mode's _generalization error_ refers to its estimated expected performance on new data.
+Given (unseen) real-world data, $(\XX^*, \yy^*)$, and a trained model, $\hatf$, the loss is given by $L(\hatf(\XX^*), \yy^*) = L(\hatyy, \yy^*)$.
+For a model to be useful, it should perform well in general, meaning its generalization error should be low.
+The *generalization error* refers to the model's performance on new data, rather than just the data encountered during training and development.
 
 A model should only be used to make predictions if its generalization error was estimated to be acceptable for a given context.
 If a model were to be trained and evaluated on the same data, the resulting loss, known as the *training error*, would be an overoptimistic estimate of the true generalization error [@Hastie2013].
 This occurs as the model is making predictions for data it has already 'seen' and the loss is therefore not evaluating the model's ability to generalize to new, unseen data.
-Estimation of the generalization error requires *data splitting*, which is the process of splitting available data, $\calD$, into *training data*, $\dtrain \subset \calD$, and *testing data*, $\dtest = \calD \setminus \dtrain$.
-Another benefit of data splitting is to help mitigate model overfitting, which occurs when models learn noise in the training data leading them to perform worse on new data.
-This can be avoided using data splitting methods but also feature engineering (manually or using built-in machine learning methods) to remove noisy features, and early stopping which stops training a model once a certain performance has been reached.
+Another reason for data splitting is to help mitigate model overfitting, which occurs when models learn noise in the training data leading them to perform worse on new data.
+This can be avoided using data splitting methods, feature engineering (manually or using built-in machine learning methods) to remove noisy features, and early stopping which stops training a model once a certain performance has been reached.
 
-### Resampling and benchmarking
+Estimation of the generalization error requires *data splitting*, which is the process of splitting available data, $\calD$, into *training data*, $\dtrain \subset \calD$, and *testing data*, $\dtest = \calD \setminus \dtrain$.
 
 The simplest method to estimate the generalization error is to use *holdout resampling*, which is the process of partitioning the data into one training dataset and one testing dataset, with the model trained on the former and predictions made for the latter.
 Using 2/3 of the data for training and 1/3 for testing is a common splitting ratio [@Kohavi1995].
-For independent and identically distributed data, it is generally best practice to partition the data randomly.
+For independent and identically distributed (iid) data, it is generally best practice to partition the data randomly.
 This ensures that any potential patterns or information encoded in the ordering of the data are removed, as such patterns are unlikely to generalize to new, unseen data.
 For example, in clinical datasets, the order in which patients enter a study might inadvertently encode latent information such as which doctor was on duty at the time, which could theoretically influence patient outcomes.
 As this information is not explicitly captured in measured features, it is unlikely to hold predictive value for future patients.
 Random splitting breaks any spurious associations between the order of data and the outcomes.
+
+When data is not iid, for example spatially correlated or time-series data, then random splitting may not be advisable, see @Hornung2023 for an overview of evaluation strategies in non-standard settings.
 
 Holdout resampling is a quick method to estimate the generalization error, and is particular useful when very large datasets are available.
 However, hold-out resampling has a very high variance for small datasets and there is no guarantee that evaluating the model on one hold-out split is indicative of real-world performance.
@@ -174,8 +167,6 @@ This process can be repeated multiple times (*repeated $k$-fold CV*) and/or $k$ 
 
 Cross-validation can also be stratified, which ensures that a variable of interest will have the same distribution in each fold as in the original data.
 This is important, and often recommended, in survival analysis to ensure that the proportion of censoring in each fold is representative of the full dataset [@Casalicchio2024; @Herrmann2020].
-Other resampling mechanisms may also be useful for event history analysis (@sec-eha).
-For example, stratifying with respect to different competing risks, or using more complex resampling schemes that can handle non-independent observations for recurrent events data [@Hornung2023].
 
 ![Three-fold cross-validation. In each iteration a different dataset is used for predictions and the other two for training. The performance from each iteration is averaged into a final, single metric. Image from @Casalicchio2024 (CC BY-NC-SA 4.0).](Figures/ml/cv.png){#fig-ml-cv}
 
@@ -211,10 +202,10 @@ The model's predictive performance is then calculated as $L(\hatyy, \yy^*)$.
 @sec-ml-models introduced model hyperparameters, which control how training and prediction algorithms are run.
 Setting hyperparameters is a critical part of model fitting and can significantly change model performance.
 *Tuning* is the process of using internal benchmark experiments to automatically select the optimal hyper-parameter configuration.
-For example, the regularization parameter, $\gamma$, in ridge regression is a potential hyperparameter to tune.
-This hyperparameter may be tuned over a range of values, say $[0.1, 25]$ or over a discrete subset, say $\{0.1, 10, 25\}$, for now assume the latter.
-Three ridge regression models with $\gamma=0.1$, $\gamma=10$, and $\gamma=25$ respectively are compared in a benchmark experiment.
-The value of $\gamma$ that results in the model with the optimal performance is then selected for the hyperparameter value going forward.
+For example, the depth of trees, $m_r$ in a random forest (@sec-ranfor) is a potential hyperparameter to tune.
+This hyperparameter may be tuned over a range of values, say $[1, 15]$ or over a discrete subset, say $\{1, 5, 15\}$, for now assume the latter.
+Three random forests with $1$, $5$, and $15$ tree depth respectively are compared in a benchmark experiment.
+The depth that results in the model with the optimal performance is then selected for the hyperparameter value going forward.
 *Nested resampling* is a common method to reduce bias that could occur from using overlapping data for tuning, training, or testing [@Simon2007].
 Nested resampling is the process of resampling the training set again for tuning and then the optimal model is refit on the entire training data (@fig-ml-nested).
 
