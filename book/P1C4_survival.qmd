@@ -62,9 +62,11 @@ where $\dtau$ denotes a time-interval. The hazard rate is often interpreted as t
 This is not a probability and $h_Y$ can be greater than one.
 
 Two points deserve emphasis.
-First, the hazard is a **rate per unit time**: its numerical value depends on the scale on which $\tau$ is measured.
+First, the hazard is a rate per unit time, which means its numerical value depends on the scale on which $\tau$ is measured.
 A hazard of $0.01$ on a daily scale equals $3.65$ on an annual scale for the same underlying process. 
-Second, hazards — not survival or density functions — are the natural modelling target in survival analysis because censoring affects them locally: at a given $\tau$, only subjects still at risk contribute, so the hazard can be estimated from locally available information even when $S(\tau)$ is not directly observed at every $\tau$.
+Second, hazards are the natural modelling target in survival analysis because censoring affects them locally.
+At a given $\tau$, only subjects still at risk contribute to the hazard rate, so the hazard can be estimated from locally available information even when $S(\tau)$ is not directly observed at every $\tau$.
+<!-- TODO: WHAT DO YOU MEAN LOCALLY AVAILABLE? -->
 For a book-length treatment of the hazard rate and its uses, see @rinneHazardRateTheory2014.
 
 The cumulative hazard function can be derived from the hazard function by
@@ -182,21 +184,7 @@ Instead, the observable variables are defined by
 Together $(T,\Delta)$ is referred to as the *survival outcome* or *survival tuple* and they form the dependent variables.
 The survival outcome provides a concise mechanism for representing the outcome time and indicating which outcome (event or censoring) took place.
 
-A *survival dataset* is a $n \times p$, real-valued matrix defined by $\calD = ((\xx_1, t_1, \delta_1), \ldots, (\xx_n, t_n, \delta_n))^\trans$, where $(t_i,\delta_i)$ are realizations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i,1}, x_{i,2}, \ldots, x_{i,p})^\trans$ of features.
-
-@tbl-surv-data-tumor exemplifies an observed survival dataset, a subset of the `tumor` data  [@pkgpammtools], which contains the time until death in days after operation ($\delta_i=1$ if death occurred at the outcome time $t_i$ and $\delta_i = 0$ otherwise).
-
-| **id** ($i$) | **age** $(\xx_{\cdot 1})$ | **sex** $(\xx_{\cdot 2})$ | **complications** $(\xx_{\cdot 3})$ | **days** ($\tt$) | **status** ($\bsdelta$) |
-|---:|---:|:------|:-------------|----:|------:|
-|  1|  71|female |no            | 1217|      1|
-|  2|  70|male   |no            |  519|      0|
-|  3|  67|female |yes           | 2414|      0|
-|  4|  58|male   |no            |  397|      1|
-|  5|  39|female |yes           | 1217|      0|
-|  6|  59|female |no            |  268|      1|
-
-: Subset of the `tumor`  [@pkgpammtools] time-to-event dataset.
-Rows are individual observations (ID), $\xx_{\cdot j}$ columns are features, $t$ is observed time-to-event, $\delta$ is the event indicator. {#tbl-surv-data-tumor}
+A *survival dataset* is an $n \times p$, real-valued matrix defined by $\calD = ((\xx_1, \ t_1, \ \delta_1) \cdots (\xx_n,t_n,\delta_n))^\trans$, where $(t_i,\delta_i)$ are realizations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i,1} \ x_{i,2} \cdots x_{i,p})^\trans$ of features.
 
 In this book, we will often refer to the unique, ordered event times.
 For example, given survival data, $(t_1=6, \delta_1=0)$, $(t_2=1, \delta_2=1)$, $(t_3=10,\delta_3=1)$, $(t_4=5,\delta_4=0)$, $(t_5 =10,\delta_5=1)$ the ordered unique event times are $(t_{(1)},  t_{(2)}) = (1,10)$ as the censored observations are removed, as are duplicated times.
@@ -241,13 +229,25 @@ For truly continuous variables, one might expect only one event to occur at each
 In practice, ties are often observed due to finite measurement precision, such that $d_{\tau} > 1$ occurs frequently in real-world datasets.
 
 The quantities $\calR_\tau$, $n_\tau$, and $d_\tau$ underlie many models and measures in survival analysis.
-Several non-parametric and semi-parametric methods (@sec-models-classical) like the Kaplan-Meier estimator (see @sec-surv-km) are based on the ratio $d_\tau / n_\tau$.
+Several non-parametric and semi-parametric methods (@sec-classical) like the Kaplan-Meier estimator (see @sec-surv-km) are based on the ratio $d_\tau / n_\tau$.
 
 Applied to the `tumor` example in @tbl-surv-data-tumor, these quantities are:
 
 * $\calR_{\tau = 1217} = \{1, 3, 5\}$ (these subjects' outcome times are greater or equal to $\tau = 1217$ so they are at risk for the event at this time)
 * $n_{\tau = 1217} = |\calR_{1217}| = 3$
 * $d_{\tau = 1217} = 1$: As only $i = 1$ experienced the event (and not censoring) at this time.
+
+| **id** ($i$) | **age** $(\xx_{\cdot 1})$ | **sex** $(\xx_{\cdot 2})$ | **complications** $(\xx_{\cdot 3})$ | **days** ($\tt$) | **status** ($\bsdelta$) |
+|---:|---:|:------|:-------------|----:|------:|
+|  1|  71|female |no            | 1217|      1|
+|  2|  70|male   |no            |  519|      0|
+|  3|  67|female |yes           | 2414|      0|
+|  4|  58|male   |no            |  397|      1|
+|  5|  39|female |yes           | 1217|      0|
+|  6|  59|female |no            |  268|      1|
+
+: Subset of the `tumor`  [@pkgpammtools] time-to-event dataset.
+Rows are individual observations (ID), $\xx_{\cdot j}$ columns are features, $t$ is observed time-to-event, $\delta$ is the event indicator. {#tbl-surv-data-tumor}
 
 ## Types of Censoring {#sec-types-of-censoring}
 
@@ -719,11 +719,10 @@ $$ {#eq-km-censoring}
 where $t_{(\ell)},l=1,\ldots,g$ are the unique, ordered censoring times.
 In this book, $\KMG$ specifically refers to the Kaplan-Meier estimator fit to the observed censoring times $(t_i, 1-\delta_i)$ from some training data.
 
-
 ### Inverse probability of censoring weights (IPCW) {#sec-surv-ipcw}
 
 A fundamental concept in survival analysis is inverse probability of censoring (IPC) weighting.
-As the name suggests, these weights are defined as the inverse of the probability of remaining uncensored.
+These weights are defined as the inverse of the probability of remaining uncensored.
 IPC weighting is most commonly used to adjust for bias introduced by right-censoring by upweighting observations that remain under observation at later time points.
 
 For an observation $i$ with covariates $\xx_i$, the IPC weight at time $\tau$ is given by
@@ -784,8 +783,9 @@ To minimize the loss at later time points, a model must place greater emphasis o
 :::: {.callout-tip icon=false}
 
 ## Further reading
-* @KalbfleischPrentice1973 provide an early, theoretical treatment of the main concepts of survival analysis.
+* @Kalbfleisch1980 provide an early, theoretical treatment of the main concepts of survival analysis.
 * @Klein2003 is a standard reference for survival analysis and provides a comprehensive overview of the different types of censoring and truncation
 * For practical discussion about survival models in the context of right-censoring and left-truncation see @McGough2021
+* @rinneHazardRateTheory2014 for a comprehensive discussion of the hazard rate.
 
 ::::
