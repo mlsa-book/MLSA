@@ -1557,3 +1557,215 @@ g_intervals = ggplot(cases) +
 
 ggsave("book/Figures/evaluation/intervals.png", g_intervals,
       height = 6, width = 8, units = "in", dpi = 600)
+
+
+## =============================================================================
+## EHA Reductions: cause-specific hazard models on sir.adm
+## Generates figures for P4C23 (Reductions for Event-History Analysis):
+##   - book/Figures/reductions/cif-marg-sir.png  (marginal: AJ vs PAM/Cox/RSF)
+##   - book/Figures/reductions/cif-adj-sir.png   (adjusted: PAM/Cox/RSF for 4 profiles)
+## =============================================================================
+
+suppressPackageStartupMessages({
+  library(survival); library(mvna); library(cmprsk); library(pammtools)
+  library(mgcv); library(randomForestSRC); library(dplyr); library(tidyr)
+  library(ggplot2); library(patchwork); library(purrr)
+})
+theme_set(theme_bw())
+set.seed(20260505)
+
+## ---- Data prep ----
+data(sir.adm, package = "mvna")
+sir <- sir.adm |>
+  mutate(
+    pneu = factor(pneu, labels = c("No pneumonia", "Pneumonia")),
+    sex  = factor(sex, levels = c("F","M"))
+  )
+
+tau <- max(sir$time)
+common_grid <- sort(unique(c(0, sir$time[sir$status > 0], tau)))
+
+## ---- Cause-specific datasets (status==1: discharge, status==2: death) ----
+sir_disch <- sir |> mutate(stat_e = as.integer(status == 1))
+sir_death <- sir |> mutate(stat_e = as.integer(status == 2))
+
+## ---- (1) Aalen-Johansen stratified by pneumonia (non-parametric baseline) ----
+sir_aj <- sir |>
+  mutate(to = case_when(status == 0 ~ "cens", .default = as.character(status)))
+aj_fit <- cuminc(sir_aj$time, sir_aj$to, group = sir_aj$pneu, cencode = "cens")
+
+aj_df <- imap_dfr(aj_fit[1:4], function(.x, .y) {
+  cause_chr <- sub(".* ", "", .y); pneu_chr <- sub(" [0-9]+$", "", .y)
+  data.frame(time = .x$time, cif = .x$est, pneu = pneu_chr, cause = cause_chr)
+}) |>
+  mutate(
+    cause  = factor(cause, levels = c("1","2"), labels = c("Discharge","Death")),
+    pneu   = factor(pneu,  levels = c("No pneumonia","Pneumonia")),
+    method = "Aalen-Johansen")
+
+## ---- (2) Cause-specific PAM (PED format + mgcv::gam, Poisson w/ log offset) ----
+ped_disch <- as_ped(sir_disch, Surv(time, stat_e) ~ pneu + age + sex,
+                    cut = common_grid, id = "id")
+ped_death <- as_ped(sir_death, Surv(time, stat_e) ~ pneu + age + sex,
+                    cut = common_grid, id = "id")
+
+pam_disch_marg <- gam(ped_status ~ s(tend) + pneu, family = poisson(),
+                      offset = offset, data = ped_disch)
+pam_death_marg <- gam(ped_status ~ s(tend) + pneu, family = poisson(),
+                      offset = offset, data = ped_death)
+pam_disch_adj  <- gam(ped_status ~ s(tend) + pneu + s(age) + sex, family = poisson(),
+                      offset = offset, data = ped_disch)
+pam_death_adj  <- gam(ped_status ~ s(tend) + pneu + s(age) + sex, family = poisson(),
+                      offset = offset, data = ped_death)
+
+# Helper: build a per-profile prediction grid on the common_grid
+make_pred_grid <- function(prof_df, ped) {
+  tends <- sort(unique(ped$tend))
+  out   <- prof_df[rep(1, length(tends)), , drop = FALSE]
+  out$tend   <- tends
+  out$intlen <- diff(c(0, tends))
+  out$offset <- log(out$intlen)
+  out
+}
+# CIF via cause-specific reduction: F_e(t|x) = sum S(t_{k-1}|x) * h_e(t_k|x) * intlen
+pred_pam_cif <- function(prof_df, pam_d, pam_e, ped_d) {
+  g <- make_pred_grid(prof_df, ped_d)
+  g$h_d <- predict(pam_d, newdata = g, type = "response")
+  g$h_e <- predict(pam_e, newdata = g, type = "response")
+  H_all <- cumsum((g$h_d + g$h_e) * g$intlen)
+  S_prev <- c(1, head(exp(-H_all), -1))
+  cif_d <- cumsum(S_prev * g$h_d * g$intlen)
+  cif_e <- cumsum(S_prev * g$h_e * g$intlen)
+  bind_rows(
+    data.frame(time = g$tend, cif = cif_d, cause = "Discharge"),
+    data.frame(time = g$tend, cif = cif_e, cause = "Death")
+  ) |>
+    bind_cols(g[rep(seq_len(nrow(g)), 2),
+                setdiff(colnames(g), c("tend","intlen","offset","h_d","h_e")),
+                drop = FALSE])
+}
+
+## ---- (3) Cause-specific Cox PH ----
+cox_disch_marg <- coxph(Surv(time, stat_e) ~ pneu, data = sir_disch, x = TRUE)
+cox_death_marg <- coxph(Surv(time, stat_e) ~ pneu, data = sir_death, x = TRUE)
+cox_disch_adj  <- coxph(Surv(time, stat_e) ~ pneu + age + sex, data = sir_disch, x = TRUE)
+cox_death_adj  <- coxph(Surv(time, stat_e) ~ pneu + age + sex, data = sir_death, x = TRUE)
+
+# CIF for cause-specific Cox: combine Breslow baseline with PH risk score
+cox_cif <- function(prof_df, cox_d, cox_e, grid) {
+  bh_d <- basehaz(cox_d, centered = FALSE)
+  bh_e <- basehaz(cox_e, centered = FALSE)
+  eta_d <- predict(cox_d, newdata = prof_df, type = "lp", reference = "zero")
+  eta_e <- predict(cox_e, newdata = prof_df, type = "lp", reference = "zero")
+  step_eval <- function(bh, t_eval)
+    approxfun(c(0, bh$time), c(0, bh$hazard), method = "constant", rule = 2, f = 0)(t_eval)
+  H_d <- step_eval(bh_d, grid) * exp(eta_d)
+  H_e <- step_eval(bh_e, grid) * exp(eta_e)
+  intlen <- diff(c(0, grid))
+  h_d <- ifelse(intlen > 0, diff(c(0, H_d)) / intlen, 0)
+  h_e <- ifelse(intlen > 0, diff(c(0, H_e)) / intlen, 0)
+  H_all <- cumsum((h_d + h_e) * intlen)
+  S_prev <- c(1, head(exp(-H_all), -1))
+  cif_d <- cumsum(S_prev * h_d * intlen)
+  cif_e <- cumsum(S_prev * h_e * intlen)
+  bind_rows(
+    data.frame(time = grid, cif = cif_d, cause = "Discharge"),
+    data.frame(time = grid, cif = cif_e, cause = "Death")
+  ) |>
+    bind_cols(prof_df[rep(1, length(grid) * 2), , drop = FALSE])
+}
+
+## ---- (4) Random Survival Forest (native competing risks) ----
+rsf_marg <- rfsrc(Surv(time, status) ~ pneu, data = sir, ntree = 500,
+                  cause = c(1, 2), seed = 42)
+rsf_adj  <- rfsrc(Surv(time, status) ~ pneu + age + sex, data = sir, ntree = 500,
+                  cause = c(1, 2), seed = 42)
+
+rsf_cif <- function(prof_df, rsf_fit) {
+  pred <- predict(rsf_fit, newdata = prof_df)
+  bind_rows(lapply(seq_len(nrow(prof_df)), function(i) {
+    bind_rows(
+      data.frame(time = pred$time.interest, cif = pred$cif[i,,1], cause = "Discharge"),
+      data.frame(time = pred$time.interest, cif = pred$cif[i,,2], cause = "Death")
+    ) |>
+      bind_cols(prof_df[rep(i, length(pred$time.interest) * 2), , drop = FALSE])
+  }))
+}
+
+## ---- Marginal verification figure: PAM/Cox/RSF recover AJ ----
+profs_marg <- data.frame(
+  pneu = factor(c("No pneumonia","Pneumonia"),
+                levels = c("No pneumonia","Pneumonia"))
+)
+profs_marg_pam <- profs_marg
+profs_marg_pam$age <- median(sir$age)
+profs_marg_pam$sex <- factor("M", levels = c("F","M"))
+
+pam_marg_df <- bind_rows(lapply(seq_len(nrow(profs_marg_pam)), function(i)
+  pred_pam_cif(profs_marg_pam[i,], pam_disch_marg, pam_death_marg, ped_disch))) |>
+  select(time, cif, cause, pneu) |>
+  mutate(method = "PAM", cause = factor(cause, levels = c("Discharge","Death")))
+
+cox_marg_df <- bind_rows(lapply(seq_len(nrow(profs_marg)), function(i)
+  cox_cif(profs_marg[i,, drop = FALSE], cox_disch_marg, cox_death_marg, common_grid))) |>
+  mutate(method = "Cox PH", cause = factor(cause, levels = c("Discharge","Death")))
+
+rsf_marg_df <- rsf_cif(profs_marg, rsf_marg) |>
+  mutate(method = "RSF", cause = factor(cause, levels = c("Discharge","Death")))
+
+marg_df <- bind_rows(aj_df, pam_marg_df, cox_marg_df, rsf_marg_df) |>
+  mutate(method = factor(method,
+                         levels = c("Aalen-Johansen","PAM","Cox PH","RSF")))
+
+p_marg <- ggplot(marg_df, aes(time, cif, color = method, linetype = method)) +
+  geom_step(linewidth = 0.7) +
+  facet_grid(cause ~ pneu) +
+  scale_color_manual(values = c("Aalen-Johansen"="black","PAM"="#377eb8",
+                                "Cox PH"="#e41a1c","RSF"="#4daf4a")) +
+  scale_linetype_manual(values = c("Aalen-Johansen"="solid","PAM"="dashed",
+                                   "Cox PH"="dotdash","RSF"="dotted")) +
+  labs(x = "Time (days)", y = "Cumulative incidence",
+       color = NULL, linetype = NULL) +
+  theme(legend.position = "bottom") +
+  coord_cartesian(xlim = c(0, 120), ylim = c(0, 1))
+
+dir.create("book/Figures/reductions", showWarnings = FALSE, recursive = TRUE)
+ggsave("book/Figures/reductions/cif-marg-sir.png", p_marg,
+       height = 5.5, width = 8.5, units = "in", dpi = 600)
+
+## ---- Covariate-adjusted figure: PAM/Cox/RSF on a 4-profile grid ----
+profs_adj <- expand.grid(
+  pneu = factor(c("No pneumonia","Pneumonia"),
+                levels = c("No pneumonia","Pneumonia")),
+  age  = c(40, 75),
+  sex  = factor("M", levels = c("F","M"))
+)
+profs_adj$profile <- with(profs_adj, paste0(pneu, ", age ", age))
+profs_adj$profile <- factor(profs_adj$profile, levels = unique(profs_adj$profile))
+
+pam_adj_df <- bind_rows(lapply(seq_len(nrow(profs_adj)), function(i)
+  pred_pam_cif(profs_adj[i,], pam_disch_adj, pam_death_adj, ped_disch))) |>
+  select(time, cif, cause, pneu, age, sex, profile) |>
+  mutate(method = "PAM", cause = factor(cause, levels = c("Discharge","Death")))
+
+cox_adj_df <- bind_rows(lapply(seq_len(nrow(profs_adj)), function(i)
+  cox_cif(profs_adj[i,, drop = FALSE], cox_disch_adj, cox_death_adj, common_grid))) |>
+  mutate(method = "Cox PH", cause = factor(cause, levels = c("Discharge","Death")))
+
+rsf_adj_df <- rsf_cif(profs_adj, rsf_adj) |>
+  mutate(method = "RSF", cause = factor(cause, levels = c("Discharge","Death")))
+
+adj_df <- bind_rows(pam_adj_df, cox_adj_df, rsf_adj_df) |>
+  mutate(method = factor(method, levels = c("PAM","Cox PH","RSF")))
+
+p_adj <- ggplot(adj_df, aes(time, cif, color = profile, linetype = method)) +
+  geom_step(linewidth = 0.6) +
+  facet_wrap(~cause) +
+  labs(x = "Time (days)", y = "Cumulative incidence",
+       color = "Profile", linetype = "Method") +
+  theme(legend.position = "bottom", legend.box = "vertical") +
+  guides(color = guide_legend(nrow = 2), linetype = guide_legend(nrow = 1)) +
+  coord_cartesian(xlim = c(0, 120), ylim = c(0, 1))
+
+ggsave("book/Figures/reductions/cif-adj-sir.png", p_adj,
+       height = 5.5, width = 9, units = "in", dpi = 600)
