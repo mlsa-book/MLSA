@@ -116,7 +116,7 @@ $$\begin{aligned}L_i
 Now recall from Equation (@eq-interval-indicator) the definition of the interval-specific event indicators $\delta_{ij}$, which always take value 0, except for the last interval, where $\delta_{iJ_i} = \delta_i$.
 Thus, the first part of (@eq-discrete-likelihood-1) can be written as
 $\prod_{j=1}^{J_i}(1-h_{\tilde{Y}}(j))^{1-\delta_{ij}}h_{\tilde{Y}}(j)^{\delta_{ij}}$ and the second part as $\prod_{j=1}^{J_i}(1-h_{\tilde{Y}}(j))^{1-\delta_{ij}}$.
-It follows, that the likelihood (@eq-discrete-likelihood-1) can be written as
+This enables (@eq-discrete-likelihood-1) to be simplified to
 <!--  -->
 $$\begin{aligned}
 L_i 
@@ -141,7 +141,7 @@ This implies that we can estimate the discrete-time hazards $h_{\tilde{Y}}(j)$ f
 <!--  -->
 $$\calD_{\mathcal{A}} = \{(\delta_{ij}, t_{j})\}_{i=1,\ldots,n;\quad j=1,\ldots,J_i},$${#eq-discrete-data}
 <!--  -->
-where $\delta_{ij}$ are the targets and $t_{j}$ — some representation of time in interval $j$ (for example $t_j = j$ or $t_j = a_{j-1}$) --- enters the estimation as a feature and is needed in order to estimate different hazards/probabilities in different intervals.
+where $\delta_{ij}$ are the targets and $t_j$ enters the estimation as a feature and is needed in order to estimate different hazards/probabilities in different intervals.
 
 In the presence of features $\xx_{i}$ we assume $\Delta_{ij}| \xx_{i}, t_j \stackrel{iid}{\sim} Ber(\pi_{ij})$, where $\pi_{ij} = P(\Delta_{ij} = 1| \xx_{i}, t_j) = h_{\tilde{Y}}(j|\xx_{i})$ is the discrete hazard rate for interval $j$ given features $\xx_{i}$ and is estimated by applying binary classifiers to
 <!--  -->
@@ -151,8 +151,7 @@ $$\calD_{\mathcal{A}} = \{(\delta_{ij}, \xx_{i}, t_{j})\}_{i=1,\ldots,n;\quad j=
 ### Example: Logistic Regression
 
 To illustrate the discrete-time reduction approach, once again consider the tumor dataset introduced in @tbl-surv-data-tumor. The follow-up time is partitioned into $J = 100$ equidistant intervals and the data are transformed according to the procedure described in @sec-data-transformation.
-Define $x_{i1} = \II(\text{complications}_i = \text{"yes"})$.
-We then fit a logistic regression model 
+Define $x_{i1} = \II(\text{complications}_i = \text{"yes"})$ and fit the logistic regression model
 <!--  -->
 $$\text{logit}(\pi_{ij}) = \beta_{0j} + \beta_1x_{i1}
 $${#eq-discrete-time-glm-po}
@@ -162,7 +161,7 @@ to the transformed dataset, where $j$ denotes the interval index, $\beta_{0j}$ a
 The estimated survival probabilities are obtained by calculating $\hat{S}_{\tilde{Y}}(j|x_{1}) = \prod_{k=1}^j (1-\hat{h}_{\tilde{Y}}(k|x_{1}))$ for each interval $j$ and complication group, where $\hat{h}_{\tilde{Y}}(k|x_{1})$ are the predicted discrete hazards from the logistic regression model.
 
 @fig-discrete-time-glm shows the estimated survival probabilities from the discrete-time model (dashed lines) together with the Kaplan-Meier estimates (solid lines) for comparison.
-The model specified in Equation (@eq-discrete-time-glm-po) is a proportional odds model, where the baseline hazard is the same for both complication groups, thus the shape of the hazard and therefore the survival probability curve is the same for both complication groups, shifted by the common effect of complications. This does not describe the data too well as the hazards are different in the two groups (as discussed in @sec-pseudo-value-S).
+The model specified in Equation (@eq-discrete-time-glm-po) is a proportional odds model, where the baseline hazard is the same for both complication groups, thus the shape of the hazard and therefore the survival probability curve is the same for both complication groups, shifted by the common effect of complications. This does not describe the data too well as in reality the hazards are different in the two groups.
 
 ![Comparison of survival probability estimates using the discrete-time model (logistic regression) and the Kaplan-Meier estimator, for patients with and without complications.](Figures/reductions/discrete-time-complications-glm.png){#fig-discrete-time-glm fig-alt="Single plot showing survival curves for patients with and without complications. Kaplan-Meier estimates are shown as solid lines (black for no complications, gray for complications) and discrete-time model estimates are shown as dashed blue lines (darker blue for no complications, lighter blue for complications)."}
 
@@ -181,7 +180,7 @@ The interaction model provides a much better fit to the data compared to the pro
 
 While this is a simple example with only one feature, it shows that the discrete time reduction approach provides a good approximation of the event time distribution when the number of intervals is large enough, despite the fact that we ignore the information about the exact event time.
 Importantly, the estimated survival probabilities are discrete, representing survival probabilities at the interval endpoints. 
-However, a simple solution to generate continuous survival function predictions is to linearly interpolate between the interval endpoints.
+These discrete estimations can be joined to a continuous survival function using a variety of approaches, most simply linear interpolation between the interval endpoints.
 
 The example also raises the question about the choice of the number of intervals $J$ and the placement of interval boundaries $\mathcal{A}$. These questions will be discussed in more detail in @sec-choice-of-interval-boundaries, which is relevant for both the discrete-time reduction approach and the piecewise constant hazards approach discussed in @sec-piecewise-constant-hazards.
 
@@ -192,7 +191,7 @@ It can be viewed as a special case of the discrete time approach, where the inte
 <!--  -->
 $$\mathcal{A} = \{t_{(1)}, \ldots, t_{(m+1)}: t_{(j)} < t_{(j+1)}\},$${#eq-survival-stacking-intervals}
 <!--  -->
-resulting in intervals $[t_{(1)}, t_{(2)}), \ldots, [t_{(m-1)}, t_{(m)}), [t_{(m)}, t_{(m+1)})$, where $t_{(m+1)}$ is some time point larger than the last event time; see @sec-left-closed-vs-left-open.
+resulting in intervals $[t_{(1)}, t_{(2)}), \ldots, [t_{(m-1)}, t_{(m)}), [t_{(m)}, t_{(m+1)})$, where $t_{(m+1)}$ is some time point larger than the last event time.
 Equivalently, survival stacking can be motivated analogous to the construction of the Kaplan-Meier estimator (@sec-surv-km): at each observed event time $t_{(j)}$, we consider all subjects in the risk set $\calR_{t_{(j)}}$ and record whether or not they experience an event at this time.
 
 For illustration, consider once again the example from @fig-data-trafo.
@@ -217,8 +216,8 @@ where the $\delta_{ij}$ can be used as targets for binary classification, $t_{(j
 
 The general idea of the piecewise constant hazards approach is conceptually simple: 
 
-1. Partition the follow-up into many intervals
-2. Estimate a constant hazard rate for each interval
+1. Partition the follow-up into many intervals;
+2. Estimate a constant hazard rate for each interval.
 
 Intuitively, any underlying continuous hazard function of the data generating process can be approximated arbitrarily well given enough intervals (and events).
 This model class is known as the piecewise exponential model (PEM) because assuming event times to be exponentially distributed, implies constant hazards within each interval.
@@ -229,7 +228,7 @@ $$h(\tau) = h_j,\ \forall\ \tau \in I_j.$${#eq-constant-hazard}
 <!--  -->
 Note that left-closed, right-open intervals are used here for consistency with the discrete-time approach in @sec-discrete-time-reduction. In the PEM literature on the other hand, intervals are often defined as left-open, right-closed (see also @sec-choice-of-interval-boundaries).
 
-First we derive the likelihood contribution of subject $i$ under assumption (@eq-constant-hazard),
+First we derive the likelihood contribution of subject $i$ under the piece-wise exponential assumption (@eq-constant-hazard),
 starting with the general likelihood for right-censored data (@eq-right-censoring-likelihood):
 <!--  -->
 $$\begin{aligned}
@@ -254,7 +253,7 @@ $$\begin{aligned}
 <!--  -->
 where the last equality follows from $\delta_{ij} \in \{0,1\}$ and $0!=1!=1$.
 
-Note that $\calL_{i,\text{Poisson}} \propto \calL_i$ from equation (@eq-pem-likelihood-general), since $t_{ij}$ is a constant and does not depend on the parameters of interest (here $h_j$).
+Note that $\calL_{\text{Poisson}, i} \propto \calL_i$ from equation (@eq-pem-likelihood-general), since $t_{ij}$ is a constant and does not depend on the parameters of interest (here $h_j$).
 This implies that we can estimate a model with piecewise constant hazards by optimizing the Poisson likelihood (@eq-pem-poisson-likelihood). The $t_{ij}$ term enters as an offset $\log(t_{ij})$ in the Poisson regression model.
 
 More generally, in the presence of features $\xx_i$, assume $\delta_{ij}|\xx_i \stackrel{iid}{\sim} \text{Poisson}(\mu_{ij})$, where $\mu_{ij} = h_{ij} t_{ij}$ is the expected number of events in interval $j$ given features $\xx_i$ and $h_{ij} = g(t_j, \xx_i)$ is the hazard rate in interval $j$ given features $\xx_i$.
@@ -296,7 +295,7 @@ This demonstrates that the piecewise constant hazards approach can effectively e
 The reduction approaches introduced in the previous sections all depend on the choice of the partition $\mathcal{A}$ (@eq-cut-points). This section discusses the practical considerations involved in selecting interval boundaries, including the number and placement of cut points, the conventions and considerations with respect to left-closed vs. left-open intervals, the representation of time within intervals, and implications for left-truncated data.
 
 
-### Number and Placement of Cut Points
+### Number and placement of cut points
 
 The choice of the number of intervals $J$ and the placement of the interval boundaries $a_j$ involves a trade-off between flexibility, robustness, and computational cost.
 More intervals allow for a finer approximation of the underlying hazard function, but at the cost of less robust estimates (fewer events per interval) and a larger transformed dataset.
@@ -306,19 +305,18 @@ The simplest strategy is to use equidistant intervals, which does not require an
 A more data-adaptive strategy is to use quantile-based intervals, which place more cut points in regions with higher event density and fewer in regions with sparse events.
 
 A natural alternative is to use the unique, observed event times as cut points, as done in survival stacking (@sec-survival-stacking). This mirrors the construction of the Kaplan-Meier estimator and ensures that interval boundaries are dense where events are frequent and sparse where they are rare. The same strategy is the default in software packages for PEMs like `pammtools` [@pkgpammtools].
-However, using all unique event times can lead to very large transformed datasets: since each of $n$ subjects can contribute up to $m$ rows (where $m$ is the number of unique event times), the augmented dataset has $\tilde{n} = \sum_{i=1}^n J_i$ rows, which is $O(nm)$ in the worst case.
+However, using all unique event times can lead to very large transformed datasets: since each of $n$ subjects can contribute up to $m$ rows (where $m$ is the number of unique event times), the augmented dataset has $\tilde{n} = \sum_{i=1}^n J_i$ rows.
 @Bender2021 showed that using a subsample of event times as cut points yields comparable predictive performance while keeping the increase in dataset size linear in the number of events, making this a practical strategy when $m$ is large.
 
 <!-- For the PEM approach, @Friedman1982 showed that the PEM estimator is consistent as long as the number of intervals grows with $n$ and the maximum interval length shrinks to zero, even when the true hazard is not a step function. In practice, this means that using a reasonably fine partition is sufficient for good approximation, and the partition does not need to be "correct" --- it only needs to be fine enough relative to the variation in the underlying hazard. -->
 
 
-### Left-Closed vs. Left-Open Intervals {#sec-left-closed-vs-left-open}
+### Left-closed vs. left-open intervals {#sec-left-closed-vs-left-open}
 
 Throughout this chapter, we have used left-closed, right-open intervals $[a_{j-1}, a_j)$, consistent with the discrete-time definitions in @sec-distributions-discrete.
-This is the natural convention for discrete-time/risk-set-based approaches (Kaplan-Meier, Nelson-Aalen, survival stacking), because all observations before the event time are excluded from the risk set in the interval $[t_{(k)}, t_{(k+1)})$, leading to the equivalence of the discrete-time hazard and risk-set-based estimation.
-This is also the definition used by @Tutz2016.
+This is the natural convention for discrete-time/risk-set-based approaches (Kaplan-Meier, Nelson-Aalen, survival stacking), because all observations before the event time are excluded from the risk set in the interval $[t_{(k)}, t_{(k+1)})$, leading to the equivalence of the discrete-time hazard and risk-set-based estimation [@Tutz2016].
 
-In the PEM literature, however, left-open, right-closed intervals $(a_{j-1}, a_j]$ are more commonly used. Software packages like `pammtools` [@pkgpammtools] adopt this convention and use event times as default cut points with $t_j = a_j$ (the right endpoint).
+In the PEM literature, however, left-open, right-closed intervals $(a_{j-1}, a_j]$ are more commonly used with the event times as cut points with $t_j = a_j$ (the right endpoint) [@pkgpammtools].
 
 In most practical situations, the choice of convention has negligible impact on the results: when intervals are small, both conventions produce nearly identical estimates.
 The distinction matters primarily when interval boundaries coincide with event times, as is the case in survival stacking or when event times are used as cut points for PEM.
