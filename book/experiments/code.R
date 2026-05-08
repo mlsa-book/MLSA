@@ -1620,97 +1620,153 @@ ggsave("book/Figures/evaluation/intervals.png", g_intervals,
       height = 6, width = 8, units = "in", dpi = 600)
 
 
+
 ## =========================================================================
 ## Censoring + truncation schematic figures (Ch. 3)
-##  Outputs:
-##   - book/Figures/survival/censoring.png        (right-censoring)
-##   - book/Figures/survival/left-truncation.png  (left-truncation)
-##   - book/Figures/survival/right-truncation.png (right-truncation)
+##  Outputs (both .svg and .png):
+##   - book/Figures/survival/censoring.{svg,png}        (right-censoring)
+##   - book/Figures/survival/left-truncation.{svg,png}  (left-truncation)
+##   - book/Figures/survival/right-truncation.{svg,png} (right-truncation)
 ## =========================================================================
 
-## --- right-censoring (4 subjects) ---
+shape_vals   <- c("observed event" = 21, "unobserved event" = 23, "censoring" = 21)
+fill_vals    <- c("observed event" = "black", "unobserved event" = "black", "censoring" = "white")
+shape_breaks <- c("observed event", "unobserved event", "censoring")
+line_vals    <- c("observed" = "solid", "unobserved" = "dashed")
+line_breaks  <- c("observed", "unobserved")
+
+save_pair <- function(p, base, h = 3.5, w = 8) {
+  ggsave(paste0(base, ".svg"), p, height = h, width = w, units = "in")
+  ggsave(paste0(base, ".png"), p, height = h, width = w, units = "in", dpi = 300)
+}
+
+# Adds phantom NA rows for missing factor levels so the legend shows all of them.
+ensure_levels <- function(df, level_col, all_levels) {
+  missing <- setdiff(all_levels, as.character(df[[level_col]]))
+  if (length(missing) == 0) return(df)
+  ph <- df[rep(1L, length(missing)), , drop = FALSE]
+  ph[[level_col]] <- factor(missing, levels = all_levels)
+  for (nm in setdiff(names(ph), level_col)) ph[[nm]] <- NA
+  rbind(df, ph)
+}
+
+cens_legend <- list(
+  shape    = guide_legend(override.aes = list(fill = c("black", "black", "white"),
+                                              shape = c(21, 23, 21),
+                                              colour = "black")),
+  linetype = guide_legend(order = 1)
+)
+
+## --- right-censoring ---
 study_end <- 8
 cens <- tibble::tribble(
   ~subject, ~obs_end, ~event_end, ~status,
-  1,        7,        7.0,        "event",     # in-study event
-  2,        4,        6.0,        "censored",  # censored, true event during study
-  3,        1,        9.0,        "censored",  # censored early, true event after study
-  4,        8,        9.5,        "censored"   # admin-censored at study end, true event after
+  1,        7,        7.0,        "event_observed",
+  2,        4,        6.0,        "event_unobserved_during",
+  3,        1,        9.0,        "event_unobserved_after",
+  4,        8,        9.5,        "event_unobserved_after"
 )
-p_cens <- ggplot(cens, aes(y = subject)) +
-  geom_segment(aes(x = 0, xend = obs_end, yend = subject), linewidth = 0.7) +
-  geom_segment(data = dplyr::filter(cens, status == "censored"),
-               aes(x = obs_end, xend = event_end, yend = subject),
-               linewidth = 0.7, linetype = "dashed") +
-  geom_point(data = dplyr::filter(cens, status == "censored"),
-             aes(x = obs_end), shape = 21, fill = "white", colour = "black", size = 3) +
-  geom_point(aes(x = event_end), shape = 23, fill = "black", colour = "black", size = 3) +
-  geom_vline(xintercept = study_end, linewidth = 0.4) +
-  annotate("text", x = study_end, y = 4.4, label = "study end", hjust = 1.05, size = 3.4) +
-  scale_y_continuous(breaks = 1:4) +
-  scale_x_continuous(breaks = 0:10, limits = c(0, 10)) +
-  labs(x = "Time", y = "Subject") +
-  theme(panel.grid.minor = element_blank())
-ggsave("book/Figures/survival/censoring.png", p_cens,
-       height = 3.8, width = 7, units = "in", dpi = 600)
+seg_solid  <- cens |> transmute(subject, x = 0, xend = obs_end, line = "observed")
+seg_dashed <- cens |> filter(status != "event_observed") |>
+  transmute(subject, x = obs_end, xend = event_end, line = "unobserved")
+segs <- bind_rows(seg_solid, seg_dashed) |>
+  mutate(line = factor(line, levels = line_breaks))
+pts <- bind_rows(
+  cens |> filter(status != "event_observed") |> transmute(subject, x = obs_end,   type = "censoring"),
+  cens |> filter(status == "event_observed")  |> transmute(subject, x = event_end, type = "observed event"),
+  cens |> filter(status != "event_observed") |> transmute(subject, x = event_end, type = "unobserved event")
+) |> mutate(type = factor(type, levels = shape_breaks))
+pts <- ensure_levels(pts, "type", shape_breaks)
 
-## --- left-truncation (3 subjects) ---
-study_end_lt <- 8
+p_cens <- ggplot() +
+  geom_segment(data = segs,
+               aes(x = x, xend = xend, y = subject, yend = subject, linetype = line),
+               linewidth = 0.7) +
+  geom_point(data = pts,
+             aes(x = x, y = subject, shape = type, fill = type),
+             colour = "black", size = 3, stroke = 0.6) +
+  scale_linetype_manual(values = line_vals, breaks = line_breaks, drop = FALSE, name = NULL) +
+  scale_shape_manual(values = shape_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
+  scale_fill_manual(values = fill_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
+  scale_y_continuous(breaks = 1:4) +
+  scale_x_continuous(breaks = c(0, study_end), labels = c("study start", "study end"),
+                     limits = c(0, 10), expand = expansion(mult = c(0.02, 0.02))) +
+  labs(x = NULL, y = "Subject") +
+  guides(shape = cens_legend$shape, linetype = cens_legend$linetype) +
+  theme(legend.position = "right",
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank())
+save_pair(p_cens, "book/Figures/survival/censoring", h = 3.5, w = 8)
+
+## --- left-truncation (brostroem-style; age 0-365 days; subject 1 invisible) ---
 lt <- tibble::tribble(
-  ~subject, ~trunc_end, ~obs_end, ~status,
-  1,        1.0,        4.0,      "event",
-  2,        2.5,        7.0,      "event",
-  3,        4.5,        8.0,      "censored"
+  ~subject, ~t_L,  ~t_event, ~status,            ~visible,
+  1,        100,   50,       "unobserved event", FALSE,
+  2,        80,    200,      "observed event",   TRUE,
+  3,        150,   365,      "censoring",        TRUE
 )
-lt_segs <- dplyr::bind_rows(
-  dplyr::transmute(lt, subject, xstart = 0,         xend = trunc_end, type = "left-truncation"),
-  dplyr::transmute(lt, subject, xstart = trunc_end, xend = obs_end,   type = "follow-up")
-)
+lt_segs <- bind_rows(
+  lt |> transmute(subject, y = subject + 0.10, x = 0, xend = t_L,
+                  line = if_else(visible, "observed", "unobserved")),
+  lt |> transmute(subject, y = subject - 0.10, x = 0, xend = t_event,
+                  line = if_else(visible, "observed", "unobserved"))
+) |> mutate(line = factor(line, levels = line_breaks))
+lt_pts <- lt |> transmute(subject, y = subject - 0.10, x = t_event,
+                          type = factor(status, levels = shape_breaks))
+lt_pts <- ensure_levels(lt_pts, "type", shape_breaks)
+
 p_lt <- ggplot() +
   geom_segment(data = lt_segs,
-               aes(x = xstart, xend = xend, y = subject, yend = subject, colour = type),
-               linewidth = 1.4) +
-  geom_point(data = dplyr::filter(lt, status == "event"),
-             aes(x = obs_end, y = subject), shape = 23, fill = "black", colour = "black", size = 3) +
-  geom_point(data = dplyr::filter(lt, status == "censored"),
-             aes(x = obs_end, y = subject), shape = 21, fill = "white", colour = "black", size = 3) +
-  geom_vline(xintercept = study_end_lt, linewidth = 0.4, linetype = "dashed") +
-  annotate("text", x = study_end_lt, y = 3.4, label = "study end", hjust = 1.05, size = 3.4) +
-  scale_colour_manual(values = c("left-truncation" = "steelblue", "follow-up" = "black"),
-                      breaks = c("left-truncation", "follow-up"), name = NULL) +
+               aes(x = x, xend = xend, y = y, yend = y, linetype = line),
+               linewidth = 0.7) +
+  geom_point(data = lt_pts,
+             aes(x = x, y = y, shape = type, fill = type),
+             colour = "black", size = 3, stroke = 0.6) +
+  scale_linetype_manual(values = line_vals, breaks = line_breaks, drop = FALSE, name = NULL) +
+  scale_shape_manual(values = shape_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
+  scale_fill_manual(values = fill_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
   scale_y_continuous(breaks = 1:3) +
-  scale_x_continuous(breaks = 0:10, limits = c(0, 10)) +
-  labs(x = "Age", y = "Subject") +
-  theme(legend.position = "bottom", panel.grid.minor = element_blank())
-ggsave("book/Figures/survival/left-truncation.png", p_lt,
-       height = 3.5, width = 7, units = "in", dpi = 600)
+  scale_x_continuous(breaks = c(0, 90, 180, 270, 365),
+                     labels = c("0", "90", "180", "270", "365\n(study end)"),
+                     limits = c(0, 400), expand = expansion(mult = c(0.02, 0.02))) +
+  labs(x = "Age (days)", y = "Subject") +
+  guides(shape = cens_legend$shape, linetype = cens_legend$linetype) +
+  theme(legend.position = "right",
+        panel.grid.minor = element_blank())
+save_pair(p_lt, "book/Figures/survival/left-truncation", h = 3.5, w = 8)
 
-## --- right-truncation (3 subjects) ---
-db_query <- 8
+## --- right-truncation (incubation 0-30 days; subject 2 invisible) ---
 rt <- tibble::tribble(
-  ~subject, ~obs_end, ~event_end, ~status,
-  1,        3.0,      3.0,        "observed",   # event before query (in sample)
-  2,        8.0,      9.5,        "truncated",  # event after query (NOT in sample)
-  3,        6.0,      6.0,        "observed"    # event before query (in sample)
+  ~subject, ~t_R, ~t_event, ~status,            ~visible,
+  1,        20,   8,        "observed event",   TRUE,
+  2,        10,   18,       "unobserved event", FALSE,
+  3,        25,   5,        "observed event",   TRUE
 )
-rt_segs <- dplyr::bind_rows(
-  dplyr::transmute(rt, subject, xstart = 0,        xend = obs_end,   type = "observed"),
-  dplyr::transmute(rt, subject, xstart = obs_end,  xend = event_end, type = "right-truncation") |>
-    dplyr::filter(xend > xstart)
-)
+rt_segs <- bind_rows(
+  rt |> transmute(subject, y = subject + 0.10, x = 0, xend = t_R,
+                  line = if_else(visible, "observed", "unobserved")),
+  rt |> transmute(subject, y = subject - 0.10, x = 0, xend = t_event,
+                  line = if_else(visible, "observed", "unobserved"))
+) |> mutate(line = factor(line, levels = line_breaks))
+rt_pts <- rt |> transmute(subject, y = subject - 0.10, x = t_event,
+                          type = factor(status, levels = shape_breaks))
+rt_pts <- ensure_levels(rt_pts, "type", shape_breaks)
+
 p_rt <- ggplot() +
   geom_segment(data = rt_segs,
-               aes(x = xstart, xend = xend, y = subject, yend = subject, colour = type),
-               linewidth = 1.4) +
-  geom_point(data = rt, aes(x = event_end, y = subject),
-             shape = 23, fill = "black", colour = "black", size = 3) +
-  geom_vline(xintercept = db_query, linewidth = 0.4, linetype = "dashed") +
-  annotate("text", x = db_query, y = 3.4, label = "database queried", hjust = 1.05, size = 3.4) +
-  scale_colour_manual(values = c("observed" = "black", "right-truncation" = "steelblue"),
-                      breaks = c("observed", "right-truncation"), name = NULL) +
+               aes(x = x, xend = xend, y = y, yend = y, linetype = line),
+               linewidth = 0.7) +
+  geom_point(data = rt_pts,
+             aes(x = x, y = y, shape = type, fill = type),
+             colour = "black", size = 3, stroke = 0.6) +
+  scale_linetype_manual(values = line_vals, breaks = line_breaks, drop = FALSE, name = NULL) +
+  scale_shape_manual(values = shape_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
+  scale_fill_manual(values = fill_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
   scale_y_continuous(breaks = 1:3) +
-  scale_x_continuous(breaks = 0:10, limits = c(0, 10)) +
-  labs(x = "Calendar time", y = "Subject") +
-  theme(legend.position = "bottom", panel.grid.minor = element_blank())
-ggsave("book/Figures/survival/right-truncation.png", p_rt,
-       height = 3.5, width = 7, units = "in", dpi = 600)
+  scale_x_continuous(breaks = c(0, 7, 14, 21, 28),
+                     limits = c(0, 30), expand = expansion(mult = c(0.02, 0.02))) +
+  labs(x = "Time since infection (days)", y = "Subject") +
+  guides(shape = cens_legend$shape, linetype = cens_legend$linetype) +
+  theme(legend.position = "right",
+        panel.grid.minor = element_blank())
+save_pair(p_rt, "book/Figures/survival/right-truncation", h = 3.5, w = 8)
