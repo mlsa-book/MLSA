@@ -37,12 +37,12 @@ Finally, @sec-choice-of-interval-boundaries discusses computational aspects and 
 
 In order to apply the reduction techniques introduced in the upcoming sections, standard time-to-event data needs to be transformed into a specific format.
 The transformation is based on the partitioning of the follow-up as illustrated in @fig-fu-partitioning and given boundaries as defined in (@eq-cut-points).
-@fig-data-trafo illustrates the resulting structure for three hypothetical subjects with interval boundaries $\mathcal{A} = \{0, 1, 1.5, 3\}$: the left-hand side shows the original time-to-event format (one row per subject), the right-hand side shows the transformed dataset $\mathcal{D}_{\mathcal{A}}$ that the rest of this section formalises.
+@fig-data-trafo illustrates the resulting structure for three hypothetical subjects with interval boundaries $\mathcal{A} = \{0, 1, 1.5, 3\}$: the left-hand side shows the original time-to-event format (one row per subject), the right-hand side shows the transformed dataset $\mathcal{D}_{\mathcal{A}}$ that the rest of this section formalizes (all notation will also be defined).
 
 ![Illustration of the data transformation needed for partition-based reductions. Left: Data in standard time-to-event format. Right: Transformed data using interval boundaries $\mathcal{A} = \{0, 1, 1.5, 3\}$.](Figures/reductions/data-trafo-pem.png){#fig-data-trafo fig-alt="Partitioning the follow-up time into discrete intervals." width=100%}
 
 The new dataset contains $J_i$ rows for each subject $i$, that is one row for each interval in which subject $i$ was at risk of experiencing an event.
-For each subject $i$, we record the subject's interval-specific event indicator
+For each subject $i$, we record their interval-specific event indicator
 <!--  -->
 $$
 \delta_{ij} = \begin{cases}
@@ -51,9 +51,11 @@ $$
 \end{cases},\quad j=1,\ldots,J_i.
 $$ {#eq-interval-indicator}
 <!--  -->
-Note that $\delta_{ij}=0$ for all intervals except the last interval of subject $i$, where $\delta_{iJ_i} = \delta_i$. Thus the total number of events is the same in both the original and transformed data, and given the interval boundaries $\mathcal{A}$, $\delta_{ij}$ is a deterministic function of the original data.
 
-We further define the time that subject $i$ was at risk for the event in interval $j$
+$\delta_{ij}=0$ for all intervals except the last interval of subject $i$, where $\delta_{iJ_i} = \delta_i$. 
+Thus the total number of events is the same in both the original and transformed data, and given the interval boundaries $\mathcal{A}$, $\delta_{ij}$ is a deterministic function of the original data.
+
+Further, let $t_{ij}$ be the time that subject $i$ was at risk for the event in interval $j$,
 <!--  -->
 $$
 t_{ij} = \begin{cases}
@@ -62,36 +64,28 @@ t_i - a_{j-1}, & \text{ if } t_i \in [a_{J_i-1}, a_{J_i})\\
 \end{cases},\quad j=1,\ldots,J_i,
 $$ {#eq-time-at-risk}
 <!--  -->
-which later enters as offset in some of the partition based reductions, 
-as well as some representation of the time in interval $j$, for example the interval midpoint
+or in words, if the event was experience by subject $i$ in interval $j$ then $t_{ij}$ is the time taken within that interval until the event occurred, otherwise, $t_{ij}$ is simply the interval length.
+Let $t_j$ be a scalar representation of interval $j$, often taken as the interval midpoint
 <!--  -->
 $$
 t_j = \frac{a_{j-1} + a_j}{2}.
 $$ {#eq-interval-endpoint}
 <!--  -->
-Choosing $t_j$ on the time scale rather than the bare interval index $j$ allows the same framework to handle both interval-specific intercepts (categorical $t_j$) and smooth functions of time (continuous $t_j$); see @sec-choice-of-interval-boundaries for further discussion.
 
-The transformation is completed by recording the subject's (potentially time-dependent) features
-<!--  -->
-$$
-\xx_{ij}
-$$ {#eq-interval-features}
-<!--  -->
-with $\xx_{ij} = \xx_{i}$ for all $j$, if the features are constant over time.
+See @sec-choice-of-interval-boundaries for specific choices of the interval and how they effect modelling.
+<!-- TODO: ANDI I DELETED THE ABOVE BECAUSE IT WAS HARD TO UNDERSTAND BY ITSELF AND WITHOUT JUMPING FORWARD -->
+
+The transformation is completed by recording the subject's (potentially time-dependent) features $\xx_{ij}$ with $\xx_{ij} = \xx_{i}$ for all $j$ if features are constant over time.
 
 
-Thus, given the partition $\mathcal{A}$, the standard time-to-event data $\calD = \{(t_i, \delta_i, \xx_i)\}_{i=1,\ldots,n}$ is transformed to data
+Thus, given the partition $\mathcal{A}$, the standard time-to-event data $\calD = \{(t_i, \delta_i, \xx_i)\}_{i=1,\ldots,n}$ is transformed to the dataset (@fig-data-trafo),
 <!--  -->
 $$
 \calD_{\mathcal{A}} = \{(i, j, \delta_{ij}, t_{ij}, t_j, \xx_{ij})\}_{i=1,\ldots,n;\  j=1,\ldots,J_i},
 $$  {#eq-transformed-data}
 <!--  -->
-where $i$ and $j$ indices are usually only used for "book-keeping" purposes but are not used in modeling later on and $t_{ij}$ is only needed for the piecewise constant hazards approach (@sec-piecewise-constant-hazards).
-Note that $t_j$ is the only feature that is shared across all subjects within an interval. 
-It is later used to estimate the (baseline) hazard. 
-In many practical implementations it is simply included as another column of $\xx_{ij}$, though we keep it explicit here to emphasise its role.
-
-
+where $i$ and $j$ indices are indices not used in modeling and $t_{ij}$ is only required for the piecewise constant hazards approach (@sec-piecewise-constant-hazards).
+$t_j$ is the only feature that is shared across all subjects within an interval and is used to estimate the baseline hazard, in many software implementations it is included as another column of $\xx_{ij}$, though it is kept separate in this chapter to emphasize its role.
 
 ## Discrete-Time Survival Analysis {#sec-discrete-time-reduction}
 
@@ -115,6 +109,7 @@ L_i
 \end{aligned}$$ {#eq-discrete-likelihood}
 <!--  -->
 The last equality holds case-by-case: for $\delta_i = 1$ the right-hand side reduces to $\prod_{j<J_i}(1-h_{\tilde{Y}}(j))\, h_{\tilde{Y}}(J_i)$ (matching the first bracket), and for $\delta_i = 0$ to $\prod_{j=1}^{J_i}(1-h_{\tilde{Y}}(j))$ (matching the second bracket).
+<!-- FIXME: WHAT DO YOU MEAN 'MATCHING THE FIRST/SECOND BRACKET'? WHICH BRACKETS? WHAT'S MATCHING? -->
 
 For a random variable $Z \sim \text{Bernoulli}(\pi)$ with $\pi = P(Z = 1)$, the likelihood contribution is $P(Z = z) = \pi^z (1-\pi)^{1-z}$, which is exactly the form of each factor in (@eq-discrete-likelihood) under the identification $\pi = h_{\tilde{Y}}(j)$.
 We therefore recognize that the interval-specific event indicators $\delta_{ij}$ can be modelled as independent Bernoulli random variables,
@@ -131,34 +126,55 @@ $$ {#eq-discrete-hazard-probability}
 <!--  -->
 
 This implies that we can estimate the discrete-time hazards $h_{\tilde{Y}}(j)$ for each interval $j$ by fitting any binary classification model to the transformed dataset
-<!--  -->
-$$\calD_{\mathcal{A}} = \{(\delta_{ij}, t_{j})\}_{i=1,\ldots,n;\quad j=1,\ldots,J_i},$${#eq-discrete-data}
-<!--  -->
-where $\delta_{ij}$ are the targets and $t_j$ enters the estimation as a feature and is needed in order to estimate different hazards/probabilities in different intervals.
 
-In the presence of features $\xx_{i}$ we assume $\Delta_{ij}| \xx_{i}, t_j \stackrel{iid}{\sim} Ber(\pi_{ij})$, where $\pi_{ij} = P(\Delta_{ij} = 1| \xx_{i}, t_j) = h_{\tilde{Y}}(j|\xx_{i})$ is the discrete hazard rate for interval $j$ given features $\xx_{i}$ and is estimated by applying binary classifiers to
-<!--  -->
-$$\calD_{\mathcal{A}} = \{(\delta_{ij}, \xx_{i}, t_{j})\}_{i=1,\ldots,n;\quad j=1,\ldots,J_i}.$$
-<!--  -->
+$$
+\calD_{\mathcal{A}} = \{(\delta_{ij}, t_{j})\}_{i=1,\ldots,n;\quad j=1,\ldots,J_i},
+$${#eq-discrete-data}
+
+where $\delta_{ij}$ are the targets and $t_j$ is a covariate used to estimate different hazards/probabilities in different intervals.
+
+In the presence of features $\xx_{i}$, it follows
+
+$$
+\Delta_{ij}| \xx_{i}, t_j \stackrel{iid}{\sim} \text{Bernoulli}(\pi_{ij}),
+$$
+
+where $\pi_{ij} = P(\Delta_{ij} = 1| \xx_{i}, t_j) = h_{\tilde{Y}}(j|\xx_{i})$ is the discrete hazard rate for interval $j$ given features $\xx_{i}$ and is estimated by applying binary classifiers to
+
+$$
+\calD_{\mathcal{A}} = \{(\delta_{ij}, \xx_{i}, t_{j})\}_{i=1,\ldots,n;\quad j=1,\ldots,J_i}.
+$$
+
+To summarize, by fitting a classification model with $\delta_{ij}$ as targets and $(\xx_i, t_j)$ as covariates, the predictions $\hat{\delta}_{ij}$ can be interpreted as estimates of $\hat{h}_{\tilde{Y}}(j|\xx_{i})$.
+<!-- FIXME: ANDI IS THIS CORRECT? -->
 
 ### Example: Logistic Regression
 
-To illustrate the discrete-time reduction approach, once again consider the tumor dataset introduced in @tbl-surv-data-tumor. The follow-up time is partitioned into $J = 100$ equidistant intervals and the data are transformed according to the procedure described in @sec-data-transformation.
-Define $x_{i1} = \II(\text{complications}_i = \text{"yes"})$ and fit the logistic regression model
-<!--  -->
-$$\log\frac{\pi_{ij}}{1-\pi_{ij}} = \beta_{0j} + \beta_1 x_{i1}
+To illustrate the discrete-time reduction approach, consider the tumor dataset introduced in @tbl-surv-data-tumor. The follow-up time is partitioned into $J = 100$ equidistant intervals and the data are transformed according to the procedure in @sec-data-transformation.
+Define $x_{i1} = \II(\text{complications}_i = \text{``yes''})$ and fit the logistic regression model
+<!--  -->,
+$$\log\frac{\pi_{ij}}{1-\pi_{ij}} = \beta_{0j} + \beta_1 x_{i1},
 $${#eq-discrete-time-glm-po}
 <!--  -->
 to the transformed dataset, where $j$ denotes the interval index, $\beta_{0j}$ are the interval-specific intercepts (technically we include the interval index $j$ as a reference coded categorical feature in the model) and $\beta_1$ is the common effect of complications on the discrete hazard rate (across all intervals).
+<!-- FIXME: ANDI THIS IS CONFUSING BECAUSE IT SOUNDS LIKE 'J' IS SEPARATELY INCLUDED SOMEHOW, CAN WE SAFELY DELETE THE LONGER BIT IN PARANTHENSES? -->
 
-The estimated survival probabilities are obtained by calculating $\hat{S}_{\tilde{Y}}(j|x_{1}) = \prod_{k=1}^j (1-\hat{h}_{\tilde{Y}}(k|x_{1}))$ for each interval $j$ and complication group, where $\hat{h}_{\tilde{Y}}(k|x_{1})$ are the predicted discrete hazards from the logistic regression model.
+The estimated survival probabilities are obtained by calculating
+
+$$
+\hat{S}_{\tilde{Y}}(j|x_{1}) = \prod_{k=1}^j (1-\hat{h}_{\tilde{Y}}(k|x_{1})),
+$$
+
+for each interval $j$ and complication group, where $\hat{h}_{\tilde{Y}}(k|x_{1})$ are the predicted discrete hazards from the logistic regression model.
+<!-- FIXME: I THINK THERE'S SOMETHING MISSING HERE AS YOU'VE TALKED ABOUT HAT{S} AND HAT{h} BUT YOU HAVEN'T SAID HOW THIS RELATES TO THE LOGIT PI FUNCTION. HOW DOES THE LOGIT RESULT IN THE PREDICTED DISCRETE HAZARDS? MAYBE WORTH SHOWING THE RESPONSE/LINK?  -->
 
 @fig-discrete-time-glm shows the estimated survival probabilities from the discrete-time model together with the Kaplan-Meier estimates for comparison, with the model encoded by line color and complications status by line type.
-The model specified in Equation (@eq-discrete-time-glm-po) is a proportional odds model, where the baseline hazard is the same for both complication groups, thus the shape of the hazard and therefore the survival probability curve is the same for both complication groups, shifted by the common effect of complications. This does not describe the data too well as in reality the hazards are different in the two groups.
+The model specified in (@eq-discrete-time-glm-po) is a proportional odds model (@sec-proportionalodds), where the baseline hazard is the same for both complication groups, thus the shape of the hazard and therefore the survival probability curve is the same for both complication groups, shifted by the common effect of complications.
+The figure indicates that (@eq-discrete-time-glm-po) does not describe the data too well as in reality the hazards are different in the two groups.
 
 ![Comparison of survival probability estimates using the discrete-time model (logistic regression) and the Kaplan-Meier estimator, for patients with and without complications.](Figures/reductions/discrete-time-complications-glm.png){#fig-discrete-time-glm fig-alt="Single plot showing survival curves: Kaplan-Meier and discrete-time model estimates differentiated by line color, complications status (yes/no) differentiated by line type."}
 
-In order to estimate separate discrete baseline hazards for each group, we can introduce an interaction term between the interval and complications variables to obtain the model
+To estimate separate discrete baseline hazards for each group, replace $\beta_{j}$ for $\beta_{1j}$ in (@eq-discrete-time-glm-po), which effectively introduces an interaction term between the interval and complications variables,
 <!--  -->
 $$\log\frac{\pi_{ij}}{1-\pi_{ij}} = \beta_{0j} + \beta_{1j} x_{i1},
 $${#eq-discrete-time-glm-interaction}
@@ -212,21 +228,26 @@ The general idea of the piecewise constant hazards approach is conceptually simp
 1. Partition the follow-up into many intervals;
 2. Estimate a constant hazard rate for each interval.
 
+<!-- FIXME: THIS CONFUSED ME BECAUSE THIS SOUND LIKE THE GENERAL DISCRETE-TIME APPROACH -->
+
 Intuitively, any underlying continuous hazard function of the data generating process can be approximated arbitrarily well given enough intervals (and events).
 This model class is known as the piecewise exponential model (PEM) because assuming event times to be exponentially distributed, implies constant hazards within each interval.
 
-Consider the partitioning of the follow-up as defined in (@eq-cut-points) and assume that within each interval $I_j = [a_{j-1}, a_j)$, the hazard function is constant, that is
+Consider the partitioning of the follow-up as defined in (@eq-cut-points) and assume that within each interval $I_j = [a_{j-1}, a_j)$, the hazard function is constant,
 <!--  -->
-$$h(\tau) = h_j,\ \forall\ \tau \in I_j.$${#eq-constant-hazard}
+$$
+h(\tau) = h_j,\ \forall\ \tau \in I_j.
+$$ {#eq-constant-hazard}
 <!--  -->
-Note that left-closed, right-open intervals are used here for consistency with the discrete-time approach in @sec-discrete-time-reduction. In the PEM literature on the other hand, intervals are often defined as left-open, right-closed (see also @sec-choice-of-interval-boundaries).
+Note that left-closed, right-open intervals are used here for consistency with the discrete-time approach in @sec-discrete-time-reduction.
+Usually in the PEM literature, intervals are defined as left-open, right-closed (see also @sec-choice-of-interval-boundaries).
 
 First we derive the likelihood contribution of subject $i$ under the piecewise-exponential assumption (@eq-constant-hazard).
 Recall from @sec-distributions-continuous the right-censored likelihood and survival-hazard identity,
 $$
 \calL_i = h(t_i)^{\delta_i}\, S(t_i), \qquad S(t) = \exp\!\left(-\int_0^t h(u)\,\du\right).
 $$
-Combining these and using assumption (@eq-constant-hazard) gives
+Combining these,
 <!--  -->
 $$\begin{aligned}
 \calL_{i}
@@ -237,14 +258,15 @@ $$\begin{aligned}
 & = \prod_{j=1}^{J_i} h_j^{\delta_{ij}} \exp(-h_j t_{ij}),
 \end{aligned}$${#eq-pem-likelihood-general}
 <!--  -->
-where the third and fourth equalities follow from the hazard being a step function (@eq-constant-hazard) and the definition of time at risk (@eq-time-at-risk), and the last equality uses the property $\delta_{iJ_i} = \delta_i$ with $\delta_{ij}=0$ for $j<J_i$ from (@eq-interval-indicator).
+where the third and fourth equalities follow from the assumption the hazard is a step function (@eq-constant-hazard) and the definition of time at risk (@eq-time-at-risk), and the last equality uses the property $\delta_{iJ_i} = \delta_i$ with $\delta_{ij}=0$ for $j<J_i$ from (@eq-interval-indicator).
 
-Now assume that the interval-specific event indicators $\delta_{ij}$ are realizations of random variables $\Delta_{ij} \stackrel{iid}\sim \text{Poisson}(\mu_{ij} : = h_j t_{ij})$ and recall that $Z\sim \text{Poisson}(\mu)$ implies $P(Z = z) = \frac{\mu^z \exp(-\mu)}{z!}$.
+Now assume that the interval-specific event indicators $\delta_{ij}$ are realizations of random variables $\Delta_{ij} \stackrel{iid}\sim \text{Poisson}(\mu_{ij} : = h_j t_{ij})$ and recall that $Z\sim \text{Poisson}(\mu)$ implies $P(Z = z) = (\mu^z \exp(-\mu))/z!$.
 Thus, the likelihood contribution of subject $i$ can be written as 
 <!--  -->
 $$\begin{aligned}
 \calL_{\text{Poisson},i} 
-& = \prod_{j=1}^{J_i} P(\Delta_{ij} = \delta_{ij}) = \prod_{j=1}^{J_i} \frac{(h_j t_{ij})^{\delta_{ij}} \exp(-h_j t_{ij})}{\delta_{ij}!}\\
+& = \prod_{j=1}^{J_i} P(\Delta_{ij} = \delta_{ij}) \\
+&= \prod_{j=1}^{J_i} \frac{(h_j t_{ij})^{\delta_{ij}} \exp(-h_j t_{ij})}{\delta_{ij}!}\\
 & = \prod_{j=1}^{J_i} h_j^{\delta_{ij}} t_{ij}^{\delta_{ij}}\exp(-h_j t_{ij}),
 \end{aligned}$$ {#eq-pem-poisson-likelihood}
 <!--  -->
@@ -268,6 +290,7 @@ Importantly, in contrast to the discrete-time reductions in @sec-discrete-time-r
 
 The fitted model returns interval-specific hazard estimates $\hat h_j(\xx)$.
 Predictions of the survival function at any continuous time $\tau$ follow by integrating the piecewise-constant hazard up to $\tau$,
+<!-- FIXME: A LITTLE CONFUSING YOU SAY INTEGRATING BUT THEN SHOW SUMMATION -->
 <!--  -->
 $$
 \hat S(\tau \mid \xx) = \exp\!\left(-\left[\sum_{j: a_j \leq \tau} \hat h_j(\xx)\,(a_j - a_{j-1}) \;+\; \hat h_{J_\tau}(\xx)\,(\tau - a_{J_\tau-1})\right]\right),
@@ -282,13 +305,17 @@ We partition the follow-up time into $J = 100$ equidistant intervals.
 We then fit a Poisson regression model with interaction between interval and complications to allow for separate baseline hazards for each complications group: 
 
 <!--  -->
-$$\log(\mu_{ij}) = \log(E[\Delta_{ij}]) = \underbrace{\beta_{0j} + \beta_{1j}x_{i1}}_{\log(h_{ij})} + \log(t_{ij}),$${#eq-pem-model-interaction}
+$$
+\log(\mu_{ij}) = \log(E[\Delta_{ij}]) = \underbrace{\beta_{0j} + \beta_{1j}x_{i1}}_{\log(h_{ij})} + \log(t_{ij}),
+$$ {#eq-pem-model-interaction}
 <!--  -->
-where $x_{i1} = \II(\text{complications}_i = \text{"yes"})$, $\beta_{0j}$ are the interval-specific intercepts for the reference group (no complications), $\beta_{1j}$ are the deviations from the reference group for the complications group (as in (@eq-discrete-time-glm-interaction), this is estimated as an interaction model using reference coded categorical features for interval and complications), and $\log(t_{ij})$ enters as a known offset (fixed by the data, not estimated). Concretely, fitting the model on $\calD_{\mathcal{A}}$ uses $\delta_{ij}$ as the response, $\xx_{ij}$ and $t_j$ as features. Estimation can be performed by any method that can handle the Poisson likelihood (with offset) as objective function.
+where $x_{i1} = \II(\text{complications}_i = \text{``yes''})$, $\beta_{0j}$ are the interval-specific intercepts for the reference group (no complications), $\beta_{1j}$ are the deviations from the reference group for the complications group (as in (@eq-discrete-time-glm-interaction), this is estimated as an interaction model using reference coded categorical features for interval and complications), and $\log(t_{ij})$ enters as a known offset (fixed by the data, not estimated). Concretely, fitting the model on $\calD_{\mathcal{A}}$ uses $\delta_{ij}$ as the response, $\xx_{ij}$ and $t_j$ as features. Estimation can be performed by any method that can handle the Poisson likelihood (with offset) as objective function.
 
 @fig-pem-interaction shows the estimated survival probabilities from the piecewise exponential model together with the Kaplan-Meier estimates for comparison, with the model encoded by line color and complications status by line type.
 The piecewise exponential model provides an excellent fit to the data, closely approximating the Kaplan-Meier estimates.
 This demonstrates that the piecewise constant hazards approach can effectively estimate the survival distribution when using a sufficient number of intervals.
+
+<!-- TODO: ANDI CAN YOU ADD ANYTHING THAT EXPLAINS WHY SOMEONE SHOULD USE PEM OVER ANY OF THE ABOVE METHODS? PROS/CONS -->
 
 ![Comparison of survival probability estimates using the piecewise exponential model (Poisson regression) and the Kaplan-Meier estimator, for patients with and without complications.](Figures/reductions/pem-complications-interaction.png){#fig-pem-interaction fig-alt="Single plot showing survival curves: Kaplan-Meier and piecewise exponential model estimates differentiated by line color, complications status (yes/no) differentiated by line type."}
 
