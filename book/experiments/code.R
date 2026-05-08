@@ -1618,3 +1618,99 @@ g_intervals = ggplot(cases) +
 
 ggsave("book/Figures/evaluation/intervals.png", g_intervals,
       height = 6, width = 8, units = "in", dpi = 600)
+
+
+## =========================================================================
+## Censoring + truncation schematic figures (Ch. 3)
+##  Outputs:
+##   - book/Figures/survival/censoring.png        (right-censoring)
+##   - book/Figures/survival/left-truncation.png  (left-truncation)
+##   - book/Figures/survival/right-truncation.png (right-truncation)
+## =========================================================================
+
+## --- right-censoring (4 subjects) ---
+study_end <- 8
+cens <- tibble::tribble(
+  ~subject, ~obs_end, ~event_end, ~status,
+  1,        7,        7.0,        "event",     # in-study event
+  2,        4,        6.0,        "censored",  # censored, true event during study
+  3,        1,        9.0,        "censored",  # censored early, true event after study
+  4,        8,        9.5,        "censored"   # admin-censored at study end, true event after
+)
+p_cens <- ggplot(cens, aes(y = subject)) +
+  geom_segment(aes(x = 0, xend = obs_end, yend = subject), linewidth = 0.7) +
+  geom_segment(data = dplyr::filter(cens, status == "censored"),
+               aes(x = obs_end, xend = event_end, yend = subject),
+               linewidth = 0.7, linetype = "dashed") +
+  geom_point(data = dplyr::filter(cens, status == "censored"),
+             aes(x = obs_end), shape = 21, fill = "white", colour = "black", size = 3) +
+  geom_point(aes(x = event_end), shape = 23, fill = "black", colour = "black", size = 3) +
+  geom_vline(xintercept = study_end, linewidth = 0.4) +
+  annotate("text", x = study_end, y = 4.4, label = "study end", hjust = 1.05, size = 3.4) +
+  scale_y_continuous(breaks = 1:4) +
+  scale_x_continuous(breaks = 0:10, limits = c(0, 10)) +
+  labs(x = "Time", y = "Subject") +
+  theme(panel.grid.minor = element_blank())
+ggsave("book/Figures/survival/censoring.png", p_cens,
+       height = 3.8, width = 7, units = "in", dpi = 600)
+
+## --- left-truncation (3 subjects) ---
+study_end_lt <- 8
+lt <- tibble::tribble(
+  ~subject, ~trunc_end, ~obs_end, ~status,
+  1,        1.0,        4.0,      "event",
+  2,        2.5,        7.0,      "event",
+  3,        4.5,        8.0,      "censored"
+)
+lt_segs <- dplyr::bind_rows(
+  dplyr::transmute(lt, subject, xstart = 0,         xend = trunc_end, type = "left-truncation"),
+  dplyr::transmute(lt, subject, xstart = trunc_end, xend = obs_end,   type = "follow-up")
+)
+p_lt <- ggplot() +
+  geom_segment(data = lt_segs,
+               aes(x = xstart, xend = xend, y = subject, yend = subject, colour = type),
+               linewidth = 1.4) +
+  geom_point(data = dplyr::filter(lt, status == "event"),
+             aes(x = obs_end, y = subject), shape = 23, fill = "black", colour = "black", size = 3) +
+  geom_point(data = dplyr::filter(lt, status == "censored"),
+             aes(x = obs_end, y = subject), shape = 21, fill = "white", colour = "black", size = 3) +
+  geom_vline(xintercept = study_end_lt, linewidth = 0.4, linetype = "dashed") +
+  annotate("text", x = study_end_lt, y = 3.4, label = "study end", hjust = 1.05, size = 3.4) +
+  scale_colour_manual(values = c("left-truncation" = "steelblue", "follow-up" = "black"),
+                      breaks = c("left-truncation", "follow-up"), name = NULL) +
+  scale_y_continuous(breaks = 1:3) +
+  scale_x_continuous(breaks = 0:10, limits = c(0, 10)) +
+  labs(x = "Age", y = "Subject") +
+  theme(legend.position = "bottom", panel.grid.minor = element_blank())
+ggsave("book/Figures/survival/left-truncation.png", p_lt,
+       height = 3.5, width = 7, units = "in", dpi = 600)
+
+## --- right-truncation (3 subjects) ---
+db_query <- 8
+rt <- tibble::tribble(
+  ~subject, ~obs_end, ~event_end, ~status,
+  1,        3.0,      3.0,        "observed",   # event before query (in sample)
+  2,        8.0,      9.5,        "truncated",  # event after query (NOT in sample)
+  3,        6.0,      6.0,        "observed"    # event before query (in sample)
+)
+rt_segs <- dplyr::bind_rows(
+  dplyr::transmute(rt, subject, xstart = 0,        xend = obs_end,   type = "observed"),
+  dplyr::transmute(rt, subject, xstart = obs_end,  xend = event_end, type = "right-truncation") |>
+    dplyr::filter(xend > xstart)
+)
+p_rt <- ggplot() +
+  geom_segment(data = rt_segs,
+               aes(x = xstart, xend = xend, y = subject, yend = subject, colour = type),
+               linewidth = 1.4) +
+  geom_point(data = rt, aes(x = event_end, y = subject),
+             shape = 23, fill = "black", colour = "black", size = 3) +
+  geom_vline(xintercept = db_query, linewidth = 0.4, linetype = "dashed") +
+  annotate("text", x = db_query, y = 3.4, label = "database queried", hjust = 1.05, size = 3.4) +
+  scale_colour_manual(values = c("observed" = "black", "right-truncation" = "steelblue"),
+                      breaks = c("observed", "right-truncation"), name = NULL) +
+  scale_y_continuous(breaks = 1:3) +
+  scale_x_continuous(breaks = 0:10, limits = c(0, 10)) +
+  labs(x = "Calendar time", y = "Subject") +
+  theme(legend.position = "bottom", panel.grid.minor = element_blank())
+ggsave("book/Figures/survival/right-truncation.png", p_rt,
+       height = 3.5, width = 7, units = "in", dpi = 600)
