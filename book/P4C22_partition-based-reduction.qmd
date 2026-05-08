@@ -11,24 +11,22 @@ abstract: This chapter introduces partition-based reductions, a family of techni
 
 {{< include _wip_minor.qmd >}}
 
-In contrast to the previously introduced reductions that focus on the estimation of a specific quantity of interest at one or few time points, partition-based reductions aim to estimate the entire distribution of the event times (similar to Cox models and other survival learners).
-The general idea is to partition the time axis into $J$ disjoint intervals $[a_0,a_1),\ldots,[a_{J-1},a_J)$ and estimate a discrete or continuous hazard rate for each interval (sometimes left-open, right-closed intervals are used instead).
+In contrast to the previously introduced reductions that focus on the estimation of a specific quantity of interest at one or few time points, partition-based reductions aim to estimate the entire distribution of the event times.
+The general idea is to partition the time axis into $J$ disjoint intervals $[a_0,a_1),\ldots,[a_{J-1},a_J)$ and estimate a discrete or continuous hazard rate for each interval; intervals do not need to be of the same size.
 
 For illustration, consider the partitioning of the follow up in @fig-fu-partitioning.
-Note that the intervals do not necessarily have to be equidistant.
-The $j$-th interval is given by $I_j:=[a_{j-1},a_{j})$.
-Let $J_i$ denote the index of the interval in which the observed time $t_i$ of subject $i$ falls, that is $t_i \in I_{J_i} = [a_{J_i-1},a_{J_i})$.
+Let $I_j:=[a_{j-1},a_{j})$ be the $j$-th interval and let $J_i$ denote the index of the interval in which the observed time $t_i$ of subject $i$ falls, that is $t_i \in I_{J_i} = [a_{J_i-1},a_{J_i})$.
 
 ![Partitioning of the follow-up time into $J$ discrete intervals $[a_0,a_1), \ldots, [a_{J-1},a_J)$. This partitioning forms the basis for the reduction techniques discussed in this chapter.](Figures/reductions/fu-partitioning.png){#fig-fu-partitioning fig-alt="Partitioning the follow-up time into discrete intervals." width=80%}
 
-Formally, define the partitioning of the follow-up via the set of interval boundary points $a_{j-1}$, $a_j$ for $j=1,\ldots,J$ as
+Formally, define the partitioning of the follow-up times via the set of interval boundary points $\{a_{j-1}, a_j\}$ for $j=1,\ldots,J$ as
 <!--  -->
 $$
 \mathcal{A} = \{a_0, a_1, \ldots, a_J\}, \quad a_0 < a_1 < \ldots < a_J,
 $$ {#eq-cut-points}
 <!--  -->
 
-where $a_0$ will often be zero and $a_J$ some time point larger than the last event time.
+where $a_0$ will often be zero and $a_J$ some time point larger than the last observed event time.
 This partitioning is used to create a transformed dataset, based on which standard regression or classification methods can be used in order to estimate (discrete) hazards in each interval.
 @sec-data-transformation introduces the required data transformation in more detail.
 Then @sec-discrete-time-reduction, @sec-survival-stacking and @sec-piecewise-constant-hazards define specific reductions based on this data transformation, provide theoretical justification why models applied to such transformed data are valid approaches for estimation in time-to-event analysis and provide illustrative examples for such models.
@@ -48,8 +46,8 @@ For each subject $i$, we record the subject's interval-specific event indicator
 <!--  -->
 $$
 \delta_{ij} = \begin{cases}
-1, & t_i \in [a_{j-1}, a_j) \text{ and } \delta_i = 1 \\
-0, & \text{ else }
+1, & t_i \in [a_{j-1}, a_j) \wedge \delta_i = 1 \\
+0, & \text{otherwise}
 \end{cases},\quad j=1,\ldots,J_i.
 $$ {#eq-interval-indicator}
 <!--  -->
@@ -268,7 +266,14 @@ where $\log(h_{ij}) = g(\xx_i, t_j)$ is the interval and feature specific hazard
 
 Importantly, in contrast to the discrete-time reductions in @sec-discrete-time-reduction, the piecewise exponential model likelihood has no information loss regarding the exact time-to-event by including the $t_{ij}$ terms (@eq-time-at-risk) and estimates continuous-time hazards rather than discrete-time hazards.
 
-<!-- TODO: The model predicts $\hat{h}_{ij}$ and we need to transform this to $\hat{S}_{ij}$ if we want S(t) predictions -->
+The fitted model returns interval-specific hazard estimates $\hat h_j(\xx)$.
+Predictions of the survival function at any continuous time $\tau$ follow by integrating the piecewise-constant hazard up to $\tau$,
+<!--  -->
+$$
+\hat S(\tau \mid \xx) = \exp\!\left(-\left[\sum_{j: a_j \leq \tau} \hat h_j(\xx)\,(a_j - a_{j-1}) \;+\; \hat h_{J_\tau}(\xx)\,(\tau - a_{J_\tau-1})\right]\right),
+$$ {#eq-pem-survival}
+<!--  -->
+where $J_\tau$ is the index of the interval that contains $\tau$. The first sum accumulates the hazard over completed intervals before $\tau$, and the trailing term adds the partial-interval contribution from $a_{J_\tau-1}$ up to $\tau$.
 
 ### Example: Poisson Regression
 
@@ -279,9 +284,7 @@ We then fit a Poisson regression model with interaction between interval and com
 <!--  -->
 $$\log(\mu_{ij}) = \log(E[\Delta_{ij}]) = \underbrace{\beta_{0j} + \beta_{1j}x_{i1}}_{\log(h_{ij})} + \log(t_{ij}),$${#eq-pem-model-interaction}
 <!--  -->
-where $x_{i1} = \II(\text{complications}_i = \text{"yes"})$, $\beta_{0j}$ are the interval-specific intercepts for the reference group (no complications), $\beta_{1j}$ are the deviations from the reference group for the complications group (as in (@eq-discrete-time-glm-interaction), this is estimated as an interaction model using reference coded categorical features for interval and complications), and $\log(t_{ij})$ enters as an known offset (fixed by the data, not estimated). Concretely, fitting the model on $\calD_{\mathcal{A}}$ uses $\delta_{ij}$ as the response, $\xx_{ij}$ and $t_j$ as features. Estimation can be performed by any method that can handle the Poisson likelihood (with offset) as objective function. 
-
-<!-- TODO: show estimated hazards? -->
+where $x_{i1} = \II(\text{complications}_i = \text{"yes"})$, $\beta_{0j}$ are the interval-specific intercepts for the reference group (no complications), $\beta_{1j}$ are the deviations from the reference group for the complications group (as in (@eq-discrete-time-glm-interaction), this is estimated as an interaction model using reference coded categorical features for interval and complications), and $\log(t_{ij})$ enters as a known offset (fixed by the data, not estimated). Concretely, fitting the model on $\calD_{\mathcal{A}}$ uses $\delta_{ij}$ as the response, $\xx_{ij}$ and $t_j$ as features. Estimation can be performed by any method that can handle the Poisson likelihood (with offset) as objective function.
 
 @fig-pem-interaction shows the estimated survival probabilities from the piecewise exponential model together with the Kaplan-Meier estimates for comparison, with the model encoded by line color and complications status by line type.
 The piecewise exponential model provides an excellent fit to the data, closely approximating the Kaplan-Meier estimates.
@@ -305,7 +308,7 @@ A more data-adaptive strategy is to use quantile-based intervals, which place mo
 
 A natural alternative is to use the unique, observed event times as cut points, as done in survival stacking (@sec-survival-stacking). This mirrors the construction of the Kaplan-Meier estimator and ensures that interval boundaries are dense where events are frequent and sparse where they are rare. The same strategy is the default in software packages for PEMs like `pammtools` [@pkgpammtools].
 However, using all unique event times can lead to very large transformed datasets: since each of $n$ subjects can contribute up to $m$ rows (where $m$ is the number of unique event times), the augmented dataset has $\tilde{n} = \sum_{i=1}^n J_i$ rows.
-@Bender2021 showed that using a subsample of event times as cut points yields comparable predictive performance while keeping the increase in dataset size linear in the number of events, making this a practical strategy when $m$ is large.
+@Bender2021 showed that using a random subsample of event times as cut points yields comparable predictive performance while keeping the increase in dataset size linear in the number of events, making this a practical strategy when $m$ is large.
 
 <!-- For the PEM approach, @Friedman1982 showed that the PEM estimator is consistent as long as the number of intervals grows with $n$ and the maximum interval length shrinks to zero, even when the true hazard is not a step function. In practice, this means that using a reasonably fine partition is sufficient for good approximation, and the partition does not need to be "correct" --- it only needs to be fine enough relative to the variation in the underlying hazard. -->
 
