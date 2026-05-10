@@ -12,14 +12,14 @@ We will continue to update this version after publication to correct mistakes (b
 Whilst this book remains a work in progress you can cite as
 
 ```
-Sonabend. R, Bender. A. 2025. Machine Learning in Survival Analysis.
+Sonabend. R, Bender. A. 2026. Machine Learning in Survival Analysis.
 https://www.mlsabook.com.
 ```
 
 Or in BibTeX format
 
 ```
-@book{MLSA2025,
+@book{MLSA2026,
   title     = "Machine Learning in Survival Analysis",
   author    = "Sonabend, Raphael and Bender, Andreas",
   year      = "2025",
