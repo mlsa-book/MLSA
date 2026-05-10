@@ -1632,7 +1632,7 @@ ggsave("book/Figures/evaluation/intervals.png", g_intervals,
 shape_vals   <- c("observed event" = 21, "unobserved event" = 23, "censoring" = 21)
 fill_vals    <- c("observed event" = "black", "unobserved event" = "black", "censoring" = "white")
 shape_breaks <- c("observed event", "unobserved event", "censoring")
-line_vals    <- c("observed" = "solid", "unobserved" = "dashed")
+line_vals    <- c("observed" = "solid", "unobserved" = "dotted")
 line_breaks  <- c("observed", "unobserved")
 
 shape_legend <- guide_legend(override.aes = list(
@@ -1654,7 +1654,13 @@ save_pair <- function(p, base, h = 3.5, w = 8) {
   ggsave(paste0(base, ".png"), p, height = h, width = w, units = "in", dpi = 300)
 }
 
-dy <- 0.05  # half-offset between stacked bars (closer than before)
+dy <- 0.10  # half-offset between stacked bars
+
+bigger_text <- theme(
+  axis.title  = element_text(size = 17),
+  axis.text   = element_text(size = 15),
+  legend.text = element_text(size = 15)
+)
 
 ## =========================================================================
 ## RIGHT-CENSORING (4 subjects)
@@ -1680,13 +1686,13 @@ pts <- bind_rows(
 pts <- ensure_levels(pts, "type", shape_breaks)
 
 p_cens <- ggplot() +
-  geom_vline(xintercept = study_end, linetype = "dashed", colour = "grey50") +
+  geom_vline(xintercept = study_end, linetype = "dashed", colour = "grey50", linewidth = 0.6) +
   geom_segment(data = segs,
                aes(x = x, xend = xend, y = subject, yend = subject, linetype = line),
-               linewidth = 0.7) +
+               linewidth = 1.1) +
   geom_point(data = pts,
              aes(x = x, y = subject, shape = type, fill = type),
-             colour = "black", size = 3, stroke = 0.6) +
+             colour = "black", size = 3.5, stroke = 0.7) +
   scale_linetype_manual(values = line_vals, breaks = line_breaks, drop = FALSE, name = NULL) +
   scale_shape_manual(values = shape_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
   scale_fill_manual(values = fill_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
@@ -1695,15 +1701,19 @@ p_cens <- ggplot() +
                      limits = c(0, 10), expand = expansion(mult = c(0.02, 0.02))) +
   labs(x = NULL, y = "Subject") +
   guides(shape = shape_legend, linetype = guide_legend(order = 1)) +
+  theme_bw(base_size = 15) +
   theme(legend.position = "right",
         panel.grid.minor = element_blank(),
-        panel.grid.major.x = element_blank())
+        panel.grid.major.x = element_blank()) +
+  bigger_text
 save_pair(p_cens, "book/Figures/survival/censoring", h = 3.5, w = 8)
 
 ## =========================================================================
 ## LEFT-TRUNCATION (3 infants on age 0-365 days)
-##  steelblue = left-truncation period; black = time-to-event
+##  steelblue = truncation time; black = time-to-event
 ##  solid = subject in data; dashed = invisible (t_i < t_i^L)
+##  Filled steelblue circle/diamond at end of truncation bar marks
+##  whether the subject is in/out of sample.
 ## =========================================================================
 lt <- tibble::tribble(
   ~subject, ~t_L,  ~t_event, ~status,            ~visible,
@@ -1711,36 +1721,53 @@ lt <- tibble::tribble(
   2,        80,    200,      "observed event",   TRUE,
   3,        150,   365,      "censoring",        TRUE
 )
-period_breaks <- c("left-truncation", "time-to-event")
-period_vals_lt <- c("left-truncation" = "steelblue", "time-to-event" = "black")
+period_breaks_lt <- c("truncation time", "time-to-event")
+period_vals_lt   <- c("truncation time" = "steelblue", "time-to-event" = "black")
 
 lt_segs <- bind_rows(
   lt |> transmute(subject, y = subject + dy, x = 0, xend = t_L,
-                  period = "left-truncation",
+                  period = "truncation time",
                   line   = if_else(visible, "observed", "unobserved")),
   lt |> transmute(subject, y = subject - dy, x = 0, xend = t_event,
                   period = "time-to-event",
                   line   = if_else(visible, "observed", "unobserved"))
-) |> mutate(period = factor(period, levels = period_breaks),
+) |> mutate(period = factor(period, levels = period_breaks_lt),
             line   = factor(line, levels = line_breaks))
 lt_pts <- lt |> transmute(subject, y = subject - dy, x = t_event,
                           type = factor(status, levels = shape_breaks))
 lt_pts <- ensure_levels(lt_pts, "type", shape_breaks)
 
+lt_labels <- bind_rows(
+  lt |> transmute(x = t_L     - 7, y = subject + dy + 0.25,
+                  label = sprintf("t[%d]^'ℓ'", subject)),
+  lt |> transmute(x = t_event - 7, y = subject - dy - 0.25,
+                  label = sprintf("t[%d]",          subject))
+)
+
 p_lt <- ggplot() +
-  geom_vline(xintercept = 365, linetype = "dashed", colour = "grey50") +
+  geom_vline(xintercept = 365, linetype = "dashed", colour = "grey50", linewidth = 0.6) +
   geom_segment(data = lt_segs,
                aes(x = x, xend = xend, y = y, yend = y,
                    colour = period, linetype = line),
-               linewidth = 0.9) +
+               linewidth = 1.5) +
+  geom_point(data = filter(lt, visible),
+             aes(x = t_L, y = subject + dy),
+             shape = 21, fill = "steelblue", colour = "steelblue",
+             size = 3.5, stroke = 0.7) +
+  geom_point(data = filter(lt, !visible),
+             aes(x = t_L, y = subject + dy),
+             shape = 23, fill = "steelblue", colour = "steelblue",
+             size = 3.5, stroke = 0.7) +
   geom_point(data = lt_pts,
              aes(x = x, y = y, shape = type, fill = type),
-             colour = "black", size = 3, stroke = 0.6) +
-  scale_colour_manual(values = period_vals_lt, breaks = period_breaks, name = NULL) +
+             colour = "black", size = 3.5, stroke = 0.7) +
+  geom_text(data = lt_labels, aes(x = x, y = y, label = label),
+            parse = TRUE, size = 5, hjust = 1, vjust = 0.5) +
+  scale_colour_manual(values = period_vals_lt, breaks = period_breaks_lt, name = NULL) +
   scale_linetype_manual(values = line_vals, breaks = line_breaks, drop = FALSE, name = NULL) +
   scale_shape_manual(values = shape_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
   scale_fill_manual(values = fill_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
-  scale_y_continuous(breaks = 1:3) +
+  scale_y_continuous(breaks = 1:3, limits = c(0.55, 3.45)) +
   scale_x_continuous(breaks = c(0, 90, 180, 270, 365),
                      labels = c("0", "90", "180", "270", "365\n(study end)"),
                      limits = c(0, 400), expand = expansion(mult = c(0.02, 0.02))) +
@@ -1748,30 +1775,33 @@ p_lt <- ggplot() +
   guides(colour   = guide_legend(order = 1, override.aes = list(linewidth = 1.2)),
          linetype = guide_legend(order = 2),
          shape    = shape_legend) +
+  theme_bw(base_size = 15) +
   theme(legend.position = "right",
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank()) +
+  bigger_text
 save_pair(p_lt, "book/Figures/survival/left-truncation", h = 3.5, w = 8.5)
 
 ## =========================================================================
 ## RIGHT-TRUNCATION (3 subjects, calendar time 0-30 days)
-##  steelblue = right-truncation period (recruit -> db query)
+##  steelblue = truncation time (recruit -> db query)
 ##  black     = time-to-event (recruit -> event)
 ##  solid = in registry (event before query); dashed = absent from registry
 ##  Vertical dashed line marks the database-query date.
+##  Filled steelblue circle/diamond at db query marks in/out of registry.
 ## =========================================================================
 db_query <- 20
 rt <- tibble::tribble(
   ~subject, ~recruit, ~t_event, ~status,            ~visible,
-  1,        0,        8,        "observed event",   TRUE,    # event well before query
-  2,        10,       28,       "unobserved event", FALSE,   # event after query (not in registry)
-  3,        5,        10,       "observed event",   TRUE     # event before query
+  1,        0,        8,        "observed event",   TRUE,
+  2,        10,       28,       "unobserved event", FALSE,
+  3,        5,        10,       "observed event",   TRUE
 )
-period_vals_rt <- c("right-truncation" = "steelblue", "time-to-event" = "black")
-period_breaks_rt <- c("right-truncation", "time-to-event")
+period_breaks_rt <- c("truncation time", "time-to-event")
+period_vals_rt   <- c("truncation time" = "steelblue", "time-to-event" = "black")
 
 rt_segs <- bind_rows(
   rt |> transmute(subject, y = subject + dy, x = recruit, xend = db_query,
-                  period = "right-truncation",
+                  period = "truncation time",
                   line   = if_else(visible, "observed", "unobserved")),
   rt |> transmute(subject, y = subject - dy, x = recruit, xend = t_event,
                   period = "time-to-event",
@@ -1782,29 +1812,46 @@ rt_pts <- rt |> transmute(subject, y = subject - dy, x = t_event,
                           type = factor(status, levels = shape_breaks))
 rt_pts <- ensure_levels(rt_pts, "type", shape_breaks)
 
+rt_labels <- bind_rows(
+  rt |> transmute(x = db_query - 0.6, y = subject + dy + 0.25, label = sprintf("t[%d]^r", subject)),
+  rt |> transmute(x = t_event  - 0.6, y = subject - dy - 0.25, label = sprintf("t[%d]",   subject))
+)
+
 p_rt <- ggplot() +
-  geom_vline(xintercept = db_query, linetype = "dashed", colour = "grey50") +
+  geom_vline(xintercept = db_query, linetype = "dashed", colour = "grey50", linewidth = 0.6) +
   geom_segment(data = rt_segs,
                aes(x = x, xend = xend, y = y, yend = y,
                    colour = period, linetype = line),
-               linewidth = 0.9) +
+               linewidth = 1.5) +
+  geom_point(data = filter(rt, visible),
+             aes(x = db_query, y = subject + dy),
+             shape = 21, fill = "steelblue", colour = "steelblue",
+             size = 3.5, stroke = 0.7) +
+  geom_point(data = filter(rt, !visible),
+             aes(x = db_query, y = subject + dy),
+             shape = 23, fill = "steelblue", colour = "steelblue",
+             size = 3.5, stroke = 0.7) +
   geom_point(data = rt_pts,
              aes(x = x, y = y, shape = type, fill = type),
-             colour = "black", size = 3, stroke = 0.6) +
+             colour = "black", size = 3.5, stroke = 0.7) +
+  geom_text(data = rt_labels, aes(x = x, y = y, label = label),
+            parse = TRUE, size = 5, hjust = 1, vjust = 0.5) +
   scale_colour_manual(values = period_vals_rt, breaks = period_breaks_rt, name = NULL) +
   scale_linetype_manual(values = line_vals, breaks = line_breaks, drop = FALSE, name = NULL) +
   scale_shape_manual(values = shape_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
   scale_fill_manual(values = fill_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
-  scale_y_continuous(breaks = 1:3) +
+  scale_y_continuous(breaks = 1:3, limits = c(0.55, 3.45)) +
   scale_x_continuous(breaks = c(0, 10, 20, 30),
-                     labels = c("0", "10", "20\n(database queried)", "30"),
+                     labels = c("0\n(start data\ncollection)", "10", "20\n(database queried)", "30"),
                      limits = c(0, 32), expand = expansion(mult = c(0.02, 0.02))) +
   labs(x = "Calendar time (days)", y = "Subject") +
   guides(colour   = guide_legend(order = 1, override.aes = list(linewidth = 1.2)),
          linetype = guide_legend(order = 2),
          shape    = shape_legend) +
+  theme_bw(base_size = 15) +
   theme(legend.position = "right",
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank()) +
+  bigger_text
 save_pair(p_rt, "book/Figures/survival/right-truncation", h = 3.5, w = 8.5)
 
 cat("Saved.\n")
