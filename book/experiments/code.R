@@ -312,15 +312,17 @@ p_km = ggplot(bkm, aes(x = time, y = estimate)) +
   geom_segment(data=df_med, aes(x=x, xend=xend, y=y, yend=yend), lty = 3)+
   ylim(c(0, 1)) +
   ylab("S(t)") +
-  xlab("time")
+  xlab("days") +
+  theme_bw()
 p_km
 ggsave("book/Figures/survival/km-tumor.png", p_km, height=3, units="in", dpi=600)
 
-# stratified KM wrt complications
+# stratified KM wrt age group
 tumor = tumor |>
-  mutate(age_bin = factor(age < 50, levels = c(TRUE, FALSE), labels = c("age < 50", "age >= 50")))
+  mutate(age_bin = factor(age < 50, levels = c(TRUE, FALSE), labels = c("< 50", "≥ 50")))
 km_age_bin = survfit(Surv(days, status)~age_bin, data = tumor)
-bkm_age_bin = broom::tidy(km_age_bin)
+bkm_age_bin = broom::tidy(km_age_bin) |>
+  mutate(age = sub("age_bin=", "", strata))
 med_km_age_bin = as.numeric(median(km_age_bin))
 df_age_bin = data.frame(
   x = c(0, med_km_age_bin[2]), # Starting x-coordinates
@@ -330,12 +332,14 @@ df_age_bin = data.frame(
 )
 
 p_km_age_bin = ggplot(bkm_age_bin, aes(x = time, y = estimate)) +
-  geom_step(aes(col = strata)) +
+  geom_step(aes(col = age)) +
   geom_segment(data=df_age_bin, aes(x=x, xend=xend, y=y, yend=yend), lty = 3)+
   geom_hline(yintercept =  .5, lty = 3) +
   ylim(c(0, 1)) +
   ylab("S(t)") +
-  xlab("time")
+  xlab("days") +
+  scale_color_discrete(name = "age") +
+  theme_bw()
 p_km_age_bin
 ggsave("book/Figures/survival/km-age-bin-tumor.png", p_km_age_bin, height=3, units="in", dpi=600)
 
@@ -1656,7 +1660,6 @@ g_intervals = ggplot(cases) +
 ggsave("book/Figures/evaluation/intervals.png", g_intervals,
       height = 6, width = 8, units = "in", dpi = 600)
 
-
 ## =============================================================================
 ## EHA Reductions: cause-specific hazard models on sir.adm
 ## Generates figures for P4C23 (Reductions for Event-History Analysis):
@@ -1867,3 +1870,238 @@ p_adj <- ggplot(adj_df, aes(time, cif, color = profile, linetype = method)) +
 
 ggsave("book/Figures/reductions/cif-adj-sir.png", p_adj,
        height = 5.5, width = 9, units = "in", dpi = 600)
+
+## =========================================================================
+## Censoring + truncation schematic figures (Ch. 3)
+##  Outputs (both .svg and .png):
+##   - book/Figures/survival/censoring.{svg,png}        (right-censoring)
+##   - book/Figures/survival/left-truncation.{svg,png}  (left-truncation)
+##   - book/Figures/survival/right-truncation.{svg,png} (right-truncation)
+## =========================================================================
+
+shape_vals   <- c("observed event" = 21, "unobserved event" = 23, "censoring" = 21)
+fill_vals    <- c("observed event" = "black", "unobserved event" = "black", "censoring" = "white")
+shape_breaks <- c("observed event", "unobserved event", "censoring")
+line_vals    <- c("observed" = "solid", "unobserved" = "dotted")
+line_breaks  <- c("observed", "unobserved")
+
+shape_legend <- guide_legend(override.aes = list(
+  fill   = c("black", "black", "white"),
+  shape  = c(21, 23, 21),
+  colour = "black"))
+
+ensure_levels <- function(df, level_col, all_levels) {
+  missing <- setdiff(all_levels, as.character(df[[level_col]]))
+  if (length(missing) == 0) return(df)
+  ph <- df[rep(1L, length(missing)), , drop = FALSE]
+  ph[[level_col]] <- factor(missing, levels = all_levels)
+  for (nm in setdiff(names(ph), level_col)) ph[[nm]] <- NA
+  rbind(df, ph)
+}
+
+save_pair <- function(p, base, h = 3.5, w = 8) {
+  ggsave(paste0(base, ".svg"), p, height = h, width = w, units = "in")
+  ggsave(paste0(base, ".png"), p, height = h, width = w, units = "in", dpi = 300)
+}
+
+dy <- 0.10  # half-offset between stacked bars
+
+bigger_text <- theme(
+  axis.title  = element_text(size = 17),
+  axis.text   = element_text(size = 15),
+  legend.text = element_text(size = 15)
+)
+
+## =========================================================================
+## RIGHT-CENSORING (4 subjects)
+## =========================================================================
+study_end <- 8
+cens <- tibble::tribble(
+  ~subject, ~obs_end, ~event_end, ~status,
+  1,        7,        7.0,        "event_observed",
+  2,        4,        6.0,        "event_unobserved_during",
+  3,        1,        9.0,        "event_unobserved_after",
+  4,        8,        9.5,        "event_unobserved_after"
+)
+seg_solid  <- cens |> transmute(subject, x = 0, xend = obs_end, line = "observed")
+seg_dashed <- cens |> filter(status != "event_observed") |>
+  transmute(subject, x = obs_end, xend = event_end, line = "unobserved")
+segs <- bind_rows(seg_solid, seg_dashed) |>
+  mutate(line = factor(line, levels = line_breaks))
+pts <- bind_rows(
+  cens |> filter(status != "event_observed") |> transmute(subject, x = obs_end,   type = "censoring"),
+  cens |> filter(status == "event_observed")  |> transmute(subject, x = event_end, type = "observed event"),
+  cens |> filter(status != "event_observed") |> transmute(subject, x = event_end, type = "unobserved event")
+) |> mutate(type = factor(type, levels = shape_breaks))
+pts <- ensure_levels(pts, "type", shape_breaks)
+
+p_cens <- ggplot() +
+  geom_vline(xintercept = study_end, linetype = "dashed", colour = "grey50", linewidth = 0.6) +
+  geom_segment(data = segs,
+               aes(x = x, xend = xend, y = subject, yend = subject, linetype = line),
+               linewidth = 1.1) +
+  geom_point(data = pts,
+             aes(x = x, y = subject, shape = type, fill = type),
+             colour = "black", size = 3.5, stroke = 0.7) +
+  scale_linetype_manual(values = line_vals, breaks = line_breaks, drop = FALSE, name = NULL) +
+  scale_shape_manual(values = shape_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
+  scale_fill_manual(values = fill_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
+  scale_y_continuous(breaks = 1:4) +
+  scale_x_continuous(breaks = c(0, study_end), labels = c("study start", "study end"),
+                     limits = c(0, 10), expand = expansion(mult = c(0.02, 0.02))) +
+  labs(x = NULL, y = "Subject") +
+  guides(shape = shape_legend, linetype = guide_legend(order = 1)) +
+  theme_bw(base_size = 15) +
+  theme(legend.position = "right",
+        panel.grid.minor = element_blank(),
+        panel.grid.major.x = element_blank()) +
+  bigger_text
+save_pair(p_cens, "book/Figures/survival/censoring", h = 3.5, w = 8)
+
+## =========================================================================
+## LEFT-TRUNCATION (3 infants on age 0-365 days)
+##  steelblue = truncation time; black = time-to-event
+##  solid = subject in data; dashed = invisible (t_i < t_i^L)
+##  Filled steelblue circle/diamond at end of truncation bar marks
+##  whether the subject is in/out of sample.
+## =========================================================================
+lt <- tibble::tribble(
+  ~subject, ~t_L,  ~t_event, ~status,            ~visible,
+  1,        100,   50,       "unobserved event", FALSE,
+  2,        80,    200,      "observed event",   TRUE,
+  3,        150,   365,      "censoring",        TRUE
+)
+period_breaks_lt <- c("truncation time", "time-to-event")
+period_vals_lt   <- c("truncation time" = "steelblue", "time-to-event" = "black")
+
+lt_segs <- bind_rows(
+  lt |> transmute(subject, y = subject + dy, x = 0, xend = t_L,
+                  period = "truncation time",
+                  line   = if_else(visible, "observed", "unobserved")),
+  lt |> transmute(subject, y = subject - dy, x = 0, xend = t_event,
+                  period = "time-to-event",
+                  line   = if_else(visible, "observed", "unobserved"))
+) |> mutate(period = factor(period, levels = period_breaks_lt),
+            line   = factor(line, levels = line_breaks))
+lt_pts <- lt |> transmute(subject, y = subject - dy, x = t_event,
+                          type = factor(status, levels = shape_breaks))
+lt_pts <- ensure_levels(lt_pts, "type", shape_breaks)
+
+lt_labels <- bind_rows(
+  lt |> transmute(x = t_L     - 7, y = subject + dy + 0.25,
+                  label = sprintf("t[%d]^'ℓ'", subject)),
+  lt |> transmute(x = t_event - 7, y = subject - dy - 0.25,
+                  label = sprintf("t[%d]",          subject))
+)
+
+p_lt <- ggplot() +
+  geom_vline(xintercept = 365, linetype = "dashed", colour = "grey50", linewidth = 0.6) +
+  geom_segment(data = lt_segs,
+               aes(x = x, xend = xend, y = y, yend = y,
+                   colour = period, linetype = line),
+               linewidth = 1.5) +
+  geom_point(data = filter(lt, visible),
+             aes(x = t_L, y = subject + dy),
+             shape = 21, fill = "steelblue", colour = "steelblue",
+             size = 3.5, stroke = 0.7) +
+  geom_point(data = filter(lt, !visible),
+             aes(x = t_L, y = subject + dy),
+             shape = 23, fill = "steelblue", colour = "steelblue",
+             size = 3.5, stroke = 0.7) +
+  geom_point(data = lt_pts,
+             aes(x = x, y = y, shape = type, fill = type),
+             colour = "black", size = 3.5, stroke = 0.7) +
+  geom_text(data = lt_labels, aes(x = x, y = y, label = label),
+            parse = TRUE, size = 5, hjust = 1, vjust = 0.5) +
+  scale_colour_manual(values = period_vals_lt, breaks = period_breaks_lt, name = NULL) +
+  scale_linetype_manual(values = line_vals, breaks = line_breaks, drop = FALSE, name = NULL) +
+  scale_shape_manual(values = shape_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
+  scale_fill_manual(values = fill_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
+  scale_y_continuous(breaks = 1:3, limits = c(0.55, 3.45)) +
+  scale_x_continuous(breaks = c(0, 90, 180, 270, 365),
+                     labels = c("0", "90", "180", "270", "365\n(study end)"),
+                     limits = c(0, 400), expand = expansion(mult = c(0.02, 0.02))) +
+  labs(x = "Age (days)", y = "Subject") +
+  guides(colour   = guide_legend(order = 1, override.aes = list(linewidth = 1.2)),
+         linetype = guide_legend(order = 2),
+         shape    = shape_legend) +
+  theme_bw(base_size = 15) +
+  theme(legend.position = "right",
+        panel.grid.minor = element_blank()) +
+  bigger_text
+save_pair(p_lt, "book/Figures/survival/left-truncation", h = 3.5, w = 8.5)
+
+## =========================================================================
+## RIGHT-TRUNCATION (3 subjects, calendar time 0-30 days)
+##  steelblue = truncation time (recruit -> db query)
+##  black     = time-to-event (recruit -> event)
+##  solid = in registry (event before query); dashed = absent from registry
+##  Vertical dashed line marks the database-query date.
+##  Filled steelblue circle/diamond at db query marks in/out of registry.
+## =========================================================================
+db_query <- 20
+rt <- tibble::tribble(
+  ~subject, ~recruit, ~t_event, ~status,            ~visible,
+  1,        0,        8,        "observed event",   TRUE,
+  2,        10,       28,       "unobserved event", FALSE,
+  3,        5,        10,       "observed event",   TRUE
+)
+period_breaks_rt <- c("truncation time", "time-to-event")
+period_vals_rt   <- c("truncation time" = "steelblue", "time-to-event" = "black")
+
+rt_segs <- bind_rows(
+  rt |> transmute(subject, y = subject + dy, x = recruit, xend = db_query,
+                  period = "truncation time",
+                  line   = if_else(visible, "observed", "unobserved")),
+  rt |> transmute(subject, y = subject - dy, x = recruit, xend = t_event,
+                  period = "time-to-event",
+                  line   = if_else(visible, "observed", "unobserved"))
+) |> mutate(period = factor(period, levels = period_breaks_rt),
+            line   = factor(line, levels = line_breaks))
+rt_pts <- rt |> transmute(subject, y = subject - dy, x = t_event,
+                          type = factor(status, levels = shape_breaks))
+rt_pts <- ensure_levels(rt_pts, "type", shape_breaks)
+
+rt_labels <- bind_rows(
+  rt |> transmute(x = db_query - 0.6, y = subject + dy + 0.25, label = sprintf("t[%d]^r", subject)),
+  rt |> transmute(x = t_event  - 0.6, y = subject - dy - 0.25, label = sprintf("t[%d]",   subject))
+)
+
+p_rt <- ggplot() +
+  geom_vline(xintercept = db_query, linetype = "dashed", colour = "grey50", linewidth = 0.6) +
+  geom_segment(data = rt_segs,
+               aes(x = x, xend = xend, y = y, yend = y,
+                   colour = period, linetype = line),
+               linewidth = 1.5) +
+  geom_point(data = filter(rt, visible),
+             aes(x = db_query, y = subject + dy),
+             shape = 21, fill = "steelblue", colour = "steelblue",
+             size = 3.5, stroke = 0.7) +
+  geom_point(data = filter(rt, !visible),
+             aes(x = db_query, y = subject + dy),
+             shape = 23, fill = "steelblue", colour = "steelblue",
+             size = 3.5, stroke = 0.7) +
+  geom_point(data = rt_pts,
+             aes(x = x, y = y, shape = type, fill = type),
+             colour = "black", size = 3.5, stroke = 0.7) +
+  geom_text(data = rt_labels, aes(x = x, y = y, label = label),
+            parse = TRUE, size = 5, hjust = 1, vjust = 0.5) +
+  scale_colour_manual(values = period_vals_rt, breaks = period_breaks_rt, name = NULL) +
+  scale_linetype_manual(values = line_vals, breaks = line_breaks, drop = FALSE, name = NULL) +
+  scale_shape_manual(values = shape_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
+  scale_fill_manual(values = fill_vals, breaks = shape_breaks, drop = FALSE, name = NULL) +
+  scale_y_continuous(breaks = 1:3, limits = c(0.55, 3.45)) +
+  scale_x_continuous(breaks = c(0, 10, 20, 30),
+                     labels = c("0\n(start data\ncollection)", "10", "20\n(database queried)", "30"),
+                     limits = c(0, 32), expand = expansion(mult = c(0.02, 0.02))) +
+  labs(x = "Calendar time (days)", y = "Subject") +
+  guides(colour   = guide_legend(order = 1, override.aes = list(linewidth = 1.2)),
+         linetype = guide_legend(order = 2),
+         shape    = shape_legend) +
+  theme_bw(base_size = 15) +
+  theme(legend.position = "right",
+        panel.grid.minor = element_blank()) +
+  bigger_text
+save_pair(p_rt, "book/Figures/survival/right-truncation", h = 3.5, w = 8.5)
+
+cat("Saved.\n")
