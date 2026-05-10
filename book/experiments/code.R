@@ -24,19 +24,60 @@ library(ggpubr)
 library(pseudo)
 library(mgcv)
 library(broom)
+library(eha) # swedeaths / swepop
 
-## Intro - distributions
-g = dstr("Gompertz", shape = 2, decorators = "ExoticStatistics")
-t = seq.int(0, 1.5, length.out = 100)
-functions <- c("Probability density function, y=f(t)", "Cumulative distribution function, y=F(t)", "Hazard function, y=h(t)", "Survival function, y=S(t)")
-d = data.frame(t = t, fun = factor(rep(functions, each = 100), levels = functions), y = c(g$pdf(t), g$hazard(t), g$cdf(t), g$survival(t)))
-g = ggplot(d, aes(x = t, y = y, color = fun)) +
-  geom_line() +
-  facet_wrap(~fun, scales = "free", nrow = 2) +
-  theme_bw() +
-  theme(legend.position = "n")
-ggsave("book/Figures/introduction/gompertz.png", g, height = 3, units = "in",
-  dpi = 600)
+## Intro - Gompertz fit to real Swedish age-specific mortality (2019, ages 30-100).
+## Data source: eha::swedeaths and eha::swepop (Statistics Sweden, bundled in eha).
+## Output: book/Figures/introduction/gompertz.png
+year_use <- 2019
+age_lo   <- 30L
+age_hi   <- 100L
+
+d_int <- subset(swedeaths, year == year_use & age >= age_lo & age <= age_hi)
+p_int <- subset(swepop,    year == year_use & age >= age_lo & age <= age_hi)
+
+d_agg <- aggregate(deaths ~ age, data = d_int, sum)
+p_agg <- aggregate(pop    ~ age, data = p_int, sum)
+lt    <- merge(d_agg, p_agg)
+lt$mx <- lt$deaths / lt$pop
+lt$x  <- lt$age - age_lo
+
+# Gompertz hazard h(x) = a * exp(b * x), fit by population-weighted log-linear
+# regression on the age-specific mortality rate.
+fit_gp <- lm(log(mx) ~ x, data = lt, weights = pop)
+a_gp   <- unname(exp(coef(fit_gp)[1]))
+b_gp   <- unname(coef(fit_gp)[2])
+cat(sprintf("Gompertz fit: a = %.4g, b = %.4f (age origin = %d)\n",
+            a_gp, b_gp, age_lo))
+
+ages_gp <- seq(age_lo, 110, length.out = 400)
+x_gp    <- ages_gp - age_lo
+hx_gp   <- a_gp * exp(b_gp * x_gp)
+Hx_gp   <- (a_gp / b_gp) * (exp(b_gp * x_gp) - 1)
+Sx_gp   <- exp(-Hx_gp)
+Fx_gp   <- 1 - Sx_gp
+fx_gp   <- hx_gp * Sx_gp
+
+fun_levels_gp <- c("f(t): density",
+                   "h(t): hazard",
+                   "F(t): CDF",
+                   "S(t): survival")
+df_gp <- rbind(
+  data.frame(age = ages_gp, y = fx_gp, func = "f(t): density"),
+  data.frame(age = ages_gp, y = hx_gp, func = "h(t): hazard"),
+  data.frame(age = ages_gp, y = Fx_gp, func = "F(t): CDF"),
+  data.frame(age = ages_gp, y = Sx_gp, func = "S(t): survival")
+)
+df_gp$func <- factor(df_gp$func, levels = fun_levels_gp)
+
+g_gp <- ggplot(df_gp, aes(x = age, y = y)) +
+  geom_line(linewidth = 0.7) +
+  facet_wrap(~ func, scales = "free_y", nrow = 2) +
+  theme_bw(base_size = 11) +
+  labs(x = "age (years)", y = NULL)
+
+ggsave("book/Figures/introduction/gompertz.png", g_gp,
+       height = 3.5, width = 7, units = "in", dpi = 600)
 
 ## Ranking
 s_t = tsk("whas")
