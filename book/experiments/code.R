@@ -716,18 +716,42 @@ x <- unlist(lapply(x_base, function(val) c(0, val, 50)))
 df <- data.frame(x = x, y = c(1, 0, 0), group = as.factor(rep(1:10, each = 3)), sex = rep(as.factor(sex), each  = 3)) %>%
   mutate(alpha = if_else(group == 10, 1, 0.1))
 
-(df %>% group_by(sex) %>% summarise(x = mean(x)))
+# Fit Weibull models to the simulated event times (treating them as fully
+# observed events) so the smooth aggregate curves in g3/g4 are derived from
+# the same data as the step functions, not hard-coded.
+events_df <- data.frame(time  = x_base,
+                        event = 1L,
+                        sex   = factor(sex, levels = levels(df$sex)))
+
+fit_uncond <- flexsurv::flexsurvreg(Surv(time, event) ~ 1,
+                                     data = events_df, dist = "weibull")
+fit_cond   <- flexsurv::flexsurvreg(Surv(time, event) ~ sex,
+                                     data = events_df, dist = "weibull")
+
+tgrid <- seq(0, 50, length.out = 200)
+
+pred_uncond <- summary(fit_uncond, t = tgrid, type = "survival", tidy = TRUE)
+pred_uncond_df <- data.frame(x = pred_uncond$time, y = pred_uncond$est)
+
+pred_cond_df <- do.call(rbind, lapply(levels(events_df$sex), function(s) {
+  nd  <- data.frame(sex = factor(s, levels = levels(events_df$sex)))
+  out <- summary(fit_cond, newdata = nd, t = tgrid,
+                 type = "survival", tidy = TRUE)
+  data.frame(x = out$time, y = out$est,
+             sex = factor(s, levels = levels(events_df$sex)))
+}))
 
 g <- ggplot(df, aes(x = x, y = y, group = group))
 g1 <- g + geom_step(linewidth = 1.3, color = "gray")
 g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity()
-g3 <- g1 + geom_smooth(aes(x = x, y = y), data.frame(x = c(0, mean(df$x), 50), y = c(1, 0, 0)),
-    inherit.aes = FALSE, method = "loess", se = FALSE, color = "black", linewidth = 1)
+g3 <- g1 + geom_line(aes(x = x, y = y), data = pred_uncond_df,
+                     inherit.aes = FALSE,
+                     color = "black", linewidth = 1)
 g4 <- g +
   geom_step(aes(color = sex), linewidth = 1.3, alpha = 0.5) +
-  geom_smooth(aes(x = x, y = y, group = sex, color = sex),
-  data.frame(x = c(0, 23.3, 50, 0, 40, 50), y = c(1, 0, 0, 1, 0, 0), sex = as.factor(c(1, 1, 1, 0, 0, 0))),
-    inherit.aes = FALSE, method = "loess", se = FALSE, linewidth = 1.5)
+  geom_line(aes(x = x, y = y, group = sex, color = sex),
+            data = pred_cond_df,
+            inherit.aes = FALSE, linewidth = 1.5)
 
 g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S(t)") & guides(color  = "none")
 
