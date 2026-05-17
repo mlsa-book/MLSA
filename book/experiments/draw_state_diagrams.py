@@ -139,8 +139,8 @@ def illness_death_svg() -> str:
             f'<text x="{mx+18:.1f}" y="{my+5:.1f}" font-size="18" font-style="italic">(τ)</text>'
         )
 
-    parts.append(hlabel(s0, s1, ("0", "1"), label_offset=-14))
-    parts.append(hlabel(s0, s2, ("0", "2"), label_offset=+18))
+    parts.append(hlabel(s0, s1, ("0", "1"), label_offset=-30))
+    parts.append(hlabel(s0, s2, ("0", "2"), label_offset=+34))
     parts.append(hlabel(s1, s2, ("1", "2"), label_offset=-22))
 
     body = '\n  '.join(parts)
