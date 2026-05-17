@@ -1,6 +1,5 @@
 ---
-abstract: |
-  This chapter introduces *cause-specific* and *transition-specific* hazard reductions, a unifying framework that lets any single-event hazard learner from Part III be applied to event-history settings such as competing risks and multi-state models. The key idea is simple. For each cause (or transition) build a separate dataset in which only that cause is treated as the event of interest and all other event types are treated as censored, fit any hazard-estimating model to each such dataset, and then combine the per-cause hazard estimates into the quantities of interest, the cumulative incidence functions for competing risks or the transition probabilities for multi-state models. The chapter formalises this construction, explains why the combination step is essential (a naive $1 - \hat S_e$ does *not* yield a valid cumulative incidence function), and works through a fully worked example on intensive-care unit data, showing that cause-specific piecewise exponential additive models, Cox models and random survival forests all recover the non-parametric Aalen-Johansen baseline in the marginal case and yield interpretable covariate-adjusted predictions in the conditional case. The transition-specific extension to multi-state models is derived analogously, with explicit treatment of the left-truncation that arises from delayed entry into intermediate states.
+abstract: This chapter introduces cause-specific and transition-specific hazard reductions, a unifying framework that lets any single-event learner be applied to event-history settings such as competing risks and multi-state models. The key idea is simple. For each cause (or transition) build a separate dataset in which only that cause is treated as the event of interest and all other event types are treated as censored, fit any model that can produce a hazard estimate to each such dataset, and then combine the per-cause hazard estimates into the quantities of interest, for example the cumulative incidence functions for competing risks or the transition probabilities for multi-state settings. The chapter formalises this construction and works through a fully worked example. The transition-specific extension to multi-state models is derived analogously, with explicit treatment of the left-truncation that arises from delayed entry into intermediate states.
 ---
 
 ::: {.content-visible when-format="html"}
@@ -9,151 +8,211 @@ abstract: |
 
 # Reductions for Event-History Analysis {#sec-reductions-eha}
 
+{{< include _wip_minor.qmd >}}
 
 @sec-eha introduced event-history analysis, showing that more complex time-to-event settings, including competing risks and multi-state models, can be characterized by cause-specific or transition-specific hazards.
 In particular, the cumulative incidence function (CIF) was shown to depend on all cause-specific hazards (@eq-cif), and transition probabilities in multi-state models were expressed via the product integral over all transition-specific hazards (@eq-ms-prodint-cumu-hazards).
 
 This chapter leverages these relationships to formulate event-history analysis as a reduction to multiple single-event hazard estimation problems.
 The key principle is to separately model each cause as the event of interest and treat the others as censoring events, repeating this for all possible causes.
-This enables any distribution-predicting model from Part III to be applied in the more general event-history setting by first predicting the cause-specific hazards and then combining them into CIFs or transition probabilities.
-This reduction principle fits naturally into the general reduction pipeline (@fig-reductions-pipeline).
+This enables any distribution-predicting model to be applied in the more general event-history setting by first predicting the cause-specific hazards and then combining them into CIFs or transition probabilities.
 
 
 ## Competing Risks via Cause-Specific Hazards {#sec-cr-reduction}
 
-Recall the competing risks setting from @sec-competing-risks: subjects start in an initial state $0$ and may transition to one of $q$ absorbing states $e \in \{1,\ldots,q\}$.
-The data consist of $(\xx_i, t_i, e_i)$ where $t_i$ is the observed time, $e_i \in \{0, 1, \ldots, q\}$ indicates the event type ($e_i = 0$ for censoring), and $\xx_i$ are covariates.
-We make use of three quantities from @sec-eha that the reduction will rely on, restated here for self-containedness.
-The cause-specific hazard
-$$
-h_e(\tau \mid \xx) = \lim_{\dtau \searrow 0} \frac{P(\tau \leq Y < \tau + \dtau,\, E(Y) = e \mid Y \geq \tau, \xx)}{\dtau}
-$$ {#eq-cr-cause-hazard-recall}
-is the instantaneous risk of an event of type $e$ at $\tau$ among subjects still in state $0$ just before $\tau$, with cause-specific cumulative hazard $H_e(\tau \mid \xx) = \int_0^\tau h_e(u \mid \xx)\,\du$.
-The all-cause survival probability $S(\tau \mid \xx) = P(Y > \tau \mid \xx)$ depends on *all* cause-specific hazards through
-$$
-S(\tau \mid \xx) = \exp\!\left(-\sum_{e=1}^q H_e(\tau \mid \xx)\right).
-$$ {#eq-cr-allcause-recall}
-Finally, the cumulative incidence function for cause $e$,
-$$
-F_e(\tau \mid \xx) = P(Y \leq \tau,\, E(Y) = e \mid \xx) = \int_0^\tau S(u^- \mid \xx)\, h_e(u \mid \xx)\,\du,
-$$ {#eq-cr-cif-recall}
-is the probability of observing event $e$ by $\tau$ in the presence of all competing events.
+Recall the competing-risks setting of @sec-competing-risks: subjects start in an initial state $0$ and may transition to one of $q$ absorbing states $e \in \{1,\ldots,q\}$, observed as data $(\xx_i, t_i, e_i)$ with $e_i = 0$ encoding censoring.
+The cause-specific hazard $h_e(\tau \mid \xx)$, cumulative hazard $H_e(\tau \mid \xx)$, all-cause survival $S(\tau \mid \xx)$, and cumulative incidence function $F_e(\tau \mid \xx)$ are the building blocks the reduction will combine; their definitions are given in @sec-competing-risks and are referred to as needed below.
 
-### The reduction {#sec-cr-reduction-procedure}
+The reduction principle is to estimate each $h_e$ separately by treating only events of type $e$ as events of interest and all other event types as censoring, then combine the per-cause hazard estimates into $\hatS$ and $\hatF_e$.
+Two variants differ in whether each cause is fit independently (@sec-cr-separate) or jointly via a single stacked model (@sec-cr-stacked); their tradeoffs are summarised in @sec-cr-separate-vs-stacked.
 
-The reduction to single-event hazard estimation proceeds as follows.
 
-1. **Create cause-specific datasets.** For each cause $e \in \{1,\ldots,q\}$ create a modified dataset $\calD_e$ in which only events of type $e$ are treated as events; all other event types $e' \neq e$ are treated as censored.
-   Formally,
+### Separate datasets {#sec-cr-separate}
+
+One realisation of the reduction builds one dataset per cause and fits one independent hazard model to each.
+@fig-cr-reduction-pipeline summarises the construction on a toy three-subject example with two competing events.
+
+![Cause-specific reduction for competing-risks data. The original dataset (left) is split into one cause-specific dataset per cause; each cause-specific dataset is then passed to its own hazard learner; the per-cause hazard estimates are then combined into the all-cause survival probability $\hat S(\tau \mid \xx)$, the cause-specific cumulative incidence functions $\hat F_e(\tau \mid \xx)$.](Figures/reductions/cr-reduction-pipeline.png){#fig-cr-reduction-pipeline fig-alt="Left-to-right flowchart of the cause-specific reduction: an original CR dataset with columns t, E, x is split into two cause-specific datasets each with a binary status column, each cause-specific dataset is fed into a cause-specific hazard model, and the two hazard models are then combined into a single 'Combined quantities' block listing the all-cause survival probability, the cause-specific cumulative incidence functions, and the state-occupancy probability."}
+
+The three steps in @fig-cr-reduction-pipeline are:
+
+1. **Create cause-specific datasets** (Step 1 of @fig-cr-reduction-pipeline).
+   For each cause $e \in \{1,\ldots,q\}$ build $\calD_e$ by relabelling the status: $\delta_{i,e} = \II(e_i = e)$.
+   Events of type $e$ remain events, all other event types are treated as censored at time $t_i$, and the tuple $(\xx_i, t_i, \delta_{i,e})$ is the observation for subject $i$ in $\calD_e$.
+   This is valid because $h_e(\tau \mid \xx)$ quantifies the instantaneous risk of event $e$ among subjects still in state $0$, regardless of how competing events are handled after they leave the risk set.
+
+2. **Fit single-event models** (Step 2 of @fig-cr-reduction-pipeline).
+   Apply any learner capable of distributional prediction to each $\calD_e$, yielding cause-specific (cumulative) hazard estimates $\hath_e(\tau \mid \xx)$ or $\hatH_e(\tau \mid \xx)$.
+
+3. **Combine into all-cause survival and CIFs** (Step 3 of @fig-cr-reduction-pipeline).
+   Combine the cause-specific cumulative hazards into the all-cause survival probability via
    $$
-   \delta_{i,e} = \II(e_i = e),
-   $$
-   and let $(\xx_i, t_i, \delta_{i,e})$ be the observation for subject $i$ in dataset $\calD_e$.
-   This is valid because $h_e(\tau \mid \xx)$ in (@eq-cr-cause-hazard-recall) quantifies the instantaneous risk of event $e$ among subjects still in state $0$, regardless of how competing events are handled after they leave the risk set.
-
-2. **Fit single-event hazard models.** Apply any learner capable of distributional prediction to each $\calD_e$, yielding cause-specific cumulative hazard estimates $\hatH_e(\tau \mid \xx)$ (or equivalently the cause-specific hazard $\hath_e(\tau \mid \xx)$).
-
-3. **Compute the all-cause survival probability.** Combine the cause-specific cumulative hazards via (@eq-cr-allcause-recall):
-   $$
-   \hatS(\tau\mid\xx) = \exp\!\left(-\sum_{e=1}^{q} \hatH_e(\tau\mid\xx)\right).
+   \hatS(\tau\mid\xx) = \exp\!\left(-\sum_{e=1}^{q} \hatH_e(\tau\mid\xx)\right),
    $$ {#eq-cr-allcause-surv}
-
-4. **Compute the CIFs.** The cumulative incidence function for cause $e$ follows from a discrete approximation to (@eq-cr-cif-recall),
+   and assemble each cause-specific cumulative incidence function via the discrete Aalen-Johansen-style sum
    $$
-   \hatF_e(\tau\mid\xx) = \sum_{k:\,t_{(k)} \leq \tau} \hatS(t_{(k-1)}\mid\xx)\, \hatH^{\Delta}_e(t_{(k)}\mid\xx),
+   \hatF_e(\tau\mid\xx) = \sum_{k:\,t_{(k)} \leq \tau} \hatS(t_{(k-1)}\mid\xx)\, \triangle\hatH_e(t_{(k)}\mid\xx),
    $$ {#eq-cr-cif-estimate}
-   where $\hatH^{\Delta}_e(t_{(k)}\mid\xx) = \hatH_e(t_{(k)}\mid\xx) - \hatH_e(t_{(k-1)}\mid\xx)$ is the increment of the cause-specific cumulative hazard in the interval $(t_{(k-1)}, t_{(k)}]$.
+   with cumulative-hazard increment $\triangle\hatH_e(t_{(k)}\mid\xx) = \hatH_e(t_{(k)}\mid\xx) - \hatH_e(t_{(k-1)}\mid\xx)$ in the interval $(t_{(k-1)}, t_{(k)}]$ (matching the notation of @eq-aalen-johanson).
 
 This procedure is a direct analogue of the Aalen-Johansen estimator (@eq-aalen-johanson), with the non-parametric hazard estimates of @sec-aalen-johanson replaced by model-based estimates that can incorporate covariate effects.
 
-### Why a naive $1 - \hatS_e$ is wrong {#sec-cr-naive-warning}
 
-It might seem strange to combine cause-specific estimates into an all-cause estimate (Step 3) and then back to cause-specific ones (Step 4).
-The CIF is the probability of observing event $e$ by time $\tau$ in the presence of all competing events (@eq-cr-cif-recall), and its computation requires the all-cause survival probability $\hatS(\tau\mid\xx)$, which depends on *all* cause-specific hazards.
-Trying to estimate the CIF by fitting a single-event model for cause $e$ and reading off $1 - \hatS_e(\tau\mid\xx) = 1 - \exp(-\hatH_e(\tau\mid\xx))$ does *not* yield a valid CIF.
-The resulting quantity, sometimes called the *net probability*, represents the marginal probability of event $e$ in a hypothetical world where the other causes can never occur, and typically overestimates the true CIF.
-A direct empirical demonstration on the same data (with the cause-specific Cox model used as the single-event learner) is given in @sec-cens-vs-cr.
+### Stacked dataset {#sec-cr-stacked}
 
-### Separate vs. stacked models {#sec-cr-separate-vs-stacked}
+An alternative is to construct a single dataset containing one row per (subject, cause) pair, with an additional indicator $c \in \{1, \ldots, q\}$ recording which cause that row represents.
+@fig-cr-reduction-stacked illustrates the construction.
 
-The procedure above fits independent models for each cause.
-An alternative is to fit a single *stacked* model that includes cause-by-covariate interactions, allowing information sharing across causes (for example, a common baseline-hazard structure or shared covariate effects).
-This can be advantageous when certain causes have few events, as the shared structure acts as a form of regularisation.
-In combination with partition-based reductions (@sec-partition-based-reductions), interactions between a cause variable and the time variable $t_j$ yield different baseline hazards for each cause.
-We restrict the worked example below to the separate-models case for clarity.
+![Stacked cause-specific reduction. Each subject in the original CR dataset contributes one row per cause $c$ to a single stacked dataset (rows shaded by $c$ in the diagram), with $\delta$ recording whether that specific cause was the observed event. A single hazard learner with a $c \times \xx$ interaction is fit, and cause-specific hazards are recovered by evaluating the fitted model at fixed $c$.](Figures/reductions/cr-reduction-stacked.png){#fig-cr-reduction-stacked fig-alt="Left-to-right flowchart for the stacked variant of the cause-specific reduction. The original CR dataset (left) is expanded into a single stacked dataset with an additional cause-indicator column c, where each original observation contributes one row per cause. A single hazard model with a c-by-x interaction is fit to this stacked dataset, and per-cause hazards (recovered by evaluating the model at each value of c) are combined into the same downstream quantities as in the separate-models version."}
+
+The three steps in @fig-cr-reduction-stacked are:
+
+1. **Stack the cause-specific datasets** (Step 1 of @fig-cr-reduction-stacked).
+   The per-cause dataset construction is identical to step 1 of @sec-cr-separate: each $\calD_e$ relabels the status as $\delta_{i,e} = \II(e_i = e)$.
+   The cause-specific datasets are then concatenated row-wise into a single stacked dataset, augmented by an additional cause indicator $c \in \{1, \ldots, q\}$ recording which cause each row represents.
+   A subject who experienced cause $1$ thus contributes one row with $(c,\delta) = (1, 1)$ and a second row with $(c,\delta) = (2, 0)$.
+
+2. **Fit a single stacked hazard learner** (Step 2 of @fig-cr-reduction-stacked).
+   A single learner is fit to the entire stacked dataset with $c$ included as a feature, typically with a full $c \times \xx$ interaction so each cause retains its own hazard structure, or with interactions discovered automatically by a flexible learner.
+   At prediction time, the cause-specific hazard is obtained by conditioning the fitted hazard on the cause, e.g.
+   $$
+   \hath_e(\tau \mid \xx) = \hath(\tau \mid \xx, c = e), \qquad e \in \{1,\ldots,q\}.
+   $$
+
+3. **Combine into all-cause survival and CIFs** (Step 3 of @fig-cr-reduction-stacked).
+   Identical to step 3 of @sec-cr-separate: once the per-cause hazards $\hath_e$ have been extracted, $\hatS$ follows from (@eq-cr-allcause-surv) and each $\hatF_e$ from (@eq-cr-cif-estimate).
+
+
+### Separate vs. stacked {#sec-cr-separate-vs-stacked}
+
+Both variants target the same per-cause hazards, but they have different advantages and disadvantages in practice. 
+
+The **separate** variant:
+
+- *Mix-and-match flexibility.* The cause-specific fits are entirely decoupled, so different model classes can in principle be used across causes (for example, a Cox model for one cause and a random survival forest for another), though typically the same class is used throughout.
+- *Independent tuning.* Hyperparameters (regularisation strength, tree depth, etc.) can be chosen separately for each cause, accommodating causes that need different bias-variance trade-offs.
+- *Embarrassingly parallel.* The $q$ models are independent and can be fit and tuned in parallel.
+- *No cross-cause borrowing.* The model for cause $e$ sees no information about other causes, even when structure such as a common baseline-hazard shape or shared covariate effects is plausibly present; with few events per cause, this can hurt sample efficiency.
+- *Prediction-time bookkeeping.* Assembling $\hatF_e$ from per-cause predictions requires interpolating each $\hatH_e$ onto a common grid before combining via (@eq-cr-cif-estimate), which adds some implementation overhead.
+
+The **stacked** variant:
+
+- *Shared structure.* A single learner sees all causes and can borrow strength through the $c \times \xx$ interaction — partial pooling of baseline-hazard shapes or covariate effects.
+- *Single-model bookkeeping.* One learner, one tuning workflow, one prediction pipeline; simpler debugging and integration than juggling $q$ models.
+- *Larger working dataset.* The stacked dataset is $q$ times larger than any single $\calD_e$, and the learner must be able to learn the $c \times \xx$ interaction structure and be able to learn different baseline hazards for each cause.
+- *Joint-misspecification risk.* A misspecified joint model can introduce bias on all causes simultaneously.
+- *Joint hyperparameter tuning.* If some causes need strong regularisation while others need a more flexible fit, the joint tuning objective can settle on a compromise that is suboptimal for any individual cause.
+
+The remainder of this chapter focuses on the separate variant.
 
 
 ### Application to ICU mortality (`sir.adm`) {#sec-cr-application-sir}
 
-We apply the cause-specific reduction to the `sir.adm` data introduced in @sec-cr-notation [@beyersmann.competing.2012; @pkgmvna]: $n = 747$ ICU admissions with two competing events, *discharge alive* ($e = 1$) and *death in ICU* ($e = 2$); covariates are pneumonia status at admission (`pneu`), age, and sex.
-The non-parametric Aalen-Johansen estimate of the CIFs stratified by pneumonia status was shown in @fig-cif-sir.
-The goal of this section is two-fold: first, to verify empirically that the cause-specific reduction recovers the AJ stratified estimate when no covariates are used; second, to illustrate the resulting covariate-adjusted CIFs.
+For illustration, we return to the `sir.adm` example of @sec-cr-notation [@pkgmvna] and additionally fit a Cox model (@sec-classical-cox) and a single-event random survival forest (@sec-ranfor) via the (separate) cause-specific reduction pipeline (@sec-cr-separate).
+For comparison, we also include the CR-specialised variant of the RSF introduced in @sec-surv-ranfor-cr [@Ishwaran2014; @pkgrfsrc], which is not an explicit instance of the cause-specific reduction but serves as a reference.
+All four estimators are given `pneu` (pneumonia status at admission) as their only covariate so they target the same stratified estimand, and we check that the resulting CIFs agree with the non-parametric Aalen-Johansen baseline of @fig-cif-sir.
 
-We use three single-event learners as base hazard models on each cause-specific dataset:
+The non-parametric AJ and the native CR RSF are essentially indistinguishable, since with a single binary covariate and many trees the RSF reduces to a stratified non-parametric estimator.
+The reduction-based RSF closely tracks the same curves, with a small offset of at most $\sim 3\text{-}4$ percentage points on the discharge CIF that is attributable to differences in tree-construction (the native CR RSF splits using both causes simultaneously, while each cause-specific RSF in the reduction sees only one cause when growing its trees).
+The Cox PH curves agree closely with AJ overall but show differences for discharge, attributable to the proportional-hazards constraint.
 
-* a **piecewise exponential additive model (PAM)** [@Bender2018PAM; @pkgpammtools], i.e.\ the partition-based reduction of @sec-piecewise-constant-hazards with smoothly-varying baseline hazard $s(t)$ fit by `mgcv::gam`;
-* a **cause-specific Cox model** with Breslow estimate of the baseline cumulative hazard;
-* a **random survival forest (RSF)** in its native competing-risks mode [@Ishwaran2014; @pkgrfsrc], which fits one forest jointly to both causes.
-
-Other choices are possible.
-For example, **boosted Cox models** [@Binder2008] reduce the cause-specific Cox fit to gradient boosting and are a natural choice when the feature set is high-dimensional or sparse;
-the same cause-specific construction applies to deep neural network hazard models such as DeepHit [@Lee2018a], and to AFT-based learners after converting AFT predictions to cause-specific hazards.
-The point of the example is the *reduction principle*, not the specific base learner.
-
-#### Marginal verification {#sec-cr-marginal-recovery}
-
-We first fit each base learner using `pneu` as the *only* covariate and stratify the AJ at the same level.
-If the reduction principle is sound and the base learners are sufficiently flexible, all four curves should overlap.
-@fig-cif-marg-sir shows the result.
-The non-parametric AJ (black solid) and the RSF (green dotted) are essentially indistinguishable, since with a single binary covariate and many trees the RSF reduces to a stratified non-parametric estimator.
-The PAM (blue dashed) and Cox PH (red dot-dash) curves are very close to AJ, with the small bias on the early part of the discharge curve attributable to (i) the smooth baseline $s(t)$ in PAM, which dampens sharp early peaks, and (ii) the proportional-hazards constraint of the Cox model.
-The death curves are essentially identical across the four methods.
-
-![Marginal verification on `sir.adm`: cumulative incidence functions for discharge (top row) and death (bottom row) stratified by pneumonia status at admission (columns), as estimated by the non-parametric Aalen-Johansen estimator (black solid), a cause-specific PAM (blue dashed), a cause-specific Cox PH model (red dot-dash) and a random survival forest in native competing-risks mode (green dotted). All four curves overlap closely.](Figures/reductions/cif-marg-sir.png){#fig-cif-marg-sir fig-alt="Faceted plot with four panels (discharge / death by pneumonia status), each showing four overlapping cumulative incidence curves from AJ, PAM, Cox PH and RSF."}
-
-#### Covariate-adjusted predictions {#sec-cr-adjusted}
-
-We now fit each base learner with the full covariate set `pneu + age + sex` (PAM uses a smooth $s(\text{age})$; Cox PH and RSF use linear `age` and `sex` adjustments) and predict the CIF for four representative covariate profiles: pneumonia × age $\in \{40, 75\}$, with sex held at male.
-Because AJ cannot condition on continuous covariates such as age, only the three model-based methods are compared.
-
-![Covariate-adjusted CIFs on `sir.adm` for four profiles (pneumonia status × age 40/75, sex held at male), estimated by cause-specific PAM (solid), Cox PH (dotted) and RSF (dashed). The three methods broadly agree on a clinical reading: pneumonia plus old age yields the lowest discharge probability and the highest death probability; absence of pneumonia plus young age the opposite. RSF shows the largest deviation on the death curves at later times, where the per-tree CIF estimates are based on small terminal-node samples.](Figures/reductions/cif-adj-sir.png){#fig-cif-adj-sir fig-alt="Two-panel plot (Discharge / Death) showing cumulative incidence curves for four covariate profiles, each rendered with three different line types corresponding to PAM, Cox PH and RSF."}
-
-@fig-cif-adj-sir shows that the predicted CIFs separate cleanly by covariate profile in the expected direction: pneumonia and older age both shift mass from the discharge curve to the death curve.
-At $\tau = 60$ days, the absence-of-pneumonia / age-40 profile reaches roughly 95% discharge probability and below 5% death probability, while the pneumonia / age-75 profile is at roughly 70% discharge and 25% death.
-The three methods agree on these qualitative patterns; quantitative differences are driven by their respective inductive biases (smooth-baseline PAM, proportional-hazards Cox, tree-based RSF).
-Differences are largest on the death curves at later times, where event counts per terminal node in RSF are small and the curve becomes noisy.
+![Cumulative incidence functions on `sir.adm` for discharge (top row) and death (bottom row) stratified by pneumonia status at admission (columns), as estimated by the non-parametric Aalen-Johansen estimator, a cause-specific Cox PH model, a reduction-based random survival forest (two single-event RSFs combined via the reduction), and a random survival forest in native competing-risks mode. All four curves overlap closely, confirming that the cause-specific reduction recovers the AJ baseline.](Figures/reductions/cif-marg-sir.png){#fig-cif-marg-sir fig-alt="Faceted plot with four panels (discharge / death by pneumonia status), each showing four overlapping cumulative incidence curves from AJ, Cox PH, reduction-based RSF and native CR RSF."}
 
 
 ## Multi-State Models {#sec-ms-reduction}
 
-The reduction principle extends naturally to multi-state models (@sec-multi-state).
-A multi-state process is characterised by transition-specific hazards $h_{\ell e}(\tau \mid \xx)$, the instantaneous risk of moving from state $\ell$ to state $e \neq \ell$ at $\tau$ given occupation of $\ell$ just before $\tau$.
-Transition probabilities $P_{\ell e}(\zeta, \tau \mid \xx) = P(E(\tau) = e \mid E(\zeta) = \ell, \xx)$ are obtained from the cumulative transition hazards $H_{\ell e}(\tau \mid \xx) = \int_0^\tau h_{\ell e}(u \mid \xx)\,\du$ via the product integral
-$$
-\mathbf{P}(\zeta, \tau \mid \xx) = \mathscr{P}_{u \in (\zeta, \tau]}\bigl(\mathbf{I} + \mathrm{d}\mathbf{H}(u \mid \xx)\bigr),
-$$ {#eq-ms-prodint-recall}
-which is approximated in practice by the finite matrix product over a partition $\zeta = t_0 < t_1 < \cdots < t_J = \tau$,
-$$
-\mathbf{P}(\zeta, \tau \mid \xx) \approx \prod_{j=1}^{J}\bigl(\mathbf{I} + \boldsymbol{\Delta}\hat{\mathbf{H}}(t_j \mid \xx)\bigr),
-$$ {#eq-ms-prodint-approx-recall}
-with $\boldsymbol{\Delta}\hat{\mathbf{H}}(t_j \mid \xx)$ the matrix of cumulative-hazard increments in $(t_{j-1}, t_j]$ (off-diagonal entries $\boldsymbol{\Delta}\hat{H}_{\ell e}$ for $\ell \neq e$, with diagonal entries chosen so each row sums to zero).
+The reduction principle introduced for competing risks extends naturally to multi-state models. Recall from @sec-multi-state that subjects occupy any state in a finite state space and transition between admissible state pairs $(\ell, e)$.
+The transition-specific hazard $h_{\ell e}(\tau \mid \xx)$, cumulative transition hazard $H_{\ell e}(\tau \mid \xx)$, and transition-probability matrix $\mathbf{P}(\zeta, \tau \mid \xx)$ — recovered from the cumulative hazards via the product integral — are the building blocks the reduction will combine.
 
-### Left-truncation and the transition-specific reduction {#sec-ms-truncation}
+The key difference relative to the competing-risks case is *internal* (process-induced) left-truncation.
+In competing risks all subjects often start in state $0$ at $\tau = 0$.
+In a multi-state process, by contrast, a subject enters the risk set for a transition $\ell \to e$ only at the time they enter state $\ell$, which differs across subjects.
+Borrowing the `prothr` example of @sec-multi-state: a subject who starts in normal-prothrombin state ($\ell = 0$) only enters the risk set for transitions out of the abnormal state ($\ell = 1$) at the time of their first $0 \to 1$ jump.
+This left-truncation must be handled by each transition-specific base learner.
 
-In the competing-risks setting, all subjects start in the initial state $0$ at time $\zeta = 0$.
-In a multi-state process, by contrast, subjects enter the risk set for a transition $\ell \to e$ at the time they enter state $\ell$, which can differ across subjects.
-Borrowing the `prothr` example of @sec-multi-state: a subject starting in normal-prothrombin state ($\ell = 0$) only enters the risk set for transitions out of the abnormal state ($\ell = 1$) at the time of their first $0 \to 1$ jump.
-This *internal*, or *process-induced*, left-truncation must be handled by the base hazard learner; otherwise the transition out of state $\ell$ is biased toward earlier times.
-Concretely, the dataset $\calD_{\ell;e}$ for transition $\ell \to e$ contains, for each subject who ever enters state $\ell$, an interval $(t_i^L, t_i^R]$ on which they are at risk for that transition together with the indicator of whether the transition actually occurred at $t_i^R$, where $t_i^L$ is the time of entry into state $\ell$ and $t_i^R$ either the time of the first transition out of $\ell$ or a censoring time.
 
-With that data structure in place, the reduction is the natural extension of the competing-risks case.
+### Transition-specific pipeline {#sec-ms-transition-datasets}
 
-1. **Create transition-specific datasets.** For each admissible transition $\ell \to e$, build $\calD_{\ell;e}$ as above, treating $\ell \to e$ as the event of interest and all other transitions out of $\ell$ as censoring.
-2. **Fit single-event hazard models.** Fit a base learner that supports left-truncation to each $\calD_{\ell;e}$, yielding $\hatH_{\ell e}(\tau \mid \xx)$.
-3. **Compute transition probabilities.** Combine the per-transition hazard estimates via the product integral approximation (@eq-ms-prodint-approx-recall) to obtain the matrix of transition probabilities $\widehat{\mathbf{P}}(\zeta, \tau \mid \xx)$.
+Similar to the competing risks case, the multi-state reduction pipeline builds one dataset per admissible transition and fits one hazard model to each.
+@fig-ms-reduction-pipeline summarises the construction for an illness-death model with recovery, where states are $\{0, 1, 2\}$ and the four admissible transitions are $0\to1$, $0\to2$, $1\to0$, $1\to2$.
 
-Most of the base learners discussed in @sec-cr-application-sir support left-truncation natively: the PAM PED transformation handles delayed entry through interval-specific risk indicators (@sec-left-truncation-intervals), the Cox model accepts `Surv(tstart, tstop, event)` arguments, and the random forest framework can be extended via inverse-probability-of-truncation weights or partly conditional approaches.
-A worked multi-state example on the `prothr` data is left as an extended exercise (the AJ baseline is the four-panel figure of @fig-multi-state-prothr; the cause-specific reduction would replace each AJ panel with three model-based curves analogous to the construction above).
+![Transition-specific reduction for multi-state data. The original multi-state dataset (left) is split into one dataset per admissible transition $\ell \to e$; each dataset is passed to a hazard learner that supports left-truncation; the per-transition cumulative hazards $\hat H_{\ell e}(\tau \mid \xx)$ are then combined into the transition probability matrix $\hat{\mathbf P}(\zeta, \tau \mid \xx)$ via the product integral.](Figures/reductions/ms-reduction-pipeline.png){#fig-ms-reduction-pipeline fig-alt="Left-to-right flowchart of the transition-specific reduction. An original multi-state dataset with columns id, from, to, t, δ is split into four transition-specific datasets, one per admissible transition (0→1, 0→2, 1→0, 1→2), each with columns id, tstart, tstop and a transition-specific status indicator. Each dataset feeds into its own hazard model; the four per-transition cumulative hazards are then combined into the transition probability matrix via the product integral."}
+
+The three steps in @fig-ms-reduction-pipeline are:
+
+1. **Create transition-specific datasets** (Step 1 of @fig-ms-reduction-pipeline).
+   For each admissible transition $\ell \to e$, build $\calD_{\ell;e}$ containing, for every subject who ever occupies state $\ell$, an at-risk interval $(t_{i,\text{start}}, t_{i,\text{stop}}]$ together with the indicator $\delta_{i,\ell e}$ of whether the transition $\ell \to e$ actually occurred at $t_{i,\text{stop}}$.
+   The interval is defined by $t_{i,\text{start}}$, the subject-specific time of entry into state $\ell$ and $t_{i,\text{stop}}$, either the time of the first transition out of $\ell$ or a censoring time.
+   Note that a subject appears in every transition-specific dataset for which they were at risk, but only for the times during which they were at risk for that specific transition (e.g. subject 1 in the toy example contributes to all four datasets — to the $0\to1$ and $0\to2$ datasets on $[0, 2]$ while in state $0$, and to the $1\to0$ and $1\to2$ datasets on $[2, 5]$ while in state $1$).
+   When $t_{i,\text{start}} > 0$ the subject contributes a *left-truncated* observation (delayed entry), visible in the toy example as the non-zero start times in the $1\to0$ and $1\to2$ datasets (subject 1 enters state $1$ at $t = 2$).
+
+2. **Fit single-event models** (Step 2 of @fig-ms-reduction-pipeline).
+   Apply any single-event hazard learner that supports left-truncation to each $\calD_{\ell;e}$, yielding the transition-specific hazards $\hath_{\ell e}(\tau \mid \xx)$ or cumulative hazards
+   $$
+   \hatH_{\ell e}(\tau \mid \xx) = \int_0^{\tau} \hath_{\ell e}(u \mid \xx) \, \du.
+   $$
+
+3. **Combine into transition probabilities** (Step 3 of @fig-ms-reduction-pipeline).
+   Stack the per-transition cumulative hazards into the matrix $\hat{\mathbf H}(\tau \mid \xx)$ (off-diagonal entries $\hat H_{\ell e}$ for $\ell \neq e$, diagonal entries chosen so each row sums to zero) and assemble the transition-probability matrix via the product-integral approximation
+   $$
+   \hat{\mathbf P}(\zeta, \tau \mid \xx) \approx \prod_{j=1}^{J}\bigl(\mathbf I + \boldsymbol{\Delta}\hat{\mathbf H}(t_j \mid \xx)\bigr),
+   $$ {#eq-ms-prodint-approx-recall}
+   over a partition $\zeta = t_0 < t_1 < \cdots < t_J = \tau$, where $\boldsymbol{\Delta}\hat{\mathbf H}(t_j \mid \xx)$ is the matrix of cumulative-hazard increments in $(t_{j-1}, t_j]$.
+
+This is the multi-state analogue of the construction in @sec-cr-separate.
+Importantly, while most of the base learners discussed in @sec-cr-application-sir can support left-truncation in theory,
+this is often not implemented in software packages and constitutes a real limitation in the current applicability of machine learning methods to multi-state models and left-truncated data in general (single-event data and competing risks data can also be left-truncated).
+
+
+### Stacked dataset {#sec-ms-stacked}
+
+As in the competing-risks case (@sec-cr-stacked), the per-transition datasets of @sec-ms-transition-datasets can equivalently be stacked row-wise into a single dataset with an added transition indicator $\ell \to e$.
+Each subject contributes one row per admissible transition they were ever at risk for, with the at-risk interval $(t_{i,\text{start}}, t_{i,\text{stop}}]$, the transition label, and the indicator $\delta_{i, \ell e}$ of whether that specific transition occurred.
+Rows whose originating state $\ell$ is reached after $\tau = 0$ carry a non-zero $t_{i,\text{start}}$, i.e. enter the dataset left-truncated.
+@fig-ms-reduction-stacked illustrates the construction.
+
+![Stacked transition-specific reduction for multi-state data. Each subject in the original multi-state dataset contributes one row per admissible transition they were at risk for (rows shaded by the originating state $\ell$ in the diagram), with $\delta$ recording whether that specific transition was observed. A single hazard learner with a $\text{trans} \times \xx$ interaction is fit; transition-specific hazards $\hath_{\ell e}(\tau \mid \xx)$ are recovered by conditioning on the transition; the per-transition cumulative hazards are then combined into the transition-probability matrix $\hat{\mathbf P}(\zeta, \tau \mid \xx)$ via the product-integral approximation (@eq-ms-prodint-approx-recall).](Figures/reductions/ms-reduction-stacked.png){#fig-ms-reduction-stacked fig-alt="Left-to-right flowchart for the stacked variant of the transition-specific reduction. The original MS dataset (left) is expanded into a single stacked dataset with an added trans column where each subject contributes one row per admissible transition they were at risk for, with non-zero tstart entries marking left-truncation at the time of entry into the originating state. A single hazard learner with a trans-by-x interaction is fit to this stacked dataset, and per-transition hazards (recovered by conditioning on trans) are combined into the transition-probability matrix."}
+
+The three steps in @fig-ms-reduction-stacked are:
+
+1. **Stack the transition-specific datasets** (Step 1 of @fig-ms-reduction-stacked).
+   Construct one row per (subject, admissible transition the subject was at risk for) with columns $(\text{id}, t_{i,\text{start}}, t_{i,\text{stop}}, \text{trans}, \delta)$.
+   The transition indicator $\text{trans}$ records which transition the row contributes to, and $t_{i,\text{start}} > 0$ encodes left-truncation when the originating state is reached only after $\tau = 0$ (visible in the toy example as the non-zero start times in the $1 \to 0$ and $1 \to 2$ rows for subject 1).
+
+2. **Fit a single stacked hazard learner** (Step 2 of @fig-ms-reduction-stacked).
+   A single base learner is fit to the stacked dataset with $\text{trans}$ as a feature (typically with a full $\text{trans} \times \xx$ interaction so each transition retains its own hazard structure, or with interactions discovered automatically by a flexible learner).
+   At prediction time, the transition-specific hazard is recovered by conditioning the fitted hazard on the transition:
+   $$
+   \hath_{\ell e}(\tau \mid \xx) = \hath(\tau \mid \xx, \text{trans} = \ell \to e), \qquad (\ell, e) \text{ admissible}.
+   $$
+
+3. **Combine into transition probabilities** (Step 3 of @fig-ms-reduction-stacked).
+   Identical to step 3 of @sec-ms-transition-datasets: stack the per-transition cumulative hazards into $\hat{\mathbf H}(\tau \mid \xx)$ and apply the product-integral approximation (@eq-ms-prodint-approx-recall) to obtain $\hat{\mathbf P}(\zeta, \tau \mid \xx)$.
+
+The trade-offs between the separate and stacked variants for multi-state are the same as those summarised for competing risks in @sec-cr-separate-vs-stacked.
+
+
+### Application to liver cirrhosis patients (`prothr`) {#sec-ms-application-prothr}
+
+We return to the `prothr` example of @sec-multi-state, where the non-parametric Aalen-Johansen estimator was used to obtain transition probabilities for each transition, conditional on transition status (figure @fig-multi-state-prothr). Here we illustate the reduction pipeline @sec-  using a flexible XGBoost learner.
+Because of the limitation mentioned earlier that few software implementations allow estimation of left-truncated data,
+the full pipeline chains two reductions introduced in this part of the book (@Bender2021):
+
+1. *Multi-state → transition-specific single-event with left-truncation (stacked variant).*
+   The reduction of @sec-ms-transition-datasets turns the multi-state task into one single-event hazard task per admissible transition, with left-truncation at the (subject-specific) time of entry into the originating state.
+2. *Single-event task with left-truncation → Poisson regression task.*
+   The piece-wise constant hazards reduction (@sec-piecewise-constant-hazards) further turns each single-event-with-left-truncation task into a Poisson regression on the piece-wise exponential dataset, where each subject contributes one row per at-risk interval, the response is the per-interval event indicator, and the log of the interval length enters as an offset.
+
+In the stacked-data variant (@sec-ms-stacked, @fig-ms-reduction-stacked) used here, the two reductions are fused into a single data-transformation step.
+A single XGBoost-Poisson learner is fit to this stacked dataset with the treatment indicator, transition indicator and interval-time $t_j$ (@eq-interval-endpoint) as features. The learner then automatically selectes splits on these features and thereby learns the hazard function for each transition.
+At prediction time the per-transition cumulative hazards are combined into the transition-probability matrix via the product-integral approximation (@eq-ms-prodint-approx-recall).
+
+@fig-tp-prothr-cmp shows that the XGBoost reduction recovers the AJ baseline closely across all four transitions and both treatment arms.
+Mild smoothing relative to AJ is visible where the AJ step function is coarse (around the kinks in $0 \to 2$ between days 1000 and 2500, and the peak in $1 \to 0$), reflecting the inductive bias of boosted shallow trees with a small learning rate.
+
+
+![Transition probabilities on `prothr` for the four admissible transitions $\ell \to e$ (panels), stratified by treatment, as estimated by two methods: the non-parametric Aalen-Johansen estimator split by treatment arm (solid lines) and a flexible XGBoost-Poisson learner trained on the multi-state PED with the treatment indicator as a feature (dotted lines), via the two-stage reduction of @sec-ms-transition-datasets and @sec-partition-based-reductions. The XGBoost curves track the AJ baseline closely across all four panels and both arms.](Figures/reductions/tp-prothr-cmp.png){#fig-tp-prothr-cmp fig-alt="Four-panel plot showing transition probabilities for the prothr multi-state model (transitions 0→1, 0→2, 1→0, 1→2), each panel comparing AJ (solid) and XGBoost-Poisson (dotted) curves stratified by treatment (placebo in blue, prednisone in red). The two methods agree closely across all panels."}
+
 
 
 ## Conclusion
@@ -163,10 +222,18 @@ A worked multi-state example on the `prothr` data is left as an extended exercis
 ## Key takeaways
 
 * Event-history analysis (competing risks, multi-state models) reduces to fitting multiple single-event hazard models, one per cause or transition.
-* Any single-event ML learner that estimates a hazard function and supports the relevant censoring (and, for multi-state models, left-truncation) can serve as the base learner.
+* The reduction pipelines introduced in this chapter are model agnostic as any single-event ML learner that estimates a hazard function and supports the relevant censoring (and, if needed, left-truncation) can serve as the base learner.
 * CIFs and transition probabilities are obtained by *combining* the per-cause hazard estimates via the cause-specific reduction (@eq-cr-cif-estimate) or the product-integral approximation (@eq-ms-prodint-approx-recall).
-* The combination step is essential. Naively reading off $1 - \hatS_e(\tau \mid \xx)$ from a cause-specific fit gives the *net* probability, not the CIF.
-* On `sir.adm`, the marginal cause-specific reduction with PAM, Cox PH and RSF base learners all recover the non-parametric Aalen-Johansen baseline; covariate adjustment then yields interpretable risk profiles per subject.
+
+::::
+
+:::: {.callout-important icon=false}
+
+## Limitations
+
+* The reduction pipelines introduced here incur additional overhead, for example preparing the separate or stacked datasets and combining the transition-specific hazards for downstream analysis.
+* They also may increase memory usage and computational time compared to specialised learners for competing risks and multi-state models.
+* Most software currently doesn't support left-truncated data, therefore limiting the applicability of the event-history reduction pipelines in the presence of left-truncation.
 
 ::::
 
@@ -174,11 +241,7 @@ A worked multi-state example on the `prothr` data is left as an extended exercis
 
 ## Further reading
 
-* @beyersmann.competing.2012 give a comprehensive and accessible introduction to competing risks and multi-state models with worked R examples on `sir.adm` and `prothr`.
 * @aalen2008survivalevent develop event-history analysis from a counting-process perspective, including the product-integral construction of transition probabilities.
-* @Bender2021 present a general machine learning framework for survival analysis based on the partition-based reduction (PAMs), with extensions to competing risks and multi-state models.
-* @Ishwaran2014 introduce the native competing-risks variant of random survival forests and discuss splitting rules tailored to CIF estimation.
-* @Binder2008 develop boosted Cox models with allowance for mandatory covariates; the construction extends straightforwardly to cause-specific Cox boosting.
-* @Lee2018a propose DeepHit, a deep-learning model for competing risks that bypasses the explicit hazard parameterisation.
+* @beyersmann.competing.2012 give a comprehensive and accessible introduction to competing risks and multi-state models with worked R examples on `sir.adm` and `prothr`.
 
 ::::

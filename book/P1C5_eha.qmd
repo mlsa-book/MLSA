@@ -1,5 +1,5 @@
 ---
-abstract: This chapter generalizes survival analysis from single-event outcomes to event-history data, where subjects may experience competing, recurrent, or sequential events. It introduces a process-based view in which each subject occupies one state at each time point and may transition between states over follow-up. This framework is used to define competing risks, cause-specific hazards, cumulative incidence functions, and the Aalen-Johansen estimator. The chapter shows why treating competing events as independent censoring can substantially distort event-probability estimates, using ICU discharge and mortality as an example. It then extends the same logic to multi-state models, where subjects may move between multiple transient and absorbing states, including possible back-transitions. Transition-specific hazards, transition probability matrices, product integrals, and state-occupancy probabilities are introduced with emphasis on interpretation rather than technical detail. A liver cirrhosis example illustrates non-parametric estimation of transition probabilities under a Markov assumption. Overall, the chapter provides the conceptual foundation for modeling richer time-to-event processes beyond standard right-censored survival data.
+abstract: This chapter generalizes survival analysis from single-event outcomes to event-history data, where subjects may experience competing, recurrent, or sequential events. It introduces a process-based view in which each subject occupies one state at each time point and may transition between states over follow-up. This framework is used to define competing risks, cause-specific hazards, cumulative incidence functions, and the Aalen-Johansen estimator. The chapter shows why treating competing events as independent censoring can substantially distort event-probability estimates, using ICU discharge and mortality as an example. It then extends the same logic to multi-state models, where subjects may move between multiple transient and absorbing states, including possible back-transitions. Transition-specific hazards, transition probability matrices, product integrals, and state-occupation probabilities are introduced. Overall, the chapter provides the conceptual foundation for modeling richer time-to-event processes beyond standard right-censored survival data.
 ---
 
 ::: {.content-visible when-format="html"}
@@ -48,7 +48,7 @@ However, when there are multiple possible events (for example, death by heart di
 Instead, one tries to model which state the subject is in at multiple different moments in time.
 
 A *state* is a mutually exclusive classification of subjects at a given time point.
-In the simplest single-event setting, there are two states: "no event yet" (which is censoring and encoded by $0$) and "event has occurred" (encoded as $1$).
+In the simplest single-event setting, there are two states: "no event yet" (encoded by $0$) and "event has occurred" (encoded as $1$).
 In a competing-risks setting with $q$ possible events, the states are $\{0, 1, \ldots, Q\}$ with $0$ retaining the "no event yet" state and $q \in \{1, \ldots, Q\}$ indicating that event of type $q$ has occurred.
 
 This is formalized as a stochastic process
@@ -58,7 +58,7 @@ E(\tau) \in \{0,\ldots, Q\},\ \tau \geq 0,
 $$ {#eq-state-process}
 <!--  -->
 which records the state occupied at time $\tau$.
-In the single-event case ($Q = 1$), $E(\tau)$ and $Y$ provide the same information: $E(\tau) = 1 \iff Y \leq \tau$.
+In the single-event case ($Q = 1$), $E(\tau)$ and $Y$ provide the same information.
 In particular, $\{Y \in [\tau, \tau + \dtau) \mid Y \geq \tau\}$ and $\{E(\tau + \dtau) = 1 \mid E(\tau-) = 0\}$ describe the same outcome — "the event occurs in the next instant" and "the process jumps from state $0$ to state $1$ in the next instant" — so the two expressions for the hazard are equivalent:
 <!--  -->
 $$
@@ -77,10 +77,10 @@ The process-valued formulation may seem over-engineered in the single-event case
 ## Competing Risks {#sec-competing-risks}
 
 @sec-surv assumed a single event of interest, with all reasons a subject might leave the observation window treated as right-censoring.
-*Competing risks* arise when several mutually exclusive events can lead to observation drop-out.
+*Competing risks* arise when several mutually exclusive events can occur on the same subject.
 Ignoring this structure, treating competing events as censoring, biases survival and hazard estimates (illustrated in @sec-cens-vs-cr).
 Canonical medical examples are cause-specific mortality, for example, death by cancer versus heart disease versus other causes; and ICU outcomes, for example, death in ICU versus discharge.
-The defining feature of the competing risks framework is that once any one of the $Q$ events occurs, the others can no longer happen.
+The defining feature of the competing risks framework is that only one of the $Q$ events can occur on a subject at any given time.
 This section introduces relevant notation (@sec-cr-notation), the non-parametric Aalen-Johansen estimator (@sec-aalen-johanson) followed by a worked example.
 
 @tbl-surv-data-sir.adm. shows an excerpt of the `sir.adm` data [@pkgmvna] of patients on an intensive care unit (ICU).
@@ -146,14 +146,14 @@ The *all-cause survival probability* gives the probability that *none* of the ev
 This is usually not estimated directly but calculated from the cause specific hazards instead via @eq-all-cause-cumu-hazard and @eq-all-cause-surv-prob:
 
 $$
-S(\tau) = P(Y > \tau) = \exp(-H(\tau))
+S(\tau) = P(Y > \tau) = P(E(\tau) = 0) = exp(-H(\tau))
 $$ {#eq-all-cause-surv-prob}
 
 Finally, the probability of experiencing an event $e$ before time $\tau$*, which is often referred to as Cumulative Incidence Function* (CIF), is given by
 <!--  -->
 $$
 \begin{aligned}
-F_{e}(\tau) &= P(Y \leq \tau, E(Y) = e)  &\ \\
+F_{e}(\tau) &= P(E(\tau) = e)  &\ \\
             & = \int_{0}^\tau f_e(u)\ \mathrm{d}u = \int_{0}^\tau S(u-)h_{e}(u)\ \mathrm{d}u,
 \end{aligned}
 $$ {#eq-cif}
@@ -314,9 +314,8 @@ $$ {#eq-ms-transition-hazards}
 
 Transition hazards (@eq-ms-transition-hazards) indicate the instantaneous risk to enter state $e$ at time $\tau$ given occupation of state $\ell$  at $\tau-$, which is the instant before $\tau$.
 
-A transition is by definition a move out of the current state and therefore $\ell \neq q$ when describing the transition hazard $h_{\ell q}(\tau)$.
-The diagonal case $\ell = q$ appears only at the level of transition probabilities (see @eq-ms-trans-prob-mat), where $P_{\ell\ell}(\zeta, \tau)$ is the probability of occupying state $\ell$ at both $\zeta$ and $\tau$ (which, in processes with back-transitions, also includes paths that leave $\ell$ and return).
-Furthermore, not every pair $(\ell, q)$ corresponds to a realisable transition: the state diagram of the specific process (for example, @fig-multi-state-prothr-states for `prothr`) determines which transitions are possible a priori, and the hazards of impossible transitions are identically zero.
+A transition is by definition a move out of the current state and therefore $\ell \neq e$ when describing the transition hazard $h_{\ell e}(\tau)$.
+Furthermore, not every pair $(\ell, e)$ corresponds to a realisable transition: the state diagram of the specific process (for example, @fig-multi-state-prothr-states for `prothr`) determines which transitions are possible a priori, and the hazards of impossible transitions are identically zero.
 
 Analogous to the competing risks setting, we can define the transition specific cumulative hazards
 
@@ -325,15 +324,17 @@ H_{\ell e}(\tau) = \int_{0}^{\tau}h_{\ell e}(u)du
 $$ {#eq-ms-cumu-hazard}
 
 
-The probability to transition from state $\ell$ to $e$ between two time-points depends on all transitions possible from $\ell$ and potentially the transitions that have taken place in the past.
-A natural quantity of interest in the multi-state setting are the transition probabilities $P_{\ell e}(\zeta, \tau):= P(E(\tau) = e \mid E(\zeta) = \ell)$, that is, the probability to be in state $e$ at $\tau$ given occupation of state $\ell$ at $\zeta < \tau$.
+In the multi-state setting, two further quantities are often of interest: 
+
+- The *transition probabilities* $P_{\ell e}(\zeta, \tau):= P(E(\tau) = e \mid E(\zeta) = \ell)$, that is, the conditional probability to be in state $e$ at $\tau$ given occupation of state $\ell$ at $\zeta < \tau$ (@sec-ms-transition-probs).
+- the *state-occupation probability* $P(E(\tau) = q)$: the probability to occupy a certain state $q$ at time $\tau$ (@sec-ms-state-occupation).
 
 Throughout the remainder of @sec-multi-state it is assumed that the multi-state process is *Markov*, meaning that the transition intensity at time $\tau$ depends only on the current state $E(\tau-)$ and not on the full state history $\{E(u) : u < \tau\}$.
 Under this assumption, conditioning on the current state alone (as in equation @eq-ms-transition-hazards) is sufficient to characterise the local dynamics, and the transition probability $P_{\ell e}(\zeta,\tau)$ is fully determined by the cumulative transition hazards between $\zeta$ and $\tau$.
 The non-parametric Aalen-Johansen estimator (@eq-ms-aj-trans-prob) of the transition-probability matrix (@eq-ms-trans-prob-mat) is then consistent.
 
 Relaxing the Markov assumption leads to *semi-Markov* and general *non-Markov* models, where the conditioning set must include past sojourn times or full state history; see @aalen2008survivalevent and @beyersmann.competing.2012 for an overview, which are not discussed in further detail here.
-The marginal *state-occupancy* probabilities $P(E(\tau)=e)$ remain consistently estimable from the same Aalen-Johansen methodology, even without the Markov assumption (see @sec-ms-state-occupancy).
+Notably, the marginal *state-occupation* probabilities $P(E(\tau)=e)$ remain consistently estimable from the same Aalen-Johansen methodology, even without the Markov assumption (see @sec-ms-state-occupation).
 
 Transition probabilities of a multi-state process are often summarized in a matrix
 <!--  -->
@@ -355,7 +356,7 @@ $$
 $$ {#eq-ms-trans-prob-row-sums}
 <!--  -->
 
-### Transition probabilities
+### Transition probabilities {#sec-ms-transition-probs}
 In this section we briefly motivate how transition probabilities between two non-consecutive time points can be expressed as the product (integral) of transition probabilities between intermediate, subsequent time points.
 
 For illustration, consider what is often referred to as an illness-death model depicted in @fig-illness-death (similar to @fig-multi-state-prothr-states, but without back-transition), where subjects can transition from healthy state $0$ to absorbing death state $2$ either directly or via intermediate state $1$.
@@ -505,30 +506,30 @@ $$ {#eq-ms-aj-trans-prob}
 <!--  -->
 
 
-### State occupancy probabilities {#sec-ms-state-occupancy}
+### State occupation probabilities {#sec-ms-state-occupation}
 
 The pairwise transition probabilities, $P_{\ell e}(\zeta, \tau)$, defined above are conditioned on a specific entry-state $\ell$ at a specific time $\zeta$; the Aalen-Johansen estimator (@eq-ms-aj-trans-prob) is only consistent for them under the Markov assumption.
-A closely related but conceptually distinct target is the *state-occupancy probability*,
+A closely related but conceptually distinct target is the *state-occupation probability*,
 <!--  -->
 $$
-P_q(\tau) := P(E(\tau) = q) = \sum_{\ell=0}^{Q} P(E(0) = \ell)\, P_{\ell q}(0, \tau),
-$$ {#eq-ms-state-occupancy}
+P_q(\tau) := P(E(\tau) = q)
+$$ {#eq-ms-state-occupation}
 <!--  -->
-which is the marginal probability that a subject occupies state $q$ at time $\tau$, averaged over the initial-state distribution $P(E(0)=\ell)$.
+which is the marginal probability that a subject occupies state $q$ at time $\tau$.
 
-State-occupancy probabilities are arguably the more natural target for many prediction tasks: questions of the form "what is the probability that the subject is alive in normal-prothrombin state at $\tau = 365$ days?" are directly answered by $P_q(\tau)$, not by a pairwise transition probability conditioned on a fixed entry-state.
+State-occupation probabilities are arguably the more natural target for many prediction tasks: questions of the form "what is the probability that the subject is alive in normal-prothrombin state at $\tau = 365$ days?" are directly answered by $P_q(\tau)$, not by a pairwise transition probability conditioned on a fixed entry-state.
 
-A practically important property is that the Aalen-Johansen plug-in (@eq-ms-aj-trans-prob), applied with the empirical initial-state distribution rather than conditioned on a fixed $\ell$, remains a consistent estimator of $P_q(\tau)$ even when the underlying process is not Markov [@aalen2008survivalevent].
+A practically important property is that the Aalen-Johansen plug-in (@eq-ms-aj-trans-prob), applied with the empirical initial-state distribution rather than conditioned on a fixed $\ell$, remains a consistent estimator of $P_q(\tau)$ even when the underlying process is not Markov [@putter2018; @niessl2023].
 By contrast, the AJ estimator of the pairwise $P_{\ell q}(\zeta, \tau)$ loses its consistency guarantees once the Markov assumption fails.
 
-Concretely, given the AJ estimate $\widehat{\mathbf{P}}(0, \tau)$ and the empirical initial-state distribution $\hat{\pi}_\ell = n_\ell^{(0)}/n$ (where $n_\ell^{(0)}$ is the number of subjects observed in state $\ell$ at $\tau=0$), the state-occupancy estimator is
+Concretely, given the AJ estimate $\widehat{\mathbf{P}}(0, \tau)$ and the empirical initial-state distribution $\hat{\pi}_\ell = n_\ell^{(0)}/n$ (where $n_\ell^{(0)}$ is the number of subjects observed in state $\ell$ at $\tau=0$), the state-occupation estimator is
 <!--  -->
 $$
 \hat{P}_q(\tau) = \sum_{\ell=0}^{Q} \hat{\pi}_\ell\, \widehat{P}_{\ell q}(0, \tau).
-$$ {#eq-ms-state-occupancy-est}
+$$ {#eq-ms-state-occupation-est}
 <!--  -->
 The remainder of this section and the application below report the pairwise transition probabilities under the Markov assumption.
-Deriving the state-occupancy estimates follows by applying the same AJ pipeline and then marginalizing with (@eq-ms-state-occupancy-est).
+Deriving the state-occupation estimates follows by applying the same AJ pipeline and then marginalizing with (@eq-ms-state-occupation-est).
 
 
 ### Application to liver cirrhosis patients
