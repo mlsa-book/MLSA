@@ -219,7 +219,7 @@ The algorithm iteratively improves the model by fitting trees to the residuals f
 
 ## Further reading
 
-* @andersenPseudoobservationsSurvivalAnalysis2010 provides an overview of the pseudo-value approach and its application to various quantities of interest in survival analysis.
+* @Andersen2010 provides an overview of the pseudo-value approach and its application to various quantities of interest in survival analysis.
 * @johansen2021regressionmodels propose an extension of pseudo-value based regression for interval censored data using parametric univariate estimators.
 * @mogensen2013randomforestb use pseudo-values in combination with random forests for competing risks analysis.
 * @Zhao2020 propose a deep learning based approach for survival analysis using pseudo-values.
@@ -233,3 +233,167 @@ The algorithm iteratively improves the model by fitting trees to the residuals f
 When the learner used to estimate the probabilities for an event at time $t_{(j)}$ is a logistic regression model, the method is known as pooled logistic regression (@dagostinoRelationPooledLogistic1990a). Pooled because rather than fitting one separate logistic regression model for each event time $t_{(j)}$, a single logistic regression model is fitted to the stacked data set, conditional on the interval information $t_j$ and potentially other features $\xx_{i}$.
 
 
+
+
+### Example: ICU Competing Risks {#sec-cr-example}
+
+We illustrate the reduction framework using the `sir.adm` dataset [@pkgmvna], previously introduced in @sec-competing-risks.
+The data contain 747 patients admitted to an intensive care unit (ICU) with three covariates: pneumonia status at admission (`pneu`), `age`, and `sex`.
+The competing events are discharge alive from the ICU ($e=1$) and death in the ICU ($e=2$), with 657 discharges, 76 deaths, and 14 censored observations (@tbl-surv-data-sir.adm).
+
+#### PAM approach
+
+Using the piecewise-exponential additive model (PAM) framework (@sec-piecewise-constant-hazards, @pkgpammtools), the reduction is carried out explicitly:
+
+1. Two cause-specific datasets are created by defining $\delta_{i,1} = \II(e_i = 1)$ (discharge) and $\delta_{i,2} = \II(e_i = 2)$ (death).
+Each dataset is then transformed to the piece-wise exponential data (PED) format using `as_ped()`.
+2. A PAM is fit to each PED using `mgcv::gam()` with a Poisson likelihood:
+    - Discharge: `ped_status ~ s(tend) + pneu + s(age) + sex`
+    - Death: `ped_status ~ s(tend) + pneu + s(age) + sex`
+3. The cause-specific hazard estimates are combined to obtain the all-cause survival probability (@eq-cr-allcause-surv) and the CIFs (@eq-cr-cif-estimate).
+
+@fig-cif-pam-sir shows the resulting CIF estimates for four covariate profiles defined by pneumonia status (yes/no) and age (40 vs. 75 years, male).
+As expected, patients with pneumonia and older patients have a higher cumulative incidence of death and a lower cumulative incidence of discharge.
+Note how the CIFs for discharge and death sum to approximately one at later time points (reflecting the fact that nearly all patients eventually experienced one of the two events).
+
+![PAM-based CIF estimates for the `sir.adm` data, stratified by four covariate profiles (pneumonia yes/no, age 40/75, male). Left panel: cumulative incidence of death. Right panel: cumulative incidence of discharge.](Figures/reductions/cif-pam-sir.png){#fig-cif-pam-sir fig-alt="PAM-based cumulative incidence function estimates for competing risks of discharge and death in ICU patients, showing higher death incidence for pneumonia and older age profiles." width=100%}
+
+
+#### Random survival forest approach
+
+Random survival forests (RSF) can handle competing risks natively.
+The implementation in the `randomForestSRC` package [@pkgrfsrc] constructs cause-specific cumulative hazard functions internally and combines them to produce CIF estimates.
+Thus, while the reduction steps are identical in principle, they are performed within the algorithm rather than by the analyst.
+
+@fig-cif-rfsrc-sir shows the RSF-based CIF estimates for the same four covariate profiles.
+The overall patterns are consistent with the PAM results, though the RSF estimates exhibit the characteristic step-function shape of tree-based methods.
+
+![RSF-based CIF estimates for the `sir.adm` data, stratified by four covariate profiles (pneumonia yes/no, age 40/75, male). Left panel: cumulative incidence of death. Right panel: cumulative incidence of discharge.](Figures/reductions/cif-rfsrc-sir.png){#fig-cif-rfsrc-sir fig-alt="Random survival forest-based cumulative incidence function estimates for competing risks of discharge and death in ICU patients." width=100%}
+
+
+#### Comparison
+
+@fig-cif-comparison-sir overlays the PAM and RSF estimates.
+Despite the fundamentally different modeling approaches --- smooth semi-parametric hazards (PAM) versus ensemble-based non-parametric hazards (RSF) --- the CIF estimates are broadly similar for all four profiles.
+This provides reassurance that both methods successfully capture the underlying competing risks structure, and highlights the modularity of the reduction approach: the choice of base learner for the cause-specific hazard models can be varied independently from the combination step.
+
+![Comparison of PAM-based (solid lines) and RSF-based (dashed lines) CIF estimates for the `sir.adm` data. Left panel: cumulative incidence of death. Right panel: cumulative incidence of discharge.](Figures/reductions/cif-comparison-sir.png){#fig-cif-comparison-sir fig-alt="Side-by-side comparison of PAM and random survival forest CIF estimates for competing risks in ICU patients, showing broadly similar estimates across methods." width=100%}
+
+
+### Discussion {#sec-cr-discussion}
+
+Several modeling choices arise within this reduction framework.
+
+**Separate vs. joint models.**
+The approach above fits fully separate models for each cause.
+An alternative is to fit a single *stacked* model that includes cause-by-covariate interactions, which allows sharing of information across causes (for example, a common baseline hazard structure or shared covariate effects).
+This can be advantageous when certain causes have few events, as the shared structure acts as a form of regularization.
+In partition-based reductions, interactions between a cause variable and the time variable $t_j$ will yield different baseline hazards for each cause.
+
+
+**Flexibility in learner choice.**
+Because the reduction treats each cause independently, the learner for each cause-specific model does not have to be the same.
+For instance, one might use a gradient boosting for cause $1$ and a random forest for cause $2$ (where complex interactions are suspected). This is however somewhat impractical as it introduces additional overhead when merging predictions from two different models.
+
+<!-- ============================================================ -->
+<!-- Moved here from P1C6_survtsk.qmd (Survival Task) on 2026-05-14 -->
+<!-- Original commit: a3d987f (Raphael, "refactor conclusion, closes #18", 2026-03-27) -->
+<!-- Reasons for move:                                              -->
+<!--   1. The factual claim about the `hdfail` dataset is wrong:    -->
+<!--      the actual data has integer days (1-11295), not 3-decimal -->
+<!--      precision, and 1,292 (not 2,641) unique event times.      -->
+<!--   2. The callout argues that prediction at every event time is -->
+<!--      unnecessary -- but most software can predict at any τ once-->
+<!--      fitted, so the framing should be about TRAINING cost, not -->
+<!--      prediction (cf. RCLL, IBS that need predictions exactly at-->
+<!--      observed event times).                                    -->
+<!-- Possible reuse: the "coarsen time grid for estimation" point   -->
+<!-- could be salvaged for a future section on training-cost trade- -->
+<!-- offs in non- and semi-parametric models, with a corrected data -->
+<!-- example (candidates: `riskRegression::Paquid`, `mets::prt`,    -->
+<!-- `mstate::ebmt2`).                                              -->
+<!-- ============================================================ -->
+
+::: {.callout-note}
+
+# Time points for prediction
+
+In practice, most software implementations produce survival predictions over a discrete set of time-points.
+These time points are often chosen to coincide with the observed event times in the training data.
+This approach is often sensible, particularly when outcomes are recorded on a coarse scale, for example as years until an event occurs.
+However, in other datasets this can lead to substantial computational burden without a practical benefit.
+For example, the `hdfail` dataset [@Monaco2018] records the time at which hard drives fail with precision to three decimal places, resulting in 2,641 unique event times.
+This resolution level is unnecessary for prediction tasks (unless in some very specialist use cases).
+
+Several strategies could be considered to address this issue.
+During pre-processing, the time scale could be coarsened, for example converting measurements from hours to days or years, or precision could be reduced through rounding.
+Alternatively, predictions could be restricted to a selection of time points, reducing computational burden while preserving the underlying information.
+
+<!-- FIXME: ANDREAS CAN YOU CONFIRM ORIGINAL TIME SCALE IS HOURS? -->
+
+:::
+
+
+<!-- ============================================================ -->
+<!-- Moved here from P4C23_eha_reduction.qmd (Reductions for EHA)  -->
+<!-- on 2026-05-15. Originally section "Why a naive 1 - Ŝ_e is    -->
+<!-- wrong" (anchor sec-cr-naive-warning) inside §Competing Risks  -->
+<!-- via Cause-Specific Hazards. The point is correct but probably -->
+<!-- belongs elsewhere (the same caveat is made empirically in     -->
+<!-- @sec-cens-vs-cr of the EHA chapter), so parked here.          -->
+<!-- ============================================================ -->
+
+### Why a naive $1 - \hatS_e$ is wrong {#sec-cr-naive-warning}
+
+It might seem strange to combine cause-specific estimates into an all-cause estimate (Step 3) and then back to cause-specific ones (Step 4).
+The CIF is the probability of observing event $e$ by time $\tau$ in the presence of all competing events (@eq-cr-cif-recall), and its computation requires the all-cause survival probability $\hatS(\tau\mid\xx)$, which depends on *all* cause-specific hazards.
+Trying to estimate the CIF by fitting a single-event model for cause $e$ and reading off $1 - \hatS_e(\tau\mid\xx) = 1 - \exp(-\hatH_e(\tau\mid\xx))$ does *not* yield a valid CIF.
+The resulting quantity, sometimes called the *net probability*, represents the marginal probability of event $e$ in a hypothetical world where the other causes can never occur, and typically overestimates the true CIF.
+A direct empirical demonstration on the same data (with the cause-specific Cox model used as the single-event learner) is given in @sec-cens-vs-cr.
+
+
+<!-- ============================================================ -->
+<!-- Below was the application sub-subsection demonstrating both  -->
+<!-- marginal and conditional state-occupation probabilities on   -->
+<!-- the prothr cohort, originally appended to "### Application   -->
+<!-- to liver cirrhosis patients" in P1C5_eha.qmd. Parked here    -->
+<!-- because the marginal SOP example raised more interpretation  -->
+<!-- questions than it resolved (no uncertainty bands, no         -->
+<!-- covariate adjustment, cohort-level prevalence is hard to     -->
+<!-- read as either causal or prognostic) and the conditional     -->
+<!-- view is numerically identical to the pairwise TPs already    -->
+<!-- shown in @fig-multi-state-prothr.                            -->
+<!--                                                              -->
+<!-- Supporting assets remain in the repo and can be re-spliced:  -->
+<!--   book/experiments/prothr_state_occupation.R                 -->
+<!--   book/experiments/prothr_state_occupation_by_entry.R        -->
+<!--   book/Figures/survival/prothr-state-occupation.png          -->
+<!--   book/Figures/survival/prothr-state-occupation-by-entry.png -->
+<!-- ============================================================ -->
+
+#### Application: state occupation in the `prothr` cohort
+
+For the `prothr` cohort we now contrast the pairwise transition picture above with the marginal state-occupation view obtained from the same Aalen-Johansen pipeline.
+Recall that the transition probabilities $\hat P_{\ell e}(0,\tau)$ shown in @fig-multi-state-prothr are *conditional*: each curve fixes a reference entry state $\ell\in\{0,1\}$ at $\tau = 0$ and reports the probability of being in state $e$ at $\tau$ for that sub-cohort.
+Because the `prothr` cohort contains substantial numbers of patients entering in *both* transient states (the empirical entry distribution is approximately $\hat\pi_0 \approx 0.45$ normal, $\hat\pi_1 \approx 0.55$ abnormal across treatment arms), the more informative population-level summary is the marginal state-occupation probability $\hat P_q(\tau)$ from @eq-ms-state-occupation-est, which mixes the two reference entry states according to their empirical weights.
+
+![Estimated state-occupation probabilities $\hat P_q(\tau)$ for the liver cirrhosis cohort, stratified by treatment arm. Bands are stacked so that at every $\tau$ they sum to one: the green band at the bottom is the probability of occupying state $0$ (normal prothrombin), the blue band is state $1$ (abnormal prothrombin), and the red band on top is the absorbing state $2$ (death). The Aalen-Johansen plug-in @eq-ms-aj-trans-prob is computed separately within each arm and then marginalised over the empirical entry-state distribution $\hat\pi_\ell = n_\ell^{(0)}/n$ as in @eq-ms-state-occupation-est.](Figures/survival/prothr-state-occupation.png){#fig-prothr-state-occupation fig-alt="Stacked area plot with two panels (Placebo on the left, Prednisone on the right). The horizontal axis is follow-up time in days from 0 to about 4000, the vertical axis is probability from 0 to 1. Within each panel three colour bands stack to a total height of one: a green band at the bottom for state 0 (normal prothrombin), a blue band above it for state 1 (abnormal prothrombin), and a red band on top for state 2 (death). The red death band grows monotonically with time in both arms, reaching roughly 0.55 at 1825 days for placebo and roughly 0.49 for prednisone. The green normal-prothrombin band widens early before contracting as mortality accumulates; the blue abnormal band shrinks gradually over follow-up."}
+
+@fig-prothr-state-occupation tells a different and complementary story to the pairwise transition probabilities.
+At each $\tau$ the three bands partition the cohort exhaustively: the red band on top is the cumulative probability of having reached the absorbing state, $\hat P_2(\tau)$, and its width is precisely the total mortality experienced by time $\tau$, regardless of how patients reached it.
+Reading off the figure at $\tau = 1825$ days (five years), roughly $56\%$ of the placebo arm and $49\%$ of the prednisone arm have died, the remaining mass being distributed between the two transient states.
+Among the survivors, the green band (state $0$, normal prothrombin) is consistently wider than the blue band (state $1$, abnormal prothrombin) under prednisone, whereas in the placebo arm the two transient bands are closer to parity over much of follow-up — consistent with a treatment-induced shift in steady-state prothrombin status among the still-alive cohort.
+
+It is worth contrasting what the two presentations make visible.
+The pairwise transition probabilities in @fig-multi-state-prothr expose the *flow* dynamics conditional on a fixed reference entry state and are interpretable only under the Markov assumption.
+The state-occupation curves in @fig-prothr-state-occupation, by contrast, summarise the cohort-level *prevalence* of each state at $\tau$ and, crucially, remain a consistent target of the Aalen-Johansen plug-in even if the Markov assumption fails [@putter2018; @niessl2023].
+For descriptive reporting and for prediction questions of the form "what fraction of treated patients will be alive in normal-prothrombin status at five years?", $\hat P_q(\tau)$ is the more direct quantity; the conditional $\hat P_{\ell e}(0,\tau)$ remain useful when the scientific question is explicitly about transitions from a specified starting state.
+
+If we are willing to assume Markovianity, we can refine the picture further by stratifying the state-occupation view by entry state, that is, by re-expressing each row of the Aalen-Johansen transition-probability matrix as a stacked area summing to one (@fig-prothr-state-occupation-by-entry).
+This re-uses exactly the numbers underlying @fig-multi-state-prothr; only the presentation differs, with each row of the matrix collapsed into a single panel that shows how a sub-cohort with a fixed entry state $\ell$ redistributes across the three states over time.
+
+![Conditional state-occupation probabilities $\hat P_{\ell q}(0,\tau)$ for the liver cirrhosis cohort, by entry state (rows) and treatment arm (columns). Within each panel the three bands stack to one and represent the same row $\ell$ of the Aalen-Johansen transition-probability matrix shown line-by-line in @fig-multi-state-prothr. Top row: sub-cohort entering in state $0$ (normal prothrombin); bottom row: sub-cohort entering in state $1$ (abnormal prothrombin). Consistency of these conditional curves relies on the Markov assumption.](Figures/survival/prothr-state-occupation-by-entry.png){#fig-prothr-state-occupation-by-entry fig-alt="Two-by-two grid of stacked-area plots. Rows correspond to entry state (top: normal; bottom: abnormal); columns to treatment arm (left: placebo; right: prednisone). Horizontal axis is follow-up time in days from 0 to 4000; vertical axis is probability from 0 to 1. Each panel shows three coloured bands summing to one: a green band for state 0 (normal prothrombin), a blue band for state 1 (abnormal prothrombin), and a red band on top for state 2 (death). In the top row the red death band climbs from 0 to roughly 0.5 over follow-up while the green band gradually narrows; the blue band is thin throughout. In the bottom row (entry state abnormal) the green band rises quickly from 0 to about 0.45 within the first year before contracting; the blue band starts at 1 and shrinks; the red band grows faster than in the top row, reaching about 0.6 by 1825 days in the placebo arm and about 0.55 in the prednisone arm."}
+
+The bottom row of @fig-prothr-state-occupation-by-entry exposes a clinically relevant dynamic that the marginal view averages out: among patients entering with abnormal prothrombin, the probability of having normalised within the first year is substantial (the green band climbs from $0$ to roughly $0.45$ before mortality starts to dominate), and prednisone shifts this redistribution further toward normalisation than placebo does.
+Numerically, $\hat P_{1,0}(0,\,1825) \approx 0.29$ under placebo versus $\approx 0.35$ under prednisone, with a corresponding gap in five-year mortality ($\hat P_{1,2}(0,\,1825) \approx 0.60$ vs. $\approx 0.55$).
+For patients entering in state $0$ (top row), mortality at five years is markedly lower in both arms and the blue band remains thin throughout, reflecting that conversions to the abnormal state are short-lived because they tend to be followed promptly by either recovery or death.
