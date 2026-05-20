@@ -21,7 +21,7 @@ Evaluation functions (Part II) can identify if one model is better suited than a
 However, they cannot identify whether the objective function itself is correctly specified as that specification depends on assumptions about the data-generating process.
 For example, the type(s) of censoring/truncation present, whether the censoring time $C$ is independent of the event time $Y$ (marginally or conditionally on covariates $X$), and whether competing events are present.
 Misstating these assumptions yields a mismatched estimand; evaluating under these assumptions produces meaningless (even if plausible looking) results.
-it is therefore vital for practitioners to be able identify and specify the survival problem present in their data to ensure models are correctly fit and evaluated.
+It is therefore vital for practitioners to be able identify and specify the survival problem present in their data to ensure models are correctly fit and evaluated.
 
 ## Quantifying the Distribution of Event Times {#sec-distributions}
 
@@ -145,9 +145,10 @@ $$
 
 It follows that the unconditional probability to survive beyond time point $\tau$ is given by
 
+<!-- FIXME (ANDREAS): CHANGED TAU TO K IN PARENTHESES - CHECK THIS FIX IS CORRECT -->
 <!--  -->
 $$
-S_{\tilde{Y}}(\tau) = P(\tilde{Y} > \tau) = \prod_{k\leq\tau} s_{\tilde{Y}}(\tau) = \prod_{k\leq\tau}(1-h_{\tilde{Y}}(\tau)),
+S_{\tilde{Y}}(\tau) = P(\tilde{Y} > \tau) = \prod_{k\leq\tau} s_{\tilde{Y}}(k) = \prod_{k\leq\tau}(1-h_{\tilde{Y}}(k)),
 $$ {#eq-discrete-surv-prob}
 <!--  -->
 and the unconditional probability for an event at time $\tau$ is
@@ -175,24 +176,23 @@ S_{\tilde{Y}}(j) = P(Y > a_{j}) = S_Y(a_{j})
 $$
 
 #### Definitions of discrete-time cumulative hazard {.unnumbered .unlisted}
-Before moving on, note that the discrete-time cumulative hazard $H^d_{\tilde{Y}}(\tau)$ may be defined in one of two ways in the literature.
+Before moving on, note that the discrete-time cumulative hazard $H_{\tilde{Y}}(\tau)$ may be defined in one of two ways in the literature.
 The additive form (@eq-discrete-cumu-hazard) is the conventional choice, and the one used in this book.
 Under this definition, the continuous-time identity $S(\tau) = \exp(-H(\tau))$ no longer holds, and survival is recovered through the product (@eq-discrete-surv-prob) instead.
 An alternative convention defines
 
 $$
-H^d_{\tilde{Y}}(\tau) := -\log S^d_{\tilde{Y}}(\tau) = -\sum_{k=1}^{\tau}\log\bigl(1 - h^d_{\tilde{Y}}(k)\bigr),
+H_{\tilde{Y}}(\tau) := -\log S_{\tilde{Y}}(\tau) = -\sum_{k=1}^{\tau}\log\bigl(1 - h_{\tilde{Y}}(k)\bigr),
 $$
 
 which preserves $S = \exp(-H)$ exactly.
 
-The two coincide in the small-hazard limit, where $-\log(1 - h^d(k)) \approx h^d(k)$, and both converge to the continuous-time integral $H(\tau) = \int_0^\tau h(u)\,\du$ as the discretization is refined; for a unified product-integral treatment, see @aalen2008survivalevent [§3.2.4].
+The two coincide in the small-hazard limit, where $-\log(1 - h_{\tilde{Y}}(k)) \approx h_{\tilde{Y}}(k)$, and both converge to the continuous-time integral $H(\tau) = \int_0^\tau h(u)\,\du$ as the discretization is refined; for a unified product-integral treatment, see @aalen2008survivalevent [§3.2.4].
 
 ## Single-event, right-censored data {#sec-data-rc}
 
 The complexity of Survival Analysis compared to other fields arises from the fact that the outcome of interest is often only observed partially. 
 In particular, the time-to-event is often unknown at the end of the observation period, as the event has not occurred yet.
-
 
 Let,
 
@@ -201,7 +201,7 @@ Let,
 * $C$ taking values in $\NNReals$ be the (partially unobservable) *true censoring time*.
 
 In the presence of censoring $C$, it is impossible to fully observe the true outcome of interest, $Y$.
-Instead, the observable variables are defined by
+Instead, the observable variables are defined by the random variables,
 
 * $T := \min\{Y,C\}$, the *outcome time* (realizations are referred to as the *observed outcome time*); and
 * $\Delta := \II(Y = T) = \II(Y \leq C)$, the *event indicator* (also known as the *censoring* or *status* indicator).
@@ -209,7 +209,7 @@ Instead, the observable variables are defined by
 Together $(T,\Delta)$ is referred to as the *survival outcome* or *survival tuple* and they form the dependent variables.
 The survival outcome provides a concise mechanism for representing the outcome time and indicating which outcome (event or censoring) took place.
 
-A *survival dataset* is an $n \times p$, real-valued matrix defined by $\calD = ((\xx_1, \ t_1, \ \delta_1) \cdots (\xx_n,t_n,\delta_n))^\trans$, where $(t_i,\delta_i)$ are realizations of the respective random variables  $(T_i, \Delta_i)$ and $\xx_i$ is a $p$-dimensional vector, $\xx_i = (x_{i,1} \ x_{i,2} \cdots x_{i,p})^\trans$ of features.
+A single-event right-censored *survival dataset* is defined by $\calD = \{(\xx_i, t_i, \delta_i)\}_{i=1}^n$, where $(t_i,\delta_i)$ are realizations of $(T_i, \Delta_i)$ and $\dvec{x_i}{p}$ is a vector of features.
 
 In this book, we will often refer to the unique, ordered event times.
 For example, given survival data, $(t_1=6, \delta_1=0)$, $(t_2=1, \delta_2=1)$, $(t_3=10,\delta_3=1)$, $(t_4=5,\delta_4=0)$, $(t_5 =10,\delta_5=1)$ the ordered unique event times are $(t_{(1)},  t_{(2)}) = (1,10)$ as the censored observations are removed, as are duplicated times.
@@ -376,7 +376,7 @@ To avoid misinterpretation, the following definitions are used in this book:
 
 * If $C \indep X$, censoring is *feature-independent*, otherwise censoring is *feature-dependent*.
 * If $C \indep Y$, censoring is *event-independent*, otherwise censoring is *event-dependent*.
-* If $(C \indep Y) | X$, censoring is conditionally independent of the event given covariates, or *conditionally event-independent*.
+* If $C \indep Y | X$, censoring is conditionally independent of the event given covariates, or *conditionally event-independent*.
 * If $C \indep (X,Y)$, censoring is *completely* or *fully independent*.
 
 Fully independent censoring is the strongest assumption and implies that censoring does not depend on either covariates or the event time.
@@ -496,39 +496,57 @@ where the last equality follows from @eq-continuous-hazard.
 Equivalently, training a model on right-censored data by minimizing the negative log of @eq-right-censoring-likelihood is the MLE view of the same objective.
 
 Similar adjustments to the likelihood can be made for other types of censoring and in the presence of truncation.
-Following @Klein2003, we can define the individual likelihood contributions for the different types of censoring as
+Let $\mathcal{C}_i$ denote the event-time information implied by the observed censoring pattern, such that [@Klein2003],
 
-- observed event at $t_i$: $f_Y(t_i|\bstheta)$
-- right-censoring: $P(Y_i > t_i|\bstheta) = S_Y(t_i|\bstheta)$
-- left-censoring: $P(Y_i < t_i|\bstheta) = F_Y(t_i|\bstheta) = 1 - S_Y(t_i|\bstheta)$
-- interval-censoring: $P(l_i < Y_i \leq r_i|\bstheta) = S_Y(l_i|\bstheta) - S_Y(r_i|\bstheta)$
-
+$$
+\Pr(\mathcal{C}_i \mid \bstheta) =
+\begin{cases}
+\Pr(Y_i = t_i \mid \bstheta) = f_Y(t_i \mid \bstheta),  & \text{observed event}, \\
+\Pr(Y_i > t_i \mid \bstheta) = S_Y(t_i \mid \bstheta),  & \text{right-censoring}, \\
+\Pr(Y_i < t_i \mid \bstheta) = F_Y(t_i \mid \bstheta),  & \text{left-censoring}, \\
+\Pr(l_i < Y_i \leq r_i \mid \bstheta) = S_Y(l_i \mid \bstheta) - S_Y(r_i \mid \bstheta),  & \text{interval-censoring}.
+\end{cases}
+$$ {#eq-likelihood-censoring}
 
 Depending on which of the above contributions occur in the data set, we can now construct our likelihood accordingly.
 Let $\mathcal{O}, \mathcal{RC}, \mathcal{LC}, \mathcal{IC}$ non-overlapping subsets of the observed data $\mathcal{D}$ for subjects with observed event times, right-censoring, left-censoring and interval-censoring, respectively.
 Assuming independence between observations and in absence of truncation, the likelihood for the observed data can be defined as
 
 $$
-\mathcal{L}(\bstheta) \propto \prod_{i \in \mathcal{O}}f_Y(t_i|\bstheta) \prod_{i \in \mathcal{RC}}S_Y(t_i|\bstheta) \prod_{i \in \mathcal{LC}}(1-S_Y(t_i|\bstheta))\prod_{i \in \mathcal{IC}}(S_Y(l_i|\bstheta)-S_Y(r_i|\bstheta))
+\calL(\bstheta) \propto \prod_{i \in \mathcal{O}}f_Y(t_i|\bstheta) \prod_{i \in \mathcal{RC}}S_Y(t_i|\bstheta) \prod_{i \in \mathcal{LC}}(1-S_Y(t_i|\bstheta))\prod_{i \in \mathcal{IC}}(S_Y(l_i|\bstheta)-S_Y(r_i|\bstheta))
 $$ {#eq-objective-function}
 
-In case of truncation, the adjustments are made to all observations, as we have to condition on the event occurring after/before the truncation time.
-The truncation adjusted likelihood contributions (assuming independence of truncation and event/censoring times) would thus be given by
+In case of truncation, the likelihood contribution is conditioned on inclusion in the observation window,
 
-* left-truncation:
+$$
+\calL_i(\bstheta) \propto \Pr(\mathcal{C}_i \mid \mathcal{T}_i, \bstheta) = \frac{\Pr(\mathcal{C}_i \cap \mathcal{T}_i \mid \bstheta)}{\Pr(\mathcal{T}_i \mid \bstheta)},
+$$ {#eq-likelihood-combined}
 
-  * event: $f(Y_i = t_i|Y_i \geq t_i^\ell, \bstheta) = \frac{f_Y(t_i|\bstheta)}{S_Y(t_i^\ell|\bstheta)}$
-  * left-censoring: $P(Y_i < t_i|Y_i \geq t_i^\ell, \bstheta) = \frac{S_Y(t_i|\bstheta)}{S_Y(t_i^\ell|\bstheta)}$
-  * interval-censoring: $P(l_i < Y_i \leq r_i|Y_i \geq t_i^\ell,\bstheta) = \frac{S_Y(l_i|\bstheta) - S_Y(r_i|\bstheta)}{S_Y(t_i^\ell|\bstheta)}$
+where $\mathcal{C}_i$ is as defined in (@eq-likelihood-censoring) and $\mathcal{T}_i$ is the truncation condition, such that,
 
-* right-truncation:
+$$
+\Pr(\mathcal{T}_i|\bstheta) =
+\begin{cases}
+P(Y_i \geq t_i^\ell|\bstheta) = S_Y(t_i^\ell|\bstheta), & \text{left truncation}, \\
+P(Y_i \leq t_i^R|\bstheta) = F_Y(t_i^R|\bstheta), & \text{right truncation}.
+\end{cases}
+$$ {#eq-likelihood-truncation}
 
-  * event: $f(Y_i = t_i|Y_i \leq t_i^R, \bstheta) = \frac{f_Y(t_i|\bstheta)}{F_Y(t_i^R|\bstheta)}$
-  * left-censoring: $P(Y_i < t_i|Y_i \leq t_i^R, \bstheta) = \frac{S_Y(t_i|\bstheta)}{F_Y(t_i^R|\bstheta)}$
-  * interval-censoring: $P(l_i < Y_i \leq r_i|Y_i \leq t_i^R,\bstheta) = \frac{S_Y(l_i|\bstheta) - S_Y(r_i|\bstheta)}{F_Y(t_i^R|\bstheta)}$
+The various combinations formed by substituting (@eq-likelihood-censoring) and (@eq-likelihood-truncation) into (@eq-likelihood-combined) are summarized in @tbl-likelihood-combinations.
 
+<!-- FIXME (ANDREAS): GPT THINKS THE RIGHT-CENSORED/RIGHT-TRUNCATION CONTRIBUTION SHOULD BE $\frac{F_Y(t_i^R\mid\bstheta)-F_Y(t_i\mid\bstheta)}{F_Y(t_i^R\mid\bstheta)}$ -->
+<!-- FIXME (ANDREAS): GPT THINKS THE LEFT-CENSORED/LEFT-TRUNCATION CONTRIBUTION SHOULD BE $\frac{F_Y(t_i\mid\bstheta)-F_Y(t_i^\ell\mid\bstheta)}{S_Y(t_i^\ell\mid\bstheta)}$ -->
 
-Note that in in practice, data sets will often not contain all types of censoring or truncation, in which case @eq-objective-function will contain only a subset of the product terms. This has been illustrated in @eq-right-censoring-likelihood under absence of truncation and $\mathcal{LC}=\mathcal{IC}=\emptyset$.
+  | Censoring type    | Left-truncation | Right-truncation |
+| --- | --- | --- |
+| Event             | $\displaystyle \frac{f_Y(t_i\mid\bstheta)}{S_Y(t_i^\ell\mid\bstheta)}$ | $\displaystyle \frac{f_Y(t_i\mid\bstheta)}{F_Y(t_i^R\mid\bstheta)}$ |
+| Right-censored    | $\displaystyle \frac{S_Y(t_i\mid\bstheta)}{S_Y(t_i^\ell\mid\bstheta)}$ | $\displaystyle \frac{S_Y(t_i\mid\bstheta)}{F_Y(t_i^R\mid\bstheta)}$ |
+| Left-censored     | $\displaystyle \frac{F_Y(t_i\mid\bstheta)}{S_Y(t_i^\ell\mid\bstheta)}$ | $\displaystyle \frac{F_Y(t_i\mid\bstheta)}{F_Y(t_i^R\mid\bstheta)}$ |
+| Interval-censored | $\displaystyle \frac{S_Y(l_i\mid\bstheta)-S_Y(r_i\mid\bstheta)}{S_Y(t_i^\ell\mid\bstheta)}$ | $\displaystyle  \frac{S_Y(l_i\mid\bstheta)-S_Y(r_i\mid\bstheta)}{F_Y(t_i^R\mid\bstheta)}$   |
+
+: Likelihood contributions adjusted for censoring and truncation. {#tbl-likelihood-combinations}
+
+Note that in practice, data sets will often not contain all types of censoring or truncation, in which case @eq-objective-function will contain only a subset of the product terms. This has been illustrated in @eq-right-censoring-likelihood under absence of truncation and $\mathcal{LC}=\mathcal{IC}=\emptyset$.
 
 ### Non-parametric estimation {#sec-surv-estimation-non-param}
 
@@ -562,11 +580,11 @@ In this book, $\KMS$ specifically refers to the Kaplan-Meier estimator fit on so
 
 For illustration, we consider the `tumor` data set from @sec-data-rc.
 @fig-km-tumor shows the estimated survival probability obtained by applying the Kaplan-Meier estimator to the full data set, containing observations of $n=776$ subjects.
-By definition, the survival function starts at $S(t)=1$ at $t=0$ and monotonically decreases towards $S(t)=0$ for $t\rightarrow \infty$. 
+By definition, the survival function starts at $S(\tau)=1$ at $\tau=0$ and monotonically decreases towards $S(\tau)=0$ for $\tau \rightarrow \infty$. 
 However, follow-ups are usually not infinite and in the presence of censoring, the survival function may not reach 0 by the end of the observation period.
 For the Kaplan-Meier estimator specifically, $\KMS(t_{(m)}) = 0$ only if the last observed time is an event time and there are no censored observations at the same time.
 
-Dotted lines indicate the median survival, defined as the time at which the survival function reaches $S(t) = 0.5$. 
+Dotted lines indicate the median survival, defined as the time at which the survival function reaches $S(\tau) = 0.5$. 
 In this example, the median survival time is approximately 1500 days.
 This means that 50% of the subjects are expected die within 1500 days after operation.
 
@@ -587,8 +605,11 @@ $$
 H_{NA}(\tau) = \sum_{k:\tbk\leq \tau} h_{\tilde{Y}}(\tbk) = \sum_{k:\tbk\leq \tau} \frac{d_{\tbk}}{n_{\tbk}}.
 $$ {#eq-nelson-aalen}
 
-Note that we use a continuous time valued $\tau$ for the definition, which implies that $H_{NA,e}(\tau) = H_{NA,e}(\tbk)\ \forall \tau \in [\tbk, t_{(k+1)})$.
-In words: For time points between two unique event times we assume the previous value of the estimate.
+This definition implies that if $\tau$ falls between two unique event times, then $H_{NA}(\tau)$ equals the value of the estimate at the most recent event time:
+
+$$
+H_{NA}(\tau) = H_{NA}(\tbk)\ \forall \tau \in [\tbk, t_{(k+1)}).
+$$
 
 Based on (@eq-surv-haz) we can also define a survival probability estimator based on the Nelson-Aalen estimator as
 
