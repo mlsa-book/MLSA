@@ -20,60 +20,63 @@ These definitions and concepts are standard in survival analysis, but are presen
 Evaluation functions\index{evaluation} (Part II) can identify if one model is better suited than another to minimize a given objective function.
 However, they cannot identify whether the objective function itself is correctly specified as that specification depends on assumptions about the data-generating process.
 For example, the type(s) of censoring/truncation present\index{censoring}\index{truncation}, whether the censoring time $C$ is independent of the event time $Y$ (marginally or conditionally on covariates $X$), and whether competing events are present.
-Misstating these assumptions yields a mismatched estimand; evaluating under these assumptions produces meaningless (even if plausible looking) results.
+Misstating these assumptions yields a mismatched estimand: evaluating under these assumptions produces meaningless (even if plausible looking) results.
 It is therefore vital for practitioners to be able to identify and specify the survival problem present in their data to ensure models are correctly fit and evaluated.
 
-## Quantifying the Distribution of Event Times {#sec-distributions}
+## Quantifying the distribution of event times {#sec-distributions}
 
 This section introduces functions that can be used to fully characterize a probability distribution\index{probability distribution}, with particular focus on functions that are important in survival analysis.
 
 In the temporal domain, events can either be recorded in discrete or continuous time.
-For example, a problem that aims to predict the number of rounds of chemotherapy before remission would record the outcome as a discrete-time value\index{discrete-time survival analysis}.
+For example, the number of rounds of chemotherapy before remission would be recorded as a discrete-time value\index{discrete-time survival analysis}.
 The number of rounds, while still measured over time, can only take values in the positive naturals, $\PNaturals$.
-In contrast, if a practitioner were instead predicting the time to remission from the first round of chemotherapy, then this may be recorded as the elapsed time between the first treatment and remission, a continuous-time measurement over the non-negative reals, $\NNReals$.
+In contrast, if a practitioner were instead recording the time to remission from the first round of chemotherapy, then this may be recorded as the elapsed time between the first treatment and remission, which is a continuous-time measurement over the non-negative reals, $\NNReals$.
 
-In practice the differences are often blurred as time-measurement will naturally be discretized at some level and precision beyond some resolution is often not of interest (hospital length of stay might be interesting up to days or hours, but not minutes and seconds).
-Many software implementations rely on continuous-time theory, and continuous-time methods are therefore typically applied even when the underlying data are technically discrete.
-Moreover, discrete-time methods are often applied to continuous-time data and vice versa (see @sec-partition-based-reductions for discrete-time methods applied to continuous data)\index{reductions}.
+In practice, the differences between continuous and discrete time measurements are often blurred.
+Time measurements are naturally discretized at some level and precision beyond some resolution is often not of interest.
+For example, length of stay in hospital could be interesting up to days or even hours, but not minutes and seconds.
+Software implementations of survival analysis techniques usually rely on continuous-time theory, and continuous-time methods are typically applied even when the underlying data are technically discrete.
 It is nevertheless important to make the distinction as it informs mathematical treatment and definition of the different quantities introduced below.
+Moreover, discrete-time methods can be applied to continuous-time data (@sec-partition-based-reductions) and separate discussion is therefore important to understand those techniques \index{reductions}.
+
 
 ::: {.callout-note}
 
 # Handling events at $\tau = 0$
 
-In the theory, continuous-time outcomes are defined on the non-negative Reals, $\tau \in \NNReals$, which allows events to occur at $\tau = 0$.
+In the literature, continuous-time outcomes are usually defined on the non-negative Reals, $\tau \in \NNReals$, which allows events to occur at $\tau = 0$.
 In practice, most model implementations assume time lies on the positive Reals, $\tau \in \PReals$, and therefore cannot accommodate events at $\tau = 0$.
 
-Although relatively uncommon, observations with $\tau = 0$ do arise in real data and must be addressed during preprocessing.
+Although relatively uncommon, observations with $\tau = 0$ do arise in real data and must be addressed during data preprocessing before model fitting.
 Some strategies include:
 
 1. Removing observations with $t_i = 0$;
-2. Replacing $t_i = 0$ with a small positive constant $\epsilon \in \PReals$;
+2. Replacing $t_i = 0$ with a small positive constant $\epsilon>0$;
 3. Setting $t_i$ to the smallest observed event time greater than zero.
 
-These decisions are context-dependent and it is essential that any decisions are clearly documented and justified.
+These choices are context-dependent and it is essential that any decisions are clearly documented and justified.
 
 :::
 
-### Continuous Time {#sec-distributions-continuous}
+### Continuous time {#sec-distributions-continuous}
 
-For now, assume a continuous, positive, random variable $Y$ taking values in $\NNReals$.
-A standard representation of the distribution of $Y$ is given by the probability density function\index{probability density function}, $f_Y: \NNReals \rightarrow \NNReals$, and cumulative distribution function\index{cumulative distribution function}, $F_Y: \NNReals \rightarrow [0,1]; F_Y(\tau) = P(Y \leq \tau)$.
+For this section, assume a continuous random variable $Y$ taking values in $\NNReals$.
+A standard representation of the distribution of $Y$ is given by the probability density function\index{probability density function}, $f_Y: \NNReals \rightarrow \NNReals$, and cumulative distribution function\index{cumulative distribution function}, $F_Y: \NNReals \rightarrow [0,1]; F_Y(\tau) = \Pr(Y \leq \tau)$.
 
 In survival analysis, it is more common to describe the distribution of event times $Y$ via the *survival function*\index{survival function} and *hazard function* (or *hazard rate*)\index{hazard function} rather than the probability density function or cumulative distribution function. The survival function is defined as
 $$
-S_Y(\tau) = P(Y > \tau) = \int^\infty_\tau f_Y(u) \ \du,
+S_Y(\tau) = \Pr(Y > \tau) = \int^\infty_\tau f_Y(u) \ \du,
 $$ {#eq-surv-prob}
 
 which is the probability that an event has not occurred by $\tau \geq 0$ and thus the complement of the cumulative distribution function: $S_Y(\tau) = 1-F_Y(\tau)$.
 By definition, $S_Y(0)=1$ and $S(\tau)\rightarrow 0$ for $\tau \rightarrow \infty$ (handling when this is not the case is discussed at the end of this section).
 
-The hazard function is given by
+The hazard function is given by,
 $$
 \begin{aligned}
-h_Y(\tau) &= \lim_{\dtau \searrow 0}\frac{P(\tau  \leq Y < \tau + \dtau|Y \geq \tau)}{\dtau} \\
-          &= \lim_{\dtau \searrow 0}\frac{P(Y \in [\tau, \tau + \dtau)|Y \geq \tau)}{\dtau}\\
-          & = \frac{f_Y(\tau)}{S_Y(\tau)}
+h_Y(\tau) &= \lim_{\dtau \searrow 0}\frac{\Pr(\tau  \leq Y < \tau + \dtau \mid Y \geq \tau)}{\dtau} \\
+          &= \lim_{\dtau \searrow 0}\frac{\Pr(Y \in [\tau, \tau + \dtau) \mid Y \geq \tau)}{\dtau}\\
+          & = \frac{f_Y(\tau)}{S_Y(\tau)},
 \end{aligned}
 $$ {#eq-continuous-hazard}
 
@@ -85,55 +88,56 @@ It is worth noting two particular points about the hazard function.
 First, the hazard is a rate per unit time, which means its numerical value depends on the scale on which $\tau$ is measured.
 A hazard of $0.01$ on a daily scale equals $3.65$ on an annual scale for the same underlying process. 
 Second, hazards are the natural modelling target in survival analysis because censoring affects them locally.
-At a given $\tau$, only the subjects still at risk contribute to the hazard rate, so it can be estimated from the event and risk-set counts at that time point alone — without needing the full survival trajectory up to $\tau$, which would itself require uncensored follow-up over $[0, \tau]$.
+At a given $\tau$, only the subjects still at risk contribute to the hazard rate, so it can be estimated from the event and risk-set counts at that time point alone.
+The full survival trajectory up to $\tau$ is not required, which would itself require uncensored follow-up over $[0, \tau]$.
 For a book-length treatment of the hazard rate and its uses, see @rinneHazardRateTheory2014.
 
-The cumulative hazard function\index{cumulative hazard function} can be derived from the hazard function by
+The cumulative hazard function\index{cumulative hazard function} can be derived from the hazard function by,
+
 $$
 H_Y(\tau) = \int^\tau_0 h_Y(u) \ \du,
 $$ {#eq-cumu-hazard}
 
-and relates to the survival function via
+and relates to the survival function via,
 
 $$
 \begin{aligned}
 H_Y(\tau) & = \int^\tau_0 h_Y(u) \ \du = \int^\tau_0 \frac{f_Y(u)}{S_Y(u)} \ \du\\
-          & = \int^\tau_0 -\frac{S'_Y(u)}{S_Y(u)} \ \du = -\log(S_Y(\tau))
+          & = \int^\tau_0 -\frac{S'_Y(u)}{S_Y(u)} \ \du = -\log(S_Y(\tau)).
 \end{aligned}
 $$
 
-These last relationships are particularly important, as many methods estimate the hazard rate, which is then used to calculate the cumulative hazard and survival probability
+These last relationships are particularly important, as many methods estimate the hazard rate, which is then used to calculate the cumulative hazard and survival probability,
 
 $$
-S_Y(\tau) = \exp(-H_Y(\tau)) = \exp\left(-\int_0^\tau h_Y(u)\ \du\right)
+S_Y(\tau) = \exp(-H_Y(\tau)) = \exp\left(-\int_0^\tau h_Y(u)\ \du\right).
 $$ {#eq-surv-haz}
 
 Unless necessary to avoid confusion, subscripts are dropped from $S_Y, h_Y$ etc. going forward and instead these functions are referred to as $S$, $h$ (and so on).
 
-#### Proper vs. improper event times {.unnumbered .unlisted}
+#### Proper and improper event times {.unnumbered .unlisted}
 
-The formal definitions above take $Y$ to be a *proper* random variable\index{proper distribution}, i.e. $S_Y(\tau) \to 0$ as $\tau \to \infty$.
-However, many real-world events are *improper* at the population level\index{improper distribution}, $S_Y(\infty) = \pi_0 > 0$.
-Continuing an example from the introduction, if modelling the time between relapses from multiple sclerosis, not every patient will experience a relapse.
+The formal definitions above take $Y$ to be a *proper* random variable\index{proper distribution}, which means $S_Y(\tau) \to 0$ as $\tau \to \infty$.
+However, many real-world events are *improper* at the population level\index{improper distribution}, $S_Y(\infty) = \pi_0 > 0$, which practically means the event is not guaranteed to occur.
+To continue an example from the introduction, when modelling the time between relapses from multiple sclerosis, not every patient will experience a relapse.
 The value $\pi_0$ is known as the _cure fraction_, for a full treatment of _cure models_ see [@Maller1996; @Lambert2007]\index{cure models}.
 
-In practice, for the predictive targets in this book, improper distributions are rarely an obstacle as predictions live on a finite horizon $[0, \tau^*]$ on which $S(\tau)$ and $h(\tau)$ for $\tau \in [0, \tau^*]$ are well-defined regardless of properness of $Y$.
-The one quantity that is genuinely sensitive to properness is the *mean* survival time $\EE[Y] = \int_0^\infty S_Y(u)\,\du$, which diverges for improper $Y$.
+In practice, for the predictive targets in this book, improper distributions are rarely an obstacle as predictions live on a finite horizon $[0, \tau^*]$ on which $S(\tau)$ and $h(\tau)$ are well-defined regardless of properness of $Y$ when $\tau \in [0, \tau^*]$.
+A quantity that is particularly sensitive to properness is the *mean* survival time $\EE[Y] = \int_0^\infty S_Y(u)\,\du$, which diverges for improper $Y$.
 The *restricted mean survival time* (RMST)\index{restricted mean survival time} $\int_0^{\tau^*} S_Y(u)\,\du$ is often used as a finite-horizon replacement (@sec-survtsk-time).
 Informal phrasings later in the chapter such as "the event may occur later in life" should be read as "later than the observation window", not as an assertion that $Y$ is proper.
 
+### Discrete time {#sec-distributions-discrete}
 
-### Discrete Time {#sec-distributions-discrete}
+Now let $\tilde{Y}$ be a random variable that represents discrete or discretized time, taking values in $\PNaturals$\index{discrete-time survival analysis}.
 
-Now let $\tilde{Y}$ be a discrete, positive random variable that represents discrete or discretized time, taking values in $\PNaturals$; and $\tau\in \PNaturals$ some time point in discrete time\index{discrete-time survival analysis}.
-
-The discrete-time hazard rate is defined as
+The discrete-time hazard rate is defined as,
 
 $$
-h_{\tilde{Y}}(\tau) = P(\tilde{Y}=\tau|\tilde{Y} \geq \tau).
+h_{\tilde{Y}}(\tau) = \Pr(\tilde{Y}=\tau \mid \tilde{Y} \geq \tau).
 $$ {#eq-discrete-hazard}
 
-Thus, in contrast to the continuous-time hazard @eq-continuous-hazard, the discrete-time hazard is an actual (conditional) probability, rather than a rate and therefore might be easier to interpret.
+Thus, in contrast to the continuous-time hazard (@eq-continuous-hazard), the discrete-time hazard is an actual (conditional) probability, rather than a rate and can therefore be easier to interpret.
 
 The cumulative discrete-time hazard is given by,
 
@@ -141,24 +145,31 @@ $$
 H_{\tilde{Y}}(\tau) = \sum_{k=1}^{\tau}h_{\tilde{Y}}(k).
 $$ {#eq-discrete-cumu-hazard}
 
-The complement of @eq-discrete-hazard, the probability to survive beyond $\tau$ given survival until $\tau$, is defined as,
+The probability of surviving beyond $\tau$ given survival until $\tau$, is given by,
 
 $$
-s_{\tilde{Y}}(\tau) := 1 - h_{\tilde{Y}}(\tau) = P(\tilde{Y}> \tau|\tilde{Y} \geq \tau).
-$$
+s_{\tilde{Y}}(\tau) = \Pr(\tilde{Y}> \tau \mid \tilde{Y} \geq \tau).
+$$ {#eq-discrete-surviving}
 
-It follows that the unconditional probability to survive beyond time point $\tau$ is given by
+Conditional on survival to $\tau$, the event either occurs at or after $\tau$, and hence (@eq-discrete-surviving) is the complement of (@eq-discrete-hazard):
+
+$$
+s_{\tilde{Y}}(\tau) = 1 - h_{\tilde{Y}}(\tau).
+$$
+<!-- FIXME (ANDREAS): I ADDED THE EXTRA LINE BECAUSE THE RELATIONSHIP WASN'T IMMEDIATELY OBVIOUS TO ME -->
+
+It follows that the unconditional probability to survive beyond time point $\tau$ is given by,
 
 <!-- FIXME (ANDREAS): CHANGED TAU TO K IN PARENTHESES - CHECK THIS FIX IS CORRECT -->
 <!--  -->
 $$
-S_{\tilde{Y}}(\tau) = P(\tilde{Y} > \tau) = \prod_{k\leq\tau} s_{\tilde{Y}}(k) = \prod_{k\leq\tau}(1-h_{\tilde{Y}}(k)),
+S_{\tilde{Y}}(\tau) = \Pr(\tilde{Y} > \tau) = \prod_{k\leq\tau} s_{\tilde{Y}}(k) = \prod_{k\leq\tau}(1-h_{\tilde{Y}}(k)),
 $$ {#eq-discrete-surv-prob}
 <!--  -->
 and the unconditional probability for an event at time $\tau$ is
 <!--  -->
 $$
-P(\tilde{Y}=\tau) = S_{\tilde{Y}}(\tau-1) h_{\tilde{Y}}(\tau).
+\Pr(\tilde{Y}=\tau) = S_{\tilde{Y}}(\tau-1) h_{\tilde{Y}}(\tau).
 $$ {#eq-discrete-prob}
 <!--  -->
 When applied to continuous time $Y$, the follow-up is divided in $J$ disjoint intervals $[a_0,a_{1}), \ldots, [a_{j-1},a_j), \ldots, [a_{J-1},a_{J}]$, such that
@@ -170,13 +181,13 @@ $$
 Thus,
 
 $$
-h_{\tilde{Y}}(j) = P(Y \in [a_{j-1},a_j)|Y \geq a_{j-1})
+h_{\tilde{Y}}(j) = \Pr(Y \in [a_{j-1},a_j) \mid Y \geq a_{j-1})
 $$
 
 and
 
 $$
-S_{\tilde{Y}}(j) = P(Y > a_{j}) = S_Y(a_{j})
+S_{\tilde{Y}}(j) = \Pr(Y > a_{j}) = S_Y(a_{j})
 $$
 
 #### Definitions of discrete-time cumulative hazard {.unnumbered .unlisted}
@@ -195,16 +206,14 @@ The two coincide in the small-hazard limit, where $-\log(1 - h_{\tilde{Y}}(k)) \
 
 ## Single-event, right-censored data {#sec-data-rc}
 
-The complexity of survival analysis compared to other fields arises from the fact that the outcome of interest is often only observed partially. 
-In particular, the time-to-event is often unknown at the end of the observation period, as the event has not occurred yet.
+The complexity of survival analysis compared to other fields arises from the fact that the outcome of interest is often only partially observed. 
+Formally, let
 
-Let,
-
-* $X$ taking values in $\Reals^p$ be the generative random variable representing the data *features*/*covariates*/*independent variables*.
-* $Y$ taking values in $\NNReals$ be the (partially unobservable) *true survival time*.
+* $X$ taking values in $\Reals^p$ be the generative random variable representing the data *features* (also known as *covariates* or *independent variables*);
+* $Y$ taking values in $\NNReals$ be the (partially unobservable) *true survival time*; and
 * $C$ taking values in $\NNReals$ be the (partially unobservable) *true censoring time*.
 
-In the presence of censoring\index{censoring} $C$, it is impossible to fully observe the true outcome of interest, $Y$.
+In the presence of censoring,\index{censoring} $C$, it is impossible to fully observe the true outcome of interest, $Y$.
 Instead, the observable variables are defined by the random variables,
 
 * $T := \min\{Y,C\}$, the *outcome time* (realizations are referred to as the *observed outcome time*); and
@@ -215,35 +224,36 @@ The survival outcome provides a concise mechanism for representing the outcome t
 
 A single-event right-censored *survival dataset*\index{survival dataset} is defined by $\calD = \{(\xx_i, t_i, \delta_i)\}_{i=1}^n$, where $(t_i,\delta_i)$ are realizations of $(T_i, \Delta_i)$ and $\dvec{x_i}{p}$ is a vector of features.
 
-A useful quantity to define that is frequently used in the literature is the set of unique, ordered event times\index{unique event times}.
-For example, given survival data, $(t_1=6, \delta_1=0)$, $(t_2=1, \delta_2=1)$, $(t_3=10,\delta_3=1)$, $(t_4=5,\delta_4=0)$, $(t_5 =10,\delta_5=1)$ the unique ordered event times are $\{t_{(1)},  t_{(2)}\} = \{1,10\}$ as the censored observations are removed, as are duplicated times.
+A useful quantity to define is the set of unique, ordered event times\index{unique event times}.
+For example, given survival data, $\{(t_1=6, \delta_1=0)$, $(t_2=1, \delta_2=1)$, $(t_3=10,\delta_3=1)$, $(t_4=5,\delta_4=0)$, $(t_5 =10,\delta_5=1)\}$ the unique ordered event times are $\{t_{(1)},  t_{(2)}\} = \{1,10\}$ as the censored observations and duplicated times are all removed.
 Formally, let $m\leq n$ be the number of unique, observed event times.
-Then the *unique, ordered event times* are defined simply as,
+Then the *unique, ordered event times* are,
 
 $$
 t_{(1)}<\cdots<t_{(m)}, \qquad m\le n.
 $$ {#eq-unique-ordered-event-times}
 
-A common short-hand in survival analysis is to assume the subscript $(k)$ is an index referring to the observation who experienced the event at time $t_{(k)}$.
-For example, $(\xx_{(k)}, \tbk, \delta_{(k)})$ are the features and outcome for the observation that experienced the event at $\tbk$, the $k$th ordered event time.
+A common short-hand is to use the subscript '$(k)$' as an index referring to the observation that experienced the event at time $t_{(k)}$.
+For example, $(\xx_{(k)}, \tbk, \delta_{(k)})$ would be the features and outcome for the observation that experienced the event at $\tbk$, the $k$th ordered event time.
 
 Finally, the following quantities are used frequently throughout this book and survival analysis literature more generally.
-Let $(t_i, \delta_i) \iid (T,\Delta), i = 1,...,n$, be observed survival outcomes, then,
+Let $\{(t_i, \delta_i)\}^n_{i=1}$ be observed survival outcomes.
 
 The *risk set at $\tau$*\index{risk set}, is the index-set of observation units at risk for the event just before $\tau$
 
 $$
-\calR_\tau := \{i: t_i \geq \tau\}
+\calR_\tau := \{i: t_i \geq \tau\},
 $$ {#eq-risk-set}
 
 where $i$ is the index of an observation in the data.
-For right-censored data, $\calR_0 = \{1,\ldots,n\}$ and $\calR_{\tau} \subseteq \calR_{\tau'}, \forall \tau > \tau'$.
-Note that in a continuous setting, 'just before' refers to an infinitesimally smaller time than $\tau$, in practice, as this is unobservable the risk set is defined at $\tau$, hence an observation may both be at risk, and experience an event (or be censored) at $\tau$.
+In a continuous setting, 'just before' refers to an infinitesimally smaller time than $\tau$.
+This infinitesimal window is unobservable in reality and as such the risk set at $\tau$ includes observations that experience the event (or are censored) at $\tau$.
+For right-censored data, the risk set contains all observations in the initial state, $\calR_0 = \{1,\ldots,n\}$, and the risk set decreases over time, $\calR_{\tau} \subseteq \calR_{\tau'}, \forall \tau > \tau'$.
 
 The *number of observations at risk at $\tau$*\index{number at risk} is the cardinality of the risk set at $\tau$,
 
 $$
-n_\tau := \sum_i \II(t_i \geq \tau) = |\calR_\tau|
+n_\tau := \sum_i \II(t_i \geq \tau) = \vert \calR_\tau \vert.
 $$ {#eq-risk-set-n}
 
 Finally, the *number of events at $\tau$*\index{number of events} is defined by,
@@ -261,7 +271,7 @@ Several non-parametric\index{non-parametric estimator} and semi-parametric\index
 Applied to the `tumor` example in @tbl-surv-data-tumor, these quantities are:
 
 * $\calR_{\tau = 1217} = \{1, 3, 5\}$ (these subjects' outcome times are greater or equal to $\tau = 1217$ so they are at risk for the event at this time)
-* $n_{\tau = 1217} = |\calR_{1217}| = 3$
+* $n_{\tau = 1217} = \vert \calR_{1217} \vert = 3$
 * $d_{\tau = 1217} = 1$: As only $i = 1$ experienced the event (and not censoring) at this time.
 
 | **id** ($i$) | **age** $(\xx_{\cdot 1})$ | **sex** $(\xx_{\cdot 2})$ | **complications** $(\xx_{\cdot 3})$ | **days** ($\tt$) | **status** ($\bsdelta$) |
@@ -276,7 +286,7 @@ Applied to the `tumor` example in @tbl-surv-data-tumor, these quantities are:
 : Subset of the `tumor`  [@pkgpammtools] time-to-event dataset.
 Rows are individual observations (ID), $\xx_{\cdot j}$ columns are features, $t$ is observed time-to-event, $\delta$ is the event indicator. {#tbl-surv-data-tumor}
 
-## Types of Censoring {#sec-types-of-censoring}
+## Types of censoring {#sec-types-of-censoring}
 
 Three types of censoring are commonly defined in survival analysis: right-censoring\index{censoring!right}, left-censoring\index{censoring!left}, and interval-censoring\index{censoring!interval}.
 The latter can be viewed as the most general case.
@@ -306,7 +316,7 @@ Different types of right-censoring can, and sometimes do, co-occur in any given 
 
 In practice, these different types of right-censoring are usually handled the same during modeling and evaluation and so this book refers to 'right-censoring' generally, which could arise from a combination of the above types.
 
-### Left- and Interval-censoring
+### Left- and interval-censoring
 
 Left-censoring\index{censoring!left} occurs when the event is known to have happened at some unknown time before observation time. 
 Interval-censoring\index{censoring!interval} occurs when the event is known to have happened within some time span, but not the exact time.
@@ -331,7 +341,7 @@ If a predictive model is defined at the level of calendar years, then the event 
 More generally, if the chosen resolution is coarser than the typical interval width, interval-censored observations can be treated as approximately observed events at that scale.
 In all other cases, interval-censoring requires dedicated estimators (see @sec-surv-estimation).
 
-### Censoring Notation
+### Censoring notation
 
 In the presence of left- or interval-censoring the usual representation of survival outcomes as $(t_i, \delta_i)$ is not sufficient to denote the different types of observations in the dataset.
 Instead, observations are represented as intervals in which the event occurs.
@@ -371,7 +381,7 @@ To avoid misinterpretation, the following definitions are used in this book:
 
 * If $C \indep X$, censoring is *feature-independent*, otherwise censoring is *feature-dependent*.\index{censoring!feature-dependent}\index{censoring!dependent}
 * If $C \indep Y$, censoring is *event-independent*, otherwise censoring is *event-dependent*\index{censoring!event-dependent}.
-* If $C \indep Y | X$, censoring is conditionally independent of the event given covariates, or *conditionally event-independent*.\index{censoring!conditionally independent}
+* If $C \indep Y  \mid  X$, censoring is conditionally independent of the event given covariates, or *conditionally event-independent*.\index{censoring!conditionally independent}
 * If $C \indep (X,Y)$, censoring is *completely* or *fully independent*.
 
 Fully independent censoring is the strongest assumption and implies that censoring does not depend on either covariates or the event time.
@@ -389,7 +399,7 @@ In practice, the majority of models and measures assume that censoring is condit
 For example, if studying the survival time of ill pregnant patients in hospital, then dropping out of the study due to pregnancy is clearly dependent on how many weeks pregnant the patient is when the study starts (for the sake of argument assume no early/late pregnancy due to illness).
 Type I and type II\index{censoring!type I}\index{censoring!type II} censoring are usually conditionally event-independent as the censoring mechanism is determined by study design or stopping rules, rather than the underlying event process; however, patients with a more positive prognosis at study entry are more likely to remain under observation for longer and therefore have a higher probability of censoring, hence the dependence on covariates.
 
-## Censoring vs. Truncation {#sec-truncation}
+## Censoring and truncation {#sec-truncation}
 A common confusion is to conflate censoring and truncation\index{truncation}, which is problematic as the methods to handle them differ substantially.
 Outside of time-to-event settings, truncation usually refers to truncating (or removing) an entire subject from a dataset.
 As discussed in @sec-intro, truncation in survival analysis refers to partially truncating a period of time and is quite common in the more general event history setting (@sec-eha).
@@ -461,7 +471,7 @@ When the parameter dependence matters explicitly (for example, inside a likeliho
 The likelihood of the data is then\index{likelihood}
 <!--  -->
 $$
-\calL(\bstheta) = \prod_{i=1}^{n}f_Y(t_i|\bstheta)
+\calL(\bstheta) = \prod_{i=1}^{n}f_Y(t_i \mid \bstheta)
 $$ {#eq-likelihood}
 
 The corresponding estimation principle is *maximum likelihood estimation (MLE)*\index{maximum likelihood estimation}, where parameters are chosen to maximize the probability of the observed data under the model,
@@ -474,17 +484,17 @@ In machine learning\index{machine learning}, models are typically trained by min
 
 However, in the presence of censoring @eq-likelihood is incorrect, as the exact event time is only known for some subjects.
 For example, for right-censored data ($\delta_i = 0$), it is only known that the event occurred after the censoring time $t_i$.
-Thus the likelihood contribution for such data points is $P(Y_i > t_i) = S_Y(t_i)$, whereas for observed event times ($\delta_i=1$) the likelihood contribution is $f_Y(t_i)$ as before.
+Thus the likelihood contribution for such data points is $\Pr(Y_i > t_i) = S_Y(t_i)$, whereas for observed event times ($\delta_i=1$) the likelihood contribution is $f_Y(t_i)$ as before.
 
 Let now $\calO = \{i:\delta_i = 1\}$ the index set of observed event times and $\mathcal{RC} = \{i:\delta_i = 0\}$ the index set of censored observations. The likelihood of this data can be written as
 
 $$
 \begin{aligned}
 \calL(\bstheta)
-  & \propto \prod_{i \in \calO}f_Y(t_i|\bstheta)\prod_{i \in \mathcal{RC}}S_Y(t_i|\bstheta)\nonumber\\
-  & = \prod_{i=1}^n f_y(t_i|\bstheta)^{\delta_i}S_Y(t_i|\bstheta)^{1-\delta_i}\\
-  & = \prod_{i=1}^n \frac{f_y(t_i|\bstheta)^{\delta_i}}{S_Y(t_i|\bstheta)^{\delta_i}}S_Y(t_i|\bstheta)\\
-  & = \prod_{i=1}^n h_Y(t_i|\bstheta)^{\delta_i}S_Y(t_i|\bstheta)\nonumber,
+  & \propto \prod_{i \in \calO}f_Y(t_i \mid \bstheta)\prod_{i \in \mathcal{RC}}S_Y(t_i \mid \bstheta)\nonumber\\
+  & = \prod_{i=1}^n f_y(t_i \mid \bstheta)^{\delta_i}S_Y(t_i \mid \bstheta)^{1-\delta_i}\\
+  & = \prod_{i=1}^n \frac{f_y(t_i \mid \bstheta)^{\delta_i}}{S_Y(t_i \mid \bstheta)^{\delta_i}}S_Y(t_i \mid \bstheta)\\
+  & = \prod_{i=1}^n h_Y(t_i \mid \bstheta)^{\delta_i}S_Y(t_i \mid \bstheta)\nonumber,
 \end{aligned}
 $$ {#eq-right-censoring-likelihood}
 
@@ -509,7 +519,7 @@ Let $\mathcal{O}, \mathcal{RC}, \mathcal{LC}, \mathcal{IC}$ non-overlapping subs
 Assuming independence between observations and in absence of truncation, the likelihood for the observed data can be defined as
 
 $$
-\calL(\bstheta) \propto \prod_{i \in \mathcal{O}}f_Y(t_i|\bstheta) \prod_{i \in \mathcal{RC}}S_Y(t_i|\bstheta) \prod_{i \in \mathcal{LC}}(1-S_Y(t_i|\bstheta))\prod_{i \in \mathcal{IC}}(S_Y(l_i|\bstheta)-S_Y(r_i|\bstheta))
+\calL(\bstheta) \propto \prod_{i \in \mathcal{O}}f_Y(t_i \mid \bstheta) \prod_{i \in \mathcal{RC}}S_Y(t_i \mid \bstheta) \prod_{i \in \mathcal{LC}}(1-S_Y(t_i \mid \bstheta))\prod_{i \in \mathcal{IC}}(S_Y(l_i \mid \bstheta)-S_Y(r_i \mid \bstheta))
 $$ {#eq-objective-function}
 
 In case of truncation\index{truncation}, the likelihood contribution is conditioned on inclusion in the observation window,
@@ -521,10 +531,10 @@ $$ {#eq-likelihood-combined}
 where $\mathcal{C}_i$ is as defined in (@eq-likelihood-censoring) and $\mathcal{T}_i$ is the truncation condition, such that,
 
 $$
-\Pr(\mathcal{T}_i|\bstheta) =
+\Pr(\mathcal{T}_i \mid \bstheta) =
 \begin{cases}
-P(Y_i \geq t_i^\ell|\bstheta) = S_Y(t_i^\ell|\bstheta), & \text{left truncation}, \\
-P(Y_i \leq t_i^R|\bstheta) = F_Y(t_i^R|\bstheta), & \text{right truncation}.
+\Pr(Y_i \geq t_i^\ell \mid \bstheta) = S_Y(t_i^\ell \mid \bstheta), & \text{left truncation}, \\
+\Pr(Y_i \leq t_i^R \mid \bstheta) = F_Y(t_i^R \mid \bstheta), & \text{right truncation}.
 \end{cases}
 $$ {#eq-likelihood-truncation}
 
@@ -560,7 +570,7 @@ Define $\tilde{Y} = k \Leftrightarrow Y \in [t_{(k)},t_{(k+1)})$ as the discrete
 Using the quantities introduced in @sec-data-rc, the discrete-time hazard\index{hazard function} (@eq-discrete-hazard) is estimated as the ratio of the number of events occurring at $t_{(k)}$ (@eq-risk-set-d) to the number of subjects at risk at $t_{(k)}$ (@eq-risk-set-n):
 
 $$
-h_{\tilde{Y}}(k) = P\left(Y\in [t_{(k)},t_{(k+1)})|Y \geq t_{(k)}\right)=\frac{d_{t_{(k)}}}{n_{t_{(k)}}}.
+h_{\tilde{Y}}(k) = P\left(Y\in [t_{(k)},t_{(k+1)}) \mid Y \geq t_{(k)}\right)=\frac{d_{t_{(k)}}}{n_{t_{(k)}}}.
 $$ {#eq-disc-haz-non-param}
 
 The survival probability\index{survival function} and the definition of the Kaplan-Meier estimator (@eq-km) then follow from Equation (@eq-discrete-surv-prob):
@@ -629,7 +639,7 @@ which excludes individuals from the risk set until their left-truncation time ha
 The number of individuals at risk at $\tau$ is then
 <!--  -->
 $$
-n^\ell_\tau = |\calR_\tau^\ell| = \sum_i \II(t_i^\ell \leq \tau \leq t_i),
+n^\ell_\tau = \vert \calR_\tau^\ell \vert = \sum_i \II(t_i^\ell \leq \tau \leq t_i),
 $$ {#eq-risk-lt-n}
 <!--  -->
 where $t_i, t_i^\ell$ are the outcome time and left truncation time of observation $i$ respectively.
@@ -724,7 +734,7 @@ n_{\tau_k}^{(j)} = \sum_{l=k}^{m} d_{\tau_l}^{(j)}.
 $$ {#eq-turnbull-n}
 
 5. \ \ \ \ \ Plug $d_{\tau_k}^{(j)}$ and $n_{\tau_k}^{(j)}$ into the Kaplan-Meier formula (@eq-km) to obtain $\hatS^{j}$.
-6. \ \ \ \ \ **If** $\max_{k}\bigl|\hatS^{j}(\tau_k) - \hatS^{j-1}(\tau_k)\bigr| < \epsilon$, **stop**.
+6. \ \ \ \ \ **If** $\max_{k}\bigl \vert \hatS^{j}(\tau_k) - \hatS^{j-1}(\tau_k)\bigr \vert < \epsilon$, **stop**.
 7. **Return** $\hatS^{j}$.
 
 The estimator is constant on each grid interval $(\tau_{k-1}, \tau_k]$. For plotting it is conventional to display jumps at the right endpoints $\tau_k$; some authors instead place each jump at the midpoint $(\tau_{k-1} + \tau_k)/2$ to reflect the underlying uncertainty about exact event timing — both are valid presentations of the same estimator.
@@ -775,7 +785,7 @@ IPC weighting is most commonly used to adjust for bias introduced by right-censo
 For an observation $i$ with covariates $\xx_i$, the IPC weight at time $\tau$ is given by
 
 $$
-w(\tau|\xx_i) = \frac{1}{S_C(\tau|\xx_i)},
+w(\tau \mid \xx_i) = \frac{1}{S_C(\tau \mid \xx_i)},
 $$ {#eq-ipcw}
 
 where $S_C(\tau)$ is the survival function of the censoring time, that is, the probability that the observation is uncensored up until $\tau$.
@@ -791,7 +801,7 @@ To illustrate the utility of IPC weights, consider their role in weighting contr
 Specific losses are introduced in Part II; for now, let $L_i$ be a modified version of the log loss\index{log loss} found in classification:
 
 $$
-L_{NL}(\xx_i, \delta_i, t_i) = \frac{-\delta_i \log(\hatg(t_i|\xx_i))}{\KMG(t_i)}.
+L_{NL}(\xx_i, \delta_i, t_i) = \frac{-\delta_i \log(\hatg(t_i \mid \xx_i))}{\KMG(t_i)}.
 $$
 
 This loss is not commonly used in practice but is useful for illustration.
