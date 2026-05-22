@@ -30,10 +30,8 @@ Survival distribution predictions are _probabilistic_ as they return a full dist
 Survival time predictions are _deterministic_ point predictions in the sense that they return a single scalar value, though uncertainty remains due to underlying variance.
 Relative risk and prognostic index predictions do not directly predict when or if the event of interest will occur, instead they produce scores that can be used to rank or compare an individual's risk to others in the same cohort.
 
-<!-- TODO (Raphael): Careful with the absolute risk below. Its a new term and has not been introduced in contrast to "relative risk" before. The statement "distribution = absolut risk" is too simplistic. Absolut risk = cumulative at a specific time point, thus F(t), S(t) = absolut risk at t, but h(t) is relative risk at t, but h(t) is a distribution defining quantitiy. -->
-To distinguish the types of 'risk', it may be helpful to view survival distribution predictions as a form of _absolute risk_ prediction.
-Derived summaries from distributions, such as the probability of experiencing the event at a given time, have a direct probabilistic interpretation and can be meaningfully understood without comparison to others in the sample.
-By contrast, the other prediction types are _relative risk_ predictions: their scale is directly tied to others in the sample and are most (in some cases _only_) interpretable through comparisons.
+The term _relative_ risk is used throughout this book to emphasize that these types of predictions should only be interpreted in comparison to others in the cohort; this is revisited in @sec-survtsk-risk.
+This contrasts with predictions such as survival probability estimates, which quantify an individual's probability of surviving to a given time point and are therefore directly related to event risk, but remain interpretable independently.
 
 These prediction types are closely related.
 Relative risks and survival time predictions can be derived from a predicted survival distribution, though the reverse does not hold in general as a single survival time or risk score does not uniquely determine a probability distribution.
@@ -47,8 +45,7 @@ Even within a single prediction type, interpretations can be confused.
 For example, in some literature a larger value of a risk score implies higher risk of event, whereas in other sources, a larger value implies lower risk.
 Distinction of prediction types is also critical for evaluation as each prediction type naturally aligns with different types of metrics, a topic returned to throughout Part II.
 
-In applied predictive modelling, _direct_ survival time prediction is uncommon as time-to-event predictions are difficult to interpret and evaluate under censoring.
-<!-- TODO (Raphael): survival times are not generally difficult to interpret — they only become so when extrapolation beyond the observation window is involved. The current wording also contradicts the Limitations callout, which says survival time predictions "appear intuitive". Reconcile these two statements. -->
+In applied predictive modelling, _direct_ survival time prediction is uncommon as they can be challenging to estimate and evaluate reliably under censoring, particularly when prediction requires extrapolation beyond the observed follow-up period.
 Instead, practitioners often report distribution-derived summaries such as $\tau$-year survival probabilities or the predicted median survival time.
 Similarly, the prognostic index is more commonly used for model interpretation or inference, whereas relative risk predictions are common in applications such as resource allocation and risk stratification.
 Though, as will be seen below, a prognostic index can usually be interpreted as a relative risk.
@@ -60,15 +57,14 @@ The top-right panel shows predicted survival times, for each observation this is
 The bottom-left panel visualizes relative risk predictions; here the score is the negative log of the predicted expected survival time, centred at zero across the six patients, so positive values indicate higher than average risk and negative values lower than average risk.
 Finally, the bottom-right panel shows survival distribution predictions, where each observation's predicted survival function $\hat{S}(\tau \mid \xx)$ is shown over time.
 
-![Illustration of prediction types using six patients from the `tumor` data set and a Weibull accelerated failure time model. Tabular survival data (top-left) can be used by an algorithm to make various prediction types, each conveying different information. Survival times (top-right) provide a single number estimating the time until an event takes place. Relative risk scores (bottom-left) compare the risk of event between subjects within the same sample. Survival distributions (bottom-right) estimate the probability of the event taking place over time.](Figures/survtsk/predict_types.png){#fig-survtsk-overview width=100% fig-alt="Graphical illustration of prediction types for six tumor patients. Top-left panel is a table with columns id, age, sex, complications, days, and status, with each row's id cell coloured to match the patient's colour in the other panels. Top-right panel is horizontal lollipops (line with a filled circle at the endpoint) showing predicted expected survival times for each patient, ranging from about 1700 to 3200 days. Bottom-left panel is vertical lollipops showing predicted relative risk scores centred around zero, indicating different risk profiles for each patient. Bottom-right panel is six smooth survival probability curves, one per patient, decreasing over time from one toward zero."}
+![Illustration of prediction types using six patients from the `tumor` data set and a Weibull accelerated failure time model. Tabular survival data (top-left) can be used by an algorithm to make various prediction types, each conveying different information. Survival times (top-right) provide a single number estimating the time until an event takes place. Relative risk scores (bottom-left) compare the risk of event between subjects within the same sample. Survival distributions (bottom-right) estimate the probability of the event taking place over time.](Figures/survtsk/predict_types.png){#fig-survtsk-overview width=100% fig-alt="Graphical illustration of prediction types for six tumor patients. Top-left panel is a table with columns id, age, sex, complications, days, and status, with each row's id cell colored to match the patient's color in the other panels. Top-right panel is horizontal lollipops (line with a filled circle at the endpoint) showing predicted expected survival times for each patient, ranging from about 1700 to 3200 days. Bottom-left panel is vertical lollipops showing predicted relative risk scores centred around zero, indicating different risk profiles for each patient. Bottom-right panel is six smooth survival probability curves, one per patient, decreasing over time from one toward zero."}
 
 ## Predicting distributions {#sec-survtsk-dist}
 
-Predicting a survival distribution means estimating the probability of an individual experiencing the event of interest from time-point $0$ to $\infty$.
+Predicting a survival distribution means estimating the probability of an individual's event time over the interval from time-point $0$ to $\infty$.
 In principle, such predictions are defined over the continuous $\NNReals$.
-However, in practice it is more common for predictions to be made over the discrete $\Naturals$.
-<!-- TODO (Raphael): I wouldn't say so. If I fit a parametric model (or piece-wise exponential), I will make continuous predictions. For plotting of course you choose a discrete grid, but the predictions themselves are continuous. -->
-This reflects the fact that many algorithms rely on discrete, non-parametric estimators or piecewise-constant representations of the underlying distribution prediction.
+In practice, the form of the prediction depends on the modeling approach: parametric models typically define predictions over continuous time, whereas several non- and semi-parametric approaches represent predictions through discrete time points.
+Even when predictions are continuous, they are often evaluated or visualized on a discrete time grid.
 
 Theoretically, distributional prediction can target any of the distribution defining functions introduced in @sec-distributions, though predicting $S(t)$ or $h(t)$ is most common.
 Mathematically, the survival task associated with the distribution prediction type is defined by $f_S: \calX \rightarrow \calS$, where $\calS \subseteq \Distr(\NNReals)$ denotes a set of distributions on $\NNReals$.
@@ -174,20 +170,18 @@ Mathematically, this corresponds to estimating $f_S: \calX \rightarrow \PReals$,
 
 From a practical perspective, the expected time-to-event may appear to be an attractive prediction type as it initially appears intuitive and easy to interpret.
 However, evaluating survival time point predictions is limited and generally ill-advised and reliance on such predictions is therefore challenging.
-To illustrate this, consider an individual censored at time $t=5$.
-<!-- TODO (Raphael): the switch between $t$ and $\tau$ is a bit confusing here — both are used as concrete time-axis values in the same example. Consider using a single symbol consistently. -->
-There is no way to know if the event would have occurred at $\tau=6$ or $\tau=600$; all that is known is that the event did not occur before $t=5$.
+To illustrate this, consider an individual censored at time $\tau=5$.
+There is no way to know if the event would have occurred at $\tau=6$ or $\tau=600$; all that is known is that the event did not occur before $\tau=5$.
 As a result, it is impossible to assess how close a time prediction is to the true, unobserved event time.
 
 Even when a prediction is clearly incorrect, the magnitude of its error cannot be quantified.
-For the same individual censored at $t=5$, suppose a model predicts a survival time of $\hat{t} = 3$.
-This prediction is clearly wrong as the event did not occur before $t=5$.
+For the same individual censored at $\tau=5$, suppose a model predicts a survival time of $\hat{t} = 3$.
+This prediction is clearly wrong as the event did not occur before $\tau=5$.
 However, the prediction might only be slightly wrong if the true event time were $\tau=6$, or extremely wrong if the true event time were $\tau=600$.
 
 For these reasons, this book recommends predicting and evaluating survival distributions and then deriving time-oriented summaries.
 
-In the event history analysis setting, a single 'survival time' is even more ill-defined as it is ambiguous whether this refers to the time until a specific event or until any event takes place.
-<!-- TODO (Raphael): we have to be careful here. why should it be possible to estimate sojourn times but not event times, where the latter is a special case of the former. -->
+In the event-history analysis setting, a single 'survival time' is ill-defined unless the event or transition of interest is explicitly specified, as it may refer either to the time until a particular event or transition, or more generally to the time until any event occurs.
 For multi-state models, one could estimate _sojourn times_, which represent the expected time spent in a given state and can be derived from estimated transition probabilities.
 Sojourn times are particularly well defined in Markov and semi-Markov models, where they follow from stochastic process theory.
 These derivations are beyond the scope of this book; for further details, see, for example, @Ibe2013.
@@ -292,10 +286,11 @@ As a result, the RMST difference over the five-year horizon remains modest, even
 
 ## Prognostic index predictions {#sec-survtsk-PI}
 
-<!-- TODO (Raphael): the PI definition is currently tied to a *linear* predictor (β'x), but a prognostic index is more general — any scalar function η(x) that summarizes risk. Linear predictors are the classical case (Cox / parametric models), but ML survival models (DeepSurv, gradient boosting, RSF mortality scores) produce nonlinear η(x) that play the same role. Suggestion: broaden the definition to a generic scalar score and drop "linear" in front of "predictor" here. the sentence about g(x)=x -> g(bsbeta) also doesnt parse for me. g(x) doesn't return a scalar x if x is multi-variate. the prognostic index = g(x) which is x^T\beta if g = linear combination of x -->
 In medical terminology (often used in survival analysis), a _prognostic index_ is a quantity that summarizes an individual's risk of experiencing the event of interest based on observed risk factors.
-Given covariates, $\XX \in \Reals^{n \times p}$, and coefficients, $\bsbeta \in \Reals^p$, the *linear predictor* is defined as $\bseta := \XX\bsbeta$.
-Applying a transformation $g$, which could simply be the identity function $g(x) = x$, yields a *prognostic index*, $g(\bseta)$.
+Therefore, as a summary of risk, a prognostic index prediction is simply another term for a relative risk (@sec-survtsk-risk).
+The term is therefore primarily useful when used specifically in reference to simple linear models.
+In these cases, a prognostic index is simply any scalar function $g$ applied to the _linear predictor_,  $\bseta := \XX\bsbeta$ where $\XX \in \Reals^{n \times p}$ are covariates and $\bsbeta \in \Reals^p$ are model coefficients.
+
 A prognostic index can serve several purposes, including:
 
 1. Scaling and/or normalization: simple transformation can improve interpretability and visualization;
