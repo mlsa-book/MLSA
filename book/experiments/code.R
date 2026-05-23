@@ -1762,7 +1762,7 @@ df <- data.frame(x = rep(0:9,2), y = c(yi, yj), Patient=rep(c("i", "j"), each = 
 
 plot_rmst <- function(df, patient) {
   filtered_df <- df %>%
-    filter(Patient == patient, x <= 5)
+    filter(Patient == patient, x <= 6)
   rect_df <-  filtered_df %>%
     arrange(x) %>%
     mutate(xmin = x, xmax = lead(x), ymin = 0, ymax = y) %>%
@@ -1776,9 +1776,9 @@ plot_rmst <- function(df, patient) {
       alpha = 0.3,
       inherit.aes = FALSE) +
     annotate("text", x = 2, y = 0.4,
-      label = as.expression(bquote(RMST[.(patient)] * "(" * 5 * ")" == .(round(sum(filtered_df$y), 2)))),
+      label = as.expression(bquote(RMST[.(patient)] * "(" * 6 * ")" == .(round(sum(filtered_df$y[-length(filtered_df$y)]), 2)))),
       parse = TRUE) +
-    labs(x = "Time", y = "Survival probability", title = paste0("RMST(5) for patient ", patient))    
+    labs(x = "Time", y = "Survival probability", title = paste0("RMST(6) for patient ", patient))    
 }
 
 p1 <- plot_rmst(df, "i")
