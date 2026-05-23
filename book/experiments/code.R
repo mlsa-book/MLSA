@@ -880,18 +880,18 @@ pred_cond_df <- do.call(rbind, lapply(levels(events_df$sex), function(s) {
 }))
 
 g <- ggplot(df, aes(x = x, y = y, group = group))
-g1 <- g + geom_step(linewidth = 1.3, color = "gray")
-g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity()
+g1 <- g + geom_step(linewidth = 1.3, color = "gray") + labs(x = "Time", y = "Survival probability")
+g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity() + labs(x = "Time", y = "Survival probability")
 g3 <- g1 + geom_line(aes(x = x, y = y), data = pred_uncond_df,
                      inherit.aes = FALSE,
-                     color = "black", linewidth = 1)
+                     color = "black", linewidth = 1) + labs(x = "Time", y = "Survival probability")
 g4 <- g +
   geom_step(aes(color = sex), linewidth = 1.3, alpha = 0.5) +
   geom_line(aes(x = x, y = y, group = sex, color = sex),
             data = pred_cond_df,
-            inherit.aes = FALSE, linewidth = 1.5)
+            inherit.aes = FALSE, linewidth = 1.5) + labs(x = "Time", y = "Survival probability")
 
-g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S(t)") & guides(color  = "none")
+g_final <- (g1 + g2 + g3 + g4) & ylim(0, 1) & xlim(0, 50) & guides(color  = "none")
 
 ggsave("book/Figures/survtsk/heavisides.png",
   g_final, height=5, width=7, units="in", dpi=600)
