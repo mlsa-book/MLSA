@@ -56,7 +56,8 @@ CSV_PATH = EXP_DIR / "tumor.csv"
 FIG_OUT = (
     EXP_DIR.parent / "Figures" / "neuralnetworks" / "weibull-aft-nn.png"
 )
-FIG_OUT.parent.mkdir(parents=True, exist_ok=True)
+FIG_DIR = FIG_OUT.parent
+FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def ensure_tumor_csv() -> pd.DataFrame:
@@ -356,3 +357,158 @@ fig.legend(
 fig.tight_layout(rect=(0, 0.06, 1, 1))
 fig.savefig(FIG_OUT, dpi=200, bbox_inches="tight")
 print(f"Saved {FIG_OUT}")
+
+
+# ---------------------------------------------------------------------------
+# Neural Networks chapter – Activation function shape plots.
+#
+# Small individual plots for the activation table (@tbl-activations).
+#
+# Output: book/Figures/neuralnetworks/activation-{relu,sigmoid,tanh,softplus}.png
+# ---------------------------------------------------------------------------
+
+v = np.linspace(-4, 4, 400)
+
+_activations = [
+    ("relu",    np.maximum(0, v)),
+    ("sigmoid", 1 / (1 + np.exp(-v))),
+    ("tanh",    np.tanh(v)),
+    ("softplus", np.log1p(np.exp(v))),
+]
+
+for name, vals in _activations:
+    fig, ax = plt.subplots(figsize=(2.4, 1.6))
+    ax.plot(v, vals, color="#C2185B", lw=2.0)
+    ax.axhline(0, color="#888", lw=0.5, ls="--")
+    ax.axvline(0, color="#888", lw=0.5, ls="--")
+    ax.set_xlim(-4, 4)
+    ax.set_xlabel("v", fontsize=9)
+    ax.set_ylabel("a(v)", fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.grid(alpha=0.2)
+    fig.tight_layout()
+    out = FIG_DIR / f"activation-{name}.png"
+    fig.savefig(out, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved {out}")
+
+
+# ---------------------------------------------------------------------------
+# Neural Networks chapter – mcycle: tanh vs ReLU comparison.
+#
+# Two-panel figure showing the same FFNN architecture (5, 3) fitted to
+# mcycle with tanh and ReLU activations respectively.
+#
+# Output: book/Figures/neuralnetworks/mcycle-tanh-vs-relu.png
+# ---------------------------------------------------------------------------
+
+mcycle = pd.read_csv(EXP_DIR / "mcycle.csv")
+
+_x = mcycle["times"].values.astype(np.float32)
+_y = mcycle["accel"].values.astype(np.float32)
+_xm, _xs, _ym, _ys = _x.mean(), _x.std(), _y.mean(), _y.std()
+_xt = torch.as_tensor((_x - _xm) / _xs).unsqueeze(-1)
+_yt = torch.as_tensor((_y - _ym) / _ys)
+
+
+def _fit_ffnn(xt, yt, hidden=(5, 3), activation=torch.nn.Tanh,
+              epochs=5000, lr=5e-3, wd=1e-3):
+    layers = []
+    d = xt.shape[-1]
+    for h in hidden:
+        layers += [torch.nn.Linear(d, h), activation()]
+        d = h
+    layers.append(torch.nn.Linear(d, 1))
+    model = torch.nn.Sequential(*layers)
+    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
+    for _ in range(epochs):
+        opt.zero_grad()
+        loss = ((model(xt).squeeze(-1) - yt) ** 2).mean()
+        loss.backward()
+        opt.step()
+    return model.eval()
+
+
+_grid = np.linspace(_x.min(), _x.max(), 400)
+_gt = torch.as_tensor((_grid - _xm) / _xs, dtype=torch.float32).unsqueeze(-1)
+
+torch.manual_seed(0)
+_m_tanh = _fit_ffnn(_xt, _yt, activation=torch.nn.Tanh)
+torch.manual_seed(0)
+_m_relu = _fit_ffnn(_xt, _yt, activation=torch.nn.ReLU)
+
+with torch.no_grad():
+    _p_tanh = _m_tanh(_gt).squeeze(-1).numpy() * _ys + _ym
+    _p_relu = _m_relu(_gt).squeeze(-1).numpy() * _ys + _ym
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+for ax, pred, title in zip(axes, [_p_tanh, _p_relu],
+                           ["tanh activation", "ReLU activation"]):
+    ax.scatter(_x, _y, s=14, alpha=0.55, color="#5B7CA8", edgecolor="none")
+    ax.plot(_grid, pred, color="#C2185B", lw=2.2)
+    ax.set_title(title)
+    ax.set_xlabel("time after impact (ms)")
+    ax.grid(alpha=0.25)
+axes[0].set_ylabel("head acceleration (g)")
+fig.tight_layout()
+fig.savefig(FIG_DIR / "mcycle-tanh-vs-relu.png", dpi=220, bbox_inches="tight")
+plt.close(fig)
+print(f"Saved {FIG_DIR / 'mcycle-tanh-vs-relu.png'}")
+
+
+# ---------------------------------------------------------------------------
+# Neural Networks chapter – mcycle: distributional regression.
+#
+# Two-headed NN (shared trunk, variant (a)) outputting mu(x) and sigma(x),
+# trained with heteroscedastic Gaussian NLL.
+#
+# Output: book/Figures/neuralnetworks/distributional-regression.png
+# ---------------------------------------------------------------------------
+
+
+class _DistributionalFFNN(torch.nn.Module):
+    def __init__(self, hidden=32):
+        super().__init__()
+        self.trunk = torch.nn.Sequential(
+            torch.nn.Linear(1, hidden), torch.nn.Tanh(),
+            torch.nn.Linear(hidden, hidden), torch.nn.Tanh(),
+        )
+        self.head_mu = torch.nn.Linear(hidden, 1)
+        self.head_log_sigma = torch.nn.Linear(hidden, 1)
+
+    def forward(self, x):
+        h = self.trunk(x)
+        return self.head_mu(h).squeeze(-1), self.head_log_sigma(h).squeeze(-1)
+
+
+torch.manual_seed(2)
+_dist_model = _DistributionalFFNN(hidden=32)
+_opt = torch.optim.Adam(_dist_model.parameters(), lr=5e-3, weight_decay=1e-2)
+for _ in range(3000):
+    _opt.zero_grad()
+    _mu, _ls = _dist_model(_xt)
+    _loss = (0.5 * ((_yt - _mu) / torch.exp(_ls)) ** 2 + _ls).mean()
+    _loss.backward()
+    _opt.step()
+_dist_model.eval()
+
+with torch.no_grad():
+    _mu_mc, _ls_mc = _dist_model(_gt)
+_mu_mc = _mu_mc.numpy() * _ys + _ym
+_sigma_mc = np.exp(_ls_mc.numpy()) * _ys
+
+fig, ax = plt.subplots(figsize=(5.6, 3.7))
+ax.scatter(_x, _y, s=14, alpha=0.55, color="#5B7CA8", edgecolor="none")
+ax.fill_between(_grid, _mu_mc - 1.96 * _sigma_mc, _mu_mc + 1.96 * _sigma_mc,
+                color="#C2185B", alpha=0.18,
+                label="$\\hat μ(x) \\pm 1.96\\,\\hat σ(x)$")
+ax.plot(_grid, _mu_mc, color="#C2185B", lw=2.0, label="$\\hat μ(x)$")
+ax.set_xlabel("time after impact (ms)")
+ax.set_ylabel("head acceleration (g)")
+ax.grid(alpha=0.25)
+ax.legend(frameon=False, loc="upper left")
+fig.tight_layout()
+fig.savefig(FIG_DIR / "distributional-regression.png",
+            dpi=220, bbox_inches="tight")
+plt.close(fig)
+print(f"Saved {FIG_DIR / 'distributional-regression.png'}")

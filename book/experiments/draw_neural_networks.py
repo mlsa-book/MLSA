@@ -114,6 +114,42 @@ def edge_between(src, dst, sw=0.7, opacity=0.55, *, arrow=False,
                      head_len=head_len, head_w=head_w, opacity=opacity)
 
 
+def sub_sup_label(cx, cy, base, sub="", sup="", font_size=18,
+                  small_ratio=0.62, fill="#111"):
+    """Render ``base`` with a subscript and superscript at proper offsets.
+
+    Unicode subscript/superscript glyphs (₁, ⁽¹⁾) don't sit low/high enough
+    in DejaVu Sans to read as real sub/super-scripts when rasterised through
+    ImageMagick, so we draw three separate text elements with explicit y
+    offsets instead.  Returns SVG ``<text>`` markup.
+    """
+    small = font_size * small_ratio
+    parts = []
+    # Estimated half-width of the main glyph so the sub/super hang to its
+    # right edge rather than to the centre of the unit.
+    half_main = font_size * 0.32
+    base_y = cy + font_size * 0.34
+    parts.append(
+        f'<text x="{cx - half_main * 0.4}" y="{base_y:.2f}" '
+        f'text-anchor="middle" font-family="{FONT}" '
+        f'font-size="{font_size}" fill="{fill}">{base}</text>'
+    )
+    if sub:
+        parts.append(
+            f'<text x="{cx + half_main + 1}" y="{base_y + small * 0.45:.2f}" '
+            f'text-anchor="start" font-family="{FONT}" '
+            f'font-size="{small:.1f}" fill="{fill}">{sub}</text>'
+        )
+    if sup:
+        parts.append(
+            f'<text x="{cx + half_main + 1}" '
+            f'y="{base_y - font_size * 0.55:.2f}" '
+            f'text-anchor="start" font-family="{FONT}" '
+            f'font-size="{small:.1f}" fill="{fill}">{sup}</text>'
+        )
+    return "".join(parts)
+
+
 def circle_node(c, fill, stroke, label="", font_size=14, sw=1.6, label_dy=0):
     parts = [
         f'<circle cx="{c.cx}" cy="{c.cy}" r="{c.r}" fill="{fill}" '
@@ -297,93 +333,355 @@ def rasterise(svg_path, density=300, margin=24):
 # ---- Figure 1: feed-forward neural network ------------------------------
 
 def fig_ffnn():
-    """Feed-forward NN diagram: input layer, two hidden layers, output.
+    """Feed-forward NN diagram: input + two hidden layers + output.
 
     Layout and unit labels mirror the workshop slide
     ``mlcu-dl-intro-workshop/slides/day2-01.qmd`` (3 inputs, 5 + 3 hidden
-    units, scalar output ``y``).  Labels use Unicode super/subscript
-    characters that render in DejaVu Sans through ImageMagick.  Above each
-    column a bold layer caption and the corresponding formula are shown.
+    units).  Each layer also carries an explicit bias node labelled ``1``
+    that connects to every unit in the next layer.  The final linear
+    combination ``z`` is mapped to the output ``y`` through the response
+    function ``r(·)``, shown as a yellow box (the link function is
+    ``r⁻¹(·)``, consistent with the pseudo-value chapter notation).
     """
-    W, H = 920, 480
+    W, H = 1500, 760
     parts = []
 
-    x_in, x_h1, x_h2, x_out = 200, 410, 620, 800
-    r_node = 24
-    spacing = 65
-    top_band_y = 30
-    centre = H / 2 + 40
+    x_in, x_h1, x_h2, x_z = 250, 540, 830, 1060
+    r_node = 40
+    spacing = 102
+    top_band_y = 50
+    centre = H / 2 + 35
+    # All biases sit on the same horizontal line below the tallest column
+    # for visual consistency across layers.
+    bias_y = centre + (5 - 1) * spacing / 2 + spacing - 4
 
-    def column(x, labels):
+    def column(x, labels, bias_below=True):
         n = len(labels)
         y0 = centre - (n - 1) * spacing / 2
         ys = [y0 + i * spacing for i in range(n)]
-        return [Circle(x, y, r_node) for y in ys]
+        nodes = [Circle(x, y, r_node) for y in ys]
+        bias = Circle(x, bias_y, r_node - 4) if bias_below else None
+        return nodes, bias
 
-    in_labels = ["x₁", "x₂", "x₃"]
-    h1_labels = ["h₁⁽¹⁾", "h₂⁽¹⁾", "h₃⁽¹⁾", "h₄⁽¹⁾", "h₅⁽¹⁾"]
-    h2_labels = ["h₁⁽²⁾", "h₂⁽²⁾", "h₃⁽²⁾"]
+    # Labels are stored as (base, subscript, superscript) triples and
+    # rendered with sub_sup_label so the indices sit at the correct height.
+    in_labels = [("x", "1", ""), ("x", "2", ""), ("x", "3", "")]
+    h1_labels = [("h", str(j + 1), "(1)") for j in range(5)]
+    h2_labels = [("h", str(j + 1), "(2)") for j in range(3)]
 
-    inputs = column(x_in, in_labels)
-    h1 = column(x_h1, h1_labels)
-    h2 = column(x_h2, h2_labels)
-    out = Circle(x_out, centre, r_node + 2)
+    inputs, b_in = column(x_in, in_labels)
+    h1, b_h1 = column(x_h1, h1_labels)
+    h2, b_h2 = column(x_h2, h2_labels)
 
-    # bottom-to-top ordering (h₁ at the bottom, like the slide)
+    # bottom-to-top visual ordering (index 1 at the bottom)
     inputs.reverse()
     h1.reverse()
     h2.reverse()
 
-    for c, lab in zip(inputs, in_labels):
-        parts.append(circle_node(c, *PAL_INPUT, label=lab,
-                                 font_size=14, sw=1.6, label_dy=-2))
-    for c, lab in zip(h1, h1_labels):
-        parts.append(circle_node(c, *PAL_HIDDEN, label=lab,
-                                 font_size=12, sw=1.4, label_dy=-2))
-    for c, lab in zip(h2, h2_labels):
-        parts.append(circle_node(c, *PAL_HIDDEN, label=lab,
-                                 font_size=12, sw=1.4, label_dy=-2))
-    parts.append(circle_node(out, *PAL_OUTPUT, label="y",
-                             font_size=15, sw=2, label_dy=-2))
+    PAL_BIAS = ("#F5F5F5", "#555555")
 
-    for a in inputs:
+    # z pre-activation node (sits centred at the height of the layer columns)
+    z_node = Circle(x_z, centre, r_node)
+
+    # response-function box (yellow) and output unit
+    r_box = Rect(x_z + 88, centre - 36, 106, 72)
+    x_out = r_box.x + r_box.w + 88
+    out = Circle(x_out, centre, r_node + 2)
+
+    # draw bias nodes first so connections render on top of their faces
+    for c, (base, sub, sup) in zip(inputs, in_labels):
+        parts.append(circle_node(c, *PAL_INPUT, sw=1.8))
+        parts.append(sub_sup_label(c.cx, c.cy, base,
+                                   sub=sub, sup=sup, font_size=24))
+    parts.append(circle_node(b_in, *PAL_BIAS, label="1",
+                             font_size=23, sw=1.6, label_dy=-2))
+    for c, (base, sub, sup) in zip(h1, h1_labels):
+        parts.append(circle_node(c, *PAL_HIDDEN, sw=1.6))
+        parts.append(sub_sup_label(c.cx, c.cy, base,
+                                   sub=sub, sup=sup, font_size=21))
+    parts.append(circle_node(b_h1, *PAL_BIAS, label="1",
+                             font_size=23, sw=1.6, label_dy=-2))
+    for c, (base, sub, sup) in zip(h2, h2_labels):
+        parts.append(circle_node(c, *PAL_HIDDEN, sw=1.6))
+        parts.append(sub_sup_label(c.cx, c.cy, base,
+                                   sub=sub, sup=sup, font_size=21))
+    parts.append(circle_node(b_h2, *PAL_BIAS, label="1",
+                             font_size=23, sw=1.6, label_dy=-2))
+
+    # z, r-box and y
+    parts.append(circle_node(z_node, "white", "#444", label="z",
+                             font_size=24, sw=1.8, label_dy=-2))
+    parts.append(
+        f'<rect x="{r_box.x}" y="{r_box.y}" width="{r_box.w}" '
+        f'height="{r_box.h}" rx="10" ry="10" '
+        f'fill="#FFF7C2" stroke="#C4A000" stroke-width="1.8"/>'
+    )
+    parts.append(text(r_box.cx, r_box.cy + 8, "r(·)",
+                      size=24, fill="#222"))
+    parts.append(circle_node(out, *PAL_OUTPUT, label="y",
+                             font_size=24, sw=2.2, label_dy=-2))
+
+    # fan-out edges between layers (scaled to match the larger nodes)
+    for a in inputs + [b_in]:
         for b in h1:
-            parts.append(edge_between(a, b, sw=0.6, opacity=0.5,
-                                      arrow=True))
-    for a in h1:
+            parts.append(edge_between(a, b, sw=1.0, opacity=0.55,
+                                      arrow=True, head_len=10, head_w=5))
+    for a in h1 + [b_h1]:
         for b in h2:
-            parts.append(edge_between(a, b, sw=0.6, opacity=0.5,
-                                      arrow=True))
-    for a in h2:
-        parts.append(edge_between(a, out, sw=0.8, opacity=0.65,
-                                  arrow=True, head_len=8, head_w=4))
+            parts.append(edge_between(a, b, sw=1.0, opacity=0.55,
+                                      arrow=True, head_len=10, head_w=5))
+    for a in h2 + [b_h2]:
+        parts.append(edge_between(a, z_node, sw=1.2, opacity=0.65,
+                                  arrow=True, head_len=12, head_w=6))
+
+    # z -> r-box -> y
+    parts.append(arrow_svg(z_node.cx + z_node.r, z_node.cy,
+                           r_box.x, r_box.cy,
+                           stroke=EDGE, sw=2.0, head_len=14, head_w=7))
+    parts.append(arrow_svg(r_box.x + r_box.w, r_box.cy,
+                           out.cx - out.r, out.cy,
+                           stroke=EDGE, sw=2.0, head_len=14, head_w=7))
 
     # Top band: bold layer caption + formula for the values in that column.
     parts.append(text(x_in, top_band_y, "input layer",
-                      size=13, weight="bold"))
-    parts.append(text(x_in, top_band_y + 18,
+                      size=23, weight="bold"))
+    parts.append(text(x_in, top_band_y + 30,
                       "x ∈ ℝ³",
-                      size=12, fill="#444"))
+                      size=23, fill="#444"))
 
     parts.append(text(x_h1, top_band_y, "hidden layer 1",
-                      size=13, weight="bold"))
-    parts.append(text(x_h1, top_band_y + 18,
-                      "h⁽¹⁾ = σ(W⁽¹⁾x + b⁽¹⁾)",
-                      size=12, fill="#444"))
+                      size=23, weight="bold"))
+    parts.append(text(x_h1, top_band_y + 30,
+                      "h⁽¹⁾ = a(W⁽¹⁾x + b⁽¹⁾)",
+                      size=23, fill="#444"))
 
     parts.append(text(x_h2, top_band_y, "hidden layer 2",
-                      size=13, weight="bold"))
-    parts.append(text(x_h2, top_band_y + 18,
-                      "h⁽²⁾ = σ(W⁽²⁾h⁽¹⁾ + b⁽²⁾)",
-                      size=12, fill="#444"))
+                      size=23, weight="bold"))
+    parts.append(text(x_h2, top_band_y + 30,
+                      "h⁽²⁾ = a(W⁽²⁾h⁽¹⁾ + b⁽²⁾)",
+                      size=23, fill="#444"))
 
-    parts.append(text(x_out, top_band_y, "output layer",
-                      size=13, weight="bold"))
-    parts.append(text(x_out, top_band_y + 18,
-                      "y = W⁽³⁾h⁽²⁾ + b⁽³⁾",
-                      size=12, fill="#444"))
+    parts.append(text((z_node.cx + out.cx) / 2, top_band_y,
+                      "output layer", size=23, weight="bold"))
+    parts.append(text((z_node.cx + out.cx) / 2, top_band_y + 30,
+                      "z = W⁽³⁾h⁽²⁾ + b⁽³⁾,   y = r(z)",
+                      size=23, fill="#444"))
 
     svg_path = write_svg("ffnn-architecture", W, H, "".join(parts))
+    rasterise(svg_path)
+    return svg_path
+
+
+# ---- Figure 1b: linear regression cast as a one-unit neural net ---------
+
+def fig_linear_nn():
+    """Tiny diagram showing y = θ₀ + θ₁·x as a one-output neural net.
+
+    Two input nodes (a bias-1 node and the covariate x) connect to a
+    single output node y by edges that carry the parameters θ₀ and θ₁.
+    Used in the chapter intro to bridge ordinary linear regression to the
+    full feed-forward neural network in @fig-ffnn-arch.
+    """
+    W, H = 720, 380
+    parts = []
+
+    r_node = 40
+    PAL_BIAS = ("#F5F5F5", "#555555")
+
+    x_in, x_out = 160, 560
+    cy_one, cy_x = 110, 270
+    cy_out = (cy_one + cy_x) / 2
+
+    one_node = Circle(x_in, cy_one, r_node)
+    x_node = Circle(x_in, cy_x, r_node)
+    y_node = Circle(x_out, cy_out, r_node + 2)
+
+    parts.append(circle_node(one_node, *PAL_BIAS, label="1",
+                             font_size=26, sw=1.8, label_dy=-2))
+    parts.append(circle_node(x_node, *PAL_INPUT, label="x",
+                             font_size=26, sw=1.8, label_dy=-2))
+    parts.append(circle_node(y_node, *PAL_OUTPUT, label="y",
+                             font_size=26, sw=2.2, label_dy=-2))
+
+    # Edges with parameter labels.
+    parts.append(edge_between(one_node, y_node, sw=2.0, opacity=0.85,
+                              arrow=True, head_len=14, head_w=7))
+    parts.append(edge_between(x_node, y_node, sw=2.0, opacity=0.85,
+                              arrow=True, head_len=14, head_w=7))
+
+    # Weight labels positioned a touch above/below the midpoints of the
+    # edges so they don't sit on top of the arrows themselves.
+    mid_x = (x_in + x_out) / 2
+    parts.append(text(mid_x, cy_one + (cy_out - cy_one) * 0.4 - 12,
+                      "θ₀", size=26, fill="#222"))
+    parts.append(text(mid_x, cy_x + (cy_out - cy_x) * 0.4 + 24,
+                      "θ₁", size=26, fill="#222"))
+
+    # Caption-style equation at the bottom.
+    parts.append(text(W / 2, H - 26,
+                      "y = θ₀ + θ₁ · x",
+                      size=24, fill="#222"))
+
+    svg_path = write_svg("linear-as-nn", W, H, "".join(parts))
+    rasterise(svg_path)
+    return svg_path
+
+
+# ---- Figure 1c: FFNN with two output heads (distributional regression) --
+
+def fig_ffnn_distributional():
+    """Architecture for distributional regression: two output heads.
+
+    Identical hidden-layer structure to fig_ffnn, but the final linear
+    layer emits two pre-activations z_μ and z_σ.  Each is passed through
+    its own response function: the identity for the mean and the softplus
+    (or exponential) for the positive scale.  The network then outputs a
+    pair (μ̂, σ̂) that parametrises a heteroscedastic Normal distribution
+    over y at the given x.
+    """
+    W, H = 1500, 820
+    parts = []
+
+    x_in, x_h1, x_h2, x_z = 250, 540, 830, 1060
+    r_node = 40
+    spacing = 102
+    top_band_y = 50
+    centre = H / 2 + 35
+    bias_y = centre + (5 - 1) * spacing / 2 + spacing - 4
+
+    def column(x, labels, bias_below=True):
+        n = len(labels)
+        y0 = centre - (n - 1) * spacing / 2
+        ys = [y0 + i * spacing for i in range(n)]
+        nodes = [Circle(x, y, r_node) for y in ys]
+        bias = Circle(x, bias_y, r_node - 4) if bias_below else None
+        return nodes, bias
+
+    in_labels = [("x", "1", ""), ("x", "2", ""), ("x", "3", "")]
+    h1_labels = [("h", str(j + 1), "(1)") for j in range(5)]
+    h2_labels = [("h", str(j + 1), "(2)") for j in range(3)]
+
+    inputs, b_in = column(x_in, in_labels)
+    h1, b_h1 = column(x_h1, h1_labels)
+    h2, b_h2 = column(x_h2, h2_labels)
+
+    inputs.reverse()
+    h1.reverse()
+    h2.reverse()
+
+    PAL_BIAS = ("#F5F5F5", "#555555")
+
+    # Two output pre-activations, stacked vertically.
+    z_mu_y = centre - 95
+    z_sg_y = centre + 95
+    z_mu = Circle(x_z, z_mu_y, r_node)
+    z_sg = Circle(x_z, z_sg_y, r_node)
+
+    # Two response-function boxes (μ and σ) and corresponding outputs.
+    r_mu_box = Rect(x_z + 88, z_mu_y - 36, 124, 72)
+    r_sg_box = Rect(x_z + 88, z_sg_y - 36, 124, 72)
+    x_out = r_mu_box.x + r_mu_box.w + 88
+    out_mu = Circle(x_out, z_mu_y, r_node + 2)
+    out_sg = Circle(x_out, z_sg_y, r_node + 2)
+
+    # Hidden / input column rendering (same pattern as fig_ffnn).
+    for c, (base, sub, sup) in zip(inputs, in_labels):
+        parts.append(circle_node(c, *PAL_INPUT, sw=1.8))
+        parts.append(sub_sup_label(c.cx, c.cy, base,
+                                   sub=sub, sup=sup, font_size=24))
+    parts.append(circle_node(b_in, *PAL_BIAS, label="1",
+                             font_size=23, sw=1.6, label_dy=-2))
+    for c, (base, sub, sup) in zip(h1, h1_labels):
+        parts.append(circle_node(c, *PAL_HIDDEN, sw=1.6))
+        parts.append(sub_sup_label(c.cx, c.cy, base,
+                                   sub=sub, sup=sup, font_size=21))
+    parts.append(circle_node(b_h1, *PAL_BIAS, label="1",
+                             font_size=23, sw=1.6, label_dy=-2))
+    for c, (base, sub, sup) in zip(h2, h2_labels):
+        parts.append(circle_node(c, *PAL_HIDDEN, sw=1.6))
+        parts.append(sub_sup_label(c.cx, c.cy, base,
+                                   sub=sub, sup=sup, font_size=21))
+    parts.append(circle_node(b_h2, *PAL_BIAS, label="1",
+                             font_size=23, sw=1.6, label_dy=-2))
+
+    # Two z nodes, two r-boxes, two outputs.
+    parts.append(circle_node(z_mu, "white", "#444", sw=1.8))
+    parts.append(sub_sup_label(z_mu.cx, z_mu.cy, "z",
+                               sub="μ", font_size=24))
+    parts.append(circle_node(z_sg, "white", "#444", sw=1.8))
+    parts.append(sub_sup_label(z_sg.cx, z_sg.cy, "z",
+                               sub="σ", font_size=24))
+
+    for box, label, sub, fill_col in (
+        (r_mu_box, "r", "μ", "#FFF7C2"),
+        (r_sg_box, "r", "σ", "#FFF7C2"),
+    ):
+        parts.append(
+            f'<rect x="{box.x}" y="{box.y}" width="{box.w}" '
+            f'height="{box.h}" rx="10" ry="10" '
+            f'fill="{fill_col}" stroke="#C4A000" stroke-width="1.8"/>'
+        )
+        parts.append(sub_sup_label(box.cx, box.cy, label,
+                                   sub=sub, sup="", font_size=24))
+
+    parts.append(circle_node(out_mu, *PAL_OUTPUT, sw=2.2))
+    parts.append(sub_sup_label(out_mu.cx, out_mu.cy, "μ̂",
+                               font_size=24))
+    parts.append(circle_node(out_sg, *PAL_OUTPUT, sw=2.2))
+    parts.append(sub_sup_label(out_sg.cx, out_sg.cy, "σ̂",
+                               font_size=24))
+
+    # Fan-out edges between layers (same widths as in fig_ffnn).
+    for a in inputs + [b_in]:
+        for b in h1:
+            parts.append(edge_between(a, b, sw=1.0, opacity=0.55,
+                                      arrow=True, head_len=10, head_w=5))
+    for a in h1 + [b_h1]:
+        for b in h2:
+            parts.append(edge_between(a, b, sw=1.0, opacity=0.55,
+                                      arrow=True, head_len=10, head_w=5))
+    for a in h2 + [b_h2]:
+        for z in (z_mu, z_sg):
+            parts.append(edge_between(a, z, sw=1.0, opacity=0.55,
+                                      arrow=True, head_len=10, head_w=5))
+
+    # z_μ -> r_μ box -> μ̂  and  z_σ -> r_σ box -> σ̂
+    for z, box, out in ((z_mu, r_mu_box, out_mu),
+                        (z_sg, r_sg_box, out_sg)):
+        parts.append(arrow_svg(z.cx + z.r, z.cy,
+                               box.x, box.cy,
+                               stroke=EDGE, sw=2.0,
+                               head_len=14, head_w=7))
+        parts.append(arrow_svg(box.x + box.w, box.cy,
+                               out.cx - out.r, out.cy,
+                               stroke=EDGE, sw=2.0,
+                               head_len=14, head_w=7))
+
+    # Top band: layer captions + formulas.
+    parts.append(text(x_in, top_band_y, "input layer",
+                      size=23, weight="bold"))
+    parts.append(text(x_in, top_band_y + 30,
+                      "x ∈ ℝ³", size=23, fill="#444"))
+
+    parts.append(text(x_h1, top_band_y, "hidden layer 1",
+                      size=23, weight="bold"))
+    parts.append(text(x_h1, top_band_y + 30,
+                      "h⁽¹⁾ = a(W⁽¹⁾x + b⁽¹⁾)",
+                      size=23, fill="#444"))
+
+    parts.append(text(x_h2, top_band_y, "hidden layer 2",
+                      size=23, weight="bold"))
+    parts.append(text(x_h2, top_band_y + 30,
+                      "h⁽²⁾ = a(W⁽²⁾h⁽¹⁾ + b⁽²⁾)",
+                      size=23, fill="#444"))
+
+    parts.append(text((x_z + out_mu.cx) / 2, top_band_y,
+                      "output layer (μ, σ)", size=23, weight="bold"))
+    parts.append(text((x_z + out_mu.cx) / 2, top_band_y + 30,
+                      "μ̂ = r_μ(z_μ),   σ̂ = r_σ(z_σ)",
+                      size=23, fill="#444"))
+
+    svg_path = write_svg("ffnn-distributional", W, H, "".join(parts))
     rasterise(svg_path)
     return svg_path
 
@@ -685,7 +983,11 @@ def fig_multimodal_fusion():
     return svg_path
 
 def main():
-    for p in (fig_ffnn(), fig_shared_trunk_cr(), fig_multimodal_fusion()):
+    for p in (fig_ffnn(),
+              fig_linear_nn(),
+              fig_ffnn_distributional(),
+              fig_shared_trunk_cr(),
+              fig_multimodal_fusion()):
         print(p)
 
 
