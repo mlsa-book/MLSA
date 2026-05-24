@@ -397,3 +397,84 @@ This re-uses exactly the numbers underlying @fig-multi-state-prothr; only the pr
 The bottom row of @fig-prothr-state-occupation-by-entry exposes a clinically relevant dynamic that the marginal view averages out: among patients entering with abnormal prothrombin, the probability of having normalised within the first year is substantial (the green band climbs from $0$ to roughly $0.45$ before mortality starts to dominate), and prednisone shifts this redistribution further toward normalisation than placebo does.
 Numerically, $\hat P_{1,0}(0,\,1825) \approx 0.29$ under placebo versus $\approx 0.35$ under prednisone, with a corresponding gap in five-year mortality ($\hat P_{1,2}(0,\,1825) \approx 0.60$ vs. $\approx 0.55$).
 For patients entering in state $0$ (top row), mortality at five years is markedly lower in both arms and the blue band remains thin throughout, reflecting that conversions to the abnormal state are short-lived because they tend to be followed promptly by either recovery or death.
+## Popular Models {#sec-nnet-popular}
+
+Each of the three strategies developed in @sec-nnet-surv has well-known instantiations in the literature.
+The descriptions below cover the most influential models and locate each within the taxonomy already established.
+
+### DeepSurv and Faraggi–Simon (Cox-based) {.unnumbered}
+
+The earliest neural-Cox model was the single-hidden-layer network of @Faraggi1995, in which the linear predictor of the Cox model was replaced by a small neural network and the partial likelihood was used as the training objective.
+*DeepSurv* [@Katzman2018] extended this to deep multi-layer perceptrons, added dropout and weight decay for regularization, and demonstrated competitive performance on a number of benchmark datasets.
+Implementations exist in the `pycox` Python package [@pkgpycox] and in major deep-learning frameworks [@pkgkeras; @pkgtensorflow].
+DeepSurv is, in essence, the natural deep-learning analogue of the Cox model (@sec-classical-cox) and is the canonical example of the Cox-based strategy of @sec-nnet-cox.
+
+### Cox-Time (Cox-based, non-proportional) {.unnumbered}
+
+*Cox-Time* [@Kvamme2019a] relaxes the proportional-hazards assumption by allowing the network to take time as an additional input, $g(\xx_i, t; \bstheta)$, so that the relative risk score can vary with time.
+The resulting hazard $h(t \mid \xx) = h_0(t)\exp\bigl(g(\xx, t; \bstheta)\bigr)$ accommodates non-proportional hazard patterns; a modified loss replaces the exact risk set with a subset sampled from the mini-batch, which keeps training mini-batchable.
+Cox-Time is the most popular Cox-based deep model to support time-varying effects.
+
+### DeepHit (discrete-time, competing risks) {.unnumbered}
+
+*DeepHit* [@Lee2018a] is the most widely used discrete-time survival network.
+It parametrizes the joint distribution over event times and causes as a multinomial output over $J \cdot Q + 1$ categories (one for each $(j, q)$ pair plus a "no event by end of follow-up" category) using a softmax activation.
+The loss augments the discrete-time log-likelihood of @eq-nnet-discrete-loss with a ranking term that directly optimizes concordance,
+$$
+L_{\text{rank}}(\bstheta \mid \dtrain) = \sum_{i \neq j} \delta_i \,\II(t_i < t_j)\,\sigma\!\left(\frac{\hatS(t_i \mid \xx_i) - \hatS(t_i \mid \xx_j)}{\omega}\right)
+$$
+for a bandwidth parameter $\omega > 0$.
+The total loss is a convex combination $\alpha\,(-\ell^d) + (1-\alpha)\,L_{\text{rank}}$, where $\alpha \in [0,1]$ is a hyper-parameter.
+DeepHit was originally designed for competing risks via the shared-trunk pattern of @sec-nnet-cr and remains a standard baseline whenever competing risks are present.
+
+### Nnet-survival (discrete-time) {.unnumbered}
+
+*Nnet-survival* [@Gensheimer2019] is a minimalist discrete-time network: the output layer has $J$ sigmoidal units producing the discrete hazards $\hat{h}^d(j \mid \xx)$, and the loss is the plain discrete-time log-likelihood of @eq-nnet-discrete-loss.
+Without the ranking term of DeepHit and with no restriction on the network architecture, Nnet-survival is the most direct deep-learning analogue of the discrete-time reduction technique (@sec-discrete-time-reduction).
+By including the interval index as a feature it can model time-varying covariate effects, and by stacking convolutional or recurrent layers it can also handle images or sequences.
+
+### PC-Hazard (piecewise exponential) {.unnumbered}
+
+*PC-Hazard* [@Kvamme2021] is a piecewise-exponential (PEM) deep model: a single network outputs the log-hazard in each interval of a fixed partition, and training minimizes the Poisson-form PEM negative log-likelihood (cf. @sec-piecewise-constant-hazards).
+Unlike DeepHit and Nnet-survival, PC-Hazard preserves the exact event and at-risk times within each interval and therefore avoids the information loss of pure discrete-time methods.
+
+### DeepPAMM (piecewise additive mixed model) {.unnumbered}
+
+*DeepPAMM* [@Kopper2021] is a further generalization of the PEM strategy that combines the structured additive predictor of piecewise-exponential additive mixed models with deep neural-network components.
+It supports time-varying effects (by interacting the network output with the interval index), left-truncation (by adjusting the risk-time accumulation in the PEM likelihood), competing risks and multi-state outcomes (via the multi-state interpretation of the PEM), recurrent events (via random effects), and multi-modal inputs (via the additive structured predictor in @eq-multimodal).
+It is the most "task-complete" of the deep-survival models in the sense of @Wiegrebe2024 and serves as a useful unifying reference point connecting the deep-learning strategies of this chapter to the partition-based reduction techniques of @sec-partition-based-reductions.
+### Non-Parametric: Discrete- and Piecewise-Time Neural Networks {#sec-nnet-discrete}
+
+The third strategy makes no parametric or proportional-hazards assumption and instead discretizes the follow-up period, framing survival estimation as a sequence of interval-wise classification or Poisson-regression problems, as introduced in @sec-partition-based-reductions.
+
+Given a partition $\mathcal{A} = \{a_0, \ldots, a_J\}$ of the follow-up period into $J$ intervals $(a_{j-1}, a_j]$, let $J_i$ be the index of the interval in which observation $i$'s outcome falls.
+The *discrete hazard* in interval $j$ conditional on covariates $\xx$ is
+$$
+h^d(j \mid \xx) = P(T \in (a_{j-1}, a_j] \mid T > a_{j-1}, \xx),
+$$
+and the corresponding discrete survival function is
+$$
+S^d(j \mid \xx) = \prod_{k=1}^{j}\bigl(1 - h^d(k \mid \xx)\bigr).
+$$
+
+A neural network with $J$ output units and sigmoid activations can predict these $J$ discrete hazards simultaneously:
+$$
+\left(\hat{h}^d(1 \mid \xx_i), \ldots, \hat{h}^d(J \mid \xx_i)\right) = \sigma\!\left(g(\xx_i; \bstheta)\right) \in (0,1)^J.
+$$
+The discrete-time log-likelihood (@eq-discrete-likelihood-1) then serves as the training objective:
+$$
+-\ell^{d}(\bstheta \mid \dtrain) = -\sum_{i=1}^{n}\left[\sum_{j=1}^{J_i - 1}\log\bigl(1 - \hat{h}^d(j \mid \xx_i)\bigr) + \delta_i \log \hat{h}^d(J_i \mid \xx_i) + (1-\delta_i)\log\bigl(1 - \hat{h}^d(J_i \mid \xx_i)\bigr)\right].
+$$ {#eq-nnet-discrete-loss}
+
+This is precisely the binary cross-entropy loss applied interval-by-interval, which is a standard and well-supported loss in deep learning frameworks.
+Once trained, the full predicted survival curve is recovered as the running product $\hatS(\tau \mid \xx^*) = \prod_{j : a_j \leq \tau}\bigl(1 - \hat{h}^d(j \mid \xx^*)\bigr)$.
+
+The number of intervals $J$ and the placement of interval boundaries $\mathcal{A}$ are important modeling choices, as discussed in @sec-choice-of-interval-boundaries.
+A fine partition allows more flexible hazard estimation but increases the output dimension and may require more training data; a coarse partition is more parsimonious but may miss important temporal patterns.
+
+A close continuous-time alternative uses the *piecewise exponential model* (PEM, @sec-piecewise-constant-hazards), in which the hazard is assumed constant within each interval but the exact event and at-risk times within the interval are preserved.
+The Poisson-form likelihood of the PEM is the training objective and the network output is the log-hazard in each interval rather than a discrete hazard.
+This avoids the information loss incurred by replacing the exact event time $t_i$ with the interval index $J_i$ and provides continuous-time predictions $\hatS(\tau \mid \xx^*)$ for any $\tau$ via the piecewise cumulative hazard.
+
+Both variants make no distributional assumptions, can model arbitrary time-varying covariate effects by including the interval index $j$ (or the interval midpoint $a_{j-1/2}$) as an input feature, and are implemented using losses that are standard in all major deep learning frameworks.
+They are also the direct deep learning instantiation of the partition-based reduction techniques (@sec-partition-based-reductions): the neural network serves as the (multi-output) classification or Poisson-regression model whose targets are the interval-wise event indicators of the transformed data.

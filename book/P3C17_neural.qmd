@@ -1,6 +1,6 @@
 ---
 abstract: |
-  This chapter develops neural networks for survival analysis from first principles. We begin with feed-forward neural networks for regression, motivated as a stack of linear models with non-linear activations that can approximate any sufficiently smooth function, and review the key ingredients — layers, activations, mini-batch stochastic gradient descent, backpropagation, and regularization. We then show that adaptation to survival analysis requires no fundamental change to either the architecture or the optimization procedure; it is enough to choose a survival-specific loss function. Three complementary strategies are developed in detail — a parametric strategy that lets the network predict distribution parameters, a semi-parametric Cox-based strategy that uses the partial likelihood as the training objective, and a non-parametric discrete- or piecewise-time strategy that frames hazard estimation as a sequence of interval-wise classification problems. We then turn to two settings where deep learning has a particular comparative advantage — competing risks, where a shared trunk learns one representation from which cause-specific heads branch off, and multi-modal data, where modality-specific encoders feed a common survival head. We close with concise descriptions of the most influential models in the literature — DeepSurv, Cox-Time, DeepHit, Nnet-survival, PC-Hazard and DeepPAMM — each presented as an instantiation of one of the three strategies, and discuss extensions to other censoring and truncation schemes.
+  This chapter introduces neural networks and develops their application to survival analysis. We begin with feed-forward neural networks for regression — their architecture (layers, activations, response functions), optimization (gradient descent, backpropagation), and the progression from deterministic point prediction to probabilistic distributional regression, where the network outputs the parameters of an assumed conditional distribution rather than a single mean. We then show that adapting neural networks to survival analysis requires no fundamental change to the architecture; it is enough to replace the regression loss with a survival-specific objective. Two strategies are developed — a parametric strategy that lets the network predict the parameters of a time-to-event distribution (illustrated with a Weibull AFT example on the tumor data), and a semi-parametric Cox-based strategy that replaces the linear predictor with a neural network. The chapter then turns to two settings where deep learning has a particular comparative advantage over classical methods — competing risks, where a shared trunk learns one representation from which cause-specific heads branch off, and multi-modal data, where modality-specific encoders (for tabular, image, and omics data) feed a common survival head.
 ---
 
 ::: {.content-visible when-format="html"}
@@ -16,7 +16,7 @@ General introductions are given in @LeCun2015, @Goodfellow2016 and @Prince2023.
 A range of specialized architectures has been developed for different data modalities, most notably *convolutional neural networks* (CNNs) for image data [@LeCun1998; @Krizhevsky2012], *recurrent neural networks* (RNNs) and *long short-term memory* (LSTM) units for sequence data [@Hochreiter1997], and *transformers* based on self-attention for sequence and multi-modal data [@Vaswani2017].
 
 For the purposes of this chapter, the precise architecture is largely orthogonal to the survival adaptation: all of these models share the same mathematical backbone that consists of compositions of linear maps cobmined with non-linear *activations*, trained by minimizing a differentiable loss with stochastic gradient descent.
-The adaptation to survival analysis acts on the loss, not on the architecture.
+The adaptation to survival analysis acts (mostly) on the loss, not on the architecture.
 We therefore introduce the basics in terms of the simplest variant, the *feed-forward neural network*, and return to the specialized architectures briefly in @sec-nnet-strengths and @sec-nnet-extensions, where they play a central role in handling images, sequences and multi-modal inputs.
 
 The key insight of this chapter is that the survival-specific likelihoods already encountered throughout this book, such as parametric likelihoods (@sec-surv-estimation-param), the Cox partial likelihood (@sec-classical-cox), the discrete-time likelihood (@sec-discrete-time-reduction), and the piecewise-exponential likelihood (@sec-piecewise-constant-hazards), translate directly into training objectives for neural networks.
@@ -25,117 +25,90 @@ The chapter is organized in five parts.
 @sec-nnet-regression introduces the essential building blocks of neural networks for continuous regression and establishes the notation used throughout.
 @sec-nnet-surv develops three general strategies for using neural networks in survival analysis: parametric, semi-parametric (Cox-based), and non-parametric (discrete- and piecewise-time).
 @sec-nnet-strengths then turns to two settings where deep learning has a particular comparative advantage: competing risks with shared representations and multi-modal data fusion.
-@sec-nnet-popular gives compact descriptions of the most influential models in the literature, each as an instantiation of one of the three strategies.
 @sec-nnet-extensions collects extensions (left-truncation, time-varying effects, alternative architectures) before the chapter concludes with takeaways, limitations, and further reading.
 
 ## Neural Networks for Regression {#sec-nnet-regression}
 
-A *feed-forward neural network* (FFNN) maps an input vector $\xx \in \Reals^p$ to an output through a sequence of *layers*.
-Each layer applies a linear transformation followed by a non-linear *activation function*.
-A network with $L$ hidden layers is defined recursively as
+We introduce neural networks in the simplest supervised-learning setting: predicting a continuous response $y_i \in \Reals$ from a covariate vector $\xx_i \in \Reals^p$, given $n$ training observations $\dtrain = \{(\xx_i, y_i)\}_{i=1}^n$.
+Neural networks can be viewed as computation graphs (usually directed acyclic graphs) where the network architecture defines how the input is transformed through a series of linear transformations, often followed by non-linear activations, to produce the output.
+
+@fig-ffnn-arch shows a *feed-forward neural network* (FFNN) with three inputs, two *hidden layers* of five and three units each, and a scalar output.
+The circles are called *nodes* or *neurons*; information flows left to right along the arrows.
+Each hidden unit computes a linear combination of its inputs (with *weights* $\mathbf{W}^{(l)}$ and *biases* $\mathbf{b}^{(l)}$) followed by a non-linear *activation function* $a^{(l)}$ (@sec-nnet-activations).
+The layers between input and output are called *hidden* because their values are not directly observed in the data — they are internal representations that the network learns.
+Mathematically, the FFNN is defined by the recursion
+
 $$
 \begin{aligned}
 \hh^{(0)} &= \xx \\
-\hh^{(l)} &= \sigma^{(l)}\!\left(\mathbf{W}^{(l)}\hh^{(l-1)} + \mathbf{b}^{(l)}\right), \quad l = 1, \ldots, L \\
-g(\xx; \bstheta) &= \mathbf{W}^{(L+1)}\hh^{(L)} + \mathbf{b}^{(L+1)},
+\hh^{(l)} &= a^{(l)}\!\left(\mathbf{W}^{(l)}\hh^{(l-1)} + \mathbf{b}^{(l)}\right), \quad l = 1, \ldots, L \\
+z &= \mathbf{W}^{(L+1)}\hh^{(L)} + \mathbf{b}^{(L+1)} \\
+g(\xx \mid \bstheta) &= r(z) = y,
 \end{aligned}
 $$ {#eq-nnet-forward}
-where $\mathbf{W}^{(l)}$ and $\mathbf{b}^{(l)}$ are the weight matrix and bias vector of layer $l$, $\sigma^{(l)}$ is the layer's activation function applied element-wise, and $\bstheta = \{\mathbf{W}^{(l)}, \mathbf{b}^{(l)}\}_{l=1}^{L+1}$ collects all trainable parameters.
-The output $g(\xx; \bstheta) \in \Reals^q$ can be a scalar ($q = 1$) for univariate regression or a vector for multi-output problems.
-The graphical structure is illustrated in @fig-ffnn-arch.
+where $\mathbf{W}^{(l)}$ and $\mathbf{b}^{(l)}$ are the weight matrix and bias vector of layer $l$, $a^{(l)}$ is the layer's activation function applied element-wise, and $\bstheta = \{\mathbf{W}^{(l)}, \mathbf{b}^{(l)}\}_{l=1}^{L+1}$ collects all trainable parameters.
+$r(\,\cdot\,)$ is an (optional) *output response function* (@sec-nnet-activations).
 
-![Schematic of a feed-forward neural network with three inputs $x_1, x_2, x_3$, two hidden layers of five and three units $h^{(l)}_j$, and a scalar output $y$. Each circle is a unit; each edge carries a weight in $\mathbf{W}^{(l)}$. The output of layer $l$ is the element-wise activation $\sigma$ of the pre-activation $\mathbf{W}^{(l)}\hh^{(l-1)} + \mathbf{b}^{(l)}$. Trainable parameters $\bstheta = \{\mathbf{W}^{(l)}, \mathbf{b}^{(l)}\}_{l=1}^{L+1}$ are learned by minimizing a differentiable loss with stochastic gradient descent.](Figures/neuralnetworks/ffnn-architecture.png){#fig-ffnn-arch fig-alt="A fully connected feed-forward neural network with three input units x_1, x_2, x_3, two hidden layers of five and three units labelled h_j^{(l)}, and a single scalar output y. Edges between adjacent layers indicate the weights." width=85%}
 
-Different activation functions can be used; the most common default for hidden layers is the *rectified linear unit* (ReLU) [@Nair2010], defined by $\sigma(v) = \max(0, v)$.
+![Schematic of a feed-forward neural network instantiating @eq-nnet-forward with three inputs $x_1, x_2, x_3$, two hidden layers of five and three units $h^{(l)}_j$, and a scalar output $y$. Arrows indicate the direction of information flow; the bias nodes labelled $\mathbf{b}^{(l)}$ contribute the additive offsets in each layer. The output layer is split into the pre-activation $z$ and the response function $r(\,\cdot\,)$ (yellow box) producing $y = r(z)$.](Figures/neuralnetworks/ffnn-architecture.png){#fig-ffnn-arch fig-alt="A fully connected feed-forward neural network with three input units x_1, x_2, x_3, two hidden layers of five and three units labelled h_j^{(l)}, explicit bias nodes labelled b^{(l)} below each non-output layer, arrows indicating forward information flow, a pre-activation node z, a yellow response-function box r(·), and a single scalar output y." width=100%}
 
-The *output* layer is treated separately: the activation applied to the last linear transformation is dictated by the natural range of the quantity the network is supposed to predict, not by gradient considerations.
-The recursion in @eq-nnet-forward, written as is, applies the identity activation at the output ($g(\xx; \bstheta) \in \Reals^q$ is unbounded), which is appropriate for unconstrained continuous regression.
-For other targets a suitable *output activation* is composed with the final linear map:
+### Activations and response functions {#sec-nnet-activations}
+
+The freedom in @eq-nnet-forward is in the choice of hidden activation $a^{(l)}$ and output response $r(\,\cdot\,)$.
+@tbl-activations lists the most common activation functions used in practice.
+The default choice for hidden layers is the *rectified linear unit* (ReLU) [@Nair2010] because of its computational simplicity and favorable gradient properties; sigmoid and tanh saturate for large $|v|$, which can slow training.
+Note, however, that each ReLU unit is piecewise linear (with a single "hinge" at $v = 0$), so a ReLU network produces a piecewise-linear function whose number of breakpoints is bounded by the number of hidden units.
+A tanh network of the same size produces smoother curves because each unit blends continuously — the effect is clearly visible in the `mcycle` example in @fig-mcycle-ffnn below.
+
+: Common activation functions. The ReLU is the default for hidden layers; sigmoid and softplus are typically used as output response functions to enforce range constraints. {#tbl-activations}
+
+| Name | Definition | Range | Shape |
+|:-----|:-----------|:------|:-----:|
+| ReLU | $a(v) = \max(0, v)$ | $[0, \infty)$ | ![](Figures/neuralnetworks/activation-relu.png){height=60px} |
+| Sigmoid | $a(v) = \frac{1}{1 + e^{-v}}$ | $(0, 1)$ | ![](Figures/neuralnetworks/activation-sigmoid.png){height=60px} |
+| Tanh | $a(v) = \frac{e^v - e^{-v}}{e^v + e^{-v}}$ | $(-1, 1)$ | ![](Figures/neuralnetworks/activation-tanh.png){height=60px} |
+| Softplus | $a(v) = \log(1 + e^v)$ | $(0, \infty)$ | ![](Figures/neuralnetworks/activation-softplus.png){height=60px} |
+
+The *response function* $r(\,\cdot\,)$ controls the range of the output: the identity $r(z) = z$ produces an unconstrained continuous prediction (the default for ordinary regression), while non-trivial choices map the unbounded $z$ into the range required by the prediction target.
+$r(\,\cdot\,)$ plays the same role as the response function in a generalized linear model, and its inverse $r^{-1}(\,\cdot\,)$ is the corresponding link function.
+Common choices of $r(\,\cdot\,)$ are:
 
 * a probability in $(0,1)$ uses the sigmoid (binary classification);
-* a probability vector over $K$ classes uses the *softmax*, $\operatorname{softmax}(\zz)_k = e^{z_k}/\sum_{j=1}^{K}e^{z_j}$ (multi-class classification);
-* a strictly positive scalar uses the *softplus*, $\sigma(v) = \log(1+e^v)$, or the exponential (e.g., a positive scale parameter such as the Weibull $\lambda$ in @sec-nnet-param);
+* a probability vector over $K$ classes uses the *softmax*, $r(\mathbf{z})_k = e^{z_k}/\sum_{j=1}^{K}e^{z_j}$, where $\mathbf{z} \in \Reals^K$ is the vector of pre-activations (multi-class classification);
+* a strictly positive scalar uses the *softplus*, $r(v) = \log(1+e^v)$, or the exponential (e.g., a positive scale parameter such as the Weibull $\lambda$ in @sec-nnet-param);
 * a value in a bounded interval uses a scaled / shifted $\tanh$.
 
-The output activation is therefore best thought of as a *link function* in the sense of generalized linear models: it maps the unbounded pre-activation of the last linear layer onto the range required by the prediction target and is implicit in how the loss function consumes the network output (e.g. binary cross-entropy expects a sigmoid output; the discrete-time survival loss of @sec-nnet-discrete expects per-interval sigmoids).
+In an actual implementation the response is usually folded into the loss function rather than the network output (e.g. binary cross-entropy expects logits, not sigmoid-transformed probabilities).
 
-### Training: loss, gradient descent and backpropagation {.unnumbered .unlisted}
+### Optimization
 
-Training consists of minimizing a differentiable loss function $\ell(\bstheta \mid \dtrain)$ with respect to $\bstheta$.
-For continuous regression the canonical default is the *mean squared error* (MSE),
+Equations (@eq-nnet-forward) define a neural network, but in order to fit the model to data, we need to choose the parameters $\bstheta$ to minimize a *loss function* $L(\bstheta)$ that averages a per-observation loss.
 $$
-\ell(\bstheta \mid \dtrain) = \frac{1}{n}\sum_{i=1}^{n}\bigl(y_i - g(\xx_i; \bstheta)\bigr)^{2},
-$$ {#eq-nnet-mse}
-where the network output $\hat{y}_i = g(\xx_i; \bstheta)$ is interpreted as a *point prediction* of the response.
+\hat{\bstheta} \;=\; \argmin_{\bstheta}\, L(\bstheta).
+$$ {#eq-nnet-argmin}
+For a linear model this objective has a *closed-form* minimum (the OLS normal equations).
+For an FFNN — even a shallow one — it does not, and $\hat{\bstheta}$ has to be found *iteratively*:
 
-#### From point predictions to distributional regression {.unnumbered .unlisted}
+1. **Initialize**: start from a random guess $\bstheta^{0}$.
+2. **Forward pass**: use the current $\bstheta$ to compute predictions $g(\xx_i; \bstheta)$ and the loss $L(\bstheta)$.
+3. **Compute gradients**: determine how each parameter should change to reduce $L$.
+4. **Update parameters**: take a step in the direction that decreases $L$.
 
-For the survival adaptation it is useful to view the MSE not as a free-standing loss but as the negative log-likelihood of a *Normal* observation model with constant variance.
-Assuming $Y_i \mid \xx_i \sim \mathcal{N}(\mu_i, \sigma^2)$ with $\mu_i = g(\xx_i; \bstheta)$ and $\sigma^2$ fixed, the per-observation log-density is
-$$
-\log p(y_i \mid \xx_i) = -\tfrac{1}{2\sigma^2}\bigl(y_i - g(\xx_i; \bstheta)\bigr)^2 - \tfrac{1}{2}\log(2\pi\sigma^2),
-$$
-and the maximum-likelihood estimator of $\bstheta$ minimizes precisely @eq-nnet-mse [@Prince2023, ch. 5].
-In other words, plain MSE regression is already a probabilistic model — it just happens to fix the variance.
+Steps 2–4 are repeated until the loss is (approximately) minimized.
+Two distinct concepts live inside steps 3 and 4:
 
-A natural and important generalization is *distributional regression*: instead of predicting only the mean, the network is given a multi-output head that produces *all* parameters of the assumed distribution.
-For a Normal model this means the network outputs both the mean and the variance (or a log-variance, to enforce positivity),
+- *Backpropagation* (step 3) is the *algorithm for computing gradients* $\partial L / \partial \bstheta$ efficiently in a multi-layer network. It applies the chain rule once, walking along the network's computation graph from output back to input.
+- *Gradient descent* (step 4) is the *update rule* that uses those gradients to take a step. In its plain form,
 $$
-\bigl(\hat{\mu}_i,\, \log \hat{\sigma}^2_i\bigr) = g(\xx_i; \bstheta) \in \Reals^2,
-$$
-and the training objective becomes the negative log-likelihood of the resulting *heteroscedastic* Normal model,
-$$
--\ell(\bstheta \mid \dtrain) = \sum_{i=1}^{n} \left[\tfrac{1}{2\hat{\sigma}^2_i}\bigl(y_i - \hat{\mu}_i\bigr)^2 + \tfrac{1}{2}\log\!\bigl(2\pi\hat{\sigma}^2_i\bigr)\right].
-$$ {#eq-nnet-gauss-nll}
-The crucial conceptual shift is that the trainable parameters $\bstheta$ now parametrize a whole conditional distribution $p(Y \mid \xx; \bstheta)$ rather than a single conditional mean.
-Once a fitted network is available, the prediction for a new observation $\xx^*$ is the full distribution $p(Y \mid \xx^*; \hat{\bstheta})$, from which the mean $\hat{\mu}^* = g(\xx^*; \hat{\bstheta})$ is just one summary among many (one may equally read off quantiles, prediction intervals, or the predictive density at a target value).
+\bstheta^{t+1} \;=\; \bstheta^{t} - \alpha\, \left.\frac{\partial L}{\partial \bstheta}\right|_{\bstheta^{t}},
+$$ {#eq-nnet-gd}
+where $\alpha > 0$ is the *learning rate* controlling the step size, $\bstheta^{t}$ is the current parameter vector, and $\left.\partial L/\partial \bstheta\right|_{\bstheta^{t}}$ is the gradient of the loss evaluated at $\bstheta^{t}$.
 
-Nothing in this generalization is specific to the Normal distribution: any parametric family $p(y \mid \bsphi)$ with a differentiable log-density can be plugged in.
-The network outputs the parameter vector $\bsphi_i = g(\xx_i; \bstheta)$ (with output activations that respect the parameter constraints — softplus for a positive scale, sigmoid for a probability, etc.), and the loss is the negative log-likelihood $-\sum_i \log p(y_i \mid \bsphi_i)$.
-This is the lens we will use to derive the *parametric* neural-network strategy for survival analysis in @sec-nnet-param: replace the Normal with a time-to-event distribution (Weibull, log-normal, …) and replace the i.i.d. log-likelihood with the censored survival log-likelihood; everything else — architecture, optimizer, gradient computation — is unchanged.
+Practical optimizers (stochastic gradient descent, Adam [@Kingma2015], ...) refine how the gradient is estimated and how the step size is adapted, but share this same skeleton.
 
-#### Classification and the general perspective {.unnumbered .unlisted}
 
-Classification fits into the same picture.
-For binary classification with $y_i \in \{0,1\}$ and a sigmoid output, the network parametrizes a *Bernoulli* distribution: write $p_i = \sigma(z_i)$ for the predicted event probability, where $z_i = g(\xx_i; \bstheta)$ is the (unconstrained, real-valued) pre-activation of the last linear layer.
-The negative log-likelihood is the familiar *binary cross-entropy*
-$$
-\ell(\bstheta \mid \dtrain) = -\frac{1}{n}\sum_{i=1}^{n}\bigl[y_i\log p_i + (1-y_i)\log\bigl(1-p_i\bigr)\bigr].
-$$ {#eq-nnet-bce}
-For multi-class classification with $K$ classes, a softmax output activation produces a probability vector $\pp_i \in (0,1)^K$ and the *categorical* negative log-likelihood is
-$$
-\ell(\bstheta \mid \dtrain) = -\frac{1}{n}\sum_{i=1}^{n}\sum_{k=1}^{K} \II(y_i = k)\,\log p_{ik}.
-$$
-The general perspective — that the network parametrizes a conditional distribution and is trained by minimizing the negative log-likelihood — is what makes the survival adaptation so direct: switching to a survival problem only requires switching the per-observation contribution, while the architecture, the optimizer and the gradient computation remain unchanged.
 
-#### In practice: logits or probabilities? {.unnumbered .unlisted}
-
-Equation @eq-nnet-bce treats the probability $p_i = \sigma(z_i)$ as the network output.
-In an actual implementation, however, the network is almost always defined to return the *unbounded* pre-activation $z_i$ — the *logit* — and the sigmoid is folded into the loss.
-Two reasons drive this convention.
-First, evaluating $\log \sigma(z)$ and $\log(1-\sigma(z))$ directly suffers from numerical overflow and underflow for $|z|$ large, whereas the algebraically equivalent forms
-$$
-\log \sigma(z) = -\log\!\bigl(1+e^{-z}\bigr), \qquad \log\bigl(1-\sigma(z)\bigr) = -\log\!\bigl(1+e^{z}\bigr),
-$$
-are stable through the standard log-sum-exp trick.
-Second, splitting the sigmoid off the network keeps the building blocks composable: the same logit can be combined with different loss functions, and a single fused "loss-from-logits" operator can be optimized inside the framework.
-Concretely, in PyTorch one omits `nn.Sigmoid` from the network's final layer and uses `nn.BCEWithLogitsLoss` instead of applying `nn.BCELoss` to an explicit sigmoid output; the multi-class analogue is `nn.CrossEntropyLoss`, which consumes the raw $K$-dimensional logits directly.
-The same pattern reappears across this chapter's survival losses: networks for Cox-based models (@sec-nnet-cox) emit an unbounded log-risk score, networks for discrete-time models (@sec-nnet-discrete) emit per-interval logits that are passed through sigmoids inside the loss, and parametric networks (@sec-nnet-param) emit log-parameters such as $\log\lambda$ and $\log k$ that are exponentiated inside the Weibull log-likelihood — see the example in @fig-weibull-aft-nn for a concrete instance.
-
-Optimization typically uses *stochastic gradient descent* (SGD) or adaptive variants such as Adam [@Kingma2015].
-In each iteration, parameters are updated by a small step in the direction of the negative gradient,
-$$
-\bstheta^{t+1} = \bstheta^{t} - \alpha\, \nabla_{\bstheta}\, \widetilde{\ell}\bigl(\bstheta^{t}\bigr),
-$$
-where the *learning rate* $\alpha > 0$ controls the step size, and $\widetilde{\ell}$ is a noisy estimate of the full loss computed on a *mini-batch* — a random subset $B \subset \{1,\ldots,n\}$,
-$$
-\widetilde{\ell}(\bstheta) = \frac{1}{|B|}\sum_{i \in B} \ell_i(\bstheta).
-$$
-Mini-batching reduces the per-step memory and compute cost from $O(n)$ to $O(|B|)$ and injects beneficial stochasticity into the gradient estimates [@Goodfellow2016].
-The gradient $\nabla_{\bstheta}\,\ell$ itself is computed efficiently by *backpropagation*, which applies the chain rule layer by layer from the output back to the input.
-Backpropagation is the *algorithm* used to compute gradients; SGD (or Adam) is the *update rule* that uses those gradients to take a step.
-
-### Regularization and hyper-parameters {.unnumbered .unlisted}
+#### Regularization and hyper-parameters {.unnumbered .unlisted}
 
 Neural networks are over-parameterized by design and would overfit small datasets without regularization.
 Two regularization strategies are widely used.
@@ -146,7 +119,7 @@ Two regularization strategies are widely used.
 The principal hyper-parameters of an FFNN are therefore the depth $L$, the width of each layer, the learning rate $\alpha$, the dropout rate $p_{\text{drop}}$, the weight-decay coefficient $\lambda$, and the mini-batch size $|B|$.
 They are usually selected by cross-validation or by monitoring a held-out validation set; an exhaustive treatment is given in @Goodfellow2016 and @Bishop2006.
 
-### Beyond fully-connected networks {.unnumbered .unlisted}
+#### Beyond fully-connected networks {.unnumbered .unlisted}
 
 The recursion in @eq-nnet-forward defines fully-connected feed-forward networks, but the same training machinery — differentiable loss, backpropagation, mini-batch SGD — applies to any differentiable architecture.
 *Convolutional* networks (CNNs) exploit local spatial structure and are the default choice for images.
@@ -154,37 +127,106 @@ The recursion in @eq-nnet-forward defines fully-connected feed-forward networks,
 *Autoencoders* and their variational extensions learn compact representations of high-dimensional inputs.
 For survival analysis these architectures are largely treated as drop-in replacements for the feature extractor $g(\,\cdot\,; \bstheta)$: the survival-specific loss function is applied on top of whichever architecture is most natural for the input data.
 
+
+### Deterministic and probabilistic regression {#sec-nnet-deterministic-vs-probabilistic}
+
+Recall from @sec-ml-tasks-regr that regression tasks can be *deterministic* — returning a single point prediction $\hat y = g(\xx \mid \bstheta)$ of the conditional mean — or *probabilistic*, returning a full conditional distribution $f(y \mid \xx, \bstheta)$ from which means, quantiles, prediction intervals, and predictive densities can all be read off.
+This distinction will be central when we adapt neural networks to survival analysis (@sec-nnet-surv), where the prediction targets are inherently distributional. 
+
+Here we illustrate the two paradigms using the `mcycle` data [@Silverman1985] in @fig-mcycle-ffnn with 133 records of head acceleration (g) at successive time points after a simulated motorcycle helmet impact.
+The response is clearly not a straight-line function of the covariate: acceleration is near zero for ~14 ms, then drops sharply, and then bounces back through several damped oscillations.
+
+
+#### Deterministic regression {#sec-nnet-deterministic}
+For deterministic regression, we use the FFNN from @fig-ffnn-arch and learn the parameters by minimizing the *mean squared error*
+$$
+\hat{\bstheta} \;=\; \argmin_{\bstheta}\; \frac{1}{n}\sum_{i=1}^{n}\bigl(y_i - g(\xx_i \mid \bstheta)\bigr)^{2},
+$$ {#eq-nnet-mse}
+which gives a single curve $\hat y = g(\xx \mid \hat{\bstheta})$ summarising the conditional mean, and nothing else.
+
+@fig-mcycle-ffnn shows the learned function for two versions of this FFNN — using the architecture of @fig-ffnn-arch with a single input, two hidden layers of five and three units, and a single output.
+Both networks were trained with the same optimizer (Adam), learning rate, weight decay, and random seed; the *only* difference is the activation function (cf. @sec-nnet-activations).
+With $\tanh$ activations (left panel) the fit is a smooth curve that captures the impact dip, the rebound, and the damped tail.
+With ReLU activations (right panel) the fit is *piecewise linear*: each ReLU unit contributes at most one "hinge" at the point where it switches between zero and the linear regime, so $5 + 3 = 8$ units can produce at most eight breakpoints.
+The resulting corners are clearly visible where $\tanh$ blends smoothly.
+
+![Deterministic FFNN fit to the `mcycle` data. Both panels use the architecture of @fig-ffnn-arch (one input, two hidden layers of five and three units, one output) with identical optimizer settings — only the activation function differs. *Left*: $\tanh$ activations. *Right*: ReLU activations.](Figures/neuralnetworks/mcycle-tanh-vs-relu.png){#fig-mcycle-ffnn fig-alt="Two side-by-side scatterplots of head acceleration against time after impact for the mcycle dataset. Left: smooth tanh FFNN fit. Right: piecewise-linear ReLU FFNN fit with visible hinge points." width=100%}
+
+
+
+#### Probabilistic regression {#sec-nnet-probabilistic}
+
+The deterministic fit in @fig-mcycle-ffnn returns a single conditional-mean curve but says nothing about the *distribution* of the response around that curve.
+For `mcycle` the spread is visibly heteroscedastic — tight before the impact, wide during the rebound — so a constant-variance prediction interval would be a poor summary and doesn't provide uncertainty quantification regarding the mean estimate.
+
+An alternative is to use *distributional regression*. 
+The network outputs not just the conditional mean $\hat\mu(\xx)$ but *all* parameters of an assumed conditional distribution.
+For the Normal distribution, this means predicting the conditional mean $\hat\mu(\xx)$ and the conditional scale $\hat\sigma(\xx)$ jointly:
+$$
+\bigl(\hat{\mu}(\xx_i),\; \log \hat{\sigma}(\xx_i)\bigr) = g(\xx_i \mid \bstheta) \in \Reals^2.
+$$
+The log-parametrisation ensures $\hat\sigma(\xx_i) > 0$ via an exponential response function.
+The training objective is the heteroscedastic Normal negative log-likelihood,
+$$
+\hat{\bstheta} \;=\; \argmin_{\bstheta}\; \sum_{i=1}^{n} \left[\tfrac{1}{2\hat{\sigma}(\xx_i)^2}\bigl(y_i - \hat{\mu}(\xx_i)\bigr)^2 + \log \hat{\sigma}(\xx_i)\right].
+$$ {#eq-nnet-gauss-nll}
+The parameters $\bstheta$ now parametrize a whole conditional density $f(y \mid \xx, \bstheta)$ rather than a single conditional mean, so the prediction at a new $\xx^*$ is the full distribution $f(\,\cdot \mid \xx^*, \hat{\bstheta})$, from which means, quantiles, and prediction intervals can all be read off.
+
+@fig-ffnn-distributional illustrates two ways a network can produce the two outputs $\hat\mu(\xx)$ and $\hat\sigma(\xx)$ that parametrize @eq-nnet-gauss-nll.
+In variant *(a)*, the hidden layers are shared and only the final layer splits into two pre-activations $z_\mu, z_\sigma$, each mapped through its own response function $r_\mu, r_\sigma$.
+Because the hidden representation is learned once and reused for both parameters, this variant is parameter-efficient and acts as a form of regularization — particularly helpful on small datasets.
+In variant *(b)*, two entirely separate networks predict $\hat\mu(\xx)$ and $\hat\sigma(\xx)$ independently; all weights are still trained jointly because both outputs feed into the same distributional loss.
+Separate networks are more flexible — for instance when the two parameters call for very different architectures (e.g. a convolutional encoder for the mean but a small MLP for the scale) or when the two parameters require different regularization (strong regularization for the scale, weak regularization for the mean).
+
+![Two architectural variants for distributional regression. *(a)* A shared trunk whose final layer splits into two pre-activations $z_\mu, z_\sigma$, each mapped through its own response function to produce $\hat\mu(\xx)$ and $\hat\sigma(\xx)$. *(b)* Two entirely separate networks; all weights are still trained jointly because both outputs parametrize the same assumed distribution $\mathcal{N}(\hat\mu, \hat\sigma^2)$.](Figures/neuralnetworks/ffnn-distributional.png){#fig-ffnn-distributional fig-alt="Two diagrams stacked vertically. Top (a): shared hidden-layer trunk splitting into two output branches for mu and sigma, each passing through a response function, converging into a Normal distribution box. Bottom (b): two separate networks for mu and sigma, each with their own response function, converging into the same Normal distribution box." width=85%}
+
+@fig-distributional-regression shows the result of fitting variant *(a)* of @fig-ffnn-distributional to the `mcycle` data: a shared trunk (with the same architecture as @fig-ffnn-arch) whose final layer branches into two outputs.
+The response functions are chosen to match the parameter constraints: $r_\mu$ is the identity (the mean is unconstrained) and $r_\sigma = \exp$ (the scale must be positive).
+The mean curve $\hat\mu(x)$ traces the same impact / rebound / damped-tail pattern as the deterministic fit in @fig-mcycle-ffnn, but the 95 % predictive band $\hat\mu(x) \pm 1.96\,\hat\sigma(x)$ is now narrow during the quiet pre-impact phase, widens during the noisy rebound, and contracts again in the tail — exactly the heteroscedasticity that was lost in the deterministic fit.
+
+![Heteroscedastic-Normal fit of @eq-nnet-gauss-nll on the `mcycle` data using variant *(a)* of @fig-ffnn-distributional. The response functions are $r_\mu = \text{identity}$ (unconstrained mean) and $r_\sigma = \exp$ (positive scale). The predicted mean $\hat\mu(x)$ (red line) is overlaid with the 95 % predictive band $\hat\mu(x) \pm 1.96\,\hat\sigma(x)$ (pink shading); blue points are the raw observations.](Figures/neuralnetworks/distributional-regression.png){#fig-distributional-regression fig-alt="Scatterplot of head acceleration against time after impact for the mcycle dataset, with a heteroscedastic feed-forward neural network fit: the mean curve follows the impact-and-rebound shape, and the surrounding predictive band is narrow during the quiet phases and wider during the noisy rebound." width=85%}
+
+Nothing in this construction is specific to the Normal distribution: any parametric family $f(y \mid \bsphi)$ with a differentiable log-density can be plugged in, where $\bsphi$ denotes the vector of distribution parameters — in the Normal case $\bsphi = (\mu, \sigma)^\top$, but more generally $\bsphi$ may contain shape, rate, or any other parameters the chosen family requires.
+The network outputs $\bsphi(\xx_i) = g(\xx_i \mid \bstheta)$, with one output head per component of $\bsphi$ and response functions chosen to respect parameter constraints (softplus or exponential for a positive scale, sigmoid for a probability, identity for an unconstrained location, etc.).
+The loss is the negative log-likelihood $-\sum_i \log f(y_i \mid \bsphi(\xx_i))$.
+This is exactly the construction we will use for the *parametric* neural-network strategy for survival analysis in @sec-nnet-param: replace the Normal with a time-to-event distribution (Weibull, log-normal, ...) and replace the i.i.d. log-likelihood with the censored survival log-likelihood; everything else — architecture, optimizer, gradient computation — is unchanged.
+
+
+
 ## Neural Networks for Survival Analysis {#sec-nnet-surv}
 
-Neural networks are not inherently designed for survival data; they expect a fixed-dimensional output and a differentiable scalar loss.
-The adaptation to survival analysis therefore rests on two choices: what the network outputs and which loss function is minimized.
-The three strategies introduced below correspond directly to the three main inferential frameworks established earlier in this book.
+For time-to-event data, deterministic regression does not work, because we cannot calculate the difference between truth and prediction ($\hat{y}_i - y_i$) for censored observations. 
+Neural network adaptation to survivival analysis are therefore (almost) all inherently distributional. 
+Compared to the general field, deep learning for survival analysis had been dormant until circa 2018, but quickly gained traction since then [@Wiegrebe2024].. 
+Nowadays a new deep learning for survival analysis paper is published almost daily. 
+Describing each of the in detail is therefore beyond the scope of this book, however, most of them fall into one of three frameworks covered throughout this book: 
 
-A critical point is that naïve adaptations — treating the event indicator $\delta_i$ as a binary classification target or the observed time $t_i$ as a regression target while ignoring censoring — are generally invalid, because they discard the information carried by censored observations (see @sec-classical-cox for a detailed discussion).
-All three strategies below correctly handle right-censored data; extensions to other censoring and truncation schemes are discussed in @sec-nnet-extensions.
+- **Parametric neural networks** (@sec-nnet-param): distributional regression with suitable parametric distributions and minimizing a survival-adjusted negative log-likelihood (@sec-surv-estimation-param).
+- **Semi-parametric/Cox** (@sec-nnet-cox): optimize the partial likelihood (@sec-classical-cox) as the training objective via neural networks to obtain a more flexible risk score and use Breslow estimator of the baseline cumulative hazard as before.   
+- **Reduction techniqes**: converts a survival task to a more standard regression or classification task (Part IV) and uses standard deep learning.
 
 ### Parametric Neural Networks {#sec-nnet-param}
 
-The most direct extension of standard regression neural networks to survival analysis is to assume a parametric distribution for the event time $T$ and to maximize the corresponding log-likelihood.
-This is exactly the distributional-regression construction of @eq-nnet-gauss-nll, with the Normal density replaced by a time-to-event density and with the log-likelihood adjusted for censoring.
+The most direct extension of standard regression neural networks to survival analysis is to assume a parametric distribution for the event time $Y$ and to minimize the corresponding negative log-likelihood as in @sec-nnet-probabilistic.
+This is exactly the distributional-regression construction of @eq-nnet-gauss-nll, with the Normal density replaced by a time-to-event density and with the log-likelihood adjusted for censoring and potentially truncation.
 
-Recall from @sec-surv-estimation-param that, for right-censored data, the log-likelihood of a parametric model with subject-specific distribution parameters $\bsphi_i$ is
+Recall from @sec-surv-estimation-param that, for right-censored data, the log-likelihood of a parametric model with feature-dependent distribution parameters $\bsphi(\xx_i)$ is
 $$
-\ell(\bsphi) = \sum_{i=1}^{n} \left[\delta_i \log f(t_i \mid \bsphi_i) + (1 - \delta_i) \log S(t_i \mid \bsphi_i)\right].
+\ell(\bstheta) = \sum_{i=1}^{n} \left[\delta_i \log f\bigl(t_i \mid \bsphi(\xx_i)\bigr) + (1 - \delta_i) \log S\bigl(t_i \mid \bsphi(\xx_i)\bigr)\right],
 $$ {#eq-nnet-param-lik}
-
-In a neural network formulation, the network $g(\,\cdot\,; \bstheta): \Reals^p \to \Reals^q$ predicts the distribution parameters $\bsphi_i = g(\xx_i; \bstheta)$ directly from the covariates.
-For a Weibull distribution, for example, the network outputs two positive scalars, the scale $\lambda_i > 0$ and the shape $k_i > 0$, with positivity ensured by a softplus or exponential output activation.
+where the network produces $\bsphi(\xx_i) = g(\xx_i \mid \bstheta)$ as in the distributional-regression setup of @sec-nnet-probabilistic.
+For a Weibull distribution, for example, the network outputs two positive scalars, the scale $\lambda(\xx_i) > 0$ and the shape $k(\xx_i) > 0$, with positivity ensured by softplus or exponential response functions.
 The training objective is then
 $$
--\ell(\bstheta \mid \dtrain) = -\sum_{i=1}^{n} \left[\delta_i \log f_{\Weib}(t_i \mid \lambda_i, k_i) + (1 - \delta_i) \log S_{\Weib}(t_i \mid \lambda_i, k_i)\right],
+\hat{\bstheta} = \argmin_{\bstheta} -\sum_{i=1}^{n} \left[\delta_i \log f_{\Weib}\bigl(t_i \mid \lambda(\xx_i), k(\xx_i)\bigr) + (1 - \delta_i) \log S_{\Weib}\bigl(t_i \mid \lambda(\xx_i), k(\xx_i)\bigr)\right],
 $$
 and standard backpropagation applies because $f_{\Weib}$ and $S_{\Weib}$ are differentiable in their parameters.
 
-This approach is very general: any distribution with a closed-form density and survival function can be used, including the exponential, log-normal, log-logistic, or Gompertz distributions, as well as mixtures and spline-based distributions that allow flexible hazard shapes.
+This approach is very general: any distribution with a closed-form density can be used, including the exponential, log-normal, log-logistic, or Gompertz distributions, as well as mixtures and spline-based distributions that allow flexible hazard shapes.
 Once the network is trained, a full predicted survival distribution $\hatS(\cdot \mid \xx^*)$ is available for each new observation $\xx^*$, enabling calibrated probabilistic predictions.
+This is identical to the parameteric approaches discussed in @sec-classical, but with a more flexible parameterisation of the distribution parameters through a neural network.
 
-The parametric approach requires committing to a distributional assumption.
+As for foundational models, parametric deep learning requires committing to a distributional assumption.
 Misspecification of the distribution can bias predictions, particularly in the tails of the survival function.
 However, the gain is a coherent probabilistic output and typically better statistical efficiency than non-parametric alternatives when the assumed distribution is approximately correct.
 
@@ -197,71 +239,35 @@ All three variants use the same Weibull likelihood and the same Adam optimizer; 
 * **M2** — both scale and shape depend on `complications`, each through a separate linear head.
 * **M3** — both scale and shape depend on *all seven* features in the dataset, each through a one-hidden-layer MLP (16 ReLU units), yielding fully *individualised* predicted distributions.
 
-To keep the optimisation well-behaved on a sample of 776 patients we constrain each head's output through a `tanh` activation, anchoring the scale around the marginal Weibull MLE and bounding the shape away from extreme values; without such a bound the more flexible MLP heads can produce pathological per-subject parameter combinations (a small number of subjects with $\hat\lambda_i \to \infty$ or $\hat k_i \gg 1$) that obscure the otherwise smooth structure of the individualised curves.
-
-@fig-weibull-aft-nn shows the predicted survival curves for the three variants.
+@fig-weibull-aft-nn shows the predicted survival curves for the three variants. 
+It illustrates two points.
+First, *which* parameters depend on the features matters: M1 imposes proportional decay (same shape, scaled time), M2 lifts that restriction by letting the shape vary across groups, and M3 lets each individual carry their own $(\lambda_i, k_i)$ pair.
+Second, despite the very different output structures of the three variants, the underlying model class — Weibull AFT — and the training procedure are identical; only the architecture of the parameter-emitting heads is changed.
+It should be noted that the model was not trained to optimize predictive performance, but to illustrate the flexibility of the neural network approach, so the complex model might not generalize to unseen data.
 
 ![Weibull AFT fit to the `tumor` data via a neural network, in three increasingly flexible parametrisations. *Left (M1)*: only $\log\lambda$ depends on `complications`; the shape $k$ is global, so the two predicted curves share the same shape and differ only in scale. *Middle (M2)*: both $\log\lambda$ and $\log k$ depend on `complications`; the predicted curves can now bend differently, and the no-complications curve flattens earlier than in M1. *Right (M3)*: both heads are MLPs over all seven covariates and produce one Weibull distribution *per patient*; the resulting fan of individualised predicted curves is coloured by complications status, with the Kaplan-Meier estimates overlaid for reference.](Figures/neuralnetworks/weibull-aft-nn.png){#fig-weibull-aft-nn fig-alt="Three side-by-side panels showing predicted survival curves vs. Kaplan-Meier estimates stratified by complications. Left and middle panels each show two AFT curves (no complications in blue, complications in red) against dotted KM step curves; the middle panel's curves bend more flexibly. The right panel shows 776 individualised AFT curves coloured by complications group, fanned out around the KM curves." width=100%}
 
-The figure illustrates two pedagogical points.
-First, *which* parameters depend on the features matters: M1 imposes proportional decay (same shape, scaled time), M2 lifts that restriction by letting the shape vary across groups, and M3 lets each individual carry their own $(\lambda_i, k_i)$ pair.
-Second, despite the very different output structures of the three variants, the underlying model class — Weibull AFT — and the training procedure are identical; only the architecture of the parameter-emitting heads is changed.
-The full PyTorch source for the figure is in `book/experiments/code.py`.
+
 
 ### Semi-Parametric: Cox-based Neural Networks {#sec-nnet-cox}
 
 The Cox proportional hazards model (@sec-classical-cox) avoids the distributional assumption by specifying only the relative hazard through a linear predictor $\eta_i = \xx_i^\trans \bsbeta$.
 This semi-parametric structure carries over naturally to neural networks: instead of a linear predictor, a neural network $g(\,\cdot\,; \bstheta): \Reals^p \to \Reals$ outputs a scalar risk score $\eta_i = g(\xx_i; \bstheta)$ and the Cox partial likelihood is used as the training objective.
 
-The negative partial log-likelihood (cf. @eq-lpartial) is
+The negative partial log-likelihood (see @eq-lpartial) is
 $$
 -\ell^{PH}(\bstheta) = -\sum_{i=1}^{n} \delta_i\left[g(\xx_i; \bstheta) - \log\!\left(\sum_{j \in \calR_{t_i}} \exp(g(\xx_j; \bstheta))\right)\right]
 $$ {#eq-nnet-cox-loss}
 where $\calR_{t_i} = \{j : t_j \geq t_i\}$ is the risk set at time $t_i$.
 This loss is differentiable in $\bstheta$ and can be minimized by backpropagation.
 
-The Cox-based approach predicts a risk score $\hatg(\xx^*) = f_{\hat{\bstheta}}(\xx^*)$, a ranking quantity analogous to $\hat{\eta}$ in the Cox model.
-To obtain a full predicted survival distribution, the Breslow estimator of the baseline cumulative hazard $\hatH_0$ is combined with the predicted risk score, exactly as in the standard Cox model (@sec-classical-cox).
+To obtain a full predicted survival distribution from the risk score $\hat\eta_i = g(\xx_i \mid \hat{\bstheta})$, the Breslow estimator of the baseline cumulative hazard $\hatH_0$ is combined with $\hat\eta_i$, exactly as in the standard Cox model (@sec-classical-cox).
 
-A key advantage of the Cox-based approach is the partial likelihood's robustness: it requires no assumption about the shape of the baseline hazard.
-The computational cost of @eq-nnet-cox-loss, however, scales quadratically with $n$ in the worst case because of the double sum over risk sets.
-This is most often addressed by *risk-set sub-sampling*: at each iteration the risk set $\calR_{t_i}$ is replaced by its intersection with the current mini-batch, which yields a stochastic but unbiased gradient estimate for the partial likelihood gradient on average [@Katzman2018; @Kvamme2019a].
+As for the parameteric approach, the extension of Cox based models to neural networks essentially makes the predictor (risk score) more flexible, but does not change the underlying model class or solve its problems. Model @eq-nnet-cox-loss for example still assumes proportional hazards, even though it allows for non-linear effects and interactions.
 
-### Non-Parametric: Discrete- and Piecewise-Time Neural Networks {#sec-nnet-discrete}
+Another limitation is that the likelihood @eq-nnet-cox-loss depends on the entire risk set, which does not play well with mini-batching and could lead to high computation cost, especially for more complex multi-modal data with images.
+This is addressed by *risk-set sub-sampling*: at each iteration the risk set $\calR_{t_i}$ is replaced by its intersection with the current mini-batch, which yields a stochastic but unbiased gradient estimate for the partial likelihood gradient on average [@Katzman2018; @Kvamme2019a].
 
-The third strategy makes no parametric or proportional-hazards assumption and instead discretizes the follow-up period, framing survival estimation as a sequence of interval-wise classification or Poisson-regression problems, as introduced in @sec-partition-based-reductions.
-
-Given a partition $\mathcal{A} = \{a_0, \ldots, a_J\}$ of the follow-up period into $J$ intervals $(a_{j-1}, a_j]$, let $J_i$ be the index of the interval in which observation $i$'s outcome falls.
-The *discrete hazard* in interval $j$ conditional on covariates $\xx$ is
-$$
-h^d(j \mid \xx) = P(T \in (a_{j-1}, a_j] \mid T > a_{j-1}, \xx),
-$$
-and the corresponding discrete survival function is
-$$
-S^d(j \mid \xx) = \prod_{k=1}^{j}\bigl(1 - h^d(k \mid \xx)\bigr).
-$$
-
-A neural network with $J$ output units and sigmoid activations can predict these $J$ discrete hazards simultaneously:
-$$
-\left(\hat{h}^d(1 \mid \xx_i), \ldots, \hat{h}^d(J \mid \xx_i)\right) = \sigma\!\left(g(\xx_i; \bstheta)\right) \in (0,1)^J.
-$$
-The discrete-time log-likelihood (@eq-discrete-likelihood-1) then serves as the training objective:
-$$
--\ell^{d}(\bstheta \mid \dtrain) = -\sum_{i=1}^{n}\left[\sum_{j=1}^{J_i - 1}\log\bigl(1 - \hat{h}^d(j \mid \xx_i)\bigr) + \delta_i \log \hat{h}^d(J_i \mid \xx_i) + (1-\delta_i)\log\bigl(1 - \hat{h}^d(J_i \mid \xx_i)\bigr)\right].
-$$ {#eq-nnet-discrete-loss}
-
-This is precisely the binary cross-entropy loss applied interval-by-interval, which is a standard and well-supported loss in deep learning frameworks.
-Once trained, the full predicted survival curve is recovered as the running product $\hatS(\tau \mid \xx^*) = \prod_{j : a_j \leq \tau}\bigl(1 - \hat{h}^d(j \mid \xx^*)\bigr)$.
-
-The number of intervals $J$ and the placement of interval boundaries $\mathcal{A}$ are important modeling choices, as discussed in @sec-choice-of-interval-boundaries.
-A fine partition allows more flexible hazard estimation but increases the output dimension and may require more training data; a coarse partition is more parsimonious but may miss important temporal patterns.
-
-A close continuous-time alternative uses the *piecewise exponential model* (PEM, @sec-piecewise-constant-hazards), in which the hazard is assumed constant within each interval but the exact event and at-risk times within the interval are preserved.
-The Poisson-form likelihood of the PEM is the training objective and the network output is the log-hazard in each interval rather than a discrete hazard.
-This avoids the information loss incurred by replacing the exact event time $t_i$ with the interval index $J_i$ and provides continuous-time predictions $\hatS(\tau \mid \xx^*)$ for any $\tau$ via the piecewise cumulative hazard.
-
-Both variants make no distributional assumptions, can model arbitrary time-varying covariate effects by including the interval index $j$ (or the interval midpoint $a_{j-1/2}$) as an input feature, and are implemented using losses that are standard in all major deep learning frameworks.
-They are also the direct deep learning instantiation of the partition-based reduction techniques (@sec-partition-based-reductions): the neural network serves as the (multi-output) classification or Poisson-regression model whose targets are the interval-wise event indicators of the transformed data.
 
 ## Strengths of Deep Learning for Survival Analysis {#sec-nnet-strengths}
 
@@ -305,77 +311,6 @@ The right-hand side of @eq-multimodal is then fed into any of the three survival
 This composability is the main practical advantage of neural networks over other survival models: while classical and tree-based models can in principle be applied to flattened images or one-hot text, they cannot exploit the local or sequential structure of the raw signal.
 Concrete instantiations in the literature include CNNs on histopathology slides combined with structured demographic and molecular features [@Wiegrebe2024], pre-trained ResNets on radiological images with tabular clinical features, and joint modelling of multi-omics inputs through modality-specific autoencoders followed by a Cox loss.
 
-## Popular Models {#sec-nnet-popular}
-
-Each of the three strategies developed in @sec-nnet-surv has well-known instantiations in the literature.
-The descriptions below cover the most influential models and locate each within the taxonomy already established.
-
-### DeepSurv and Faraggi–Simon (Cox-based) {.unnumbered}
-
-The earliest neural-Cox model was the single-hidden-layer network of @Faraggi1995, in which the linear predictor of the Cox model was replaced by a small neural network and the partial likelihood was used as the training objective.
-*DeepSurv* [@Katzman2018] extended this to deep multi-layer perceptrons, added dropout and weight decay for regularization, and demonstrated competitive performance on a number of benchmark datasets.
-Implementations exist in the `pycox` Python package [@pkgpycox] and in major deep-learning frameworks [@pkgkeras; @pkgtensorflow].
-DeepSurv is, in essence, the natural deep-learning analogue of the Cox model (@sec-classical-cox) and is the canonical example of the Cox-based strategy of @sec-nnet-cox.
-
-### Cox-Time (Cox-based, non-proportional) {.unnumbered}
-
-*Cox-Time* [@Kvamme2019a] relaxes the proportional-hazards assumption by allowing the network to take time as an additional input, $g(\xx_i, t; \bstheta)$, so that the relative risk score can vary with time.
-The resulting hazard $h(t \mid \xx) = h_0(t)\exp\bigl(g(\xx, t; \bstheta)\bigr)$ accommodates non-proportional hazard patterns; a modified loss replaces the exact risk set with a subset sampled from the mini-batch, which keeps training mini-batchable.
-Cox-Time is the most popular Cox-based deep model to support time-varying effects.
-
-### DeepHit (discrete-time, competing risks) {.unnumbered}
-
-*DeepHit* [@Lee2018a] is the most widely used discrete-time survival network.
-It parametrizes the joint distribution over event times and causes as a multinomial output over $J \cdot Q + 1$ categories (one for each $(j, q)$ pair plus a "no event by end of follow-up" category) using a softmax activation.
-The loss augments the discrete-time log-likelihood of @eq-nnet-discrete-loss with a ranking term that directly optimizes concordance,
-$$
-L_{\text{rank}}(\bstheta \mid \dtrain) = \sum_{i \neq j} \delta_i \,\II(t_i < t_j)\,\sigma\!\left(\frac{\hatS(t_i \mid \xx_i) - \hatS(t_i \mid \xx_j)}{\omega}\right)
-$$
-for a bandwidth parameter $\omega > 0$.
-The total loss is a convex combination $\alpha\,(-\ell^d) + (1-\alpha)\,L_{\text{rank}}$, where $\alpha \in [0,1]$ is a hyper-parameter.
-DeepHit was originally designed for competing risks via the shared-trunk pattern of @sec-nnet-cr and remains a standard baseline whenever competing risks are present.
-
-### Nnet-survival (discrete-time) {.unnumbered}
-
-*Nnet-survival* [@Gensheimer2019] is a minimalist discrete-time network: the output layer has $J$ sigmoidal units producing the discrete hazards $\hat{h}^d(j \mid \xx)$, and the loss is the plain discrete-time log-likelihood of @eq-nnet-discrete-loss.
-Without the ranking term of DeepHit and with no restriction on the network architecture, Nnet-survival is the most direct deep-learning analogue of the discrete-time reduction technique (@sec-discrete-time-reduction).
-By including the interval index as a feature it can model time-varying covariate effects, and by stacking convolutional or recurrent layers it can also handle images or sequences.
-
-### PC-Hazard (piecewise exponential) {.unnumbered}
-
-*PC-Hazard* [@Kvamme2021] is a piecewise-exponential (PEM) deep model: a single network outputs the log-hazard in each interval of a fixed partition, and training minimizes the Poisson-form PEM negative log-likelihood (cf. @sec-piecewise-constant-hazards).
-Unlike DeepHit and Nnet-survival, PC-Hazard preserves the exact event and at-risk times within each interval and therefore avoids the information loss of pure discrete-time methods.
-
-### DeepPAMM (piecewise additive mixed model) {.unnumbered}
-
-*DeepPAMM* [@Kopper2021] is a further generalization of the PEM strategy that combines the structured additive predictor of piecewise-exponential additive mixed models with deep neural-network components.
-It supports time-varying effects (by interacting the network output with the interval index), left-truncation (by adjusting the risk-time accumulation in the PEM likelihood), competing risks and multi-state outcomes (via the multi-state interpretation of the PEM), recurrent events (via random effects), and multi-modal inputs (via the additive structured predictor in @eq-multimodal).
-It is the most "task-complete" of the deep-survival models in the sense of @Wiegrebe2024 and serves as a useful unifying reference point connecting the deep-learning strategies of this chapter to the partition-based reduction techniques of @sec-partition-based-reductions.
-
-## Extensions {#sec-nnet-extensions}
-
-### Left-truncation {.unnumbered .unlisted}
-
-Left-truncation (@sec-left-truncation) is accommodated by adjusting each likelihood contribution.
-For the parametric approach, the log-likelihood @eq-nnet-param-lik becomes
-$$
-\ell(\bstheta) = \sum_{i=1}^{n}\left[\delta_i \log f(t_i \mid \bsphi_i) + (1 - \delta_i) \log S(t_i \mid \bsphi_i) - \log S(l_i \mid \bsphi_i)\right],
-$$
-where $l_i$ is the left-truncation time of observation $i$, conditioning on survival to entry into the study.
-The same adjustment applies to the discrete-time likelihood.
-For the Cox partial likelihood, the risk sets $\calR_{t_i}$ are updated to include only observations that were at risk at time $t_i$ given their truncation times, $\calR_{t_i} = \{j : l_j \leq t_i \leq t_j\}$, as in @sec-surv-estimation-param.
-
-### Time-varying covariates and effects {.unnumbered .unlisted}
-
-Time-varying covariates are accommodated by reshaping the data so that each observation is replaced by a sequence of $(t_{\text{start}}, t_{\text{end}}, \xx(t))$ tuples and by feeding the time-stamped covariates into a recurrent or transformer-based encoder.
-Time-varying *effects* — coefficients that depend on $t$ — are accommodated either explicitly, by feeding the time argument as an extra input (as in Cox-Time and the time-as-feature version of Nnet-survival), or implicitly, by using a discrete- or piecewise-time network with sufficiently expressive interval-specific outputs.
-
-### Other architectures {.unnumbered .unlisted}
-
-All three strategies apply to any differentiable network architecture.
-Convolutional architectures are the default when the input is an image, e.g. in medical imaging applications; recurrent and transformer-based architectures are appropriate for longitudinal or sequential inputs; autoencoders and their variational extensions provide compact representations of high-dimensional inputs such as gene-expression profiles.
-In all cases, the survival-specific loss function is unchanged; only the network's feature extractor changes.
-This architectural flexibility is, together with the multi-modal composability of @sec-nnet-multimodal, the main practical advantage of neural networks over other survival models [@Wiegrebe2024].
 
 ## Conclusion
 
