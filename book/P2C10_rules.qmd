@@ -1,5 +1,5 @@
 ---
-abstract: TODO (150-200 WORDS)
+abstract: "This chapter introduces scoring rules as measures for evaluating probabilistic predictions in survival analysis, with a focus on assessing overall predictive performance through calibration and discrimination. The chapter first reviews scoring rules in classification settings, introducing concepts such as properness and strict properness through the Brier score and log loss. These ideas are then extended to censored survival data, where survival losses are formalized and their dependence on censoring assumptions is discussed. Common survival scoring rules are presented, including the integrated survival Brier score, right-censored log loss, and integrated survival absolute score, with attention given to their interpretation, weighting schemes, and theoretical properties. Particular emphasis is placed on the integrated survival Brier score and logarithmic losses, including discussion of properness and practical limitations. Prediction error curves are introduced as graphical tools for time-dependent evaluation, while baseline models and explained residual variation are discussed to improve interpretability of scores. The chapter concludes by considering extensions to competing risks settings and highlighting ongoing methodological challenges, including limited consensus regarding optimal scoring rule selection and practical implementation constraints."
 ---
 
 ::: {.content-visible when-format="html"}
@@ -7,8 +7,6 @@ abstract: TODO (150-200 WORDS)
 :::
 
 # Scoring Rules {#sec-rules}
-
-{{< include _wip_minor.qmd >}}
 
 Scoring rules evaluate probabilistic predictions and (attempt to) measure the overall predictive ability of a model in terms of both calibration and discrimination [@Gneiting2007; @Murphy1973].
 In contrast to calibration measures, which assess the average performance across all observations on a population level, scoring rules evaluate the sample mean of individual predictions across all observations in a test set.
@@ -20,7 +18,7 @@ Before delving into these measures, we will first describe scoring rules in the 
 Scoring rules are pointwise losses, which means a loss is calculated for all observations and the sample mean is taken as the final score.
 To simplify notation, we only discuss scoring rules in the context of a single observation, where $L_i(\hatS_i, t_i, \delta_i)$ would be the loss calculated for some observation $i$ where $\hatS_i$ is the predicted survival function (from which other distribution functions can be derived), and $(t_i, \delta_i)$ is the observed survival outcome.
 
-## Classification Losses
+## Classification losses
 
 In the simplest terms, a scoring rule compares a probabilistic prediction to an observed outcome and assigns them a score.
 Formally, a loss function is written as
@@ -65,28 +63,27 @@ where again $y_i \in \{0,1\}$ is the ground truth and $\hatp_i$ is a predicted p
 These losses are visualized in @fig-eval-brierlog, which highlights that both losses are strictly proper [@Dawid2014] as they are minimized when the true prediction is made, and converge to the minimum as predictions are increasingly improved.
 It can also be seen from the scale of the plots that the log-loss penalizes wrong predictions more strongly than the Brier score, which may be beneficial or not depending on the given use-case.
 
-![Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in $[0,1]$, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimized when $\hatp_i(y_i) = y_i$.](Figures/evaluation/brier_logloss.png){#fig-eval-brierlog fig-alt="TODO"}
+![Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in $[0,1]$, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimized when $\hatp_i(y_i) = y_i$.](Figures/evaluation/brier_logloss.png){#fig-eval-brierlog fig-alt="Left plot (x=Brier score, y = predicted probability), shows two crossing curves, a blue curve (when y_i=1) from (0,1) to (1,0) and a red curve (when y_i=0) from (0,0) to (1,1). Right plot (x=Log loss, y = predicted probability), shows two crossing curves, a blue curve (when y_i=1) from (0,3) to (1,0) and a red curve (when y_i=0) from (0,0) to (1,3). "}
 
-<!-- TODO: REMOVE THE HORIZONTAL DASHED LINES FROM ABOVE PLOTS -->
+## Survival losses {#sec-eval-distr-commonsurv}
 
-## Survival Losses {#sec-eval-distr-commonsurv}
-
-<!-- FIXME: COPY FINAL DEFINITION FROM PROPERNESS PAPER -->
 Analogously to classification losses, one can define a survival loss as
 
 $$
-L_S: \calP \times \PReals \times \bset \rightarrow \ExtReals,
+L_S: \calP \times \calT \times \bset \rightarrow \ExtReals,
 $$
 
-where now $\calP$ denotes a set of probability distributions over $\PReals$. $L_S$ is *proper* if for any distributions $p_Y, p$ in $\calP$, and for any random variables $Y \sim p_Y$, and $C$ taking values in $\PReals$; with $T := \min(Y,C)$ and $\Delta := \II(T=Y)$; it holds that, $\EE[L_S(p_Y, T, \Delta)] \leq \EE[L_S(p, T, \Delta)]$.
+where now $\calP$ denotes a set of probability distributions over $\PReals$ and $\calT \subseteq \PReals$.
+For any distributions $p_Y, p$ in $\calP$, $L_S$ is called:
 
-The loss is *strictly proper* if, in addition, $p = p_Y$ uniquely minimizes the loss. A survival loss is referred to as outcome-independent (strictly) proper if it is only (strictly) proper when $C$ and $Y$ are independent.
+* **proper** if $\EE_{T, \Delta} [L_S(p_Y, T, \Delta)] \le \EE_{T,\Delta}[L(p, T, \Delta)]$ for all $p \in \calP$;
+* **strictly proper** if in addition to being proper, $p = p_Y$ uniquely minimizes the loss.
 
 With these definitions, the rest of this chapter lists common scoring rules in survival analysis and discusses some of their properties.
-As with other chapters, this list is likely not exhaustive but will cover commonly used losses.
+As with other chapters, this list is not exhaustive but will cover commonly used losses.
 The losses are grouped into squared losses, absolute losses, and logarithmic losses, which respectively estimate the mean squared error, mean absolute error, and log loss in uncensored settings.
 
-### Squared Losses {#sec-rules-squared}
+### Squared losses {#sec-rules-squared}
 
 The Integrated Survival Brier Score (ISBS) was introduced by Graf [@Graf1995; @Graf1999] as an analogue to the integrated Brier score in regression.
 It is likely the most commonly used scoring rule in survival analysis, possibly due to its intuitive interpretation.
@@ -178,9 +175,10 @@ The log loss can then be constructed depending on what type of censoring or trun
 For example, if only right-censoring is present then the right-censored log loss (RCLL) is defined as:
 
 $$
-L_{RCLL}(\hatS_i, t_i, \delta_i) = -\log\big(\delta_i\hatf_i(t_i) + (1-\delta_i)\hatS_i(t_i)\big)
+L_{RCLL}(\hatS_i, t_i, \delta_i) = -\log\big(\delta_i\hatf_i(t_i) + (1-\delta_i)\hatS_i(t_i)\big),
 $$ {#eq-rcll}
-<!-- TODO: \hatf is use don RHS but not input on LHS -->
+
+where $\hatf_i$ can be derived from the predicted survival probabilities, $\hatS_i$.
 
 If censoring is independent of the event (@sec-types-of-censoring) then this scoring rule is strictly proper [@Avati2020].
 The loss is also highly interpretable as a measure of predictive performance when broken down into its two halves:
@@ -191,32 +189,32 @@ The loss is also highly interpretable as a measure of predictive performance whe
 Analogous losses follow when left- and/or interval-censoring is present by using the objective functions in @sec-surv-estimation-param.
 
 Other logarithmic losses have also been proposed, such as the integrated survival log loss (ISLL) in @Graf1999.
-The ISLL is similar to the ISBS except $\hatS_i^2$ and $\hatF_i^2$ are replaced with $\log(\hatF_i)$ and $\log(\hatS_i)$ respectively. 
-<!-- TODO: ordering not consistent \hatS -> \log(\hatF) ... -->
+The ISLL is similar to the ISBS except $\hatS_i^2$ and $\hatF_i^2$ are replaced with $\log(\hatS_i)$ and $\log(\hatF_i)$ respectively. 
 To our knowledge, the ISLL does not appear used in practice and nor is there a practical benefit over other losses -- though we note the work of @Alberge2025 discussed in @sec-rules-ext.
 
-### Absolute Losses
+### Absolute losses
 
 The final class of losses considered here can be viewed as analogs of the mean absolute error in an uncensored setting.
-The absolute survival loss, developed over time by @Schemper2000 and @Schmid2011 is similar to the ISBS but removes the squared term:
+The integrated survival absolute score (ISAS), developed over time by @Schemper2000 and @Schmid2011 is similar to the ISBS but removes the squared term:
 
 $$
-L_{ASL}(\hatS_i, t_i, \delta_i|\KMG) = \int^{\tau^*}_0 \frac{\hatS_i(\tau)\II(t_i \leq \tau, \delta_i = 1)}{\KMG(t_i)} + \frac{\hatF_i(\tau)\II(t_i > \tau)}{\KMG(\tau)} \ d\tau
+L_{ISAS}(\hatS_i, t_i, \delta_i|\KMG) = \int^{\tau^*}_0 \frac{\hatS_i(\tau)\II(t_i \leq \tau, \delta_i = 1)}{\KMG(t_i)} + \frac{\hatF_i(\tau)\II(t_i > \tau)}{\KMG(\tau)} \ d\tau
 $$
+
 where $\KMG$ and $\tau^*$ are as defined above.
-Analogously to the ISBS, the absolute survival loss consistently estimates the mean absolute error when censoring is fully independent [@Schmid2011], but there are also no proofs or claims of properness.
-The absolute survival loss and ISBS tend to yield similar results [@Schmid2011], but in practice the former does not appear to be widely used.
+Analogously to the ISBS, the ISAS consistently estimates the mean absolute error when censoring is fully independent [@Schmid2011], but there are also no proofs or claims of properness.
+The ISAS and ISBS tend to yield similar results [@Schmid2011], but in practice the former does not appear to be widely used.
 
-## Prediction Error Curves {#sec-pecs}
+## Prediction error curves {#sec-pecs}
 
-<!-- FIXME - UNCHANGED FROM THESIS. I THINK FINE FOR NOW BUT NEEDS TO BE REWRITTEN IN THE FUTURE (MAINLY TO AVOID SELF PLAGIARISM) -->
 As well as evaluating probabilistic outcomes with integrated scoring rules, non-integrated scoring rules can be utilized for evaluating distributions at a single point.
 For example, instead of evaluating a probabilistic prediction with the ISBS over $\PReals$, one could compute the Brier score at a single time-point, $\tau \in \PReals$, only.
 Plotting these for varying values of $\tau$ results in *prediction error curves*, which provide a simple visualization for how predictions vary over time.
 Prediction error curves are mostly used as a graphical guide when comparing few models, rather than as a formal tool for model comparison.
 Example prediction error curves are provided in @fig-eval-pecs for the ISBS where the Cox PH consistently outperforms the SVM.
 
-![Prediction error curves for the CPH and SVM models from @sec-eval-distr-calib. x-axis is time and y-axis is the ISBS computed at different time-points. The CPH (red) performs better than the SVM (blue) as it scores consistently lower. Trained and tested on randomly simulated data from $\pkg{mlr3proba}$.](Figures/evaluation/pecs.png){#fig-eval-pecs fig-alt="TODO"}
+<!-- FIXME (ANDREAS): SAME PROBLEM AS CALIB CHAPTER - CAN'T RECREATE THESE ANYMORE USING PROBA BUT THEME IS WRONG; WHAT DO YOU THINK? -->
+![Prediction error curves for the CPH and SVM models from @sec-eval-distr-calib. x-axis is time and y-axis is the ISBS computed at different time-points. The CPH (red) performs better than the SVM (blue) as it scores consistently lower. Trained and tested on randomly simulated data from $\pkg{mlr3proba}$.](Figures/evaluation/pecs.png){#fig-eval-pecs fig-alt="x-axis is Time from 0 to 5, y-axis is Score from 0 to 1. A red curve (Cox PH) runs from (0,0) to around (2.5, 0.25) and plateaus. A blue curve (SVM) runs from (0,0) to (1,0.8) down to around (4.5,0.3). The Cox PH appears superior at all time points."}
 
 ## Baselines and ERV {#sec-eval-distr-score-base}
 
@@ -226,8 +224,7 @@ The first method is to make use of baselines for model comparison, which are mod
 In classification, it is possible to derive analytical baseline values, for example a Brier score is considered 'bad' if it is above 0.25 or a log loss if it is above 0.693 (@fig-eval-brierlog). This is because these are the values obtained if you always predicted probabilities as $0.5$, which is the best un-informed (i.e., data independent) baseline in a binary classification problem.
 In survival analysis, simple analytical expressions are not possible as losses are dependent on the unknown distributions of both the survival and censoring time.
 For this reason it is advisable to include baseline models for model comparison.
-Common baselines include the Kaplan-Meier estimator (@sec-surv-km) and Cox PH (@sec-surv-models-crank).
-<!-- TODO: sec-surv-models-crank broken in this branch -->
+Common baselines include the Kaplan-Meier estimator (@sec-surv-km) and Cox PH (@sec-ph-semi-parametric).
 As a rule of thumb, if a model performs worse than the Kaplan-Meier, then it's considered 'bad', whereas if it outperforms the Cox PH then it is considered 'good'.
 
 As well as directly comparing losses from a 'sophisticated' model to a baseline, one can also compute the percentage increase in performance between the sophisticated and baseline models, which produces a measure of explained residual variation (ERV) [@Korn1990; @Korn1991].
@@ -243,27 +240,31 @@ The ERV interpretation makes reporting of scoring rules easier within and betwee
 For example, say in experiment A we have $L_{|S} = 0.004$ and $L_{|B} = 0.006$, and in experiment B we have $L_{|S} = 4$ and $L_{|B} = 6$.
 The sophisticated model may appear worse at first glance in experiment A (as the losses are very close) but when considering the ERV we see that the performance increase is identical (both $R_L = 33\%$), thus providing a clearer way to compare models.
 
-## Competing Risks {#sec-rules-ext}
+## Competing risks {#sec-rules-ext}
 
 Similarly to discrimination measures, scoring rules are primarily used with competing risks by evaluating cause-specific probabilities individually [@vanGeloven2022; @Lee2018a; @Bender2021].
 
-For example, given the cause-specific survival, $S_e$, density, $f_e$, and cumulative distribution function, $F_e$, the right-censored log loss for event $e$ is defined as
+For example, let $\hatS_{i;q}$ be the predicted cause-specific survival for observation $i$ and cause $q$, then the right-censored log loss for event $\tilde{q} \in \{1,...,Q\}$ is defined as
 
 $$
-L^e_{RCLL;i}(\hatS_{i;e}, t_i, \delta_i) = -\log[\delta_i\hatf_{i;e}(t_i) + (1-\delta_i)\hatS_{i;e}(t_i)]
+L_{RCLL;\tilde{q}}(\hatS_{\tilde{q}}(\cdot \mid \xx_i), t_i, q_i) = -\log[\II(q_i = \tilde{q})\hatf_{i;\tilde{q}}(t_i \mid \xx_i) + \II(q_i \ne \tilde{q})\hatS_{i;\tilde{q}}(t_i \mid \xx_i)],
 $$
 
-Similar logic can be applied to the ISBS and other scoring rules.
+where $\hatf_{\tilde{q}}$ can e derived from $\hatS_{\tilde{q}}$. Similar logic can be applied to the ISBS and other scoring rules.
 
-Recently, an all-cause logarithmic scoring rule has been proposed which makes use of the IPC weighting in the ISBS [@Alberge2025]:
+Recently, an all-cause logarithmic scoring rule has been proposed which makes use of IPC weighting, similarly to the ISBS [@Alberge2025]:
 
 $$
-L_{AC;i}(\hatS_i, t_i, \delta_i) = \sum^k_{e=1} \frac{\II(t_i \leq \tau, \delta_i = e)\log(\hatF_{i;e})}{\hat{G}(t_i)} + \frac{\II(t_i > \tau)\log(\hatS_i(\tau))}{\hat{G}(\tau)}
+\begin{aligned}
+&L_{AC}(\tau^*, \hatS(\cdot \mid \xx_i), \{\hatF_{q}(\cdot \mid \xx_i)\}^Q_{q=1}, t_i, q_i) = \\
+&\int^{\tau^*}_0 \left[\sum^Q_{q=1} \frac{\II(t_i \leq \tau, q_i = q)\log(\hatF_q(\tau \mid \xx_i))}{\hat{G}(t_i)} + \frac{\II(t_i > \tau)\log(\hatS(\tau \mid \xx_i))}{\hat{G}(\tau)}\right] \dtau,
+\end{aligned}
 $$
-<!-- TODO: -\sum^k_{e=1} ? -->
+
+where $\hatS(\cdot \mid \xx_i)$ is the predicted all-cause survival function for observation $i$ and $\hatF_{q}(\cdot \mid \xx_i)$ is the predicted CIF for observation $i$ and cause $q$.
 
 This 'all-cause' loss is an adaptation of the ISLL (@sec-rules-log) with the weights modified to handle competing risks.
-Comparing this loss to the decomposition in @sec-rules-squared, the observations either: experience the event of interest, in which case their cause-specific CIF is evaluated; do not experience any event and so the all-cause survival is evaluated; or experience a different event and contribute nothing to the loss.
+Comparing this loss to the decomposition in @sec-rules-squared, for each cause $q$, observations either: experience the cause of interest, in which case their cause-specific CIF is evaluated; do not experience any cause and so the all-cause survival is evaluated; or experience a different cause and contribute zero to the term for cause $q$.
 
 One advantage of the all-cause loss is that it provides a single scalar quantity, which makes it particularly convenient for (automated) model comparison, especially when there are many competing causes.
 However, this convenience comes at a cost as optimizing a single all-cause loss can obscure heterogeneity in performance across causes. This is especially problematic when accurate modeling of some causes is more important than others.
@@ -280,13 +281,6 @@ In such settings, automated procedures, such as those used for hyperparameter op
 * Scoring rules are a useful tool for measuring a model's overall predictive ability, taking into account calibration and discrimination.
 * Strictly proper scoring rules allow models to be compared to one another, which is important when choosing models in a benchmark experiment.
 * Many scoring rules for censored data are *not* strictly proper, however experiments suggest that improper rules still provide useful and trustworthy results [@Sonabend2025].
-
-::::
-
-:::: {.callout-important icon=false}
-
-## Limitations
-
 * Scoring rules can be difficult to interpret but ERV representations can be a helpful way to overcome this.
 * There is no consensus about which scoring rule to use and when so in practice multiple scoring rules may have to be reported in experiments to ensure transparency and fairness of results.
 * For non- and semi-parametric survival models that return distribution predictions, estimates of $f(t)$ are not readily available and require approximations [@Rindt2022], hence logarithmic losses such as RCLL often cannot be directly used in practice.
