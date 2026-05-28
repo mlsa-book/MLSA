@@ -334,21 +334,21 @@ for i in np.where(yes_mask)[0]:
     axes[2].plot(GRID_T, S3_ind[i], color=COL_YES, linewidth=0.5, alpha=0.18)
 overlay_km(axes[2])
 
-# Single legend at the bottom.
+# Legend: colour = complications status, linestyle = model type.
 legend_handles = [
     Line2D([0], [0], color=COL_NO, linewidth=2.0,
-           label="Weibull AFT NN, no complications"),
+           label="no complications"),
     Line2D([0], [0], color=COL_YES, linewidth=2.0,
-           label="Weibull AFT NN, complications"),
-    Line2D([0], [0], color=COL_NO, linewidth=1.6, linestyle=":",
-           label="Kaplan-Meier, no complications"),
-    Line2D([0], [0], color=COL_YES, linewidth=1.6, linestyle=":",
-           label="Kaplan-Meier, complications"),
+           label="complications"),
+    Line2D([0], [0], color="#555", linewidth=2.0, linestyle="-",
+           label="Weibull AFT NN"),
+    Line2D([0], [0], color="#555", linewidth=1.6, linestyle=":",
+           label="Kaplan-Meier"),
 ]
 fig.legend(
     handles=legend_handles,
     loc="lower center",
-    ncol=2,
+    ncol=4,
     frameon=False,
     fontsize=10,
     bbox_to_anchor=(0.5, -0.04),
@@ -377,14 +377,14 @@ _activations = [
 ]
 
 for name, vals in _activations:
-    fig, ax = plt.subplots(figsize=(2.4, 1.6))
-    ax.plot(v, vals, color="#C2185B", lw=2.0)
+    fig, ax = plt.subplots(figsize=(3.2, 2.2))
+    ax.plot(v, vals, color="#C2185B", lw=2.5)
     ax.axhline(0, color="#888", lw=0.5, ls="--")
     ax.axvline(0, color="#888", lw=0.5, ls="--")
     ax.set_xlim(-4, 4)
-    ax.set_xlabel("v", fontsize=9)
-    ax.set_ylabel("a(v)", fontsize=9)
-    ax.tick_params(labelsize=8)
+    ax.set_xlabel("v", fontsize=13)
+    ax.set_ylabel("a(v)", fontsize=13)
+    ax.tick_params(labelsize=11)
     ax.grid(alpha=0.2)
     fig.tight_layout()
     out = FIG_DIR / f"activation-{name}.png"

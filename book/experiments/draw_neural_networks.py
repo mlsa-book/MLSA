@@ -353,7 +353,7 @@ def fig_ffnn():
     centre = H / 2 + 35
     # All biases sit on the same horizontal line below the tallest column
     # for visual consistency across layers.
-    bias_y = centre + (5 - 1) * spacing / 2 + spacing - 4
+    bias_y = centre + (4 - 1) * spacing / 2 + spacing - 4
 
     def column(x, labels, bias_below=True):
         n = len(labels)
@@ -365,8 +365,8 @@ def fig_ffnn():
 
     # Labels are stored as (base, subscript, superscript) triples and
     # rendered with sub_sup_label so the indices sit at the correct height.
-    in_labels = [("x", "1", ""), ("x", "2", ""), ("x", "3", "")]
-    h1_labels = [("h", str(j + 1), "(1)") for j in range(5)]
+    in_labels = [("x", "1", ""), ("x", "2", "")]
+    h1_labels = [("h", str(j + 1), "(1)") for j in range(4)]
     h2_labels = [("h", str(j + 1), "(2)") for j in range(3)]
 
     inputs, b_in = column(x_in, in_labels)
@@ -446,7 +446,7 @@ def fig_ffnn():
     parts.append(text(x_in, top_band_y, "input layer",
                       size=23, weight="bold"))
     parts.append(text(x_in, top_band_y + 30,
-                      "x ∈ ℝ³",
+                      "x ∈ ℝ²",
                       size=23, fill="#444"))
 
     parts.append(text(x_h1, top_band_y, "hidden layer 1",
