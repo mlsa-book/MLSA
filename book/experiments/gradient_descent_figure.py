@@ -104,8 +104,8 @@ ax.plot(path[-1, 0], path[-1, 1], marker="o", markersize=9,
         color="#D32F2F", markeredgecolor="black", markeredgewidth=0.5,
         linestyle="None", label="End")
 
-ax.set_xlabel(r"$\theta_0$ (intercept)", fontsize=16)
-ax.set_ylabel(r"$\theta_1$ (slope)", fontsize=16)
+ax.set_xlabel(r"$\beta_0$ (intercept)", fontsize=16)
+ax.set_ylabel(r"$\beta_1$ (slope)", fontsize=16)
 ax.tick_params(axis="both", labelsize=13)
 ax.set_xlim(t0_grid.min(), t0_grid.max())
 ax.set_ylim(t1_grid.min(), t1_grid.max())
