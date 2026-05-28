@@ -13,30 +13,55 @@ abstract: |
 
 *Neural networks* are a flexible class of models that, with enough hidden units, can approximate any sufficiently smooth function [@Hornik1989; @Hornik1991].
 General introductions are given in @LeCun2015, @Goodfellow2016 and @Prince2023.
-A range of specialized architectures has been developed for different data modalities, most notably *convolutional neural networks* (CNNs) for image data [@LeCun1998; @Krizhevsky2012], *recurrent neural networks* (RNNs) and *long short-term memory* (LSTM) units for sequence data [@Hochreiter1997], and *transformers* based on self-attention for sequence and multi-modal data [@Vaswani2017].
+Beyond the basic feed-forward network, a variety of architectures have been proposed, including *convolutional neural networks* (CNNs) [@LeCun1998; @Krizhevsky2012], *recurrent neural networks* (RNNs) [@Hochreiter1997], and *transformers* [@Vaswani2017].
 
-For the purposes of this chapter, the precise architecture is largely orthogonal to the survival adaptation: all of these models share the same mathematical backbone that consists of compositions of linear maps cobmined with non-linear *activations*, trained by minimizing a differentiable loss with stochastic gradient descent.
+For the purposes of this chapter, the precise architecture is largely orthogonal to the survival adaptation: all of these models share the same mathematical backbone that consists of compositions of linear maps (@sec-nnet-regression) combined with non-linear *activations* (@sec-nnet-activations), trained by minimizing a differentiable loss with stochastic gradient descent (@sec-nnet-optimization).
 The adaptation to survival analysis acts (mostly) on the loss, not on the architecture.
-We therefore introduce the basics in terms of the simplest variant, the *feed-forward neural network*, and return to the specialized architectures briefly in @sec-nnet-strengths and @sec-nnet-extensions, where they play a central role in handling images, sequences and multi-modal inputs.
-
-The key insight of this chapter is that the survival-specific likelihoods already encountered throughout this book, such as parametric likelihoods (@sec-surv-estimation-param), the Cox partial likelihood (@sec-classical-cox), the discrete-time likelihood (@sec-discrete-time-reduction), and the piecewise-exponential likelihood (@sec-piecewise-constant-hazards), translate directly into training objectives for neural networks.
-
-The chapter is organized in five parts.
-@sec-nnet-regression introduces the essential building blocks of neural networks for continuous regression and establishes the notation used throughout.
-@sec-nnet-surv develops three general strategies for using neural networks in survival analysis: parametric, semi-parametric (Cox-based), and non-parametric (discrete- and piecewise-time).
-@sec-nnet-strengths then turns to two settings where deep learning has a particular comparative advantage: competing risks with shared representations and multi-modal data fusion.
-@sec-nnet-extensions collects extensions (left-truncation, time-varying effects, alternative architectures) before the chapter concludes with takeaways, limitations, and further reading.
+We therefore introduce the basics in terms of the simplest variant, the *feed-forward neural network*.
 
 ## Neural Networks for Regression {#sec-nnet-regression}
 
 We introduce neural networks in the simplest supervised-learning setting: predicting a continuous response $y_i \in \Reals$ from a covariate vector $\xx_i \in \Reals^p$, given $n$ training observations $\dtrain = \{(\xx_i, y_i)\}_{i=1}^n$.
-Neural networks can be viewed as computation graphs (usually directed acyclic graphs) where the network architecture defines how the input is transformed through a series of linear transformations, often followed by non-linear activations, to produce the output.
+In general, neural networks can be viewed as computation graphs (usually directed acyclic graphs) that transform the input through a sequence of differentiable operations to produce the output.
 
-@fig-ffnn-arch shows a *feed-forward neural network* (FFNN) with three inputs, two *hidden layers* of five and three units each, and a scalar output.
-The circles are called *nodes* or *neurons*; information flows left to right along the arrows.
-Each hidden unit computes a linear combination of its inputs (with *weights* $\mathbf{W}^{(l)}$ and *biases* $\mathbf{b}^{(l)}$) followed by a non-linear *activation function* $a^{(l)}$ (@sec-nnet-activations).
-The layers between input and output are called *hidden* because their values are not directly observed in the data — they are internal representations that the network learns.
-Mathematically, the FFNN is defined by the recursion
+@fig-ffnn-arch shows a specific neural network architecture, the *feed-forward neural network* (FFNN). 
+The inputs (features) are denoted by $x$. 
+Here there are three inputs and one intercept term. 
+Arrows indicate operations that are applied to the input to produce the output from left to right. 
+The final layer is refered to as *ouput layer*. The layers between input and output layer are called *hidden* layers, and each unit in the hidden layer is referred to as *hidden unit*. 
+In each step the inputs are multiplied with scalar weights and summed up, then transformed through a known *activation function* (see @sec-nnet-activations), denoted by $a^{(l)}(\cdot)$. 
+Concretely, the $j$th hidden unit of the first layer is given by
+$$
+h_j^{(1)} = a^{(1)}\!\left(b_j^{(1)} + w_{j,1}^{(1)} x_1 + w_{j,2}^{(1)} x_2\right), \quad j = 1, \ldots, 4,
+$$
+where the scalars $w_{j,k}^{(1)}$ are called *weights* (coefficients) and $b_j^{(1)}$ are the *biases* (intercepts). Collecting them into a vector and a matrix,
+$$
+\xx =
+\begin{pmatrix} x_1 \\ x_2 \end{pmatrix},
+\qquad
+\mathbf{b}^{(1)} =
+\begin{pmatrix} b_1^{(1)} \\ b_2^{(1)} \\ b_3^{(1)} \\ b_4^{(1)} \end{pmatrix},
+\qquad
+\mathbf{W}^{(1)} =
+\begin{pmatrix}
+w_{1,1}^{(1)} & w_{1,2}^{(1)} \\
+w_{2,1}^{(1)} & w_{2,2}^{(1)} \\
+w_{3,1}^{(1)} & w_{3,2}^{(1)} \\
+w_{4,1}^{(1)} & w_{4,2}^{(1)}
+\end{pmatrix},
+$$
+the entire first hidden layer can be written compactly as
+$$
+\hh^{(1)} = a^{(1)}\!\left(\mathbf{b}^{(1)} + \mathbf{W}^{(1)} \xx\right) \in \Reals^4,
+$$
+with $a^{(1)}$ applied element-wise.
+
+
+![Schematic of a feed-forward neural network instantiating @eq-nnet-forward with two inputs $x_1, x_2$, two hidden layers of four and three units $h^{(l)}_j$, and a scalar output $y$. Arrows indicate the direction of information flow; the bias nodes (labelled $1$) contribute the additive offsets $\mathbf{b}^{(l)}$ in each layer. The output layer is split into the pre-activation $z$ and the response function $r(\,\cdot\,)$ (yellow box) producing $y = r(z)$.](Figures/neuralnetworks/ffnn-architecture.png){#fig-ffnn-arch fig-alt="A fully connected feed-forward neural network with two input units x_1, x_2, two hidden layers of four and three units labelled h_j^{(l)}, explicit bias nodes labelled 1 below each non-output layer, arrows indicating forward information flow, a pre-activation node z, a yellow response-function box r(·), and a single scalar output y." width=100%}
+
+
+
+Putting everything together, the FFNN is defined by the recursion
 
 $$
 \begin{aligned}
@@ -50,39 +75,50 @@ where $\mathbf{W}^{(l)}$ and $\mathbf{b}^{(l)}$ are the weight matrix and bias v
 $r(\,\cdot\,)$ is an (optional) *output response function* (@sec-nnet-activations).
 
 
-![Schematic of a feed-forward neural network instantiating @eq-nnet-forward with three inputs $x_1, x_2, x_3$, two hidden layers of five and three units $h^{(l)}_j$, and a scalar output $y$. Arrows indicate the direction of information flow; the bias nodes labelled $\mathbf{b}^{(l)}$ contribute the additive offsets in each layer. The output layer is split into the pre-activation $z$ and the response function $r(\,\cdot\,)$ (yellow box) producing $y = r(z)$.](Figures/neuralnetworks/ffnn-architecture.png){#fig-ffnn-arch fig-alt="A fully connected feed-forward neural network with three input units x_1, x_2, x_3, two hidden layers of five and three units labelled h_j^{(l)}, explicit bias nodes labelled b^{(l)} below each non-output layer, arrows indicating forward information flow, a pre-activation node z, a yellow response-function box r(·), and a single scalar output y." width=100%}
 
 ### Activations and response functions {#sec-nnet-activations}
+Both activation functions and response functions are known, prespecified functions that are fixed before training. 
+They can be identical, but serve different purposes.
 
-The freedom in @eq-nnet-forward is in the choice of hidden activation $a^{(l)}$ and output response $r(\,\cdot\,)$.
+Hidden activation is a modelling choice.
 @tbl-activations lists the most common activation functions used in practice.
-The default choice for hidden layers is the *rectified linear unit* (ReLU) [@Nair2010] because of its computational simplicity and favorable gradient properties; sigmoid and tanh saturate for large $|v|$, which can slow training.
+The default choice for hidden layers is the *rectified linear unit* (ReLU) [@Nair2010] because of its computational simplicity and favorable gradient properties (avoids vanishing gradients in deep networks). 
 Note, however, that each ReLU unit is piecewise linear (with a single "hinge" at $v = 0$), so a ReLU network produces a piecewise-linear function whose number of breakpoints is bounded by the number of hidden units.
 A tanh network of the same size produces smoother curves because each unit blends continuously — the effect is clearly visible in the `mcycle` example in @fig-mcycle-ffnn below.
 
-: Common activation functions. The ReLU is the default for hidden layers; sigmoid and softplus are typically used as output response functions to enforce range constraints. {#tbl-activations}
+: Common element-wise non-linearities used as hidden activations or output response functions. ReLU is the default hidden activation in modern feedforward networks; sigmoid and softplus are most commonly used as output response functions to enforce a probability in $(0,1)$ or a positive scalar, respectively. Tanh appears as a hidden activation in small networks and inside recurrent architectures (LSTMs/GRUs), and as a response function for bounded outputs. {#tbl-activations}
 
 | Name | Definition | Range | Shape |
 |:-----|:-----------|:------|:-----:|
-| ReLU | $a(v) = \max(0, v)$ | $[0, \infty)$ | ![](Figures/neuralnetworks/activation-relu.png){height=60px} |
-| Sigmoid | $a(v) = \frac{1}{1 + e^{-v}}$ | $(0, 1)$ | ![](Figures/neuralnetworks/activation-sigmoid.png){height=60px} |
-| Tanh | $a(v) = \frac{e^v - e^{-v}}{e^v + e^{-v}}$ | $(-1, 1)$ | ![](Figures/neuralnetworks/activation-tanh.png){height=60px} |
-| Softplus | $a(v) = \log(1 + e^v)$ | $(0, \infty)$ | ![](Figures/neuralnetworks/activation-softplus.png){height=60px} |
+| ReLU | $a(v) = \max(0, v)$ | $[0, \infty)$ | ![](Figures/neuralnetworks/activation-relu.png){height=90px} |
+| Sigmoid | $a(v) = \frac{1}{1 + e^{-v}}$ | $(0, 1)$ | ![](Figures/neuralnetworks/activation-sigmoid.png){height=90px} |
+| Tanh | $a(v) = \frac{e^v - e^{-v}}{e^v + e^{-v}}$ | $(-1, 1)$ | ![](Figures/neuralnetworks/activation-tanh.png){height=90px} |
+| Softplus | $a(v) = \log(1 + e^v)$ | $(0, \infty)$ | ![](Figures/neuralnetworks/activation-softplus.png){height=90px} |
 
-The *response function* $r(\,\cdot\,)$ controls the range of the output: the identity $r(z) = z$ produces an unconstrained continuous prediction (the default for ordinary regression), while non-trivial choices map the unbounded $z$ into the range required by the prediction target.
+
+The response function controls the range of the output and is usually dictated by the application rather then computational considerations. The identity $r(z) = z$ produces an unconstrained continuous prediction (the default for ordinary regression), while non-trivial choices map the unbounded $z$ into the range required by the prediction target (for example a predicted probability needs to be in $(0,1)$).
 $r(\,\cdot\,)$ plays the same role as the response function in a generalized linear model, and its inverse $r^{-1}(\,\cdot\,)$ is the corresponding link function.
+
 Common choices of $r(\,\cdot\,)$ are:
 
-* a probability in $(0,1)$ uses the sigmoid (binary classification);
-* a probability vector over $K$ classes uses the *softmax*, $r(\mathbf{z})_k = e^{z_k}/\sum_{j=1}^{K}e^{z_j}$, where $\mathbf{z} \in \Reals^K$ is the vector of pre-activations (multi-class classification);
-* a strictly positive scalar uses the *softplus*, $r(v) = \log(1+e^v)$, or the exponential (e.g., a positive scale parameter such as the Weibull $\lambda$ in @sec-nnet-param);
-* a value in a bounded interval uses a scaled / shifted $\tanh$.
+* *sigmoid* for binary classiffication: outcome is a probability in $(0,1)$;
+* *softmax* for multi-class classification: outcome is a probability vector over $K$ classes (e.g. for predicting the class of an image), $r(\mathbf{z})_k = e^{z_k}/\sum_{j=1}^{K}e^{z_j}$, where $\mathbf{z} \in \Reals^K$ is the vector of pre-activations;
+* *softplus* or *exponential* for non-negative outcomes (e.g. income).
 
-In an actual implementation the response is usually folded into the loss function rather than the network output (e.g. binary cross-entropy expects logits, not sigmoid-transformed probabilities).
+In practice the response function is often used implicitly when evaluating the loss function rather than applied as a separate step before evaluation. 
+For example, for a binary outcome $y \in \{0,1\}$ with with response function $r$ being the sigmoid, rather than first computing the probability $\pi = r(z) = P(Y = 1 \mid \xx)$ and then evaluating the Bernoulli negative log-likelihood
+$$
+-\bigl[y \log \pi + (1-y) \log(1-\pi)\bigr],
+$$
+one equivalently evaluates
+$$
+\log(1 + e^z) - y \cdot z
+$$
+directly using the untransformed output $z$, because the latter form is numerically more stable.
 
-### Optimization
+### Optimization {#sec-nnet-optimization}
 
-Equations (@eq-nnet-forward) define a neural network, but in order to fit the model to data, we need to choose the parameters $\bstheta$ to minimize a *loss function* $L(\bstheta)$ that averages a per-observation loss.
+Equations (@eq-nnet-forward) define a neural network, but in order to fit the model to data, we need to choose the parameters $\bstheta$ to minimize a *loss function* $L(\bstheta)$ so that
 $$
 \hat{\bstheta} \;=\; \argmin_{\bstheta}\, L(\bstheta).
 $$ {#eq-nnet-argmin}
@@ -133,8 +169,8 @@ For survival analysis these architectures are largely treated as drop-in replace
 Recall from @sec-ml-tasks-regr that regression tasks can be *deterministic* — returning a single point prediction $\hat y = g(\xx \mid \bstheta)$ of the conditional mean — or *probabilistic*, returning a full conditional distribution $f(y \mid \xx, \bstheta)$ from which means, quantiles, prediction intervals, and predictive densities can all be read off.
 This distinction will be central when we adapt neural networks to survival analysis (@sec-nnet-surv), where the prediction targets are inherently distributional. 
 
-Here we illustrate the two paradigms using the `mcycle` data [@Silverman1985] in @fig-mcycle-ffnn with 133 records of head acceleration (g) at successive time points after a simulated motorcycle helmet impact.
-The response is clearly not a straight-line function of the covariate: acceleration is near zero for ~14 ms, then drops sharply, and then bounces back through several damped oscillations.
+Below, we illustrate the two paradigms using the `mcycle` data [@Silverman1985], which collects data from a helmet placed on a crash-test-dummy,  measuring 133 records of head acceleration (g) at successive time points after a simulated motorcycle impact against a wall.
+The response is clearly not a straight-line function of time ($x$): acceleration ($y$) is near zero for ~14 ms, then drops sharply, and then bounces back through several damped oscillations.
 
 
 #### Deterministic regression {#sec-nnet-deterministic}
