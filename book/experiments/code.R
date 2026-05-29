@@ -2417,3 +2417,33 @@ ggsave("book/Figures/survtsk/predict_types.svg", final_pt,
        width = 9.5, height = 6.5, units = "in")
 ggsave("book/Figures/survtsk/predict_types.png", final_pt,
        width = 9.5, height = 6.5, units = "in", dpi = 300)
+
+####
+# log hazard
+####
+
+loglogistic_hazard <- function(t, shape, scale = 1) {
+  (shape / scale) * (t / scale)^(shape - 1) /
+    (1 + (t / scale)^shape)
+}
+
+t_grid <- seq(0.001, 5, length.out = 1000)
+shapes <- c(0.5, 1, 1.5, 3, 7)
+
+dat <- expand.grid(
+  T = t_grid,
+  Shape = shapes
+)
+
+dat$hazard <- loglogistic_hazard(dat$T, dat$Shape, scale = 1)
+
+g = ggplot(dat, aes(x = T, y = hazard, color = factor(Shape))) +
+  geom_line(linewidth = 0.8) +
+  labs(
+    x = "t",
+    y = "Log-logistic Hazard, h(t)",
+    color = "Shape"
+  ) + ylim(0, 5) + xlim(0, 5)
+
+ggsave("book/Figures/classical/llog_hazard.png", g,
+       width = 7, height = 3, units = "in", dpi = 300)
