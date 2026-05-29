@@ -114,13 +114,13 @@ Let $\dvec{x}{n}$ and $\dvec{y}{n}$ be data such that $x_i \in \calX$ and $y_i \
 Say the **learner** of interest is a regularized linear regression model\index{linear regression} with **learning algorithm**:
 
 $$
-(\hat{\beta}_0,\hat{\beta}_1):=\argmin_{\beta_0,\beta_1}\left(\sum_{i=1}^n\left(y_i-(\beta_0 +\beta_1 x_i)\right)^2+\gamma\beta_1^2\right).
+(\hat{\beta}_0,\hat{\beta}_1):=\argmin_{\beta_0,\beta_1}\left(\sum_{i=1}^n\left(y_i-\beta_0 -\beta_1 x_i)\right)^2+\gamma\beta_1^2\right).
 $$
 
 and **prediction algorithm**:
 
 $$
-\hatg(x) = \hat{\beta}_0 + \hat{\beta}_1 x
+\hatg(x \mid \bstheta) = \hat{\beta}_0 + \hat{\beta}_1 x
 $$
 
 The **hyperparameter**\index{hyperparameter} vector is $\bslambda = (\gamma) \in \PReals$ and the **parameters** are $\bstheta = (\beta_0 \ \beta_1)^\trans$.
@@ -132,47 +132,6 @@ $$
 $$
 
 ::::
-
-## Gradient descent {#sec-ml-gradient-descent}
-
-A general principle used by many learning algorithms to obtain the model parameters $\bstheta$ during training is *gradient descent*.
-The idea is simple: given a differentiable loss function $L(\bstheta)$ that measures how well the model predicts the training data, repeatedly take a small step in the direction that decreases the loss until no further improvement is possible.
-This principle underlies, among others, gradient boosting (@sec-boost) and neural networks (@sec-nnet), but it is easiest to introduce on a simple linear regression model with only two parameters.
-
-Consider the linear regression model $y = g(x \mid \bstheta) = \beta_0 + \beta_1 x$ with parameter vector $\bstheta = (\beta_0, \beta_1)^\trans$, fitted to $n$ observations $(x_i, y_i)$ by minimising the *mean squared error* loss
-$$
-L(\bstheta) = \frac{1}{n}\sum_{i=1}^n \bigl(y_i - \beta_0 - \beta_1 x_i\bigr)^2.
-$$ {#eq-ml-mse}
-For this loss the optimum $\hat{\bstheta} = \argmin_{\bstheta} L(\bstheta)$ has a closed form (the OLS normal equations), so gradient descent is not actually needed here.
-We use it only as a transparent setting in which every step of the procedure can be checked against the known optimum.
-
-The key quantity is the *gradient* $\nabla_{\bstheta} L = \bigl(\partial L / \partial \beta_0,\, \partial L / \partial \beta_1\bigr)^\trans$, the vector of partial derivatives of the loss with respect to each parameter.
-At any point $\bstheta$, the gradient points in the direction of steepest *increase* of $L$.
-To decrease the loss, we therefore take a step in the *opposite* direction,
-$$
-\bstheta^{t+1} = \bstheta^{t} - \alpha \,\nabla_{\bstheta} L\bigl(\bstheta^{t}\bigr),
-$$ {#eq-ml-gd}
-where $\alpha > 0$ is the *learning rate* (or step size).
-Starting from an arbitrary initial guess $\bstheta^{0}$ and applying @eq-ml-gd repeatedly drives $\bstheta$ towards a minimum of $L$.
-
-For the MSE loss in @eq-ml-mse the partial derivatives are
-$$
-\begin{aligned}
-\frac{\partial L}{\partial \beta_0} &= -\frac{2}{n}\sum_{i=1}^n (y_i - \beta_0 - \beta_1 x_i), \\
-\frac{\partial L}{\partial \beta_1} &= -\frac{2}{n}\sum_{i=1}^n x_i (y_i - \beta_0 - \beta_1 x_i),
-\end{aligned}
-$$
-so each gradient-descent step uses the current residuals $r_i = y_i - \beta_0^{t} - \beta_1^{t} x_i$ to update the intercept and slope simultaneously.
-
-@fig-gradient-descent illustrates the procedure for a concrete numerical example.
-The contours shows the loss surface of $L(\bstheta)$ over the two-dimensional parameter space; lighter colours correspond to smaller loss.
-The black cross marks the OLS optimum.
-Starting from a deliberately poor initial guess (green square), gradient descent traces the blue path along the loss surface and reaches the optimum (red circle) — at every step the update moves in the direction $-\nabla_{\bstheta} L$, and the step size automatically becomes smaller as the gradient shrinks near the optimum.
-
-![Gradient descent on a two-parameter linear regression problem. Contours and colour show the MSE loss $L(\bstheta)$ from @eq-ml-mse in the parameter space $(\beta_0, \beta_1)$. The black cross marks the closed-form OLS optimum. From the start point (green square), gradient descent follows the blue path of @eq-ml-gd, ending close to the optimum (red circle).](Figures/introduction/gradient-descent.png){#fig-gradient-descent fig-alt="Filled contour plot of the loss over the two-dimensional parameter space (intercept on the horizontal axis, slope on the vertical axis), shaded from yellow at low loss to dark red at high loss. The OLS optimum is marked with a black cross in the upper-left region. A green square in the lower-right marks the starting point; a blue path runs from the green square up and to the left, ending at a red circle that essentially coincides with the OLS cross." width=70%}
-
-The learning rate $\alpha$ controls how far each step moves: too small and convergence is slow, too large and the iterates can overshoot or oscillate.
-In simple settings such as this one a single $\alpha$ chosen by hand is enough; in more complex models it becomes a tuning parameter in its own right.
 
 ## Evaluating and benchmarking {#sec-ml-eval}
 
@@ -272,6 +231,96 @@ Nested resampling is the process of resampling the training set again for tuning
 ![An illustration of nested resampling. The large blocks represent three-fold CV for the outer resampling for model evaluation and the small blocks represent four-fold CV for the inner resampling for hyperparameter optimization. The light blue blocks are the training sets and the dark blue blocks are the test sets. Image and caption from @Becker2024 (CC BY-NC-SA 4.0).](Figures/ml/nested.png){#fig-ml-nested}
 
 <!-- TODO (ANDREAS): OPTIONAL REMAKE FIGURE USING THE SAME STYLE AS THE REST OF THE BOOK OR KEEP THIS BUT ASK BERND FOR PERMISSION. ADD FIG-ALT -->
+
+## Gradient descent {#sec-ml-gradient-descent}
+
+Many machine learning algorithms use _gradient descent_\index{gradient descent} to estimate the model parameters, $\bstheta$, during training.
+Gradient descent is commonly used when no closed-form solution exists for minimizing a loss function.
+Given a differentiable loss function, $L(\bstheta)$, that measures how well the model predicts the training data, gradient descent repeatedly updates the parameter estimates by taking small steps that decrease the loss until the loss stabilizes or a stopping criterion is met.
+This principle underlies, among others, gradient boosting\index{boosting} (@sec-boost) and neural networks (@sec-nnet),\index{neural networks} but is simpler to introduce for a simple linear regression model\index{linear regression} with only two parameters.
+
+Consider the linear regression model $y = g(x \mid \bstheta) = \beta_0 + \beta_1 x$ with parameter vector $\bstheta = (\beta_0 \ \beta_1)^\trans$, fitted to observations $\{(x_i, y_i)\}^n_{i=1}$ by minimizing the *mean squared error* (MSE)\index{mean squared error} loss:
+
+$$
+L(\bstheta) = \frac{1}{n}\sum_{i=1}^n \bigl(y_i - \beta_0 - \beta_1 x_i\bigr)^2.
+$$ {#eq-ml-mse}
+
+The _gradient_ of this loss is the vector of partial derivatives of the loss with respect to each parameter: 
+
+$$
+\nabla_{\bstheta} L = \bigl(\partial L / \partial \beta_0 \ \partial L / \partial \beta_1\bigr)^\trans.
+$$ 
+
+For any parameter values $\bstheta$, the gradient describes how the loss changes when the parameters are changed.
+If the gradient component for a parameter is positive, decreasing that parameter reduces the loss; if negative, increasing the parameter reduces the loss.
+Gradient descent therefore updates the parameters in the _opposite_ direction of the gradient to reduce the loss,
+$$
+\bstheta^{t+1} = \bstheta^{t} - \alpha \,\nabla_{\bstheta} L\bigl(\bstheta^{t}\bigr),
+$$ {#eq-ml-gd}
+
+where $\alpha > 0$ is the *learning rate*,\index{learning rate} also known as the step size as it controls the size of the parameter update at each iteration.
+If $\alpha$ is too small then convergence is slow, but too large values mean iterations can overshoot or oscillate.
+In machine learning models $\alpha$ is typically tuned (@sec-ml-opt). \index{tuning}
+
+Starting from an arbitrary initial guess $\bstheta^{0}$, (@eq-ml-gd) is repeated to drive $\bstheta$ towards a minimum of $L$.
+
+For the loss in (@eq-ml-mse), the partial derivatives are:
+$$
+\begin{aligned}
+\frac{\partial L}{\partial \beta_0} &= -\frac{2}{n}\sum_{i=1}^n (y_i - \beta_0 - \beta_1 x_i), \\
+\frac{\partial L}{\partial \beta_1} &= -\frac{2}{n}\sum_{i=1}^n x_i (y_i - \beta_0 - \beta_1 x_i).
+\end{aligned}
+$$ {#eq-mse-partials}
+
+In a simple example, suppose the data are $\{(3, 1.8), (2, 14)\}$, the initial guess is $\bstheta^{0} = (1,1)$, and $\alpha=0.1$, then substituting (@eq-mse-partials) into (@eq-ml-gd) gives:
+
+$$
+\begin{aligned}
+\bstheta^1 &= 
+\begin{pmatrix}
+1 \\
+1 \\
+\end{pmatrix} - 0.1
+\begin{pmatrix}
+-\frac{2}{n}\sum_{i=1}^n (y_i - 1 - x_i) \\
+-\frac{2}{n}\sum_{i=1}^n x_i (y_i - 1 - x_i) \\
+\end{pmatrix} \\
+&=
+\begin{pmatrix}
+1 \\
+1 \\
+\end{pmatrix} - 0.1
+\begin{pmatrix}
+-\frac{2}{2}((1.8 - 1 - 3) + (14 - 1 - 2)) \\
+-\frac{2}{2}(3(1.8 - 1 - 3) + 2(14 - 1 - 2)) \\
+\end{pmatrix} \\
+&=
+\begin{pmatrix}
+1 \\
+1 \\
+\end{pmatrix} - 0.1
+\begin{pmatrix}
+-8.8 \\
+-15.4 \\
+\end{pmatrix} =
+\begin{pmatrix}
+1.88 \\
+2.54 \\
+\end{pmatrix}.
+\end{aligned}
+$$
+
+As can be seen, each gradient-descent step updates all parameters simultaneously.
+
+Linear regression minimized by the mean squared error has a known, closed form expression (ordinary least squares, OLS).
+@fig-gradient-descent illustrates gradient descent for a different example with more observations, comparing the gradient descent procedure to the known closed form optimum.
+The contours show the loss surface of $L(\bstheta)$ over the two-dimensional parameter space; lighter colors correspond to a smaller loss.
+Starting from a deliberately poor initial guess (green square), gradient descent traces the blue path along the loss surface and finishes (red circle) at the known closed form optimum (black cross).
+At every step, the update moves in the direction $-\nabla_{\bstheta} L$; as the gradient becomes smaller near the optimum, the parameter updates also become smaller.
+
+![Gradient descent on a two-parameter linear regression problem. Contours and colour show the MSE loss $L(\bstheta)$ from (@eq-ml-mse) in the parameter space $(\beta_0 \ \beta_1)^\trans$. The black cross marks the closed-form ordinary least squares (OLS) optimum. From the start point (green square), gradient descent follows the blue path of (@eq-ml-gd), ending close to the optimum (red circle).](Figures/introduction/gradient-descent.png){#fig-gradient-descent fig-alt="Filled contour plot of the loss over the two-dimensional parameter space with beta_0 (intercept) on x-axis and beta_1 (slope) on y-axis. The plot shows that the initial guess (around (8, 1) and represented by a green square) is far from the truth but through using gradient descent each guess is one step closer to the optimum, which eventually is found (around (-6, 5.5) and represented by a red dot that is on top of a black cross)." width=70%}
+
+For large datasets, gradient descent is often replaced by _stochastic_, or _mini-batch gradient descent_, which estimate the gradient using a random subset of observations at each iteration to reduce computational cost.
 
 ## Conclusion
 
