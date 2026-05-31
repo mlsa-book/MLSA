@@ -9,14 +9,17 @@ PNG into the appropriate ``book/Figures/...`` sub-folder.
 # ---------------------------------------------------------------------------
 # Neural Networks chapter – Weibull AFT with a neural network.
 #
-# Tumor data (pammtools), three increasingly flexible parametrisations:
-#   M1: scale depends on complications, shape is global
-#   M2: scale and shape depend on complications
-#   M3: scale and shape depend on all features (individualised prediction)
+# Tumor data (pammtools), four increasingly flexible parametrisations
+# arranged in a 2x2 design (which parameters depend on x, and on
+# which subset of x):
+#   M1: scale depends on complications,  shape is global
+#   M2: scale depends on all features,   shape is global
+#   M3: scale and shape depend on complications
+#   M4: scale and shape depend on all features (individualised)
 #
-# All panels overlay the Kaplan-Meier estimate stratified by complications
-# so the effect of letting the network parametrise more pieces of the
-# Weibull distribution is directly visible.
+# All panels overlay the Kaplan-Meier estimate stratified by
+# complications so the effect of letting the network parametrise more
+# pieces of the Weibull distribution is directly visible.
 #
 # Output: book/Figures/neuralnetworks/weibull-aft-nn.png
 # ---------------------------------------------------------------------------
@@ -130,48 +133,44 @@ def weibull_nll(
 class WeibullNet(torch.nn.Module):
     """Two-headed network producing log-scale and log-shape.
 
+    Each head is a small FFNN matching the reference architecture of
+    @fig-ffnn-arch: ``p -> 4 -> 3 -> 1`` with tanh activations.
+
     Each head emits a *raw* output that is mapped through a bounded
     activation: log-scale is constrained to ``log_t_init ± scale_range`` and
     log-shape to ``±shape_range``.  Without these bounds an unregularised
-    MLP head will produce pathological Weibull parameters on small datasets
+    head can produce pathological Weibull parameters on small datasets
     (λ → ∞ or k → ∞) and therefore visibly bad individualised curves.
 
-    A ``None`` head means the corresponding parameter is a single global
-    scalar (independent of x).  A ``"linear"`` head is a 1-layer linear map;
-    a ``"mlp"`` head adds one hidden layer with ``hidden`` ReLU units.
+    A ``None`` shape head means the shape is a single global scalar
+    (independent of x).  A ``True`` shape head means a per-subject shape
+    head with the same FFNN architecture as the scale head.
     """
 
     def __init__(
         self,
         p: int,
-        scale_head: str = "linear",
-        shape_head: str | None = None,
-        hidden: int = 16,
+        shape_head: bool = False,
         log_t_init: float = 7.0,
         scale_range: float = 2.5,
         shape_range: float = 1.5,
     ) -> None:
         super().__init__()
-        self.scale_head = self._make_head(p, scale_head, hidden)
-        self.shape_head = self._make_head(p, shape_head, hidden)
+        self.scale_head = self._make_head(p)
+        self.shape_head = self._make_head(p) if shape_head else None
         self.global_log_k = torch.nn.Parameter(torch.zeros(1))
         self.log_t_init = log_t_init
         self.scale_range = scale_range
         self.shape_range = shape_range
 
     @staticmethod
-    def _make_head(p: int, kind: str | None, hidden: int):
-        if kind is None:
-            return None
-        if kind == "linear":
-            return torch.nn.Linear(p, 1)
-        if kind == "mlp":
-            return torch.nn.Sequential(
-                torch.nn.Linear(p, hidden),
-                torch.nn.ReLU(),
-                torch.nn.Linear(hidden, 1),
-            )
-        raise ValueError(f"unknown head: {kind}")
+    def _make_head(p: int):
+        # FFNN(p -> 4 -> 3 -> 1) with tanh — matches @fig-ffnn-arch.
+        return torch.nn.Sequential(
+            torch.nn.Linear(p, 4), torch.nn.Tanh(),
+            torch.nn.Linear(4, 3), torch.nn.Tanh(),
+            torch.nn.Linear(3, 1),
+        )
 
     def forward(self, x: torch.Tensor):
         raw_scale = self.scale_head(x).squeeze(-1)
@@ -200,22 +199,23 @@ def fit(model: torch.nn.Module, x: torch.Tensor, *, epochs: int = 3000,
 log_t_init = float(torch.log(t[delta == 1].mean()).item())
 
 torch.manual_seed(0)
-m1 = WeibullNet(p=1, scale_head="linear", shape_head=None,
-                log_t_init=log_t_init)
+m1 = WeibullNet(p=1, shape_head=False, log_t_init=log_t_init)
 
 torch.manual_seed(0)
-m2 = WeibullNet(p=1, scale_head="linear", shape_head="linear",
-                log_t_init=log_t_init)
+m2 = WeibullNet(p=x_full.shape[1], shape_head=False, log_t_init=log_t_init)
 
 torch.manual_seed(0)
-m3 = WeibullNet(p=x_full.shape[1], scale_head="mlp", shape_head="mlp",
-                hidden=16, log_t_init=log_t_init)
+m3 = WeibullNet(p=1, shape_head=True, log_t_init=log_t_init)
+
+torch.manual_seed(0)
+m4 = WeibullNet(p=x_full.shape[1], shape_head=True, log_t_init=log_t_init)
 
 fit(m1, x_comp)
-fit(m2, x_comp)
-# M3 has many more parameters relative to the data; a light weight decay
-# keeps both heads from drifting to the bounds of the tanh range.
-fit(m3, x_full, weight_decay=1e-3)
+# M2 has many more parameters relative to the data; a light weight decay
+# keeps the scale head from drifting to the bounds of the tanh range.
+fit(m2, x_full, weight_decay=1e-3)
+fit(m3, x_comp)
+fit(m4, x_full, weight_decay=1e-3)
 
 
 # ---- Kaplan-Meier estimator (right-censored) -----------------------------
@@ -276,11 +276,13 @@ def two_group_predictions(model: torch.nn.Module) -> tuple:
 
 
 S1_no, S1_yes = two_group_predictions(m1)
-S2_no, S2_yes = two_group_predictions(m2)
+S3_no, S3_yes = two_group_predictions(m3)
 
 with torch.no_grad():
-    log_lambda3, log_k3 = m3(x_full)
-    S3_ind = weibull_S(log_lambda3, log_k3, log_grid).numpy()
+    log_lambda2, log_k2 = m2(x_full)
+    S2_ind = weibull_S(log_lambda2, log_k2, log_grid).numpy()
+    log_lambda4, log_k4 = m4(x_full)
+    S4_ind = weibull_S(log_lambda4, log_k4, log_grid).numpy()
 
 
 # ---- Plotting ------------------------------------------------------------
@@ -289,21 +291,24 @@ COL_NO = "#2C7FB8"
 COL_YES = "#C2185B"
 GRID_T = grid.numpy()
 
-fig, axes = plt.subplots(1, 3, figsize=(11.5, 3.6), sharey=True)
+fig, axes = plt.subplots(2, 2, figsize=(9.5, 7.0), sharey=True, sharex=True)
 titles = [
-    "M1: $\\log\\lambda(x)$, $k$ constant",
-    "M2: $\\log\\lambda(x)$, $\\log k(x)$",
-    "M3: full $\\log\\lambda(\\mathbf{x})$, $\\log k(\\mathbf{x})$",
+    "M1: $\\log\\lambda(\\mathrm{compl.})$, $k$ global",
+    "M2: $\\log\\lambda(\\mathbf{x})$, $k$ global",
+    "M3: $\\log\\lambda(\\mathrm{compl.})$, $\\log k(\\mathrm{compl.})$",
+    "M4: $\\log\\lambda(\\mathbf{x})$, $\\log k(\\mathbf{x})$",
 ]
 
-for ax, title in zip(axes, titles):
+for ax, title in zip(axes.flat, titles):
     ax.set_title(title, fontsize=11)
-    ax.set_xlabel("days")
     ax.set_xlim(0, float(tumor["days"].max()))
     ax.set_ylim(0, 1.02)
     ax.grid(alpha=0.25)
 
-axes[0].set_ylabel("$\\hat S(t \\mid x)$")
+axes[1, 0].set_xlabel("days")
+axes[1, 1].set_xlabel("days")
+axes[0, 0].set_ylabel("$\\hat S(t \\mid \\mathbf{x})$")
+axes[1, 0].set_ylabel("$\\hat S(t \\mid \\mathbf{x})$")
 
 
 def overlay_km(ax: plt.Axes) -> None:
@@ -313,26 +318,34 @@ def overlay_km(ax: plt.Axes) -> None:
             linestyle=":", linewidth=1.6, alpha=0.85, label="KM (compl.)")
 
 
-# Panel 1
-overlay_km(axes[0])
-axes[0].plot(GRID_T, S1_no, color=COL_NO, linewidth=2.0,
-             label="AFT (no compl.)")
-axes[0].plot(GRID_T, S1_yes, color=COL_YES, linewidth=2.0,
-             label="AFT (compl.)")
-
-# Panel 2
-overlay_km(axes[1])
-axes[1].plot(GRID_T, S2_no, color=COL_NO, linewidth=2.0)
-axes[1].plot(GRID_T, S2_yes, color=COL_YES, linewidth=2.0)
-
-# Panel 3: individualised curves coloured by complications group.
 yes_mask = tumor["complications"].values == "yes"
 no_mask = ~yes_mask
-for i in np.where(no_mask)[0]:
-    axes[2].plot(GRID_T, S3_ind[i], color=COL_NO, linewidth=0.5, alpha=0.18)
-for i in np.where(yes_mask)[0]:
-    axes[2].plot(GRID_T, S3_ind[i], color=COL_YES, linewidth=0.5, alpha=0.18)
-overlay_km(axes[2])
+
+
+def plot_individual(ax: plt.Axes, S_ind: np.ndarray) -> None:
+    for i in np.where(no_mask)[0]:
+        ax.plot(GRID_T, S_ind[i], color=COL_NO, linewidth=0.5, alpha=0.18)
+    for i in np.where(yes_mask)[0]:
+        ax.plot(GRID_T, S_ind[i], color=COL_YES, linewidth=0.5, alpha=0.18)
+
+
+# M1 — two-group (only complications enters)
+overlay_km(axes[0, 0])
+axes[0, 0].plot(GRID_T, S1_no, color=COL_NO, linewidth=2.0)
+axes[0, 0].plot(GRID_T, S1_yes, color=COL_YES, linewidth=2.0)
+
+# M2 — individualised scale, shared shape
+plot_individual(axes[0, 1], S2_ind)
+overlay_km(axes[0, 1])
+
+# M3 — two-group, scale and shape both depend on complications
+overlay_km(axes[1, 0])
+axes[1, 0].plot(GRID_T, S3_no, color=COL_NO, linewidth=2.0)
+axes[1, 0].plot(GRID_T, S3_yes, color=COL_YES, linewidth=2.0)
+
+# M4 — fully individualised
+plot_individual(axes[1, 1], S4_ind)
+overlay_km(axes[1, 1])
 
 # Legend: colour = complications status, linestyle = model type.
 legend_handles = [
@@ -354,8 +367,9 @@ fig.legend(
     bbox_to_anchor=(0.5, -0.04),
 )
 
-fig.tight_layout(rect=(0, 0.06, 1, 1))
+fig.tight_layout(rect=(0, 0.04, 1, 1))
 fig.savefig(FIG_OUT, dpi=200, bbox_inches="tight")
+plt.close(fig)
 print(f"Saved {FIG_OUT}")
 
 
@@ -369,8 +383,12 @@ print(f"Saved {FIG_OUT}")
 
 v = np.linspace(-4, 4, 400)
 
+from scipy.special import erf  # noqa: E402
+
 _activations = [
     ("relu",    np.maximum(0, v)),
+    ("gelu",    0.5 * v * (1.0 + erf(v / np.sqrt(2.0)))),
+    ("silu",    v / (1.0 + np.exp(-v))),
     ("sigmoid", 1 / (1 + np.exp(-v))),
     ("tanh",    np.tanh(v)),
     ("softplus", np.log1p(np.exp(v))),
@@ -411,7 +429,7 @@ _xt = torch.as_tensor((_x - _xm) / _xs).unsqueeze(-1)
 _yt = torch.as_tensor((_y - _ym) / _ys)
 
 
-def _fit_ffnn(xt, yt, hidden=(5, 3), activation=torch.nn.Tanh,
+def _fit_ffnn(xt, yt, hidden=(4, 3), activation=torch.nn.Tanh,
               epochs=5000, lr=5e-3, wd=1e-3):
     layers = []
     d = xt.shape[-1]
@@ -467,14 +485,16 @@ print(f"Saved {FIG_DIR / 'mcycle-tanh-vs-relu.png'}")
 
 
 class _DistributionalFFNN(torch.nn.Module):
-    def __init__(self, hidden=32):
+    """FFNN trunk matching @fig-ffnn-arch: 1 -> 4 -> 3 with tanh,
+    then two heads for mu and log sigma."""
+    def __init__(self):
         super().__init__()
         self.trunk = torch.nn.Sequential(
-            torch.nn.Linear(1, hidden), torch.nn.Tanh(),
-            torch.nn.Linear(hidden, hidden), torch.nn.Tanh(),
+            torch.nn.Linear(1, 4), torch.nn.Tanh(),
+            torch.nn.Linear(4, 3), torch.nn.Tanh(),
         )
-        self.head_mu = torch.nn.Linear(hidden, 1)
-        self.head_log_sigma = torch.nn.Linear(hidden, 1)
+        self.head_mu = torch.nn.Linear(3, 1)
+        self.head_log_sigma = torch.nn.Linear(3, 1)
 
     def forward(self, x):
         h = self.trunk(x)
@@ -482,7 +502,7 @@ class _DistributionalFFNN(torch.nn.Module):
 
 
 torch.manual_seed(2)
-_dist_model = _DistributionalFFNN(hidden=32)
+_dist_model = _DistributionalFFNN()
 _opt = torch.optim.Adam(_dist_model.parameters(), lr=5e-3, weight_decay=1e-2)
 for _ in range(3000):
     _opt.zero_grad()
@@ -512,3 +532,76 @@ fig.savefig(FIG_DIR / "distributional-regression.png",
             dpi=220, bbox_inches="tight")
 plt.close(fig)
 print(f"Saved {FIG_DIR / 'distributional-regression.png'}")
+
+
+# ---------------------------------------------------------------------------
+# Neural Networks chapter – mcycle: deterministic vs probabilistic fit
+# (same tanh trunk, two losses) for @sec-nnet-deterministic-vs-probabilistic.
+#
+# Both panels use the same architecture as the distributional model above
+# (trunk = 1 -> 32 -> 32 with tanh) — the left panel has a single output
+# head trained with MSE, the right has the existing two-headed (mu, log
+# sigma) model trained with heteroscedastic Gaussian NLL.
+#
+# Output: book/Figures/neuralnetworks/mcycle-det-vs-prob.png
+# ---------------------------------------------------------------------------
+
+
+class _DeterministicFFNN(torch.nn.Module):
+    """FFNN matching @fig-ffnn-arch: 1 -> 4 -> 3 -> 1 with tanh."""
+    def __init__(self):
+        super().__init__()
+        self.trunk = torch.nn.Sequential(
+            torch.nn.Linear(1, 4), torch.nn.Tanh(),
+            torch.nn.Linear(4, 3), torch.nn.Tanh(),
+        )
+        self.head = torch.nn.Linear(3, 1)
+
+    def forward(self, x):
+        return self.head(self.trunk(x)).squeeze(-1)
+
+
+torch.manual_seed(2)
+_det_model = _DeterministicFFNN()
+_opt_det = torch.optim.Adam(_det_model.parameters(), lr=5e-3, weight_decay=1e-2)
+for _ in range(3000):
+    _opt_det.zero_grad()
+    _pred = _det_model(_xt)
+    _loss_det = ((_yt - _pred) ** 2).mean()
+    _loss_det.backward()
+    _opt_det.step()
+_det_model.eval()
+
+with torch.no_grad():
+    _mu_det = _det_model(_gt).numpy() * _ys + _ym
+
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4), sharey=True)
+
+# Left: deterministic.
+ax = axes[0]
+ax.scatter(_x, _y, s=14, alpha=0.55, color="#5B7CA8", edgecolor="none")
+ax.plot(_grid, _mu_det, color="#C2185B", lw=2.2, label=r"$\hat y(x)$")
+ax.set_title("Deterministic")
+ax.set_xlabel("time after impact (ms)")
+ax.set_ylabel("head acceleration (g)")
+ax.legend(frameon=False, loc="upper left")
+ax.grid(alpha=0.25)
+
+# Right: probabilistic (reuse _mu_mc / _sigma_mc from distributional block).
+ax = axes[1]
+ax.scatter(_x, _y, s=14, alpha=0.55, color="#5B7CA8", edgecolor="none")
+ax.fill_between(_grid, _mu_mc - 1.96 * _sigma_mc, _mu_mc + 1.96 * _sigma_mc,
+                color="#C2185B", alpha=0.18,
+                label=r"$\hat\mu(x) \pm 1.96\,\hat\sigma(x)$")
+ax.plot(_grid, _mu_mc, color="#C2185B", lw=2.2, label=r"$\hat\mu(x)$")
+ax.set_title("Probabilistic")
+ax.set_xlabel("time after impact (ms)")
+ax.legend(frameon=False, loc="upper left")
+ax.grid(alpha=0.25)
+
+fig.tight_layout()
+fig.savefig(FIG_DIR / "mcycle-det-vs-prob.png",
+            dpi=220, bbox_inches="tight")
+plt.close(fig)
+print(f"Saved {FIG_DIR / 'mcycle-det-vs-prob.png'}")

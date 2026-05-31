@@ -478,3 +478,34 @@ This avoids the information loss incurred by replacing the exact event time $t_i
 
 Both variants make no distributional assumptions, can model arbitrary time-varying covariate effects by including the interval index $j$ (or the interval midpoint $a_{j-1/2}$) as an input feature, and are implemented using losses that are standard in all major deep learning frameworks.
 They are also the direct deep learning instantiation of the partition-based reduction techniques (@sec-partition-based-reductions): the neural network serves as the (multi-output) classification or Poisson-regression model whose targets are the interval-wise event indicators of the transformed data.
+
+## Strengths of Deep Learning for Survival Analysis (from NN chapter)
+
+The three strategies above already make neural networks competitive with classical and tree-based models on tabular survival data, but they do not yet exhibit a clear comparative advantage [@Wiegrebe2024].
+Two settings, however, play to neural networks' specific strengths: settings with multiple competing event types, where a *shared representation* can be learned once and re-used by cause-specific heads, and *multi-modal* data, where modality-specific encoders (CNNs for images, FFNNs for tabular data, etc.) can be plugged in and trained jointly under a single survival objective.
+
+### Competing Risks via Shared Networks
+
+In the competing-risks setting a subject can transition to one of $Q$ mutually exclusive terminal states, with cause-specific hazards $h_q(t \mid \xx)$ for $q = 1,\ldots,Q$.
+A naïve neural-network solution is to train $K$ separate single-event networks, one per cause, each ignoring observations whose event is of a different cause (treating them as censored at the time of the competing event).
+The richer alternative — and the dominant pattern in the deep-learning–for-survival literature [@Wiegrebe2024] — is to share parameters across causes by stacking a common *feature extractor* (a block of shared hidden layers that maps inputs to a learned representation), followed by $Q$ cause-specific *heads* that produce the cause-specific predictions.
+
+Formally, decompose the network as $g(\xx; \bstheta) = (\psi_1(\phi(\xx)), \ldots, \psi_Q(\phi(\xx)))$, where $\phi$ is the shared feature extractor and $\psi_q$ are the cause-specific heads.
+Training is by joint minimization of the sum of cause-specific losses, e.g.
+$$
+-\ell_{\text{CR}}(\bstheta \mid \dtrain) = \sum_{q=1}^{Q} \left[-\ell^{(q)}(\bstheta \mid \dtrain)\right],
+$$
+where $\ell^{(q)}$ is the cause-$q$ contribution under one of the three survival strategies (the cause-specific partial likelihood for a Cox-based head, a discrete-time log-likelihood with softmax-over-causes for a discrete-time head, or a parametric sub-distribution log-likelihood).
+
+This shared-representation pattern is an instance of *multi-task learning*: the feature extractor $\phi$ is encouraged to learn representations that are useful for predicting all causes simultaneously, which acts as a form of regularization and typically improves sample efficiency when the same covariates are predictive of multiple event types.
+
+### Multi-modal Data
+
+A second comparative advantage of neural networks is their ability to learn jointly from heterogeneous *modalities*: tabular clinical features, medical images, free text, gene-expression vectors, or wearable-device time series.
+Each modality has its own natural architectural prior — convolutional networks for images, transformers for text, FFNNs for tabular features — but all of them produce real-valued embeddings that can be concatenated (or otherwise fused) and fed into a single survival head.
+
+Formally, generalize the linear predictor from a single covariate vector $\xx$ to a tuple $(\xx, \mathbf{z}_1, \ldots, \mathbf{z}_G)$ of modalities and write
+$$
+\eta_i = f(\xx_i) + \sum_{g=1}^{G} d_g(\mathbf{z}_{ig}),
+$$
+where $f$ is the tabular encoder and $d_g$ are the modality-specific embedding networks for $G$ unstructured modalities (image, text, omics, …) [@Wiegrebe2024].
