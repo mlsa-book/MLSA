@@ -2417,3 +2417,195 @@ ggsave("book/Figures/survtsk/predict_types.svg", final_pt,
        width = 9.5, height = 6.5, units = "in")
 ggsave("book/Figures/survtsk/predict_types.png", final_pt,
        width = 9.5, height = 6.5, units = "in", dpi = 300)
+
+#####
+# SVR
+#####
+library(ggplot2)
+
+df <- data.frame(
+  x = c(1.8, 2.4, 2.7, 3.0, 3.3, 4.4, 4.2, 4.5, 5.7, 6.2, 6.5, 5),
+  y = c(1.4, 2.2, 2.6, 3.4, 1.2, 2.0, 2.8, 7, 3.8, 5.2, 6.2, 4.2)
+)
+
+eps <- 1
+line <- function(x) x
+upper <- function(x) x + eps
+lower <- function(x) x - eps
+
+df$support <- with(
+  df,
+  y >= upper(x) | y <= lower(x)
+)
+
+tube <- data.frame(
+  x = seq(0.5, 8.5, length.out = 200)
+)
+
+g_svm = ggplot(df, aes(x, y)) +
+geom_ribbon(
+    data = tube,
+    aes(
+      x = x,
+      ymin = lower(x),
+      ymax = upper(x)
+    ),
+    inherit.aes = FALSE,
+    fill = "grey90",
+    alpha = 0.5
+  ) +
+
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.8) +
+  geom_abline(intercept = eps, slope = 1, linetype = "dashed", color = "#0cb702", linewidth = 0.75) +
+  geom_abline(intercept = -eps, slope = 1, linetype = "dashed", color = "#ed68ed", linewidth = 0.75) +
+
+  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 18)) +
+  scale_color_manual(values = c(`FALSE` = "#f8766d", `TRUE` = "#619cff")) +
+
+  # xi*: point above upper epsilon tube
+  geom_segment(
+    aes(x = 4.5, xend = 4.5, y = upper(4.5), yend = 7),
+    arrow = arrow(ends = "both", length = unit(0.12, "inches")),
+  ) +
+  annotate("text", x = 4.65, y = 6.5, label = expression(xi[i]^"*"), color = "black", size = 6) +
+
+  # xi': point below lower epsilon tube
+  geom_segment(
+    aes(x = 5.7, xend = 5.7, y = 3.8, yend = lower(5.7)),
+    arrow = arrow(ends = "both", length = unit(0.12, "inches")),
+  ) +
+  annotate("text", x = 5.9, y = 4.3, label = expression(xi[i]^minute), color = "black", size = 6) +
+
+  annotate("text", x = 6.5, y = 8.2, label = expression(y + epsilon), hjust = 0, color = "#0cb702", size = 6) +
+  annotate("text", x = 7.1, y = line(7.55),  label = "y", hjust = 0, size = 6) +
+  annotate("text", x = 6.9, y = lower(7.55), label = expression(y - epsilon), hjust = 0, color = "#ed68ed", size = 6) +
+
+    geom_point(
+    aes(shape = support, color = support),
+    size = 2.7,
+    show.legend = FALSE
+  ) +
+
+  coord_cartesian(xlim = c(0.5, 8), ylim = c(0.5, 8.7), expand = FALSE) +
+  labs(x = "x", y = "g(x)")
+
+ggsave("book/Figures/svm/regression.png", g_svm,
+       width = 7.5, height = 4.3, units = "in", dpi = 600)
+
+
+#####
+# SSVM
+#####
+
+df <- data.frame(
+  x = c(1.7, 2.2, 2.4, 2.6, 3.0, 3.3, 3.9, 4.2, 5.2, 5.7, 6.1, 6.5),
+  y = c(1.4, 2.2, 2.8, 5.2, 3.5, 2.0, 6.8, 2.4, 7.0, 1.2, 4.7, 7.1),
+  support = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
+              TRUE, FALSE, TRUE, TRUE, TRUE, FALSE)
+)
+
+line <- function(x) x + 0.2
+
+g_svm_surv <- ggplot(df, aes(x, y)) +
+  geom_abline(intercept = 0.2, slope = 1, linewidth = 0.8) +
+
+
+  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 18)) +
+  scale_color_manual(values = c(`FALSE` = "#f8766d", `TRUE` = "#619cff")) +
+
+  # xi double dagger: finite upper bound, above fitted line
+  geom_segment(
+    aes(x = 3.9, xend = 3.9, y = line(3.9), yend = 6.8),
+    color = "#0cb702",
+    arrow = arrow(ends = "both", length = unit(0.12, "inches"))
+  ) +
+  annotate(
+    "text",
+    x = 4.4, y = 6.45,
+    label = expression(xi[i]^"*" * "," ~ i %in% U),
+    size = 5
+  ) +
+
+  # xi dagger: finite lower bound, below fitted line
+  geom_segment(
+    aes(x = 5.7, xend = 5.7, y = 1.2, yend = line(5.7)),
+    color = "#ed68ed",
+    arrow = arrow(ends = "both", length = unit(0.12, "inches"))
+  ) +
+  annotate(
+    "text",
+    x = 6.2, y = 2.15,
+    label = expression(xi[i]^minute * "," ~ i %in% L),
+    size = 5
+  ) +
+
+  annotate("text", x = 7.2, y = 7.7, label = "t", size = 6) +
+
+    geom_point(
+    aes(shape = support, color = support),
+    size = 2.8,
+    show.legend = FALSE
+  ) +
+
+  coord_cartesian(xlim = c(0.6, 8), ylim = c(0.5, 8.4), expand = FALSE) +
+  labs(x = "x", y = "g(x)")
+
+ggsave("book/Figures/svm/survival.png", g_svm_surv,
+       width = 7.5, height = 4.3, units = "in", dpi = 600)
+
+####
+# SVM pairs
+####
+set.seed(2)
+
+dat <- data.frame(
+  i = 1:6,
+  t = 1:6,
+  status = c("censored", "uncensored", "censored", "uncensored", "censored", "censored")
+)
+
+pairs <- data.frame(
+  i = c(2, 3, 4, 5, 6),
+  j = c(1, 2, 2, 4, 4),
+  x = c(2, 3, 4, 5, 6),
+  xj = c(1, 2, 2, 4, 4),
+  y_drop = c(0.55, 0.9, 1.4, 1.6, 2.3)
+)
+
+pairs$xj_arrow <- pairs$xj + runif(nrow(pairs), -0.07, 0.07)
+pairs$lab_y <- pairs$y_drop - 0.17
+
+g_cp <- ggplot(dat, aes(t, i)) +
+  geom_segment(data = pairs,
+               aes(x = x, xend = x, y = i, yend = y_drop, colour = factor(i)),
+               inherit.aes = FALSE, linewidth = 0.8) +
+  geom_point(aes(shape = status, fill = status, colour = status),
+             size = 6, stroke = 1.1) +
+  geom_segment(data = pairs,
+               aes(x = x, xend = xj_arrow, y = y_drop, yend = y_drop, colour = factor(i)),
+               inherit.aes = FALSE, linewidth = 0.8) +
+  geom_segment(data = pairs,
+               aes(x = xj_arrow, xend = xj_arrow, y = y_drop, yend = j-0.2, colour = factor(i)),
+               inherit.aes = FALSE, linewidth = 0.8,
+               arrow = arrow(length = unit(0.12, "inches"))) +
+
+  geom_text(data = pairs,
+            aes(x = (x + xj) / 2 + 0.05, y = lab_y,
+                label = paste0("(i=", i, ", j(i)=", j, ")"), colour = factor(i)),
+            inherit.aes = FALSE, size = 5, hjust = 0.5) +
+  scale_shape_manual(values = c(censored = 21, uncensored = 22)) +
+  scale_fill_manual(values = c(censored = "#d9e8ff", uncensored = "#ffd6d6")) +
+  scale_colour_manual(values = c(
+    censored = "#7aa6d9",
+    uncensored = "#e06666",
+    `2` = "#8a8cff", `3` = "#4caf50", `4` = "#66bb6a",
+    `5` = "#f4a742", `6` = "#ff6f69"
+  )) +
+  labs(x = "Outcome time", y = "Observation") +
+  theme(
+    legend.position = "none"
+  )
+
+ggsave("book/Figures/svm/comparable.png", g_cp,
+       width = 7.5, height = 4.3, units = "in", dpi = 600)
+
