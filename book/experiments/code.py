@@ -475,12 +475,12 @@ print(f"Saved {FIG_DIR / 'mcycle-tanh-vs-relu.png'}")
 
 
 # ---------------------------------------------------------------------------
-# Neural Networks chapter – mcycle: distributional regression.
+# Neural Networks chapter – mcycle: distributional regression model.
 #
 # Two-headed NN (shared trunk, variant (a)) outputting mu(x) and sigma(x),
-# trained with heteroscedastic Gaussian NLL.
-#
-# Output: book/Figures/neuralnetworks/distributional-regression.png
+# trained with heteroscedastic Gaussian NLL. The fitted outputs
+# (`_mu_mc`, `_sigma_mc`) are reused by the deterministic-vs-probabilistic
+# panel below.
 # ---------------------------------------------------------------------------
 
 
@@ -516,22 +516,6 @@ with torch.no_grad():
     _mu_mc, _ls_mc = _dist_model(_gt)
 _mu_mc = _mu_mc.numpy() * _ys + _ym
 _sigma_mc = np.exp(_ls_mc.numpy()) * _ys
-
-fig, ax = plt.subplots(figsize=(5.6, 3.7))
-ax.scatter(_x, _y, s=14, alpha=0.55, color="#5B7CA8", edgecolor="none")
-ax.fill_between(_grid, _mu_mc - 1.96 * _sigma_mc, _mu_mc + 1.96 * _sigma_mc,
-                color="#C2185B", alpha=0.18,
-                label="$\\hat μ(x) \\pm 1.96\\,\\hat σ(x)$")
-ax.plot(_grid, _mu_mc, color="#C2185B", lw=2.0, label="$\\hat μ(x)$")
-ax.set_xlabel("time after impact (ms)")
-ax.set_ylabel("head acceleration (g)")
-ax.grid(alpha=0.25)
-ax.legend(frameon=False, loc="upper left")
-fig.tight_layout()
-fig.savefig(FIG_DIR / "distributional-regression.png",
-            dpi=220, bbox_inches="tight")
-plt.close(fig)
-print(f"Saved {FIG_DIR / 'distributional-regression.png'}")
 
 
 # ---------------------------------------------------------------------------
