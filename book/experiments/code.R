@@ -205,35 +205,50 @@ dev.off()
 # Log-rank test
 set.seed(20241125)
 sf0 <- survfit(Surv(time, status) ~ 1, lung)
-p0 <- ggplot(rbind(data.frame(x=sf0$time, y=sf0$surv), data.frame(x=0,y=1)), aes(x=x,y=y))+geom_step()
+p0 <- ggplot(rbind(data.frame(x=sf0$time, y=sf0$surv), data.frame(x=0,y=1)), aes(x=x,y=y))+geom_step() +
+labs(x = "Time", y = "Survival probability")
 
-opt_1 <- lung$age > 50
-opt_2 <- lung$age > 75
-df_1 <- cbind(lung, split = opt_1)
-df_2 <- cbind(lung, split = opt_2)
+df_1 <- cbind(
+  lung,
+  split = factor(lung$age > 50,
+                 levels = c(FALSE, TRUE),
+                 labels = c("Age ≤ 50", "Age > 50"))
+)
+
+df_2 <- cbind(
+  lung,
+  split = factor(lung$age > 75,
+                 levels = c(FALSE, TRUE),
+                 labels = c("Age ≤ 75", "Age > 75"))
+)
 logrank_1 <- survdiff(Surv(time, status) ~ split, data = df_1)
 logrank_2 <- survdiff(Surv(time, status) ~ split, data = df_2)
 sf_1 <- survfit(Surv(time, status) ~ split, df_1)
 sf_2 <- survfit(Surv(time, status) ~ split, df_2)
-p1 <- ggplot(
-  rbind(data.frame(x=sf_1$time, y=sf_1$surv,group=c(rep(FALSE, sf_1$strata[1]), rep(TRUE, sf_1$strata[2]))), data.frame(x = 0, y = 1, group=c(TRUE, FALSE))),
-  aes(x=x,y=y,color=group)) +
-  geom_step() +
-  geom_label(aes(x=x,y=y), data.frame(x = 750, y = 0.9), label =sprintf("χ²=%.2f (p=%.2f)", logrank_1$chisq, logrank_1$pvalue), inherit.aes = FALSE)
-p2 <- ggplot(
-  rbind(data.frame(x=sf_2$time, y=sf_2$surv,group=c(rep(FALSE, sf_2$strata[1]), rep(TRUE, sf_2$strata[2]))), data.frame(x = 0, y = 1, group=c(TRUE, FALSE))),
-  aes(x=x,y=y,color=group)) +
-  geom_step() +
-  geom_label(aes(x=x,y=y), data.frame(x = 750, y = 0.9), label = sprintf("χ²=%.2f (p=%.2f)", logrank_2$chisq, logrank_2$pvalue), inherit.aes = FALSE)
+make_plot <- function(sf, logrank, split_lab) {
+  strata <- rep(names(sf$strata), sf$strata)
+  ggplot(rbind(
+    data.frame(x = sf$time, y = sf$surv, group = strata),
+    data.frame(x = 0, y = 1, group = names(sf$strata))),
+    aes(x = x, y = y, color = group)
+  ) +
+    geom_step(linewidth = 0.8) +
+    geom_label(data = data.frame(x = 700, y = 0.80), aes(x = x, y = y),
+      label = sprintf("%s\nχ² = %.2f\np = %.2f", split_lab, logrank$chisq, logrank$pvalue),
+      inherit.aes = FALSE
+    ) +
+    labs(x = "Time", y = "Survival probability", color = NULL)
+}
 
-g <- p0 / (p1 + p2) &
-  labs(x = "t", y = "S(t)") &
-  theme_classic() &
+p1 <- make_plot(sf_1, logrank_1, "Split: age > 50")
+p2 <- make_plot(sf_2, logrank_2, "Split: age > 75")
+
+g <- (p0 / (p1 + p2) )&
   guides(color = "none") &
   scale_x_continuous(limits = c(0, 1000),  expand = c(0, 0)) &
   plot_annotation(tag_levels = 'a', tag_suffix = ")")
 
-ggsave("book/Figures/forests/logrank.png", g, height = 6, units = "in",
+ggsave("book/Figures/forests/logrank.png", g, height = 6, width = 8, units = "in",
   dpi = 600)
 
 
@@ -247,8 +262,6 @@ dev.off()
 
 ## bootstrapped rsfs
 
-
-
 x = 0:13
 y1 = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.8, 0.1, 0.1)
 y2 = c(1, 1, 0.6, 0.6, 0.6, 0.6, 0.3, 0.3, 0.2, 0.2, 0, 0, 0, 0)
@@ -257,29 +270,27 @@ group = rep(c("blue", "red", "green"), each = 14)
 df = data.frame(x = x, y = c(y1, y2, y3), group = group)
 
 p0 <- ggplot(df, aes(x = x, y = y, color = group))
-p1 <-  p0 + geom_step()
-p2 <- p0 + geom_vline(xintercept = x, lty = 2, color = "gray") + geom_step()
+p1 <-  p0 + geom_step() + labs(x = "t", y = "S(t)") 
+p2 <- p0 + geom_vline(xintercept = x, lty = 2, color = "gray") + geom_step() + labs(x = "t", y = "S(t)") 
 p3 <- p0 + geom_vline(xintercept = x, lty = 2, color = "gray") +  geom_point() +
   geom_label(aes(x=x,y=y),
     data.frame(x=5,y=c(0.9, 0.2, 0.4),group=c("blue", "red", "green")),
-    label = sprintf("S(6) = %s", c(1, 0.3, 0.5)))
+    label = sprintf("S(6) = %s", c(1, 0.3, 0.5))) + labs(x = "t", y = "S(t)") 
 
 df2 = data.frame(x = x, y = apply(data.frame(y1, y2, y3), 1, mean))
 p4 <- ggplot(df2, aes(x = x, y = y)) + geom_step() + geom_point() +
   geom_label(aes(x=x,y=y),
-    data.frame(x=6,y=0.5), label = "S(6) = 0.6")
+    data.frame(x=6,y=0.5), label = "S(6) = 0.6") + labs(x = "t", y = "S(t)") 
 
 ybreaks = seq.int(0, 1, 0.25)
 xbreaks = seq.int(0, 12, 3)
 g = p1 + p2 + p3 + p4 &
-  labs(x = "t", y = "S(t)") &
-  theme_classic() &
   guides(color = "none") &
   scale_y_continuous(limits = c(0, 1), breaks = ybreaks, labels = ybreaks) &
   scale_x_continuous(limits = c(0, 14), breaks = xbreaks, labels = xbreaks, expand = c(0, 0)) &
   plot_annotation(tag_levels = 'a', tag_suffix = ")")
 
-ggsave("book/Figures/forests/bootstrap.png", g, height = 6, units = "in",
+ggsave("book/Figures/forests/bootstrap.png", g, width = 7, height = 6, units = "in",
   dpi = 600)
 
 ## Kaplan Meier
