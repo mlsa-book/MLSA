@@ -134,9 +134,11 @@ $$
 \hat{\bstheta} \;=\; \argmin_{\bstheta}\, L(\bstheta).
 $$ {#eq-nnet-argmin}
 For a linear model this objective has a *closed-form* minimum (the ordinary-least-squares (OLS) normal equations); for an FFNN, even a shallow one, it does not, and $\hat{\bstheta}$ has to be found *iteratively* by gradient descent, which was introduced as a general optimization principle in @sec-ml-gradient-descent.
-A full training run is summarised in @alg-nn-gd.
+A full training run is summarised in [Algorithm 1](#alg-nn-gd).
 
-::: {#alg-nn-gd}
+:::: {.callout-note icon=false}
+
+## Algorithm 1  (Gradient descent training of a neural network) {#alg-nn-gd}
 
 **Inputs:** training set $\dtrain = \{(\xx_i, y_i)\}_{i=1}^{n}$, loss $L(\bstheta) = \tfrac{1}{n}\sum_{i=1}^{n} \ell_i(\bstheta)$, learning rate $\alpha$, number of iterations $T$, optimizer update rule $\calU$ with internal state $\mathbf{s}$.
 
@@ -157,21 +159,19 @@ Notes:
    In modern deep-learning frameworks (PyTorch, JAX, TensorFlow) this is done automatically by *automatic differentiation*: the user only writes the forward computation in Step 3, and the backward pass is constructed and executed by the framework.
 3. The number of iterations $T$ is itself a hyperparameter; in practice it is rarely fixed in advance but determined by *early stopping*, that is, monitoring a held-out validation loss and terminating training once it stops improving.
 
-Gradient descent training of a neural network.
-
-:::
+::::
 
 The update rule in Step 5 is exactly (@eq-ml-gd) (when $\calU$ is plain gradient descent), only now $\bstheta$ collects the weights and biases of all layers of the network rather than the two parameters of a linear regression.
 The genuinely new ingredient compared to the linear case is Step 4: in a multi-layer network the gradient $\nabla_{\bstheta} L$ cannot be written down in closed form parameter by parameter as in the linear example, and computing it naively would be infeasible.
 Backpropagation makes it tractable, and automatic differentiation removes the need to derive the gradient by hand.
 The user specifies only the forward pass, and the gradient with respect to every trainable parameter is obtained "for free".
 
-The two pieces of @alg-nn-gd that are commonly modified in practice are the *gradient estimate* used in Steps 3–4 (replacing the full-batch sum by an estimate on a small random subset of the data) and the *optimizer* $\calU$ in Step 5 (replacing plain gradient descent by an *adaptive* variant).
+The two pieces of [Algorithm 1](#alg-nn-gd) that are commonly modified in practice are the *gradient estimate* used in Steps 3–4 (replacing the full-batch sum by an estimate on a small random subset of the data) and the *optimizer* $\calU$ in Step 5 (replacing plain gradient descent by an *adaptive* variant).
 We describe both in turn.
 
 ##### Stochastic gradient descent and mini-batching {.unnumbered .unlisted}
 
-In Steps 3–4 of @alg-nn-gd the *full-batch* gradient
+In Steps 3–4 of [Algorithm 1](#alg-nn-gd) the *full-batch* gradient
 $$
 \nabla_{\bstheta} L(\bstheta) \;=\; \frac{1}{n}\sum_{i=1}^{n} \nabla_{\bstheta}\,\ell_i(\bstheta)
 $$
@@ -186,19 +186,19 @@ L_{\calB_t}(\bstheta) \;=\; \frac{1}{B}\sum_{i \in \calB_t} \ell_i(\bstheta),
 \qquad
 \nabla_{\bstheta} L_{\calB_t}(\bstheta^{t}) \;=\; \frac{1}{B}\sum_{i \in \calB_t}\nabla_{\bstheta}\,\ell_i(\bstheta^{t}),
 $$ {#eq-nnet-minibatch}
-and Steps 3–4 of @alg-nn-gd use $L_{\calB_t}(\bstheta^{t})$ and $\mathbf{g}^{t} = \nabla_{\bstheta} L_{\calB_t}(\bstheta^{t})$ in place of $L(\bstheta^{t})$ and $\nabla_{\bstheta} L(\bstheta^{t})$.
+and Steps 3–4 of [Algorithm 1](#alg-nn-gd) use $L_{\calB_t}(\bstheta^{t})$ and $\mathbf{g}^{t} = \nabla_{\bstheta} L_{\calB_t}(\bstheta^{t})$ in place of $L(\bstheta^{t})$ and $\nabla_{\bstheta} L(\bstheta^{t})$.
 Min-batching has two useful effects: (i) each step is roughly $n / B$ times cheaper than a full-batch step (particularly useful for large datasets or in case of memory constraints), and (ii) the stochasticity helps the iterates escape narrow saddle points and shallow local minima of the highly non-convex loss surface, which tends to improve generalization.
 
 The resulting procedure is called (mini-batch) *stochastic gradient descent* (SGD) [@Robbins1951].
-Each mini-batch produces one parameter update (Step 5), so each iteration $t$ of the outer loop in @alg-nn-gd is now a single mini-batch step rather than a full pass over the data.
+Each mini-batch produces one parameter update (Step 5), so each iteration $t$ of the outer loop in [Algorithm 1](#alg-nn-gd) is now a single mini-batch step rather than a full pass over the data.
 One *epoch* is a complete pass over the training set and corresponds to $\lceil n / B \rceil$ such updates.
 In practice each mini-batch is drawn by shuffling the training set at the start of every epoch and partitioning it into consecutive mini-batches of size $B$, so every training example is visited exactly once per epoch.
 
 ##### Adam and other adaptive optimizers {.unnumbered .unlisted}
 
-The simplest choice for the optimizer $\calU$ in Step 5 of @alg-nn-gd is plain gradient descent, which applies the *same* learning rate $\alpha$ to every parameter and uses no information from past gradients.
+The simplest choice for the optimizer $\calU$ in Step 5 of [Algorithm 1](#alg-nn-gd) is plain gradient descent, which applies the *same* learning rate $\alpha$ to every parameter and uses no information from past gradients.
 Modern *adaptive* optimizers improve on this in two ways: they accumulate a running estimate of the gradient direction (*momentum*) and an estimate of the per-parameter gradient magnitude (*scaling*), and use both to adjust the effective step size on the fly.
-Algorithmically, this only changes the update rule $\calU$ in Step 5; everything else in @alg-nn-gd is unchanged.
+Algorithmically, this only changes the update rule $\calU$ in Step 5; everything else in [Algorithm 1](#alg-nn-gd) is unchanged.
 
 The most widely used variant in deep learning is *Adam* [@Kingma2015].
 Adam maintains exponential moving averages of the gradient and the element-wise squared gradient,
@@ -208,13 +208,13 @@ $$
 \mathbf{v}^{t} &= \nu_2\,\mathbf{v}^{t-1} + (1 - \nu_2)\,(\mathbf{g}^{t})^2,
 \end{aligned}
 $$ {#eq-nnet-adam-moments}
-where $\mathbf{g}^{t}$ is the gradient supplied to $\calU$ in Step 5 of @alg-nn-gd, $(\mathbf{g}^{t})^2$ denotes element-wise squaring, and $\nu_1, \nu_2 \in [0, 1)$ are decay rates.
+where $\mathbf{g}^{t}$ is the gradient supplied to $\calU$ in Step 5 of [Algorithm 1](#alg-nn-gd), $(\mathbf{g}^{t})^2$ denotes element-wise squaring, and $\nu_1, \nu_2 \in [0, 1)$ are decay rates.
 After a bias correction that compensates for the zero-initialization of $\bar{\mathbf{g}}$ and $\mathbf{v}$ (omitted here for brevity), the parameter update is
 $$
 \bstheta^{t+1} \;=\; \bstheta^{t} - \alpha\,\frac{\bar{\mathbf{g}}^{t}}{\sqrt{\mathbf{v}^{t}} + \varepsilon},
 $$ {#eq-nnet-adam-update}
 where $\varepsilon > 0$ is a small numerical-stability constant (typically $10^{-8}$) that prevents division by zero whenever $v_j^{t}$ is close to zero.
-In the notation of @alg-nn-gd, this corresponds to $\calU(\bstheta, \mathbf{s}, \mathbf{g}, \alpha)$ with state $\mathbf{s} = (\bar{\mathbf{g}}, \mathbf{v})$ updated according to (@eq-nnet-adam-moments) and $\bstheta$ updated according to (@eq-nnet-adam-update).
+In the notation of [Algorithm 1](#alg-nn-gd), this corresponds to $\calU(\bstheta, \mathbf{s}, \mathbf{g}, \alpha)$ with state $\mathbf{s} = (\bar{\mathbf{g}}, \mathbf{v})$ updated according to (@eq-nnet-adam-moments) and $\bstheta$ updated according to (@eq-nnet-adam-update).
 
 Two effects make this update appealing in practice:
 
@@ -226,7 +226,7 @@ Two effects make this update appealing in practice:
 
 ### Hyperparameters and practical training {#sec-nnet-hyperparameters}
 
-In the previous section, @alg-nn-gd and its mini-batch / Adam refinements were described as if the network architecture,  the learning rate $\alpha$ and other parameters outside $\bstheta$ were given.
+In the previous section, [Algorithm 1](#alg-nn-gd) and its mini-batch / Adam refinements were described as if the network architecture,  the learning rate $\alpha$ and other parameters outside $\bstheta$ were given.
 In practice they are not and how close the optimizer's $\hat{\bstheta}$ is to the (typically unknown) optimum depends to some extent on these design choices.
 
 Following the terminology of @sec-ml-models, hyperparameters control how the learner is run and are set *before* training rather than learned from the data.
@@ -237,7 +237,7 @@ They include the choice of architecture family (FFNN, CNN, RNN, transformer, …
 Changing any of them changes which $\hat{\bstheta}$ is in principle reachable, much as the depth of a decision tree fixes the set of partitions the tree can express (@sec-ml-models).
 
 **Mathematical hyperparameters** control how the loss surface of that fixed function class is traversed and how solutions on it are penalised.
-They include the learning rate $\alpha$ of @alg-nn-gd, Adam's decay rates $\nu_1, \nu_2$ and stability constant $\varepsilon$ from (@eq-nnet-adam-moments), the mini-batch size $B$ from (@eq-nnet-minibatch), the number of training epochs (or, equivalently, the stopping criterion), and the regularization strengths discussed below.
+They include the learning rate $\alpha$ of [Algorithm 1](#alg-nn-gd), Adam's decay rates $\nu_1, \nu_2$ and stability constant $\varepsilon$ from (@eq-nnet-adam-moments), the mini-batch size $B$ from (@eq-nnet-minibatch), the number of training epochs (or, equivalently, the stopping criterion), and the regularization strengths discussed below.
 
 Searching jointly over both groups is expensive: each candidate configuration requires a full (possibly multi-hour) training run.
 *Neural architecture search* (NAS) [@Elsken2019] automates the search over the structural part using reinforcement learning, evolutionary algorithms, or gradient-based relaxations of the discrete choices, but is itself extremely compute-intensive and largely confined to settings where the same architecture will be reused many times (e.g. image classification backbones).
@@ -261,7 +261,7 @@ The number of hyperparameters that *can* be tuned is large, but a few defaults w
 - Use an architecture (family, depth, width) that is comfortably over-parameterized for the data at hand, rather than trying to find the smallest network that still fits.
 - Couple this with weight decay and/or dropout to suppress overfitting; this trades one hyperparameter (effective capacity) for one or two regularization strengths that are typically less sensitive.
 - Run an *adaptive* optimizer such as Adam with a small learning rate $\alpha$ for *many* epochs, and rely on *early stopping* on a held-out validation loss to choose the effective number of epochs.
-  Adam's per-parameter scaling removes much of the sensitivity to $\alpha$, so a single global learning rate tends to work for all layers, and the early-stopping criterion replaces an explicit tuning of $T$ in @alg-nn-gd.
+  Adam's per-parameter scaling removes much of the sensitivity to $\alpha$, so a single global learning rate tends to work for all layers, and the early-stopping criterion replaces an explicit tuning of $T$ in [Algorithm 1](#alg-nn-gd).
 - Use standard hyperparameter tuning with nested resampling (@sec-ml-opt) for everything else.
 
 
@@ -456,7 +456,7 @@ where $\calR_{t_i} = \{j : t_j \geq t_i\}$ is the risk set at time $t_i$.
 This loss is differentiable in $\bstheta$ and can be minimized by backpropagation.
 To obtain a full predicted survival distribution from the risk score $\hat\eta_i = g(\xx_i \mid \hat{\bstheta})$, the Breslow estimator of the baseline cumulative hazard $\hatH_0$ (@eq-breslow) is combined with $\hat\eta_i$, exactly as in the standard Cox model (@sec-classical-cox).
 
-One practical complication is that the inner sum in (@eq-nnet-cox-loss) ranges over the *entire* risk set $\calR_{t_i}$, which does not play well with the mini-batch gradient descent of @alg-nn-gd and can become prohibitively expensive on large or multi-modal datasets.
+One practical complication is that the inner sum in (@eq-nnet-cox-loss) ranges over the *entire* risk set $\calR_{t_i}$, which does not play well with the mini-batch gradient descent of [Algorithm 1](#alg-nn-gd) and can become prohibitively expensive on large or multi-modal datasets.
 A common fix is *risk-set sub-sampling*: instead of taking the full risk set $\calR_{t_i}$ at each event, the risk set is restricted to the subjects in the current mini-batch, which yields a stochastic (but on average unbiased) estimate of the partial-likelihood gradient [@Kvamme2019a].
 
 
