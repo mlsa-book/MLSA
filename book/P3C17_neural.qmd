@@ -10,33 +10,45 @@ abstract: |
 
 # Neural Networks {#sec-nnet}
 
-*Neural networks* are a flexible class of models that, with enough hidden units, can approximate any sufficiently smooth function [@Hornik1989; @Hornik1991].
-For a comprehensive overview to neural networks, see @LeCun2015, @Goodfellow2016 and @Prince2023.
+Neural networks are a flexible class of models that can approximate any smooth function given sufficient capacity [@Hornik1989; @Hornik1991].
+Their emphasis on hidden layers, large numbers of hyperparameters, and diverse architectures means that working with neural networks is sometimes described as more art than science [@Chollet2018].
+A comprehensive treatment is beyond the scope of this chapter; readers interested in a broader introduction are referred to @LeCun2015, @Goodfellow2016 and @Prince2023.
+The goal here is instead to introduce enough of the underlying concepts to understand how neural networks are adapted to survival analysis.
+Despite their architectural diversity, neural networks share the same mathematical foundation: compositions of linear maps (@sec-nnet-regression) and non-linear activations (@sec-nnet-activations), trained by minimizing a differentiable loss using (stochastic) gradient descent (@sec-nnet-optimization).
+The adaptation to survival analysis acts primarily on the loss rather than on the architecture itself.
+The chapter therefore develops the key ideas using the simplest architecture, the feed-forward neural network; extensions to other architectures are briefly introduced in @sec-nnet-beyond-ffnn.
 
-For the purposes of this chapter, the precise architecture is largely orthogonal to the survival adaptation: all of these models share the same mathematical backbone that consists of compositions of linear maps (@sec-nnet-regression) combined with non-linear *activations* (@sec-nnet-activations), trained by minimizing a differentiable loss with (stochastic) gradient descent (@sec-nnet-optimization).
-The adaptation to survival analysis acts (mostly) on the loss, not on the architecture.
-This chapter will therefore introduce the basics in terms of the simplest architecture, the *feed-forward neural network*, extensions to other architectures are briefly introduced in @sec-nnet-beyond-ffnn.
+## Neural networks for regression {#sec-nnet-regression}
 
-## Neural Networks for Regression {#sec-nnet-regression}
+To begin, let $y_i \in \Reals$ be a continuous target, $\xx_i \in \Reals^p$ be a covariate vector and $\dtrain = \{(\xx_i, y_i)\}_{i=1}^n$ be a set of training data for $n$ observations.
+Throughout this chapter, the term _unit_ (also known as a _node_ or _neuron_) refers to a single computational element of a neural network.
+A _layer_ is a collection of units operating at the same stage of the network, with the output of one layer serving as the input to the next.
+The _architecture_ is the arrangement of layers, units, and their connections.
 
-Neural networks are first introduced in the simplest supervised-learning setting: predicting a continuous response $y_i \in \Reals$ from a covariate vector $\xx_i \in \Reals^p$, given $n$ training observations $\dtrain = \{(\xx_i, y_i)\}_{i=1}^n$.
-In general, neural networks can be viewed as computation graphs (usually directed acyclic graphs) that transform the input through a sequence of differentiable operations to produce the output.
-
-@fig-ffnn-arch shows a specific neural network architecture, the *feed-forward neural network* (FFNN). 
-The inputs (features) are denoted by $x \in \xx$.
-Here there are two inputs and one intercept term. 
+In general, neural networks can be viewed as computational graphs (usually _directed acyclic graphs_) that transform inputs through a sequence of differentiable operations to produce an output.
+@fig-ffnn-arch shows a *feed-forward neural network* (FFNN), the simplest neural network architecture.
+There are two inputs (features), $x_1$ and $x_2$, and one intercept per layer.
 Arrows indicate operations that are applied to the input to produce the output from left to right. 
 The final layer is referred to as the *output layer*.
 The layers between input and output layer are called *hidden* layers, and each unit in the hidden layer is referred to as a *hidden unit*.
-In each step, the inputs are multiplied with scalar weights and summed up, then transformed through a known *activation function* (see @sec-nnet-activations), denoted by $a^{(l)}(\cdot)$, where the superscript $(l)$ indexes the layer.
-Concretely, the $j$th hidden unit of the first layer is given by
+In each step, the inputs are multiplied with scalar weights and summed, then transformed through a known *activation function* (@sec-nnet-activations), denoted by $a^{(l)}(\cdot)$, where the superscript $(l)$ indexes the layer.
+
+As a concrete example, using the architecture in @fig-ffnn-arch, the $j$th hidden unit of the first layer is given by:
+
 $$
 h_j^{(1)} = a^{(1)}\!\left(b_j^{(1)} + w_{j,1}^{(1)} x_1 + w_{j,2}^{(1)} x_2\right), \quad j = 1, \ldots, 4,
 $$
+
 where the scalars $w_{j,k}^{(1)}$ are called *weights* (coefficients) and $b_j^{(1)}$ are the *biases* (intercepts). 
-In @fig-ffnn-arch both are edges in the graph. 
-The weights connect the feature inputs $x_k$ to the hidden units, and the biases connect the constant bias node ($1$) to the hidden units. 
-Collecting them into vectors and matrices,
+In @fig-ffnn-arch, the weights are represented by edges connecting the feature inputs $x_k$ to the hidden units, while the biases are represented by edges connecting the constant bias node ($1$) to the hidden units.
+Each hidden layer can be compactly written in vector form as:
+
+$$
+\hh^{(1)} = a^{(1)}\!\left(\mathbf{b}^{(1)} + \mathbf{W}^{(1)} \xx\right) \in \Reals^4,
+$$
+
+where $\hh^{(1)} = (\hh_1^{(1)} \ \hh_2^{(1)} \cdots \hh_4^{(1)})^\trans$, the activation, $a^{(1)}$, is applied element-wise, and
+
 $$
 \xx =
 \begin{pmatrix} x_1 \\ x_2 \end{pmatrix},
@@ -50,17 +62,16 @@ w_{1,1}^{(1)} & w_{1,2}^{(1)} \\
 w_{2,1}^{(1)} & w_{2,2}^{(1)} \\
 w_{3,1}^{(1)} & w_{3,2}^{(1)} \\
 w_{4,1}^{(1)} & w_{4,2}^{(1)}
-\end{pmatrix},
+\end{pmatrix}.
 $$
-the entire first hidden layer, collected into the vector $\hh^{(1)} = \bigl(h_1^{(1)}, \ldots, h_4^{(1)}\bigr)^\trans$, can be written compactly as
-$$
-\hh^{(1)} = a^{(1)}\!\left(\mathbf{b}^{(1)} + \mathbf{W}^{(1)} \xx\right) \in \Reals^4,
-$$
-with $a^{(1)}$ applied element-wise.
 
+For a deterministic regression problem, the output layer consists of a single unit constructed in the same way as the hidden units, except the activation functions are replaced by an optional _response function_ (@sec-nnet-activations), $r$, giving in (@fig-ffnn-arch):
 
-<!-- FIXME (ANDREAS; MINOR): PLEASE CAN YOU CHANGE OUTPUT TO HAT{Y} -->
-![Schematic of a feed-forward neural network instantiating (@eq-nnet-forward) with two inputs $x_1, x_2$, two hidden layers of four and three units $h^{(l)}_j$, and a scalar output $y$. Arrows indicate the direction of information flow; the bias nodes (labelled $1$) contribute the additive offsets $\mathbf{b}^{(l)}$ in each layer. The output layer is split into the pre-response value $z$ and the response function $r(\,\cdot\,)$ (yellow box) producing $y = r(z)$. This split is drawn only at the output for visualization; computationally every unit applies the same linear-combination-then-function operation.](Figures/neuralnetworks/ffnn-architecture.png){#fig-ffnn-arch fig-alt="A fully connected feed-forward neural network with two input units x_1, x_2, two hidden layers of four and three units labelled h_j^{(l)}, explicit bias nodes labelled 1 below each non-output layer, arrows indicating forward information flow, a pre-response node z, a yellow response-function box r(·), and a single scalar output y." width=100%}
+$$
+z = \mathbf{b}^{(3)} + \mathbf{W}^{(3)} \hh^{(2)}, \qquad y = r(z),
+$$
+
+where $\mathbf{b}^{(3)}$ and $\mathbf{W}^{(3)}$ are the bias and weights in the final layer, and $\hh^{(2)}$ are the outputs from the hidden units in layer 2.
 
 Putting everything together, the FFNN is defined by the recursion:
 
@@ -73,47 +84,42 @@ g(\xx \mid \bstheta) &= r(z),
 \end{aligned}
 $$ {#eq-nnet-forward}
 
-where $\mathbf{W}^{(l)}$ and $\mathbf{b}^{(l)}$ are the weight matrix and bias vector of layer $l$, $a^{(l)}$ is the layer's activation function, and $L$ is the number of hidden layers (so the network has $L+1$ weight layers in total). $\bstheta = \{\mathbf{W}^{(l)}, \mathbf{b}^{(l)}\}_{l=1}^{L+1}$ collects all trainable parameters.
-$r(\,\cdot\,)$ is an (optional) output *response function* (@sec-nnet-activations).
+where $\mathbf{W}^{(l)}$ and $\mathbf{b}^{(l)}$ are the weight matrix and bias vector of layer $l$, $a^{(l)}$ is the layer's activation function, $L$ is the number of hidden layers (so FFNNs have $L+1$ weight layers in total), $\bstheta = \{\mathbf{W}^{(l)}, \mathbf{b}^{(l)}\}_{l=1}^{L+1}$ collects all trainable parameters, and $r(\,\cdot\,)$ is the response function.
 <!-- TODO (ANDREAS; MINOR): STRUGGLING WITH Y IN LAST LINE OF THE ABOVE EQUATION; BIT CONFUSING. RE-ADD IF I'M JUST BEING ANNOYING -->
 
-### Activations and response functions {#sec-nnet-activations}
-Both activation functions and response functions are known, prespecified functions that are fixed before training. 
-The same functions could serve as both, activation and response function, but they serve different purposes and are usually chosen independently of each other. @tbl-activations lists common activation and response functions used in practice.
+<!-- FIXME (ANDREAS; MINOR):
+ 1. PLEASE CAN YOU CHANGE OUTPUT TO HAT{Y}
+ 2. The use of '1' for the intercept is really confusing because the example is for the first layer so when reading the maths I got confused about whether the superscript referred to the bias or the layer. Can't they be labelled 'b' or tilde{b} or something like that?
+ -->
+![Schematic of a feed-forward neural network instantiating (@eq-nnet-forward) with two inputs $x_1, x_2$, two hidden layers of four and three units $h^{(l)}_j$, and a scalar output $y$. Arrows indicate the direction of information flow; the bias nodes (labelled $1$) contribute the additive offsets $\mathbf{b}^{(l)}$ in each layer. The output layer is split into the pre-response value $z$ and the response function $r(\,\cdot\,)$ (yellow box) producing $y = r(z)$.](Figures/neuralnetworks/ffnn-architecture.png){#fig-ffnn-arch fig-alt="Four columns of nodes (circles) are presented to represent an FFNN. The first column 'input layer; x in R2' shows nodes: 1, x_1, x_2. The second column 'hidden layer 1; h^1=a(W^1x + b^1)' shows nodes: 1, h_1^1, h_2^1, h_3^1, h_4^1. The third column 'hidden layer 2; h^2=a(W^2h^1 + b^2)' shows nodes: 1, h_1^2, h_2^2, h_3^2. The final column 'output layer; z=W^3h^2 + b^3, y = r(z)' shows a node 'z' with an arrow to a box 'r(.)' to a green node 'y'. Every single node has an arrow going from the node to all nodes in the next layer, indicating the architecture is 'fully connected'." width=100%}
 
+### Activations and response functions {#sec-nnet-activations}
+Both activation and response functions are prespecified before training. 
+Activation and response functions may use the same underlying function; however, they serve different purposes and are usually chosen independently of each other.
+@tbl-activations lists common activation and response functions used in practice.
 
 #### Activation functions {.unnumbered .unlisted}
-Hidden activation is a modelling choice.
-The default choice for hidden layers is the *rectified linear unit* (ReLU) [@Nair2010] because of its computational simplicity and favorable gradient properties.
-Each ReLU unit is piecewise linear, so a ReLU network produces a piecewise-linear function with finitely many breakpoints. <!-- TODO (ANDREAS; MINOR): SAME CHANGE AS THE OTHER RELU NOTE-->
-A tanh network of the same size produces smoother curves (see example in @fig-mcycle-ffnn below).
-Smooth ReLU-like alternatives such as *GELU* [@Hendrycks2016] and *SiLU/Swish* [@Ramachandran2017] are now standard in modern architectures: GELU is the default hidden activation in transformer language models (BERT, GPT) and SiLU dominates recent CNNs (EfficientNet) and large language models (LLaMA, Mistral).
-
+A network may use the same activation function for all units, different activation functions across layers, or even different activation functions within the same layer, although the latter is uncommon in practice.
+The default choice for hidden layers is the *rectified linear unit* (ReLU) [@Nair2010] due to its computational simplicity and favorable gradient properties.
+As ReLU is piecewise linear, a network composed entirely of ReLU activations represents a piecewise-linear function with finitely many breakpoints. <!-- TODO (ANDREAS; MINOR): SAME CHANGE AS THE OTHER RELU NOTE-->
+A network of the same size but only using $\tanh$ activations would instead produce smoother curves (see @fig-mcycle-ffnn).
+Smooth ReLU-like alternatives such as *GELU* [@Hendrycks2016] and *SiLU/Swish* [@Ramachandran2017] are common in modern deep-learning architectures (@sec-nnet-beyond-ffnn).
+GELU is widely used in transformer models, while SiLU is frequently used in contemporary CNNs and LLMs.
+<!-- TODO (ANDREAS; NOTE): ALTERED ABOVE SLIGHTLY SO IT ISN'T DATED QUICKLY -->
 
 #### Response functions {.unnumbered .unlisted}
 The response function controls the range of the output and is usually dictated by the application rather than by computational considerations.
-The identity $r(z) = z$ produces an unconstrained continuous prediction (the default for standard regression), while non-trivial choices map the unbounded $z$ into the range required by the prediction target (for example, a predicted probability needs to lie in $(0,1)$).
-In the deep-learning literature $r(\,\cdot\,)$ is more commonly referred to as the *output activation* and treated terminologically on the same footing as the hidden activations $a^{(l)}$.
-The term "response function" is used to emphasize its different role.
+In the deep-learning literature, $r(\,\cdot\,)$ is commonly referred to as the *output activation* and is treated just like another activation.
+The term "response function" is used here to emphasize its different role.
 
-Common examples of $r(\,\cdot\,)$ are:
+Common examples of $r(\,\cdot\,)$ are (@tbl-activations):
 
-* *sigmoid* for binary classification: outcome is a probability in $(0,1)$;
-* *softmax* for multi-class classification: outcome is a probability vector over $K$ classes (for example, for predicting the class of an image), $r(\mathbf{z})_k = e^{z_k}/\sum_{j=1}^{K}e^{z_j}$, where $\mathbf{z} \in \Reals^K$ is the vector of unconstrained outputs from the last layer;
-* *softplus* or *exponential* for non-negative outcomes (for example income).
-<!-- 
-In practice the response function is often used implicitly when evaluating the loss function rather than applied as a separate step before evaluation. 
-For example, for a binary outcome $y \in \{0,1\}$ with response function $r$ being the sigmoid, rather than first computing the probability $\pi = r(z) = P(Y = 1 \mid \xx)$ and then evaluating the Bernoulli negative log-likelihood
-$$
--\bigl[y \log \pi + (1-y) \log(1-\pi)\bigr],
-$$
-one equivalently evaluates
-$$
-\log(1 + e^z) - y \cdot z
-$$
-directly using the untransformed output $z$, because the latter form is numerically more stable. -->
+* _identity_, $r(z) = z$: for deterministic regression when the outcome lies in $\Reals$;
+* *sigmoid*: to constrain $z \in [0,1]$ for binary classification;
+* *softmax*, $r(\mathbf{z})_k = e^{z_k}/\sum_{j=1}^{K}e^{z_j}$: to transform an output vector, $\mathbf{z}$, into a vector of non-negative values that sum to one for multi-class classification problems;
+* *softplus* or *exponential*: to constrain $z \in \NNReals$.
 
-: Common functions used as element-wise hidden activations or output response functions. ReLU is the default hidden activation in classical feedforward networks; GELU and SiLU are smooth ReLU-like variants now standard in transformers and modern CNNs. Sigmoid and softplus are most commonly used as output response functions to enforce a probability in $(0,1)$ or a positive scalar, respectively. Tanh appears as a hidden activation in small networks and inside recurrent architectures (LSTMs/GRUs), and as a response function for bounded outputs. {#tbl-activations}
+: Common functions used as activations and response functions. {#tbl-activations}
 
 | Name | Definition | Range | Shape |
 |:-----|:-----------|:------|:-----:|
@@ -126,50 +132,51 @@ directly using the untransformed output $z$, because the latter form is numerica
 
 ### Optimization {#sec-nnet-optimization}
 
-Equations (@eq-nnet-forward) define a neural network, but in order to fit the model to data one must choose the parameters $\bstheta$ to minimize a *loss function* $L(\bstheta)$ so that
+As with boosting (@sec-boost), fitting the model in (@eq-nnet-forward) to training data involves estimating the parameters $\bstheta$ to minimize a *loss function*, $L(\bstheta)$, so that:
+
 $$
 \hat{\bstheta} \;=\; \argmin_{\bstheta}\, L(\bstheta).
 $$ {#eq-nnet-argmin}
-For a linear model this objective has a *closed-form* minimum (the ordinary-least-squares (OLS) normal equations); for an FFNN, even a shallow one, it does not, and $\hat{\bstheta}$ has to be found *iteratively* by gradient descent, which was introduced as a general optimization principle in @sec-ml-gradient-descent.
-The loss decomposes into per-observation terms, $L(\bstheta) = \tfrac{1}{n}\sum_{i=1}^{n} \ell_i(\bstheta)$, where each $\ell_i(\bstheta) = \ell\bigl(y_i,\, g(\xx_i \mid \bstheta)\bigr)$ compares the network's prediction $g(\xx_i \mid \bstheta)$ from (@eq-nnet-forward) to the observed target $y_i$ (for the squared-error loss, $\ell_i(\bstheta) = (y_i - g(\xx_i \mid \bstheta))^2$).
-A full training run is summarized in [Algorithm 1](#alg-nn-gd).
+
+A closed-form minimum to (@eq-nnet-argmin) does not exist for neural networks and instead $\hat{\bstheta}$ has to be found *iteratively* by gradient descent (@sec-ml-gradient-descent).
+
+<!-- TODO (ANDREAS; NOTE) I ADDED BELOW BECAUSE TOO MUCH WAS INTRODUCED IN THE ALGORITHM AND IT WAS OVERWHELMING. BUT PUTTING THIS HERE WE CAN SUMMARIZE THE KEY STEPS AND FORWARD REFERENCE SO READERS KNOW EVERYTHING WILL BE CLEARLY EXPLAINED -->
+Training a neural network consists of repeatedly performing three operations for a fixed number of iterations, $M$.
+As with boosting (@sec-boost), $M$ is usually chosen to be large and training is terminated by early stopping.
+First, the network passes the inputs through (@eq-nnet-forward), producing predictions (forward pass).
+Second, the discrepancy between the predictions and the observed outcomes is quantified through a loss function (@sec-rules), and the corresponding gradients are computed by backpropagation (backward pass).
+_Backpropagation_ efficiently computes gradients by applying the chain rule layer by layer, starting from the output and proceeding back to the input [@Rumelhart1986].
+Finally, the gradients are used by an _optimizer_ (@sec-nn-opt) to update the parameters.
+One complete pass through all the training data is called an _epoch_ and may consist of many iterations due to the use of _mini-batches_ (@sec-nn-batches).
+In practice, modern frameworks compute gradients automatically using _automatic differentiation_, so specifying the forward pass, choice of optimizer, and batch size is sufficient to define the entire optimization procedure.
+
+<!-- TODO (ANDREAS; NOTE): CHANGED T TO M TO ALIGN WITH BOOSTING CHAPTER -->
 
 :::: {.callout-note icon=false}
 
-## Algorithm 1  (Gradient descent training of a neural network) {#alg-nn-gd}
+## Algorithm 3  (Full-batch gradient descent training of a neural network) {#alg-nn-gd}
 
-**Inputs:** training set $\dtrain = \{(\xx_i, y_i)\}_{i=1}^{n}$, loss $L(\bstheta) = \tfrac{1}{n}\sum_{i=1}^{n} \ell_i(\bstheta)$, learning rate $\alpha$, number of iterations $T$, optimizer update rule $\calU$ with internal state $\mathbf{s}$.
+**Inputs:** training set $\dtrain = \{(\xx_i, y_i)\}_{i=1}^{n}$, loss $L(\bstheta) = \tfrac{1}{n}\sum_{i=1}^{n} \ell_i(\bstheta)$, learning rate $\alpha$, number of iterations $M$, optimizer update rule $\calU$ with internal state $\mathbf{s}$.
 
-1. $\bstheta^{0} \gets$ random initialization;\ \ \ $\mathbf{s}^{0} \gets$ optimizer initial state \ \ \ *(the superscript indexes the iteration, so $\bstheta^{t}$ are the parameters at iteration $t$)*
-2. **For** $t = 0, 1, \ldots, T - 1$:
-3. \ \ \ \ \ **Forward pass:** compute predictions $g(\xx_i \mid \bstheta^{t})$ for $i = 1, \ldots, n$ and loss $L(\bstheta^{t})$
-4. \ \ \ \ \ **Backward pass:** compute gradients $\boldsymbol{\gamma}^{t} = \nabla_{\bstheta} L(\bstheta^{t})$ via backpropagation
-5. \ \ \ \ \ **Update:** $(\bstheta^{t+1}, \mathbf{s}^{t+1}) \gets \calU(\bstheta^{t}, \mathbf{s}^{t}, \boldsymbol{\gamma}^{t}, \alpha)$
-6. **end For**
-7. **return** $\hat{\bstheta} \gets \bstheta^{T}$
-
-Notes:
-
-1. The optimizer update $\calU$ instantiates the gradient-descent step.
-   The simplest choice is *plain gradient descent*, $\calU(\bstheta, \mathbf{s}, \boldsymbol{\gamma}, \alpha) = (\bstheta - \alpha\,\boldsymbol{\gamma},\, \mathbf{s})$, where the state $\mathbf{s}$ is unused; this corresponds exactly to (@eq-ml-gd).
-   Adaptive variants that maintain non-trivial state $\mathbf{s}$ are introduced below.
-2. Step 4 is where *backpropagation* is invoked: the gradient $\nabla_{\bstheta} L$ is computed by applying the chain rule layer by layer, starting from the output and going back to the input [@Rumelhart1986].
-   In modern deep-learning frameworks (PyTorch, JAX, TensorFlow) this is done automatically by *automatic differentiation*: the user only writes the forward computation in Step 3, and the backward pass is constructed and executed by the framework.
-3. The number of iterations $T$ is itself a hyperparameter; in practice it is rarely fixed in advance but determined by *early stopping*, that is, monitoring a held-out validation loss and terminating training once it stops improving.
-4. As written, the algorithm performs (non-stochastic) *full-batch* gradient descent. The stochastic (mini-batch) variant used in practice replaces this gradient in Steps 3–4 and is introduced below.
+1. $\bstheta^{0} \gets$ random initialization;\ \ \ $\mathbf{s}^{0} \gets$ optimizer initial state
+2. **for** $m = 0, 1, \ldots, M - 1$:
+3. \ \ \ \ \ **Forward pass:** compute predictions $g(\xx_i \mid \bstheta^{m})$ for $i = 1, \ldots, n$ and loss $L(\bstheta^{m})$
+4. \ \ \ \ \ **Backward pass:** compute gradients $\boldsymbol{\gamma}^{m} = \nabla_{\bstheta} L(\bstheta^{m})$ via backpropagation
+5. \ \ \ \ \ **Update:** $(\bstheta^{m+1}, \mathbf{s}^{m+1}) \gets \calU(\bstheta^{m}, \mathbf{s}^{m}, \boldsymbol{\gamma}^{m}, \alpha)$
+6. **end for**
+7. **return** $\hat{\bstheta} \gets \bstheta^{M}$
 
 ::::
 
-The update rule in Step 5 is exactly (@eq-ml-gd) (when $\calU$ is plain gradient descent), only now $\bstheta$ collects the weights and biases of all layers of the network rather than the two parameters of a linear regression.
-The genuinely new ingredient compared to the linear case is Step 4. The gradient $\nabla_{\bstheta} L$ can in principle still be written down in closed form, but deriving it by hand parameter by parameter becomes extremely tedious and error-prone as the network grows in depth and width — feasible for small networks, impractical at scale. Backpropagation computes it efficiently by reusing intermediate quantities, and automatic differentiation removes the need to derive it by hand at all.
-The user specifies only the forward pass, and the gradient with respect to every trainable parameter is obtained "for free".
+Algorithm 3 presents training in its simplest form with full-batch gradient descent.
+It is common to instead update neural networks using subsets of the data (the same principle as seen in random forests and boosting) and to replace gradient descent with an alternative optimizer.
+Both ideas are discussed in turn.
 
-The two pieces of [Algorithm 1](#alg-nn-gd) that are commonly modified in practice are the *gradient estimate* used in Steps 3–4 (replacing the full-batch sum by an estimate on a small random subset of the data) and the *optimizer* $\calU$ in Step 5 (replacing plain gradient descent by an *adaptive* variant).
-Both are described in turn.
+#### Stochastic gradient descent and mini-batching {#sec-nn-batches}
 
-##### Stochastic gradient descent and mini-batching {.unnumbered .unlisted}
+When $\calU$ is plain gradient descent, $\calU(\bstheta, \mathbf{s}, \boldsymbol{\gamma}, \alpha) = (\bstheta - \alpha\,\boldsymbol{\gamma},\, \mathbf{s})$, then the update rule in Algorithm 3 Step 5 is exactly (@eq-ml-gd), only now $\bstheta$ collects the weights and biases of all layers of the network rather than the two parameters of a linear regression.
 
-In Steps 3–4 of [Algorithm 1](#alg-nn-gd) the *full-batch* gradient
+In Steps 3–4 of Algorithm 3 the *full-batch* gradient
 $$
 \nabla_{\bstheta} L(\bstheta) \;=\; \frac{1}{n}\sum_{i=1}^{n} \nabla_{\bstheta}\,\ell_i(\bstheta)
 $$
@@ -178,25 +185,25 @@ This requires one forward and one backward pass through all $n$ observations for
 For the dataset sizes typical in modern deep learning this is prohibitively expensive.
 Even when it is feasible, full-batch updates turn out to be suboptimal in practice.
 
-In Steps 3–4, NNs are therefore typically trained in *mini-batches*: the full-batch loss $L(\bstheta)$ is replaced by a *mini-batch loss* computed on a small random subset $\calB_t \subset \{1, \ldots, n\}$ of fixed size $\vert \calB_t \vert = B$,
+In Steps 3–4, NNs are therefore typically trained in *mini-batches*: the full-batch loss $L(\bstheta)$ is replaced by a *mini-batch loss* computed on a small random subset $\calB_m \subset \{1, \ldots, n\}$ of fixed size $\vert \calB_m \vert = B$,
 $$
-L_{\calB_t}(\bstheta) \;=\; \frac{1}{B}\sum_{i \in \calB_t} \ell_i(\bstheta),
+L_{\calB_m}(\bstheta) \;=\; \frac{1}{B}\sum_{i \in \calB_m} \ell_i(\bstheta),
 \qquad
-\nabla_{\bstheta} L_{\calB_t}(\bstheta^{t}) \;=\; \frac{1}{B}\sum_{i \in \calB_t}\nabla_{\bstheta}\,\ell_i(\bstheta^{t}),
+\nabla_{\bstheta} L_{\calB_m}(\bstheta^{t}) \;=\; \frac{1}{B}\sum_{i \in \calB_m}\nabla_{\bstheta}\,\ell_i(\bstheta^{t}),
 $$ {#eq-nnet-minibatch}
-and Steps 3–4 of [Algorithm 1](#alg-nn-gd) use $L_{\calB_t}(\bstheta^{t})$ and $\boldsymbol{\gamma}^{t} = \nabla_{\bstheta} L_{\calB_t}(\bstheta^{t})$ in place of $L(\bstheta^{t})$ and $\nabla_{\bstheta} L(\bstheta^{t})$.
+and Steps 3–4 of Algorithm 3 use $L_{\calB_m}(\bstheta^{t})$ and $\boldsymbol{\gamma}^{t} = \nabla_{\bstheta} L_{\calB_m}(\bstheta^{t})$ in place of $L(\bstheta^{t})$ and $\nabla_{\bstheta} L(\bstheta^{t})$.
 Min-batching has two useful effects: (i) each step is roughly $n / B$ times cheaper than a full-batch step (particularly useful for large datasets or in case of memory constraints), and (ii) the stochasticity helps the iterates escape narrow saddle points and shallow local minima of the highly non-convex loss surface, which tends to improve generalization.
 
 The resulting procedure is called (mini-batch) *stochastic gradient descent* (SGD) [@Robbins1951].
-Each mini-batch produces one parameter update (Step 5), so each iteration $t$ of the outer loop in [Algorithm 1](#alg-nn-gd) is now a single mini-batch step rather than a full pass over the data.
-The single loop of [Algorithm 1](#alg-nn-gd) is therefore best read as *two nested loops*: an outer loop over *epochs* and, within each epoch, an inner loop over the $\lceil n / B \rceil$ mini-batches that partition the (reshuffled) training set.
+Each mini-batch produces one parameter update (Step 5), so each iteration $t$ of the outer loop in Algorithm 3 is now a single mini-batch step rather than a full pass over the data.
+The single loop of Algorithm 3 is therefore best read as *two nested loops*: an outer loop over *epochs* and, within each epoch, an inner loop over the $\lceil n / B \rceil$ mini-batches that partition the (reshuffled) training set.
 One *epoch* is thus a complete pass over the training set and corresponds to $\lceil n / B \rceil$ updates; because the mini-batches *partition* the data — rather than being drawn independently at random indefinitely — every observation contributes exactly once per epoch.
 
-##### Adam and other adaptive optimizers {.unnumbered .unlisted}
+#### Optimizers {#sec-nn-opt}
 
-The simplest choice for the optimizer $\calU$ in Step 5 of [Algorithm 1](#alg-nn-gd) is plain gradient descent, which applies the *same* learning rate $\alpha$ to every parameter and uses no information from past gradients.
+The simplest choice for the optimizer $\calU$ in Step 5 of Algorithm 3 is plain gradient descent, which applies the *same* learning rate $\alpha$ to every parameter and uses no information from past gradients.
 Modern *adaptive* optimizers improve on this in two ways: they accumulate a running estimate of the gradient direction (*momentum*) and an estimate of the per-parameter gradient magnitude (*scaling*), and use both to adjust the effective step size on the fly.
-Algorithmically, this only changes the update rule $\calU$ in Step 5; everything else in [Algorithm 1](#alg-nn-gd) is unchanged.
+Algorithmically, this only changes the update rule $\calU$ in Step 5; everything else in Algorithm 3 is unchanged.
 
 The most widely used variant in deep learning is *Adam* [@Kingma2015].
 Adam maintains exponential moving averages of the gradient and the element-wise squared gradient,
@@ -206,13 +213,13 @@ $$
 \mathbf{v}^{t} &= \nu_2\,\mathbf{v}^{t-1} + (1 - \nu_2)\,(\boldsymbol{\gamma}^{t})^2,
 \end{aligned}
 $$ {#eq-nnet-adam-moments}
-where $\boldsymbol{\gamma}^{t}$ is the gradient supplied to $\calU$ in Step 5 of [Algorithm 1](#alg-nn-gd), $\bar{\boldsymbol{\gamma}}^{t}$ and $\mathbf{v}^{t}$ are the resulting exponential moving averages of the gradient and of the element-wise squared gradient $(\boldsymbol{\gamma}^{t})^2$, and $\nu_1, \nu_2 \in [0, 1)$ are the corresponding decay rates.
+where $\boldsymbol{\gamma}^{t}$ is the gradient supplied to $\calU$ in Step 5 of Algorithm 3, $\bar{\boldsymbol{\gamma}}^{t}$ and $\mathbf{v}^{t}$ are the resulting exponential moving averages of the gradient and of the element-wise squared gradient $(\boldsymbol{\gamma}^{t})^2$, and $\nu_1, \nu_2 \in [0, 1)$ are the corresponding decay rates.
 After a bias correction that compensates for the zero-initialization of $\bar{\boldsymbol{\gamma}}$ and $\mathbf{v}$ (omitted here for brevity), the parameter update is
 $$
 \bstheta^{t+1} \;=\; \bstheta^{t} - \alpha\,\frac{\bar{\boldsymbol{\gamma}}^{t}}{\sqrt{\mathbf{v}^{t}} + \varepsilon},
 $$ {#eq-nnet-adam-update}
 where $\varepsilon > 0$ is a small numerical-stability constant (typically $10^{-8}$) that prevents division by zero whenever a component $v_j^{t}$ of $\mathbf{v}^{t}$ is close to zero.
-In the notation of [Algorithm 1](#alg-nn-gd), this corresponds to $\calU(\bstheta, \mathbf{s}, \boldsymbol{\gamma}, \alpha)$ with state $\mathbf{s} = (\bar{\boldsymbol{\gamma}}, \mathbf{v})$ updated according to (@eq-nnet-adam-moments) and $\bstheta$ updated according to (@eq-nnet-adam-update).
+In the notation of Algorithm 3, this corresponds to $\calU(\bstheta, \mathbf{s}, \boldsymbol{\gamma}, \alpha)$ with state $\mathbf{s} = (\bar{\boldsymbol{\gamma}}, \mathbf{v})$ updated according to (@eq-nnet-adam-moments) and $\bstheta$ updated according to (@eq-nnet-adam-update).
 
 Two effects make this update appealing in practice:
 
@@ -224,7 +231,7 @@ Two effects make this update appealing in practice:
 
 ### Hyperparameters and practical training {#sec-nnet-hyperparameters}
 
-In the previous section, [Algorithm 1](#alg-nn-gd) and its mini-batch / Adam refinements were described as if the network architecture,  the learning rate $\alpha$ and other parameters outside $\bstheta$ were given.
+In the previous section, Algorithm 3 and its mini-batch / Adam refinements were described as if the network architecture,  the learning rate $\alpha$ and other parameters outside $\bstheta$ were given.
 In practice they are not and how close the optimizer's $\hat{\bstheta}$ is to the (typically unknown) optimum depends to some extent on these design choices.
 
 Following the terminology of @sec-ml-models, hyperparameters control how the learner is run and are set *before* training rather than learned from the data.
@@ -235,7 +242,7 @@ They include the choice of architecture family (such as FFNN and CNN; @sec-nnet-
 Changing any of them changes which $\hat{\bstheta}$ is in principle reachable, much as the depth of a decision tree fixes the set of partitions the tree can express (@sec-ml-models).
 
 **Mathematical hyperparameters** control how the loss surface of that fixed function class is traversed and how solutions on it are penalized.
-They include the learning rate $\alpha$ of [Algorithm 1](#alg-nn-gd), Adam's decay rates $\nu_1, \nu_2$ from (@eq-nnet-adam-moments), the mini-batch size $B$ from (@eq-nnet-minibatch), the number of training epochs (or, equivalently, the stopping criterion), and the regularization strengths discussed below.
+They include the learning rate $\alpha$ of Algorithm 3, Adam's decay rates $\nu_1, \nu_2$ from (@eq-nnet-adam-moments), the mini-batch size $B$ from (@eq-nnet-minibatch), the number of training epochs (or, equivalently, the stopping criterion), and the regularization strengths discussed below.
 
 Searching jointly over both groups is expensive: each candidate configuration requires a full (possibly multi-hour) training run.
 *Neural architecture search* (NAS) [@Elsken2019] automates the search over the structural part using reinforcement learning, evolutionary algorithms, or gradient-based relaxations of the discrete choices, but is itself extremely compute-intensive and largely confined to settings where the same architecture will be reused many times (for example, image classification backbones).
@@ -251,7 +258,7 @@ Three regularization strategies are widely used.
   The penalization strength $\lambda$ is a mathematical hyperparameter.
 - *Dropout* [@Srivastava2014] randomly sets a fraction $p$ of activations to zero during each training step, which can be interpreted as implicit ensembling over thinned sub-networks.
   The drop probability $p$ is also a mathematical hyperparameter.
-- *Early stopping* terminates training once a held-out validation loss stops improving (Note 3 of [Algorithm 1](#alg-nn-gd)).
+- *Early stopping* terminates training once a held-out validation loss stops improving (Note 3 of Algorithm 3).
   Unlike weight decay and dropout it adds no explicit penalty; it acts as an *implicit* regularizer, limiting how far the parameters move from their initialization and so restricting the network's effective capacity.
 
 More broadly, training an over-parameterized network with (stochastic) gradient descent carries its own *implicit regularization*: among the many parameter settings that fit the training data equally well, the optimization tends to favour simpler, better-generalizing ones.
@@ -263,7 +270,7 @@ The number of hyperparameters that *can* be tuned is large, but a few defaults w
 - Use an architecture (family, depth, width) that is comfortably over-parameterized for the data at hand, rather than trying to find the smallest network that still fits.
 - Couple this with weight decay and/or dropout to suppress overfitting; this trades one hyperparameter (effective capacity) for one or two regularization strengths that are typically less sensitive.
 - Run an *adaptive* optimizer such as Adam with a small learning rate $\alpha$ for *many* epochs, and rely on *early stopping* on a held-out validation loss to choose the effective number of epochs.
-  Adam's per-parameter scaling removes much of the sensitivity to $\alpha$, so a single global learning rate tends to work for all layers, and the early-stopping criterion replaces an explicit tuning of $T$ in [Algorithm 1](#alg-nn-gd).
+  Adam's per-parameter scaling removes much of the sensitivity to $\alpha$, so a single global learning rate tends to work for all layers, and the early-stopping criterion replaces an explicit tuning of $M$ in Algorithm 3.
 - Use standard hyperparameter tuning with nested resampling (@sec-ml-opt) for everything else.
 
 
@@ -366,7 +373,7 @@ In modern practice these families are rarely used in isolation: most large syste
 The encoder is a sub-network (for example, CNN on images, transformer on sequences) that maps the raw input into a fixed-dimensional feature representation, and the heads (in the sense of @sec-nnet-deterministic-vs-probabilistic) consume that representation to produce the prediction targets.
 
 
-## Neural Networks for Survival Analysis {#sec-nnet-surv}
+## Neural networks for survival analysis {#sec-nnet-surv}
 
 For time-to-event data, deterministic regression does not work as it is not possible to calculate the difference between truth and prediction ($\haty_i - y_i$) for censored observations.
 Neural-network adaptations to survival analysis are therefore (almost) all inherently distributional.
@@ -379,7 +386,7 @@ Most of them, however, fall into one of three frameworks covered in the remainde
 - **Semi-parametric Cox-based neural networks** (@sec-nnet-cox): optimize the partial likelihood (@sec-classical-cox) as the training objective to obtain a more flexible risk score, then use the Breslow estimator of the baseline cumulative hazard as before.
 - **Reduction-based neural networks** (@sec-nnet-reduction): convert the survival task into a standard regression or classification task (Part IV) and train a standard neural network on the transformed data.
 
-### Parametric Neural Networks {#sec-nnet-param}
+### Parametric neural networks {#sec-nnet-param}
 
 The most direct extension of standard regression neural networks to survival analysis is to assume a parametric distribution for the event time $Y$ and to minimize the corresponding negative log-likelihood as in @sec-nnet-deterministic-vs-probabilistic.
 This is exactly the distributional-regression construction of (@eq-nnet-gauss-nll), with the Normal density replaced by a time-to-event density and with the log-likelihood adjusted for censoring and potentially truncation.
@@ -412,7 +419,7 @@ Particularly in combination with flexible parametric families like the generaliz
 The neural network and the optimizer are unchanged; only the per-observation log-likelihood term reflects what was actually observed.
 Cox-based and discrete-time alternatives, by contrast, are tightly coupled to right-censoring (the partial likelihood and the discrete-time hazard updates respectively presume an observed event time or right-censoring time), and accommodating left- or interval-censoring there requires more involved reformulations of the likelihood or estimation procedures.
 
-#### Example: Weibull AFT on the tumor data {#sec-nn-weibull}
+#### Example: Weibull AFT on the tumor dataset {#sec-nn-weibull}
 
 To make the construction concrete, consider a Weibull *accelerated failure time* (AFT) model fit in four increasingly flexible parametrizations to the `tumor` data set (@tbl-surv-data-tumor) and contrast the predicted survival curves with the corresponding Kaplan-Meier (KM) estimate stratified by `complications`.
 All four variants use the same Weibull likelihood and the same Adam optimizer, and every feature-dependent head is an FFNN with the reference architecture of @fig-ffnn-arch.
@@ -448,7 +455,7 @@ Concretely, *DeepWeiSurv* [@Bennis2020] uses a feedforward encoder to predict th
 The fourth approach, *Countdown Regression* [@Avati2020], is parametric but evaluates (and trains) the predicted distribution via a *survival-adapted continuous ranked probability score* rather than the NLL.
 For sufficiently large $K$, mixtures of Weibull or log-normal distributions can approximate a wide range of smooth survival distributions while retaining the practical advantages of a fully parametric model, such as closed-form survival, hazard, and quantile functions.
 
-### Semi-Parametric: Cox-based Neural Networks {#sec-nnet-cox}
+### Semi-Parametric: Cox-based neural networks {#sec-nnet-cox}
 
 The Cox *proportional hazards* (PH) model (@sec-classical-cox) avoids the distributional assumption by specifying only the relative hazard through a linear predictor $\eta_i = \xx_i^\trans \bsbeta$.
 This semi-parametric structure carries over naturally to neural networks: instead of a linear predictor, a neural network $g(\,\cdot\, \mid \bstheta): \Reals^p \to \Reals$ outputs a scalar risk score $\eta_i = g(\xx_i \mid \bstheta)$ and the Cox partial likelihood is used as the training objective.
@@ -461,11 +468,11 @@ where $\calR_{t_i} = \{j : t_j \geq t_i\}$ is the risk set at time $t_i$.
 This loss is differentiable in $\bstheta$ and can be minimized by backpropagation.
 To obtain a full predicted survival distribution from the risk score $\hat\eta_i = g(\xx_i \mid \hat{\bstheta})$, the Breslow estimator of the baseline cumulative hazard $\hatH_0$ (@eq-breslow) is combined with $\hat\eta_i$, exactly as in the standard Cox model (@sec-classical-cox).
 
-One practical complication is that the inner sum in (@eq-nnet-cox-loss) ranges over the *entire* risk set $\calR_{t_i}$, which does not play well with the mini-batch gradient descent of [Algorithm 1](#alg-nn-gd) and can become prohibitively expensive on large or multi-modal datasets.
+One practical complication is that the inner sum in (@eq-nnet-cox-loss) ranges over the *entire* risk set $\calR_{t_i}$, which does not play well with the mini-batch gradient descent of Algorithm 3 and can become prohibitively expensive on large or multi-modal datasets.
 A common fix is *risk-set sub-sampling*: instead of taking the full risk set $\calR_{t_i}$ at each event, the risk set is restricted to the subjects in the current mini-batch, which yields a stochastic estimate of the partial-likelihood gradient [@Kvamme2019a].
 
 
-#### Example: Neural-network-based Cox PH on the tumor data
+#### Example: Neural-network-based Cox PH on the tumor dataset
 
 To illustrate the construction, two Cox-NN variants are fit to the `tumor` data (@tbl-surv-data-tumor), again using the reference FFNN architecture of @fig-ffnn-arch for the risk score in both cases (the only difference is the input dimension):
 
