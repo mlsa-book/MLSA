@@ -144,7 +144,7 @@ The three steps in @fig-ms-reduction-pipeline are:
 1. **Create transition-specific datasets** (Step 1 of @fig-ms-reduction-pipeline).
    For each admissible transition $\ell \to e$, build $\calD_{\ell;e}$ containing, for every subject who ever occupies state $\ell$, an at-risk interval $(t_{i,\text{start}}, t_{i,\text{stop}}]$ together with the indicator $\delta_{i,\ell e}$ of whether the transition $\ell \to e$ actually occurred at $t_{i,\text{stop}}$.
    The interval is defined by $t_{i,\text{start}}$, the subject-specific time of entry into state $\ell$ and $t_{i,\text{stop}}$, either the time of the first transition out of $\ell$ or a censoring time.
-   Note that a subject appears in every transition-specific dataset for which they were at risk, but only for the times during which they were at risk for that specific transition (e.g. subject 1 in the toy example contributes to all four datasets — to the $0\to1$ and $0\to2$ datasets on $[0, 2]$ while in state $0$, and to the $1\to0$ and $1\to2$ datasets on $[2, 5]$ while in state $1$).
+   Note that a subject appears in every transition-specific dataset for which they were at risk, but only for the times during which they were at risk for that specific transition (e.g. subject 1 in the illness-death toy example of @fig-ms-reduction-pipeline contributes to all four datasets — to the $0\to1$ and $0\to2$ datasets on $[0, 2]$ while in state $0$, and to the $1\to0$ and $1\to2$ datasets on $[2, 5]$ while in state $1$).
    When $t_{i,\text{start}} > 0$ the subject contributes a *left-truncated* observation (delayed entry), visible in the toy example as the non-zero start times in the $1\to0$ and $1\to2$ datasets (subject 1 enters state $1$ at $t = 2$).
 
 2. **Fit single-event models** (Step 2 of @fig-ms-reduction-pipeline).
@@ -208,7 +208,7 @@ Because of the limitation mentioned earlier that few software implementations al
    The piece-wise constant hazards reduction (@sec-piecewise-constant-hazards) further turns each single-event-with-left-truncation task into a Poisson regression on the piece-wise exponential dataset, where each subject contributes one row per at-risk interval, the response is the per-interval event indicator, and the log of the interval length enters as an offset.
 
 In the stacked-data variant (@sec-ms-stacked, @fig-ms-reduction-stacked) used here, the two reductions are fused into a single data-transformation step.
-A single XGBoost-Poisson learner is fit to this stacked dataset with the treatment indicator, transition indicator and interval-time $t_j$ (@eq-interval-endpoint) as features. The learner then automatically selects splits on these features and thereby learns the hazard function for each transition.
+A single XGBoost-Poisson learner is fit to this stacked dataset with the treatment indicator, transition indicator and interval-time $t_j$ (@eq-interval-time) as features. The learner then automatically selects splits on these features and thereby learns the hazard function for each transition.
 At prediction time the per-transition cumulative hazards are combined into the transition-probability matrix via the product-integral approximation (@eq-ms-prodint-approx-recall).
 
 @fig-tp-prothr-cmp shows that the XGBoost reduction recovers the AJ baseline closely across all four transitions and both treatment arms.
@@ -235,7 +235,7 @@ Mild smoothing relative to AJ is visible where the AJ step function is coarse (a
 
 ## Limitations
 
-* The reduction pipelines introduced here incur additional overhead, for example preparing the separate or stacked datasets and combining the transition-specific hazards for downstream analysis.
+* The reduction pipelines introduced here add implementation overhead: the data must first be transformed into the per-cause or per-transition (stacked) datasets, and the per-cause/per-transition hazard estimates must afterwards be recombined (interpolated onto a common grid and integrated) into the target quantities.
 * They also may increase memory usage and computational time compared to specialised learners for competing risks and multi-state models.
 * Most software currently doesn't support left-truncated data, therefore limiting the applicability of the event-history reduction pipelines in the presence of left-truncation.
 
