@@ -16,14 +16,14 @@ Building on the motivation in the preface, this chapter introduces the concepts 
 
 ## Survival analysis {#sec-intro-def}
 
-This book uses the term survival analysis\index{survival analysis}, which highlights the field's roots in medical statistics and in particular analyzing survival times (the time until death).
+This book uses the term survival analysis\index{survival analysis}, which highlights the field's roots in medical statistics, in particular the analysis of survival times (the time until death).
 However, as discussed in the preface, this is not the only application of the field and other terms may also be found; for example, reliability, duration, and failure-time analysis.
 
 In @sec-surv, 'survival analysis' is refined to specifically refer to the case when the event of interest can occur exactly once, for example, predicting when a patient may die after diagnosis of Stage IV non-small cell lung cancer.
 In @sec-eha, 'event history analysis'\index{event history analysis} is defined, which is a generalization of the single-event setting to the case when one or more events can occur one or more times, for example, predicting when a patient will have relapses of multiple sclerosis.
 To align with common practice, the term 'survival analysis' is used throughout the book and context will make clear when the more general event history methods apply.
 
-One of the key aims in this book is to highlight the ubiquitous nature of survival analysis and to encourage more machine learning practitioners to use survival analysis when appropriate.
+One of the key aims in this book is to highlight the ubiquitous nature of survival analysis and to encourage more machine learning practitioners to use it when appropriate.
 Machine learning practitioners are likely familiar with classification and regression, but may not be familiar with survival analysis.
 The examples below demonstrate when survival analysis might be appropriate.
 
@@ -31,7 +31,7 @@ The examples below demonstrate when survival analysis might be appropriate.
 
 Returning to the example in the preface, say an elderly man receives the treatment investigated in the randomized trial for advanced non-small cell lung cancer (NSCLC).
 The oncologist might tell him (in softer words) "based on the results of this trial, the three-year survival probability of NSCLC in 75-year-old males on this treatment is 67.5\%".
-This initially appears as a probabilistic classification\index{classification!probabilistic} problem: given a set of patient characteristics (here age and sex), predict if a patient survives to three years (a binary outcome).
+This initially appears as a probabilistic classification\index{classification!probabilistic} problem: given a set of patient characteristics (here age and sex), predict whether a patient survives to three years (a binary outcome).
 In other words, among patients with similar characteristics, approximately 67.5\% survived to three years.
 However, the data needed to estimate such probabilities is obtained from a dataset with incomplete information.
 For many patients, the event time is only partially observed.
@@ -44,17 +44,17 @@ Survival analysis models allow valid estimation of the three-year survival proba
 
 Another common survival problem is to _rank_ observations rather than predicting an absolute probability\index{relative risk}.
 Consider the allocation of donor hearts to eligible candidates on a transplant\index{transplant} waiting list, which requires estimating which candidate is most likely to die soonest without a transplant.
-Candidates could be ranked in a list of least to highest risk of death, or assigned to risk groups: for example, patients at low or high-risk of dying within one year.
+Candidates could be ranked in a list of least to highest risk of death, or assigned to risk groups: for example, patients at low or high risk of dying within one year.
 A naive approach would be to train a classification model on historical waiting-list data, labeling each patient as "died within one year" or "survived to one year".
-However, waiting-list records are full of censoring and competing events\index{competing risks}: some patients will receive a transplant before the one-year mark (hence their natural waiting-list outcome is no longer observable after transplant) and others will again be lost to follow-up or remain on the list at the end of the study.
+However, waiting-list records are full of censoring and competing events\index{competing risks}: some patients will receive a transplant before the one-year mark (hence their natural waiting-list outcome is no longer observable after transplant) and others will be lost to follow-up or remain on the list at the end of the study.
 A classifier\index{classification} restricted to patients with a fully observed one-year outcome may discard the cases that most inform the ranking and thus yield biased predictions.
-A survival model uses the partial information in censored records to produce a risk ranking that reflects the relative ordering of event times, while making assumptions about the censoring process.
+A survival model uses the partial information in censored records to produce a risk ranking that reflects the relative ordering of event times (under appropriate assumptions about the censoring process).
 
 #### Estimating duration {.unnumbered .unlisted}
 
 For a non-medical example, return to the study in the preface that considered how long unemployed workers take to find a full-time job (assuming the outcome is first exit from current unemployment period).
-Say data is collected over one calendar year, at the end of that period many workers will still be unemployed, others may move to a different country, take on a part-time job, are permanently removed from the labor force, or may drop out of the study for other reasons.
-A regression\index{regression} model trained only on uncensored observations could be heavily biased as the longest unemployment spells, those ongoing at the study end, would be absent from the training data.
+Say data is collected over one calendar year. At the end of that period, many workers will still be unemployed, while others may move to a different country, take on a part-time job, be permanently removed from the labor force, or drop out of the study for other reasons.
+A regression\index{regression} model trained only on uncensored observations could be heavily biased because the longest unemployment spells, those ongoing at the study end, would be absent from the training data.
 
 This unemployment setting has further structure that standard regression cannot accommodate.
 Workers may exhibit multiple unemployment spells (recurrent events\index{recurrent events}) and the ways in which they exit unemployment may be mutually exclusive: someone cannot both find full-time work _and_ be permanently removed from the workforce.
@@ -107,16 +107,16 @@ In contrast, the event-time density around age 100 is substantially lower than a
 
 As already discussed, censoring\index{censoring} is a defining feature of survival analysis.
 In addition to censoring, survival data can include _truncation_\index{truncation}, which means portions of follow-up time are excluded.
-The precise definitions of different types of censoring and truncation are provided in @sec-surv, non-technical summaries of the most common forms of censoring and truncation are below.
+The precise definitions of the different types of censoring and truncation are provided in @sec-surv. Brief, non-technical summaries are given below.
 
 The most common form of censoring is right-censoring\index{censoring!right} (@fig-intro-censoring, second row), which occurs when the true survival time is greater than ('to the right of,' if you imagine a number line) the observed censoring time.
-The examples in @sec-intro-def are all exhibiting forms of right-censoring.
+The examples in @sec-intro-def all exhibit forms of right-censoring.
 Left-censoring\index{censoring!left} is recorded when the event of interest is less than ('to the left of') the observed censoring time.
 @sec-surv provides an example of someone telling an interviewer that they started using a phone (the event of interest) before the interview, but they do not remember when.
-If the time-to-event outcome is "age at first phone use" then a 23-year-old who is using a phone but cannot remember when they started, is left-censored at $23$.
+If the time-to-event outcome is "age at first phone use" then a $23$-year-old who is using a phone but cannot remember when they started is left-censored at $23$.
 Often, the censoring event is assumed to be independent of the event of interest (for example, random dropout).
-However, when the secondary event either precludes the primary event or fundamentally changes the probability of its occurrence, it is known as a _competing risk_\index{competing risks} (@sec-eha).
-For example, if an unemployed worker is still looking for a job when the study window closes, the censoring is independent of if/when they would eventually find work (subject to some assumptions)\index{censoring!independent}.
+However, when the occurrence of another event is not independent of the event of interest and precludes observation of the primary event, it is known as a _competing risk_\index{competing risks} (@sec-eha).
+For example, if an unemployed worker is still looking for a job when the study window closes, the censoring is independent\index{censoring!independent}.
 In contrast, finding a part-time job is a competing event as it precludes the primary event (finding full-time employment) and may depend on the same factors (skills, availability, local labor market).
 
 _Left-truncation_\index{truncation!left} is the more common form of truncation and involves data before the truncation time being excluded.
@@ -127,14 +127,13 @@ Truncation affects whether an individual is included in the observed sample, whe
 As a concrete example, consider a study on time until death in patients diagnosed with tuberculosis (TB).
 Assume enrolment is open to anyone with a TB diagnosis, including those diagnosed before the study opened.
 Left-truncation arises if patients die between their diagnosis and the study start.
-These patients are never observed and are absent from the data, inducing a form of selection bias as the highest-risk cases may never be observed (@fig-intro-censoring, fourth row).
+These patients are never observed and are absent from the data, inducing a form of selection bias: the highest-risk cases (those dying earliest) are systematically missing (@fig-intro-censoring, fourth row).
 Those who do survive to the study start will enter with a known gap between diagnosis and enrolment (@fig-intro-censoring, third row).
-Bias\index{selection bias} occurs if their outcome time is erroneously calculated from study entry: a patient diagnosed two years before study start but dying one year into the study has a true survival of three years, not one.
-As a remedy, these observations should only enter the risk set\index{risk set} (discussed in full in @sec-surv) at their delayed entry\index{delayed entry} time.
-In other words, the number of patients at risk at a given time should not include patients before they enter the study (even if they are known to have the diagnosis).
+Bias\index{selection bias} occurs when delayed entry and the implicit selection bias are not explicitly accounted for (discussed in full in @sec-surv).
 
-A related phenomenon that can occur during data collection is immortal time bias\index{immortal time bias}, which happens when group membership is determined only after a period of guaranteed survival.
-For example, this can occur if study entry depends on receiving a medical treatment that can only be given three years after diagnosis; immortal time bias is discussed further in @sec-surv.
+Another bias that often occurs when time-dependent dynamics of survival data collection are not explicitly accounted for is _immortal time bias_\index{immortal time bias}. 
+It occurs when group membership (treatment) is determined only after a period of guaranteed survival but is treated as if present from baseline.
+Immortal time bias is discussed further in @sec-surv.
 
 The first part of this book will formally introduce and develop these concepts further.
 
