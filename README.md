@@ -1,6 +1,6 @@
 # Machine Learning in Survival Analysis
 
-<img src="book/Figures/cover_inverse.svg" align="right" width = "200" />
+<img src="book/Figures/cover-new-inverse.svg" align="right" width = "200" />
 
 This book is a work in progress, the final work will be published by Chapman and Hall/CRC.
 This electronic version (including pdf download) will always be free and open access ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)).
