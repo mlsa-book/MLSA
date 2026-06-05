@@ -30,7 +30,7 @@ The basic machine learning workflow is represented in @fig-ml-basic:
 3. **Predicting:** Features from the test data are passed to the model which makes predictions for the unseen outcomes (Box 1).
 4. **Evaluation:** Outcomes from the test data are passed to a chosen measure\index{performance measure} with the predictions, which evaluates the performance\index{model performance} of the model (Box 2).
 
-The process of repeating this procedure to test different training and test data is called *resampling*\index{resampling} and running multiple resampling experiments with different models is called *benchmarking*\index{benchmarking}.
+The process of (repeatedly) splitting the data into training and test data is called *resampling*\index{resampling} and running multiple resampling experiments with different models is called *benchmarking*\index{benchmarking}.
 All these concepts will be explained in this chapter. 
 
 ![Basic machine learning workflow with data splitting, model training, predicting, and evaluating. Image from @Foss2024 (CC BY-NC-SA 4.0).](Figures/ml/resampling.png){#fig-ml-basic}
@@ -40,16 +40,13 @@ All these concepts will be explained in this chapter.
 ## Tasks {#sec-ml-tasks}
 
 A machine learning task\index{task} is the specification of the mathematical problem that is to be solved by a given algorithm\index{algorithm}.
-Tasks are derived from datasets and one dataset can give rise to many tasks across any machine learning domain.
-The dataset described by columns: 'age', 'weight', 'height', 'sex', 'diagnosis', 'time of death', 'clinician notes', could give rise to any of the following tasks (and more):
+Tasks are derived from datasets and one dataset can give rise to many tasks.
+For example, a dataset with columns 'age', 'weight', 'height', 'sex', 'diagnosis', and 'time of death' could give rise to several supervised tasks:
 
 * Supervised regression\index{regression}: Predict age from weight, height, and sex.
 * Supervised classification\index{classification}: Predict sex from age and diagnosis.
 * Supervised survival: Predict time of death from all other features.
-* Unsupervised clustering\index{clustering}: Categorize observations into clusters.
-* Reinforcement learning\index{reinforcement learning}: Learn to speak like a clinician depending on client diagnosis.
 
-As this book is focused on supervised learning\index{supervised learning}, only the first three of these are covered in this chapter and beyond.
 The specification of a task is vital for interpreting predictions from a model and its subsequent performance.
 This is particularly true when separating between deterministic and probabilistic predictions, as discussed later in the chapter.
 
@@ -67,7 +64,7 @@ For example, predicting an individual's height as 165cm would be a deterministic
 
 Formally, a deterministic regression task is specified by $g_{Rd} : \calX \rightarrow \calY \subseteq \Reals$, and a probabilistic regression task by $g_{Rp} : \calX \rightarrow \calS$ where $\calS \subseteq \Distr(\calY)$ and $\Distr(\calY)$ is the space of distributions over $\calY$.
 
-In machine learning literature, deterministic regression is more common than probabilistic and hence the shorthand 'regression' is used to refer to deterministic regression.
+In the machine learning literature, deterministic regression is more common than probabilistic and hence the shorthand 'regression' is used to refer to deterministic regression.
 
 ### Classification {#sec-ml-tasks-classif}
 
@@ -92,13 +89,13 @@ During *training*, data, $\calD$, is fed into the learning algorithm and induces
 Whereas the learner defines the algorithm for training and prediction, the model is the result of training the algorithm on data\index{model training}.
 
 After training the model, new data, $\xx^*$, can be fed to the *prediction algorithm*, which is a mathematical strategy that uses the model to make predictions, $\hatyy = \hatg(\xx^*)$\index{predicting}.
-Algorithms can vary from simple linear equations with coefficients to estimate, to complex iterative procedures that differ considerably between training and predicting.
+Algorithms range in complexity from simple linear equations, with only a few coefficients to estimate, to complex iterative procedures whose training and prediction steps differ considerably.
 
 Algorithms usually involve parameters and hyperparameters\index{parameter}\index{hyperparameter}.
 Parameters are learned from data whereas hyperparameters are set beforehand to guide the algorithms.
 Model *parameters* (or *weights*), $\bstheta$, are coefficients to be estimated during model training.
 Hyperparameters, $\bslambda$, control how the algorithms are run but are not directly updated by them.
-Hyperparameters can be mathematical, for example the learning rate in a gradient boosting machine\index{gradient boosting machine} (@sec-boost), or structural, for example the depth of a decision tree\index{decision tree} (@sec-ranfor).
+Hyperparameters can be mathematical, for example the learning rate in a gradient boosting machine\index{gradient boosting machine} (@sec-boost), or structural, for example the depth of a decision tree\index{decision tree} (@sec-ranfor) or the architecture of a neural network\index{neural network} (@sec-nnet).
 The number of hyperparameters usually increases with learner complexity and affects its predictive performance. 
 Often hyperparameters need to be tuned\index{tuning} (@sec-ml-opt) instead of manually set.
 
@@ -106,7 +103,7 @@ An example bringing these concepts together is given in Box 1.
 
 :::: {.callout-note icon=false}
 
-## Box 1  (Ridge regression)
+## Box 1 (Ridge regression)
 
 Let $g : \calX \rightarrow \calY$ be the regression\index{regression} task of interest with $\calX \subseteq \Reals$ (a single feature) and $\calY \subseteq \Reals$.
 Let $\dvec{x}{n}$ and $\dvec{y}{n}$ be data such that $x_i \in \calX$ and $y_i \in \calY$ for all $i = 1,\ldots,n$.
@@ -114,17 +111,17 @@ Let $\dvec{x}{n}$ and $\dvec{y}{n}$ be data such that $x_i \in \calX$ and $y_i \
 Say the **learner** of interest is a regularized linear regression model\index{linear regression} with **learning algorithm**:
 
 $$
-(\hat{\beta}_0,\hat{\beta}_1):=\argmin_{\beta_0,\beta_1}\left(\sum_{i=1}^n\left(y_i-\beta_0 -\beta_1 x_i)\right)^2+\gamma\beta_1^2\right).
+(\hat{\beta}_0,\hat{\beta}_1):=\argmin_{\beta_0,\beta_1}\left(\sum_{i=1}^n\left(y_i-\beta_0 -\beta_1 x_i\right)^2+\gamma\beta_1^2\right).
 $$
 
 and **prediction algorithm**:
 
 $$
-\hatg(x \mid \bstheta) = \hat{\beta}_0 + \hat{\beta}_1 x
+\hatg(x):= g(x \mid \hat{\bstheta}) = \hat{\beta}_0 + \hat{\beta}_1 x
 $$
 
 The **hyperparameter**\index{hyperparameter} vector is $\bslambda = (\gamma) \in \PReals$ and the **parameters** are $\bstheta = (\beta_0 \ \beta_1)^\trans$.
-Say that $\gamma = 2$ is set and the learner is then trained by passing $(\xx, \yy)$ to the learning algorithm and thus estimating $\hat{\bstheta}$ and $\hatg$.
+Say that $\gamma = 2$ is set and the learner is then trained by passing $(\xx, \yy)$ to the learning algorithm and thus estimating $\hat{\bstheta}$.
 A **prediction**, $\haty$, can then be made by passing new data $x^* \in \calX$ to the fitted model,
 
 $$
@@ -145,8 +142,9 @@ Trusting a model's performance requires two elements: firstly, quantifying perfo
 
 To understand whether a model is 'good', its predictions are evaluated with a *loss function*\index{loss function}\index{model evaluation}.
 For deterministic predictions, loss functions assign a score to the discrepancy between predictions and true values, $L: \calY \times \calY \rightarrow \ExtReals$.
-For example, the absolute loss is the absolute difference between two values, $L(y, \hat{y}) = \vert y - \hat{y} \vert$\index{mean absolute error}.
-More generally, losses compare an observed outcome with a prediction object, which could be a numeric value, a class probability vector, or a predicted distribution.
+This formulation is general and also covers losses that can take negative or infinite values, such as those based on the negative log-likelihood.
+Many losses used in practice, on the other hand, are non-negative; for example the *absolute loss*, the absolute difference between a prediction and the true value, $L(y, \hat{y}) = \vert y - \hat{y} \vert$\index{absolute error}.
+In general, losses compare an observed outcome with a prediction object, which could be a numeric value, a class probability vector, or a predicted distribution.
 
 A model is considered truly useful if it performs well _in general_, meaning it should perform well on new, previously unseen data, rather than only the data encountered during training and development.
 A model's _generalization error_\index{generalization error} refers to its expected performance on new data.
@@ -237,7 +235,7 @@ Nested resampling is the process of resampling the training set again for tuning
 Many machine learning algorithms use _gradient descent_\index{gradient descent} to estimate the model parameters, $\bstheta$, during training.
 Gradient descent is commonly used when no closed-form solution exists for minimizing a loss function.
 Given a differentiable loss function, $L(\bstheta)$, that measures how well the model predicts the training data, gradient descent repeatedly updates the parameter estimates by taking small steps that decrease the loss until the loss stabilizes or a stopping criterion is met.
-This principle underlies, among others, gradient boosting\index{boosting} (@sec-boost) and neural networks (@sec-nnet),\index{neural networks} but is simpler to introduce for a simple linear regression model\index{linear regression} with only two parameters.
+This principle underlies, among others, gradient boosting\index{boosting} (@sec-boost) and neural networks\index{neural networks} (@sec-nnet), but is easier to introduce for a simple linear regression model\index{linear regression} with only two parameters.
 
 Consider the linear regression model $y = g(x \mid \bstheta) = \beta_0 + \beta_1 x$ with parameter vector $\bstheta = (\beta_0 \ \beta_1)^\trans$, fitted to observations $\{(x_i, y_i)\}^n_{i=1}$ by minimizing the *mean squared error* (MSE)\index{mean squared error} loss:
 
@@ -260,7 +258,7 @@ $$ {#eq-ml-gd}
 
 where $\alpha > 0$ is the *learning rate*,\index{learning rate} also known as the step size as it controls the size of the parameter update at each iteration.
 If $\alpha$ is too small then convergence is slow, but too large values mean iterations can overshoot or oscillate.
-In machine learning models $\alpha$ is typically tuned (@sec-ml-opt). \index{tuning}
+In machine learning models $\alpha$ is typically tuned\index{tuning} (@sec-ml-opt) or adaptive and combined with early stopping. 
 
 Starting from an arbitrary initial guess $\bstheta^{0}$, (@eq-ml-gd) is repeated to drive $\bstheta$ towards a minimum of $L$.
 
@@ -313,7 +311,7 @@ $$
 As can be seen, each gradient-descent step updates all parameters simultaneously.
 
 Linear regression minimized by the mean squared error has a known, closed form expression (ordinary least squares, OLS).
-@fig-gradient-descent illustrates gradient descent for a different example with more observations, comparing the gradient descent procedure to the known closed form optimum.
+@fig-gradient-descent illustrates gradient descent for an example with more observations, comparing the gradient descent procedure to the known closed form optimum.
 The contours show the loss surface of $L(\bstheta)$ over the two-dimensional parameter space; lighter colors correspond to a smaller loss.
 Starting from a deliberately poor initial guess (green square), gradient descent traces the blue path along the loss surface and finishes (red circle) at the known closed form optimum (black cross).
 At every step, the update moves in the direction $-\nabla_{\bstheta} L$; as the gradient becomes smaller near the optimum, the parameter updates also become smaller.
@@ -328,7 +326,7 @@ For large datasets, gradient descent is often replaced by _stochastic_, or _mini
 
 ## Key takeaways
 
-* Machine learning\index{machine learning} tasks define the predictive problem of interest. Regression\index{regression} tasks make predictions for continuous outcomes, such as the amount of rain tomorrow. Classification\index{classification} tasks make predictions for discrete outcomes, such as the predicted weather tomorrow.
+* Machine learning\index{machine learning} tasks define the predictive problem of interest. Regression\index{regression} tasks make predictions for continuous outcomes, such as the amount of rain tomorrow. Classification\index{classification} tasks make predictions for discrete outcomes, such as if it will rain tomorrow (yes/no).
 * Both regression and classification tasks may make deterministic predictions (a single value or category), or probabilistic predictions (a probability distribution over values or categories).
 * Models have parameters\index{parameter} that are learned during training and hyperparameters\index{hyperparameter} that are set or tuned.
 * Models should be evaluated on resampled\index{resampling} data to estimate the generalization error\index{generalization error} to understand performance on new, unseen data.
