@@ -22,7 +22,7 @@ Or in BibTeX format
 @book{MLSA2026,
   title     = "Machine Learning in Survival Analysis",
   author    = "Sonabend, Raphael and Bender, Andreas",
-  year      = "2025",
+  year      = "2026",
   note      = "https://www.mlsabook.com"
 }
 ```
