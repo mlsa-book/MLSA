@@ -591,7 +591,8 @@ p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
   geom_vline(xintercept = 120, lty = 3) +
   # geom_step(data=km_sir_b, aes(col = pneumonia), lty = 2) +
   labs(
-    y = expression(P(Y <= tau~ "," ~ E(Y) == e))
+    x = expression("time, " * tau),
+    y = expression(hat(F)[q](tau))
   ) +
   coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
 
@@ -633,7 +634,8 @@ p_cens_vs_cr = ggplot(
     coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
     geom_vline(xintercept = 120, lty = 3) +
     labs(
-      y = expression(P(Y <= tau~ "," ~ E(Y) == 2)),
+      x = expression("time, " * tau),
+      y = expression(hat(F)[2](tau)),
       linetype = "assumption"
     )
 
