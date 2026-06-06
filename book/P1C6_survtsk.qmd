@@ -102,15 +102,13 @@ In machine learning terms, the relative risk prediction task\index{task} is the 
 As an example of this prediction type, consider three individuals, $\{i,j,k\}$ with predicted risks $\{0.5, 10, 0.1\}$, respectively.
 From these values, two broad types of conclusion can be drawn.
 
-<!-- FIXME (RAPHAEL): the two list items below are both numbered "1." — should this enumeration be "1." and "2."? (the text says "two broad types of conclusion"). -->
-
 1. Conclusions comparing individuals:
 
 * The corresponding ranks for $\{i,j,k\}$ are $\{2,3,1\}$.
 * $k$ has the lowest risk and $j$ the highest risk.
 * The risk of $i$ is slightly higher than that of $k$, whereas $j$'s risk is substantially higher than both.
 
-1. Conclusions comparing risk groups:
+2. Conclusions comparing risk groups:
 
 * Thresholding at $0.4$ classifies $k$ as low-risk and $i$ and $j$ as high-risk.
 * Thresholding at $1.0$ classifies $i$ and $k$ as low-risk and $j$ as high-risk.
@@ -147,12 +145,10 @@ $$
 From these values alone, it is not immediately obvious which individual would be considered at higher risk.
 The corresponding cumulative hazards are,
 
-<!-- FIXME (RAPHAEL): the $\hatH$ values below do not match the $\hatS$ values under $\hatH=-\log\hatS$ (the definition just above). E.g. $-\log(0.8)=0.22$ (not 0.10), $-\log(0.4)=0.92$ (not 0.40), $-\log(0.15)=1.90$ (not 0.82); for j: $-\log(0.6)=0.51$, $-\log(0.4)=0.92$, $-\log(0.35)=1.05$. Correct values: $\hatH_i=(0,0.22,0.92,1.90)$, $\hatH_j=(0,0.51,0.92,1.05)$, with sums 3.04 and 2.48 and ratio ~1.23 (so the "~1.2x higher" conclusion still holds, but the H values and the sums 1.32/1.08 below need updating). -->
-
 $$
 \begin{aligned}
-&(\tau, \hatH_i(\tau)) = (0, 0), (1, 0.10), (2, 0.40), (3, 0.82), \\
-&(\tau, \hatH_j(\tau)) = (0, 0), (1, 0.22), (2, 0.40), (3, 0.46).
+&(\tau, \hatH_i(\tau)) = (0, 0), (1, 0.22), (2, 0.92), (3, 1.90), \\
+&(\tau, \hatH_j(\tau)) = (0, 0), (1, 0.51), (2, 0.92), (3, 1.05).
 \end{aligned}
 $$
 
@@ -160,8 +156,8 @@ Using the expected mortality approach yields relative risk scores of
 
 $$
 \begin{aligned}
-&\sum_{\tau \in \calT} \hatH_i(\tau) = 0 + 0.10 + 0.40 + 0.82 = 1.32, \\
-&\sum_{\tau \in \calT} \hatH_j(\tau) = 0 + 0.22 + 0.40 + 0.46 = 1.08.
+&\sum_{\tau \in \calT} \hatH_i(\tau) = 0 + 0.22 + 0.92 + 1.90 = 3.01, \\
+&\sum_{\tau \in \calT} \hatH_j(\tau) = 0 + 0.51 + 0.92 + 1.05 = 2.48.
 \end{aligned}
 $$
 
@@ -206,8 +202,11 @@ The reverse transformation, from ranking to survival time, is generally not poss
 
 ### Times and distributions
 
-Moving from a survival time to a distribution prediction\index{survival distribution} is uncommon: given the availability of models that directly predict distributions and the difficulty of evaluating survival time predictions, there is little reason to do so.
-It is nonetheless _possible_, as in regression settings, to construct a distribution around a central estimate $\hatt$ by assuming a parametric form --- for example $\operatorname{TruncatedNormal}(\hatt, \sigma, a=0, b=\infty)$, with $\sigma$ an assumed or estimated standard deviation --- but such constructions rely on strong assumptions and are rarely used in practice.
+Moving from a survival time to a distribution prediction\index{survival distribution} is uncommon.
+Given the availability of models that directly predict survival distributions, and the difficulty of evaluating survival time predictions, there is little motivation for this transformation.
+It is nonetheless _possible_, as in regression settings, to construct a distribution around a central estimate $\hatt$ by assuming a parametric form.
+For example, one could use a truncated Normal distribution on $\NNReals$ with location $\hatt$ and standard deviation $\sigma$, where $\sigma$ is assumed or estimated.
+Such constructions depend on strong distributional assumptions and are rarely used in practice.
 
 It is more common to reduce a prediction from a probability distribution to a survival time by attempting to compute the mean or median of the distribution.
 When there is no censoring, the expected survival time can be computed from the survival function using the 'Darth Vader rule'\index{Darth Vader rule} [@Muldowney2012],
@@ -289,11 +288,19 @@ As a result, the RMST difference over the six-year horizon remains modest, even 
 ## Prognostic index predictions {#sec-survtsk-PI}
 
 In medical terminology, a _prognostic index_\index{prognostic index} is a quantity that summarizes an individual's risk of experiencing the event of interest based on observed risk factors.
-Therefore, as a summary of risk, a prognostic index prediction is simply another term for a relative risk (@sec-survtsk-risk).
+A prognostic index is closely related to a relative risk score (@sec-survtsk-risk), but the two terms emphasize different aspects of the prediction.
+A relative risk score is any scalar prediction whose ordering reflects relative risk.
+A prognostic index _additionally_ emphasizes an interpretable model-specific mapping from covariates to that scalar prediction.
 
-<!-- FIXME (RAPHAEL): I still don't get why this has to be a linear model. Why can't $\eta$ be produced by any ML model, i.e. $\eta = g(x)$, rather than restricting to the linear predictor $\XX\bsbeta$? -->
-The term is primarily useful when used specifically in reference to simple linear models.
-In these cases, a prognostic index is any scalar function $\psi$ applied to the _linear predictor_\index{linear predictor},  $\bseta := \XX\bsbeta$ where $\XX \in \Reals^{n \times p}$ are covariates and $\bsbeta \in \Reals^p$ are model coefficients.
+Formally, a prognostic index is
+
+$$
+\hat{r}_i = \psi(\hatg(\xx_i)),
+$$
+
+where $\hatg:\calX \rightarrow \Reals$ maps covariates to a scalar model output, and $\psi$ is a transformation chosen so that the resulting quantity has the desired scale, sign, and interpretation.
+For simple linear models, the prognostic index is a transformation of the _linear predictor_\index{linear predictor},  $\eta_i := \xx_i^\trans\bsbeta$ where $\xx_i \in \Reals^p$ are covariates and $\bsbeta \in \Reals^p$ are model coefficients.
+For more flexible machine learning models, $\hatg$ may be non-linear and need not have an explicit linear-predictor form.
 
 A prognostic index can serve several purposes, including:
 
@@ -309,7 +316,7 @@ A prognostic index is naturally interpreted as a relative risk score\index{relat
 When used in this way, it is essential that both the magnitude and sign of the index align with the convention adopted above, meaning that larger values must correspond to a higher risk of experiencing the event.
 
 The reverse transformation, from risk score to prognostic index, does not hold in general.
-For example, models introduced in @sec-svm and @sec-boost directly predict risk scores that cannot be expressed as transformations of covariates\index{gradient boosting machines}\index{support vector machines}.
+For example, models introduced in @sec-svm and @sec-boost directly predict risk scores that are useful for ranking individuals but do not necessarily have an immediate covariate-level interpretation\index{gradient boosting machines}\index{support vector machines}.
 Therefore, reporting a prognostic index emphasizes that the predicted quantity is interpretable in its own right, much like a survival time prediction\index{survival time}.
 
 There is no direct mapping between a prognostic index and survival time.
@@ -325,12 +332,10 @@ The manner in which these components are combined is algorithm-specific and disc
 As a concrete illustration, one class of models known as 'proportional hazards models'\index{proportional hazards} (described in full in @sec-classical-cox), construct survival predictions of the form
 
 $$
-S_{PH}(\tau \mid \xx_i)= S_0(\tau)^{\exp(\eta_i)},
+S_{PH}(\tau \mid \xx_i)= S_0(\tau)^{\exp(\hatg(\xx_i))},
 $$
 
-where $S_0(\tau)$ is known as the baseline survival function\index{baseline survival function}, $\eta_i$ is the individual's linear predictor\index{linear predictor} and $\exp(\eta_i)$ serves as a prognostic index\index{prognostic index}.
-
-<!-- FIXME (RAPHAEL): to my previous point, this is exactly the case where $\eta_i$ could be replaced by a boosting or neural-network predictor (i.e. $\eta_i = g(\xx_i)$) before the Breslow estimator is applied — so it need not be a linear predictor. -->
+where $S_0(\tau)$ is known as the baseline survival function\index{baseline survival function}, $\hatg(\xx_i)$ is the model prediction, and $\exp(\hatg(\xx_i))$ serves as a prognostic index\index{prognostic index}.
 
 ## Conclusion
 
@@ -357,9 +362,6 @@ where $S_0(\tau)$ is known as the baseline survival function\index{baseline surv
 
 * @Sonabend2022 and @Haider2020 discuss methods for transforming survival distribution predictions into relative risks and survival times.
 * For deeper discussion of the restricted mean survival time, see @Uno2014, @Han2022, and @Royston2011.
-* @VanHouwelingen2007 provides a comprehensive overview of dynamic survival prediction settings in which models are updated over time.
-<!-- FIXME (RAPHAEL): why do we need the Van Houwelingen dynamic-prediction reference here? Dynamic prediction isn't discussed in this chapter — does it belong in the further reading for the survival task? -->
-
 * @Kalbfleisch1980 offers a more theoretical perspective on the relationships between prediction types.
 * See @Candido2017 for a real-world example of how survival distribution predictions can be computed in a healthcare setting.
 
