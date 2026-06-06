@@ -10,7 +10,7 @@ abstract: This chapter introduces pseudo-value regression as a flexible reductio
 
 {{< include _wip_minor.qmd >}}
 
-Pseudo-value-based approaches are relatively new to survival analysis [see @Andersen2010 for an overview] but have quickly gained traction due to their flexibility and ease of application. 
+Pseudo-value-based approaches were introduced to survival analysis by @andersen2003generalisedlinear [see @Andersen2010 for an overview] and have since gained traction due to their flexibility and ease of application.
 This approach allows regression learners to be used to make predictions for transformed survival data, conditional on covariates, after both censored and uncensored survival times are transformed to *pseudo-values*.
 This reduction has two steps.
 Firstly, the survival outcomes $(\tt, \bsdelta)$ are transformed to 'pseudo-values' $\bstheta$, termed because they are not identical to the outcome of interest but behave similarly in expectation.
@@ -28,7 +28,7 @@ $${#eq-pseudo-value}
 
 Thus, the calculation of all pseudo-values, $\dvec{\theta}{n}$, requires $n+1$ estimates of the univariate estimator ($n$ calculations of $\hat\psi^{-i}(\tau)$ and one calculation of $\hat\psi(\tau)$) per $m$ time points of interest, leading to $m(n+1)$ total calculations.
 This may seem prohibitive, but calculation of univariate estimators are usually very fast, and methods that use efficient approximations have been proposed in the literature [@parnerRegressionModelsCensored2023; @bouaziz2023fastapproximations].
-Furthermore, pseudo-value analysis is most commonly used only when a few time points are of interest so $m$ is small.
+Furthermore, pseudo-value analysis is most commonly used only when a few time points are of interest so $m$ is small, which is usually enough unless a fine grained estimation of the distribution is of interest.
 
 Pseudo-values have two key properties that motivate their use as regression targets.
 First, by construction the empirical mean of the pseudo-values equals the global, featureless estimate,
@@ -49,23 +49,23 @@ This approximate unbiasedness is what justifies regressing $\theta_i$ on $\xx_i$
 The relationship between features $\xx_i$ and pseudo-values $\theta_i(\tau)$ is then learned through a regression model, fitted separately for each $\tau$ of interest,
 <!--  -->
 $$
-E[\theta_i(\tau)\mid\xx_i] = h(f_{\tau}(\xx_i)),
+E[\theta_i(\tau)\mid\xx_i] = r(f_{\tau}(\xx_i)),
 $$ {#eq-pseudo-value-expectation-2}
 <!--  -->
 where $f_{\tau}(\xx_i)$ is a function of the features $\xx_i$ that is learned by the model; for example, $f_{\tau}(\xx_i) = \xx_i^\top\bsbeta_{\tau}$ for linear regression.
 The subscript $\tau$ indicates that the function is different for each time point $\tau$.
-The function $h(\cdot)$ is a given response (or 'link') function that maps the predictor to the target space; for example, the identity or sigmoid functions.
+The function $r(\cdot)$ is a known *response function* that maps the predictor to the target space; its inverse $r^{-1}(\cdot)$ is the *link function* familiar from generalized linear models. Examples include the identity (linear regression) and the sigmoid (binary regression).
 The response function is required as pseudo-values can take any value on $\Reals$ but the target quantity of interest might be constrained to a smaller set, for example survival probabilities must be within $[0,1]$.
 The response function may be estimated during model fitting, as in generalized estimating equations [@hardinGeneralizedEstimatingEquations2012], or applied to the raw predictions as in many machine learning methods.
 
 It follows from (@eq-pseudo-value-expectation-1) and (@eq-pseudo-value-expectation-2) that the fitted regression models can be used to make predictions of the quantity of interest conditional on covariates from new data $\xx^*$,
 
 $$
-\hat\theta(\tau\mid\xx^*) = \hat{\psi}(\tau\mid\xx^*) = h(\hat{f}_{\tau}(\xx^*)).
+\hat\theta(\tau\mid\xx^*) = \hat{\psi}(\tau\mid\xx^*) = r(\hat{f}_{\tau}(\xx^*)).
 $$
 
-The following sections introduce concrete examples assuming $h(f(\xx)) = f(\xx)$ for illustration: survival probabilities (@sec-pseudo-value-S) and the restricted mean survival time (@sec-pseudo-value-rmst).
-The choice of $h$ is then discussed in @sec-pseudo-value-response-function, where its consequences for estimation and the interpretation of covariate effects are spelled out.
+The following sections introduce concrete examples assuming $r(f(\xx)) = f(\xx)$ for illustration: survival probabilities (@sec-pseudo-value-S) and the restricted mean survival time (@sec-pseudo-value-rmst).
+The choice of $r$ is then discussed in @sec-pseudo-value-response-function, where its consequences for estimation and the interpretation of covariate effects are spelled out.
 Finally, @sec-pseudo-value-eha extends this reduction to competing risks and multi-state models.
 
 ## Pseudo-values for survival probability {#sec-pseudo-value-S}
@@ -107,7 +107,7 @@ $$
 \hat{\theta}(\tau) = \hat{S}(\tau|\xx_i) = \hat{\beta}_{\tau,0} + \hat{\beta}_{\tau,1} x_{i,1},\quad x_{i,1} = \II(\text{complications}_i = \text{`yes'}),
 $$ {#eq-pseudo-value-S-lm-complications}
 
-for time points $\tau \in \{1000, 2000, 3000\}$ days and let the response be the identity function, $h(x) = x$. 
+for time points $\tau \in \{1000, 2000, 3000\}$ days and let the response be the identity function, $r(x) = x$. 
 
 The results are shown in @fig-pseudo-lm, where the black dots indicate the survival probability predictions from (@eq-pseudo-value-S-lm-complications) and the solid lines are Kaplan-Meier estimates of the survival probabilities. 
 The Kaplan-Meier estimates visualized in the solid lines are stratified by the 'complication' variable, though the usual unstratified, univariate Kaplan-Meier is used for the pseudo-value calculations.
@@ -122,13 +122,14 @@ This interpretability also carries to other time-points, for example at $\tau = 
 
 Of course, if the data only contained a single, discrete feature, then a stratified Kaplan-Meier estimator could be used instead of the pseudo-value approach.
 So as a final illustration, consider adding age to the model,
+
 $$
-\begin{align}
+\begin{aligned}
 \hat{S}(\tau|\xx_i) = \hat{\beta}_{\tau,0} + \hat{\beta}_{\tau,1} x_{i,1} + \hat{\beta}_{\tau,2} x_{i,2},\\ \quad x_{i,1} = \II(\text{complications}_i = \text{`yes'}), x_{i,2} = \text{age}_i,
-\end{align}
+\end{aligned}
 $$
 
-assume again $h(f(\xx)) = f(\xx)$.
+assume again $r(f(\xx)) = f(\xx)$.
 The resulting estimates are in @tbl-pseudo-lm-age, where the effects of age and complications are calculated for each time-point $\tau \in \{1000, 2000, 3000\}$ days separately.
 
 | $\tau$|     $\hat{\beta}_{\tau,1}$| $\hat{\beta}_{\tau,2}$|
@@ -170,7 +171,7 @@ $$
 $$
 <!--  -->
 
-and again assume $h(f(\xx)) = f(\xx)$ for simplicity.
+and again assume $r(f(\xx)) = f(\xx)$ for simplicity.
 
 For time point $\tau = 1000$ days, the estimated coefficient is $\hat{\beta}_1 \approx -239$. 
 Thus, the expected RMST for patients with complications is reduced by around 239 days, which is similar to the result obtained from the Kaplan-Meier analysis in @fig-pseudo-rmst. 
@@ -184,24 +185,24 @@ where $x_{i,1}$ as before and $x_{i,2}$ is the age of subject $i$. The respectiv
 
 ## Choice of Response Function {#sec-pseudo-value-response-function}
 
-The examples in @sec-pseudo-value-S and @sec-pseudo-value-rmst assumed the identity link, $h(f(\xx)) = f(\xx)$, for simplicity.
-In general the response function $h(\cdot)$ in (@eq-pseudo-value-expectation-2) is a modeling choice with two distinct but related consequences: how the model is estimated, and how covariate effects are interpreted.
+The examples in @sec-pseudo-value-S and @sec-pseudo-value-rmst assumed the identity response, $r(f(\xx)) = f(\xx)$, for simplicity.
+In general the response function $r(\cdot)$ in (@eq-pseudo-value-expectation-2) is a modeling choice with two distinct but related consequences: how the model is estimated, and how covariate effects are interpreted.
 
 ### Post-hoc vs. embedded applications
 
-The simplest approach is to apply $h(\cdot)$ post-hoc: fit a regression model on the raw pseudo-values (e.g., minimizing squared error) and then transform the predictions.
+The simplest approach is to apply $r(\cdot)$ post-hoc: fit a regression model on the raw pseudo-values (e.g., minimizing squared error) and then transform the predictions.
 This is straightforward and works with any off-the-shelf regression method, but the optimization objective no longer corresponds to the final target space.
-For example, when $h(\cdot)$ is the sigmoid, a model trained with squared error on pseudo-values $\theta_i \in \Reals$ will not necessarily minimize the error of the final probabilities $h(\hat{f}_\tau(\xx)) \in [0,1]$.
+For example, when $r(\cdot)$ is the sigmoid, a model trained with squared error on pseudo-values $\theta_i \in \Reals$ will not necessarily minimize the error of the final probabilities $r(\hat{f}_\tau(\xx)) \in [0,1]$.
 
-The alternative is to embed $h(\cdot)$ into the fitting process by modifying the loss function.
+The alternative is to embed $r(\cdot)$ into the fitting process by modifying the loss function.
 For models that support custom loss functions, such as gradient boosting or neural networks, this is particularly natural [@Friedman2001].
 For example, when the target is a survival probability, one can use the binary cross-entropy loss
 $$
-\ell(\theta_i, f_\tau(\xx_i)) = -\left[\theta_i \log h(f_\tau(\xx_i)) + (1 - \theta_i) \log(1 - h(f_\tau(\xx_i)))\right],
+\ell(\theta_i, f_\tau(\xx_i)) = -\left[\theta_i \log r(f_\tau(\xx_i)) + (1 - \theta_i) \log(1 - r(f_\tau(\xx_i)))\right],
 $$
-where $h(\cdot)$ is the sigmoid and $f_\tau(\xx_i)$ is the model output on the logit scale.
+where $r(\cdot)$ is the sigmoid and $f_\tau(\xx_i)$ is the model output on the logit scale.
 This approach ensures the gradient updates during training are consistent with the final probability scale, which can improve calibration and estimation [@Hothorn2021].
-For RMST targets, which take values in $[0, \tau]$, the log link $h(f) = \exp(f)$ is a natural choice that guarantees positive fitted values and yields coefficients interpretable as log-RMST ratios [@andersen2004regressionanalysis; @Sachs2022].
+For RMST targets, which take values in $[0, \tau]$, the log link, equivalently the response $r(f) = \exp(f)$, is a natural choice that guarantees positive fitted values and yields coefficients interpretable as log-RMST ratios [@andersen2004regressionanalysis; @Sachs2022].
 
 Identity or post-hoc transformations are usually sufficient when the pseudo-values are not too close to the boundary of the target space (such as near $0$ or $1$ when estimating probabilities), and may be preferred for simplicity.
 Embedded applications are recommended when calibration is critical or when the pseudo-values vary widely.
@@ -212,7 +213,7 @@ The response function also determines how estimated feature effects are to be in
 @tbl-pseudo-link-interpretation summarizes the most common choices when estimating survival probabilities, along with their interpretations after the response function is applied; all assume a linear fitted model, $\hat{f}_{\tau}$, for the features with coefficients $\hat{\bsbeta}_\tau$.
 The same principles apply when using interpretable machine learning methods for black-box models instead [@Molnar2019; @Langbein2025].
 
-| Link $h^{-1}(\hat{\psi})$ | **Response** $h(\hat{f}_{\tau}(\xx))$ | Interpretation of $\hat{\beta}_{\tau;j}$ |
+| Link $r^{-1}(\hat{\psi})$ | **Response** $r(\hat{f}_{\tau}(\xx))$ | Interpretation of $\hat{\beta}_{\tau;j}$ |
 |---|---|---|
 | Identity<br>$\hat{\psi}$ | Identity<br>$\hat{f}_{\tau}(\xx)$ | Absolute difference in $\hat{\psi}(\tau\mid\xx)$ per unit increase in $x_j$ |
 | Logit<br>$\log\frac{\hat{\psi}}{1-\hat{\psi}}$ | Sigmoid<br>$\left[1+\exp(-\hat{f}_{\tau}(\xx))\right]^{-1}$ | Log-odds ratio for the event at $\tau$; $e^{\hat{\beta}_{\tau;j}}$ is an odds ratio |
