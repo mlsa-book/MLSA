@@ -1,5 +1,5 @@
 ---
-abstract: This chapter introduces the core concepts needed to formulate, model, and evaluate survival analysis problems. It begins by defining event-time distributions in continuous and discrete time, including survival, hazard, cumulative hazard, and their relationships. The chapter then formalizes single-event right-censored data through observed outcome times, event indicators, risk sets, and ordered event times. It distinguishes major censoring mechanisms, including right-, left-, and interval-censoring, and explains why assumptions about the dependence between censoring, covariates, and event times are central to valid modeling. Truncation is contrasted with censoring, with particular attention to left-truncation, delayed entry, and right-truncation in retrospective sampling. The chapter also introduces likelihood-based estimation under censoring and truncation, non-parametric estimators such as Kaplan-Meier and Nelson-Aalen, extensions to left-truncated data, and Turnbull's nonparametric maximum likelihood estimator for interval-censored data. Finally, it describes estimation of the censoring distribution and inverse probability of censoring weighting, which are key tools for evaluating survival models under incomplete observation.
+abstract: This chapter introduces the core concepts needed to formulate, model, and evaluate survival analysis problems. It begins by defining event-time distributions in continuous and discrete time, including survival function, hazard, cumulative hazard, and their relationships. The chapter then formalizes single-event right-censored data through observed outcome times, event indicators, risk sets, and ordered event times. It distinguishes major censoring mechanisms, including right-, left-, and interval-censoring, and explains why assumptions about the dependence between censoring, covariates, and event times are central to valid modeling. Truncation is contrasted with censoring, with particular attention to left-truncation, delayed entry, and right-truncation in retrospective sampling. The chapter also introduces likelihood-based estimation under censoring and truncation, non-parametric estimators such as Kaplan-Meier and Nelson-Aalen, extensions to left-truncated data, and Turnbull's nonparametric maximum likelihood estimator for interval-censored data. Finally, it describes estimation of the censoring distribution and inverse probability of censoring weighting, which are key tools for evaluating survival models under incomplete observation.
 ---
 
 ::: {.content-visible when-format="html"}
@@ -69,7 +69,7 @@ S_Y(\tau) = \Pr(Y > \tau) = \int^\infty_\tau f_Y(u) \ \du,
 $$ {#eq-surv-prob}
 
 which is the probability that an event has not occurred by $\tau \geq 0$ and thus the complement of the cumulative distribution function: $S_Y(\tau) = 1-F_Y(\tau)$.
-By definition, $S_Y(0)=1$ and $S(\tau)\rightarrow 0$ for $\tau \rightarrow \infty$ (handling when this is not the case is discussed at the end of this section).
+By definition, $S_Y(0)=1$, and $S(\tau)\rightarrow 0$ as $\tau \rightarrow \infty$ for a proper event-time distribution; the case where it does not (an *improper* distribution) is discussed at the end of this section.
 
 The hazard function is given by,
 $$
@@ -87,7 +87,7 @@ This is not a probability and $h_Y$ can be greater than one.
 It is worth noting two particular points about the hazard function.
 First, the hazard is a rate per unit time, which means its numerical value depends on the scale on which $\tau$ is measured.
 A hazard of $0.01$ on a daily scale equals $3.65$ on an annual scale for the same underlying process. 
-Second, hazards are the natural modelling target in survival analysis because censoring affects them locally.
+Second, hazards are the natural modeling target in survival analysis because censoring affects them locally.
 At a given $\tau$, only the subjects still at risk contribute to the hazard rate, so it can be estimated from the event and risk-set counts at that time point alone.
 The full survival trajectory up to $\tau$ is not required, which would itself require uncensored follow-up over $[0, \tau]$.
 For a book-length treatment of the hazard rate and its uses, see @rinneHazardRateTheory2014.
@@ -119,7 +119,7 @@ Unless necessary to avoid confusion, subscripts are dropped from $S_Y, h_Y$ etc.
 
 The formal definitions above take $Y$ to be a *proper* random variable\index{proper distribution}, which means $S_Y(\tau) \to 0$ as $\tau \to \infty$.
 However, many real-world events are *improper* at the population level\index{improper distribution}, $S_Y(\infty) = \pi_0 > 0$, which practically means the event is not guaranteed to occur.
-To continue an example from the introduction, when modelling the time between relapses from multiple sclerosis, not every patient will experience a relapse.
+To continue an example from the introduction, when modeling the time between relapses from multiple sclerosis, not every patient will experience a relapse.
 The value $\pi_0$ is known as the _cure fraction_, for a full treatment of _cure models_ see [@Maller1996; @Lambert2007]\index{cure models}.
 
 In practice, for the predictive targets in this book, improper distributions are rarely an obstacle as predictions live on a finite horizon $[0, \tau^*]$ on which $S(\tau)$ and $h(\tau)$ are well-defined regardless of properness of $Y$ when $\tau \in [0, \tau^*]$.
@@ -156,11 +156,9 @@ Conditional on survival to $\tau$, the event either occurs at or after $\tau$, a
 $$
 s_{\tilde{Y}}(\tau) = 1 - h_{\tilde{Y}}(\tau).
 $$
-<!-- FIXME (ANDREAS): I ADDED THE EXTRA LINE BECAUSE THE RELATIONSHIP WASN'T IMMEDIATELY OBVIOUS TO ME -->
 
 It follows that the unconditional probability to survive beyond time point $\tau$ is given by,
 
-<!-- FIXME (ANDREAS): CHANGED TAU TO K IN PARENTHESES - CHECK THIS FIX IS CORRECT -->
 <!--  -->
 $$
 S_{\tilde{Y}}(\tau) = \Pr(\tilde{Y} > \tau) = \prod_{k\leq\tau} s_{\tilde{Y}}(k) = \prod_{k\leq\tau}(1-h_{\tilde{Y}}(k)),
@@ -317,7 +315,7 @@ Right-censoring is the most common form of censoring in survival data\index{cens
 It occurs when the event of interest was not experienced during the observation period, which may happen because it was no longer observable (for example, due to withdrawal from the study) or because the event did not happen until study end.
 The exact event time is unknown but it *is* known that the event happened after the observed censoring time, hence *right*-censoring (imagine a timeline from left to right as in @fig-survset-censor).
 
-![Right-censoring for four subjects. Solid lines mark observed periods, dotted lines mark hypothetical (unknown in reality) post-censoring continuations. The vertical dashed line marks the end of the study. Filled black circles mark observed events, filled black diamonds mark true (unobserved) event times, and open circles mark censoring. Subject 1's event is observed during the study. Subject 2 is censored during the study and would have died during the study (unobserved). Subject 3 is censored early in the study and dies after study end (unobserved). Subject 4 is administratively censored at study end and dies later (unobserved).](Figures/survival/censoring.png){#fig-survset-censor fig-alt="Time on the x-axis (study start to study end), four subjects on the y-axis. Subject 1 has a solid line until a solid black circle indicating a fully observed event. Subject 2 has a solid line until a white circle then a dashed line to a solid diamond before study end, indicating that whilst their event did happen within the study window it was not observed due to censoring. Subject 3 also drops out during the study period but their unobserved event time happens after the study end. Finally, subject 4 is fully observed until the end of the study and then after the study they experience the event."}
+![Right-censoring for four subjects. Solid lines mark observed periods, dotted lines mark hypothetical (unknown in reality) post-censoring continuations. The vertical dashed line marks the end of the study. Filled black circles mark observed events, filled black diamonds mark true (unobserved) event times, and open circles mark censoring. Subject 1's event is observed during the study. Subject 2 is censored during the study and would have died during the study (unobserved). Subject 3 is censored early in the study and dies after study end (unobserved). Subject 4 is administratively censored at study end and dies later (unobserved).](Figures/survival/censoring.png){#fig-survset-censor fig-alt="Time on the x-axis (study start to study end), four subjects on the y-axis. Subject 1 has a solid line until a solid black circle indicating a fully observed event. Subject 2 has a solid line until a white circle then a dashed line to a solid diamond before study end, indicating that while their event did happen within the study window it was not observed due to censoring. Subject 3 also drops out during the study period but their unobserved event time happens after the study end. Finally, subject 4 is fully observed until the end of the study and then after the study they experience the event."}
 
 Right-censoring can be further divided into type I\index{censoring!type I}, type II\index{censoring!type II} and random censoring\index{censoring!random}.
 
@@ -339,7 +337,7 @@ In practice, these different types of right-censoring are usually handled the sa
 Left-censoring\index{censoring!left} occurs when the event is known to have happened at some unknown time before the observation time. 
 Interval-censoring\index{censoring!interval} occurs when the event is known to have happened within some time range, but the exact time is unknown.
 
-Consider a survey participants are asked "how old were you when you used a smart phone for the first time?".
+Consider a survey in which participants are asked "how old were you when you used a smart phone for the first time?".
 The possible answers from a participant are:
 
   * the exact age of first use; or
@@ -356,7 +354,7 @@ Interval-censoring is pervasive in medicine whenever events are detectable only 
 For example, in HIV cohort studies the exact time of seroconversion is unknown; it lies in the interval between the last negative test and the first positive test [@Zhigang2010].
 Handling of interval-censoring depends on the modeling time scale.
 For example, consider a patient in the second year of the HIV cohort study who receives a positive test in July.
-If a predictive model is defined at the level of calendar years, then the event is exactly assigned to year $2$, effectively ignoring the within-year uncertainty which requires interval censoring.
+If a predictive model is defined at the level of calendar years, the event can be assigned to year $2$ and treated as observed, ignoring the within-year timing uncertainty that a finer time scale would have to handle as interval-censoring.
 More generally, if the chosen resolution is coarser than the typical interval width, interval-censored observations can be treated as approximately observed events at that scale.
 In all other cases, interval-censoring requires dedicated estimators (see @sec-surv-estimation).
 
@@ -376,13 +374,13 @@ Then, the event time of subject $i$ is:
 With this notation it is clear that right- and left-censoring are special cases of interval-censoring with left-censoring corresponding to $(0, t_i]$ and right-censoring corresponding to $(t_i, \infty)$.
 
 In the HIV seroconversion example above, $r_i$ is the time of the first positive test and $l_i$ the time of the last negative test before $r_i$.
-In the phone survey example, the participants might specify any age range between $0$ and $t_i$; some examples are given in (@tbl-censoring-phones).
-
-<!-- TODO (ANDREAS): I REMOVED T_I, AS YOU SAID ABOVE IT WAS UNNECESSARY AND I THINK IT MAKES IT HARDER TO FOLLOW -->
+In the phone survey example, suppose all participants are interviewed at age $18$. 
+A participant might then specify any age range between $0$ and $18$. 
+Some examples are given in (@tbl-censoring-phones).
 
 |id|$l_i$|$r_i$   | Description |
 |-|-|-|:--------- |
-|1 |13   |$\infty$| First use sometime after $13$ (right-censored) |
+|1 |18   |$\infty$| No use yet at $18$ (right-censored) |
 |2 |15   |15      | First use at $15$ (event) |
 |3 |14   |16      | First use sometime between $14$ and $16$ (interval-censored) |
 |4 |0    |18      | First use sometime before $18$ (left-censored) |
@@ -390,7 +388,7 @@ In the phone survey example, the participants might specify any age range betwee
 : Examples of censoring notation using age at first smart phone use. {#tbl-censoring-phones}
 
 An interesting distinction to note is that in the case of left- and interval-censoring, it is _guaranteed_ that the event occurred, either before the left-censoring time or within the given interval.
-In the case of right-censoring, it is usually _assumed_ the event will occur in $(t_i, \infty)$ (@sec-distributions-continuous); under this assumption, censoring encodes _when_ the event occurs, not _if_.
+In the case of right-censoring, it is usually _assumed_ the event will occur in $(t_i, \infty)$ (@sec-distributions-continuous); under this assumption, censoring encodes uncertainty about _when_ the event occurs, not uncertainty about _whether_ the event occurs.
 
 ### Independent and dependent censoring
 
@@ -407,24 +405,23 @@ Marginally independent censoring is the strongest assumption and implies that ce
 In this setting, standard survival estimators can recover the underlying survival distribution without bias.
 However, censored observations still contain partial information and should not be discarded as doing so reduces efficiency and can introduce bias in finite samples.
 
-In reality, censoring is rarely completely independent as reasons for drop-out or missingness in outcomes tend to be related to the study of interest.
-Event-dependent censoring, when $C \not\!\perp\!\!\!\perp Y$, is a tricky case that, if not handled appropriately can easily lead to poor model development.
-Imagine a study is interested in predicting the time between relapses of stroke but a patient suffers a brain aneurysm due to some separate neurological condition.
-There is a high possibility that a stroke may have occurred if the aneurysm had not.
-A survival model is unlikely to distinguish the censoring event (aneurysm) from the event of interest (stroke) and will result in miscalibrated predictions.
-In such cases, these non-independent censoring events should actually be modelled as competing events\index{competing risks} (@sec-eha).
-
 The majority of models and measures assume conditionally event-independent censoring, meaning that once conditioned on observed features, the censoring time provides no additional information about the event time.
-As an example, if studying the survival time of pregnant patients in hospital, dropping out of the study due to pregnancy is clearly dependent on how many weeks pregnant the patient is when the study starts (for the sake of argument assume no early or late pregnancy due to illness).
-Type I and type II\index{censoring!type I}\index{censoring!type II} censoring (@sec-types-of-censoring-right) are usually conditionally event-independent because the censoring mechanism is determined by study design or stopping rules rather than the underlying event process.
-However, patients with a more favorable prognosis at study entry are often more likely to remain under observation for longer and therefore have a higher probability of censoring, illustrating that censoring may depend on covariates while still remaining conditionally event-independent.
+Type I and type II\index{censoring!type I}\index{censoring!type II} censoring (@sec-types-of-censoring-right) are usually conditionally event-independent, as the censoring mechanism is determined by study design or stopping rules rather than the underlying event process.
+Censoring can still depend on covariates while remaining conditionally event-independent: for example, patients with a more favorable prognosis at study entry are often more likely to remain under observation for longer and therefore have a higher probability of being censored.
+
+In reality, the mechanisms that prevent the event of interest from being observed are rarely independent, as drop-out, incomplete follow-up, and intervening events tend to be related to the outcome under study.
+Two cases have to be distinguished, dependent censoring and competing risks.
+Under _dependent_ (event-dependent) censoring\index{censoring!dependent}, $C \not\!\perp\!\!\!\perp Y$: the event of interest could still occur, but the censoring time itself carries information about when, so treating the censoring as independent leads to biased estimates and miscalibrated predictions.
+When the dependence is fully captured by measured covariates, that is, censoring is conditionally event-independent given those covariates, this bias can be corrected by reweighting observations [@RobinsFinkelstein2000] with inverse probability of censoring weights (@sec-surv-ipcw).
+A _competing risk_\index{competing risks}, by contrast, is an event whose occurrence precludes the event of interest from ever occurring, rather than merely ending its observation.
+Which of the two applies depends on the precise definition of the event of interest: discharge from hospital, for example, is often treated as a competing event because the event of interest, _in-hospital death_ during the current stay, can no longer occur once a patient has been discharged.
+Competing risks are discussed in more detail in @sec-eha.
 
 ## Censoring and truncation {#sec-truncation}
 Censoring and truncation\index{truncation} are related but distinct concepts and require substantially different methods to handle them.
 As discussed in @sec-intro, truncation in survival analysis refers to partially truncating a period of time and is quite common in the more general event history setting (@sec-eha).
-In particular, left truncations plays an important role when modeling recurrent events\index{recurrent events} or multi-state data\index{multi-state models} (@sec-multi-state).
-While censored observations have incomplete information about the time-to-event, they are still part of the dataset.
-Whereas truncation leads to observations not entering the dataset, or at least not at time $0$.
+In particular, left-truncation plays an important role when modeling recurrent events\index{recurrent events} or multi-state data\index{multi-state models} (@sec-multi-state).
+While censored observations have incomplete information about the time-to-event, they are still part of the dataset, whereas truncation leads to observations not entering the dataset at all.
 This usually introduces bias that must be resolved appropriately.
 
 ### Left-truncation {#sec-left-truncation}
@@ -434,9 +431,10 @@ This means observations have a subject-specific entry time, $t^\ell_i$, also kno
 Left-truncation has two important consequences for the observed data; let $t_i$ be the outcome time, then
 
 1. if the subject experiences the event _before_ their entry time, $t_i < t^\ell_i$, they never enter the dataset and so the sample is systematically biased toward longer event times;
-2. if the subject _does_ enter the study, $t_i \ge t^\ell_i$, then they are only observed from $\tau = t_i^\ell$ rather than $\tau = 0$ (known as *delayed entry*)\index{delayed entry}\index{selection bias}.
+2. if the subject _does_ enter the study, $t_i \ge t^\ell_i$, then they are only observed from $t_i^\ell > 0$ (known as *delayed entry*)\index{delayed entry}\index{selection bias}.
 
-Methods to handle these cases are discussed in @sec-surv-estimation-param and @sec-non-param-lt; failing to account for left-truncation results in biased estimators.
+Methods to handle these cases are discussed in @sec-surv-estimation-param and @sec-non-param-lt. 
+Failing to account for left-truncation results in biased estimators.
 
 For illustration, consider a study from the 18th century [@brostrom.influence.1987], when childhood and maternal mortality were relatively high.
 The goal of the study was to establish the effect of a mother's death on infant survival.
@@ -448,7 +446,7 @@ This is illustrated in @fig-left-truncation for three infants.
 For each infant, the upper bar shows the left-truncation time $t_i^\ell$ (age at the mother's death) and the lower bar the time-to-event $t_i$ (age at the infant's own death or, for infant 3, censoring at study end at 365 days).
 Infant 1's own death occurs before the mother's, so $t_1 < t_1^\ell$ and the infant never enters the dataset; both bars are drawn dotted to indicate they are not observed.
 Infants 2 and 3 enter the study at their respective $t_i^\ell$ and are then followed: infant 2 dies during the study at $t_2$, while infant 3 is alive at study end and is right-censored.
-In this example, left-truncation biases the sample towards healthier infants, as frail infants die earlier and thus on average before their mothers.
+In this example, left-truncation biases the sample toward healthier infants, as frail infants die earlier and thus on average before their mothers.
 
 ![Illustration of left-truncation for three infants. For each subject, the upper steel blue bar shows the truncation time $t_i^\ell$ (age at mother's death) and the lower black bar the time-to-event $t_i$ (age at own death or censoring). Solid lines mark in-sample subjects ($t_i^\ell < t_i$); dotted lines mark the invisible subject 1 ($t_1 < t_1^\ell$, infant dies before mother). The truncation bar ends in a filled steel blue circle for in-sample subjects and a filled steel blue diamond for the unobserved subject. The vertical dashed line marks the study end at age 365 days. Filled black circles, filled black diamonds, and open circles mark observed events, unobserved events, and right-censoring respectively.](Figures/survival/left-truncation.png){#fig-left-truncation fig-alt="Three subjects on the y-axis, each with two stacked horizontal bars on an age axis 0-365 days: the upper steel blue bar shows the truncation time and the lower black bar the time-to-event. Subject 1's bars are both dotted (never enters the sample) and the truncation bar ends in a filled steel blue diamond; subjects 2 and 3's bars are solid with their truncation bars ending in a filled steel blue circle, while the time-to-event bars end at a filled black circle (observed event at ~200 days) and an open circle (censoring at study end) respectively. A vertical dashed grey line marks the study end at 365 days."}
 
@@ -468,9 +466,9 @@ Thus, at the time of querying the database, this subject will not be included in
 Note the difference to right-censoring\index{censoring!right}.
 If subject 2 was right-censored, the subject would be in the sample with a known time of infection and the time of disease onset would be censored.
 In case of right-truncation on the other hand, the subject is not included in the sample at time of data extraction, as subjects are only included in the registry after disease onset.
-Overall this leads to a bias towards shorter incubation times and potentially feature values that lead to shorter incubation times.
+Overall this leads to a bias toward shorter incubation times and potentially feature values that lead to shorter incubation times.
 
-![Illustration of right-truncation for three subjects observed retrospectively from a disease registry. The x-axis is calendar time and subjects are recruited at staggered times (subject 1 at $t = 0$, subject 3 at $t = 5$, subject 2 at $t = 10$). For each subject, the upper steel blue bar runs from recruitment to the database query date (truncation time, $t_i^r$) and the lower black bar runs from recruitment to the event ($t_i$). Subjects 1 and 3 have $t_i < t_i^r$ (event before query) and are included in the registry (solid bars, truncation bar ending in a filled steel blue circle). Subject 2 has $t_2 > t_2^r$ (event after query), so they are absent from the registry — both bars are drawn dotted, the truncation bar ends in a filled steel blue diamond, and the unobserved event marker (filled black diamond) lies beyond the query line. The vertical dashed line marks the database-query date.](Figures/survival/right-truncation.png){#fig-right-truncation fig-alt="Three subjects on the y-axis, calendar time 0-32 days on the x-axis. Each subject has two stacked horizontal bars starting at their recruitment time: an upper steel blue bar (truncation time, ending at the database-query date) and a lower black bar (time-to-event). Subjects 1 and 3 have solid bars with the truncation bars ending in filled steel blue circles and observed-event circles before the query; subject 2 has dotted bars with the truncation bar ending in a filled steel blue diamond and the time-to-event extending past the query line and ending in an unobserved-event black diamond. A vertical dashed grey line marks the database-query date."}
+![Illustration of right-truncation for three subjects observed retrospectively from a disease registry. The x-axis is calendar time and subjects are recruited at staggered times (subject 1 at $\tau = 0$, subject 3 at $\tau = 5$, subject 2 at $\tau = 10$). For each subject, the upper steel blue bar runs from recruitment to the database query date (truncation time, $t_i^r$) and the lower black bar runs from recruitment to the event ($t_i$). Subjects 1 and 3 have $t_i < t_i^r$ (event before query) and are included in the registry (solid bars, truncation bar ending in a filled steel blue circle). Subject 2 has $t_2 > t_2^r$ (event after query), so they are absent from the registry — both bars are drawn dotted, the truncation bar ends in a filled steel blue diamond, and the unobserved event marker (filled black diamond) lies beyond the query line. The vertical dashed line marks the database-query date.](Figures/survival/right-truncation.png){#fig-right-truncation fig-alt="Three subjects on the y-axis, calendar time 0-32 days on the x-axis. Each subject has two stacked horizontal bars starting at their recruitment time: an upper steel blue bar (truncation time, ending at the database-query date) and a lower black bar (time-to-event). Subjects 1 and 3 have solid bars with the truncation bars ending in filled steel blue circles and observed-event circles before the query; subject 2 has dotted bars with the truncation bar ending in a filled steel blue diamond and the time-to-event extending past the query line and ending in an unobserved-event black diamond. A vertical dashed grey line marks the database-query date."}
 
 As for left-truncation\index{truncation!left}, ignoring right-truncation will lead to biased estimations.
 While for left-truncated data simple adjustments of the risk set\index{risk set} (see @sec-non-param-lt) work for non- and semi-parametric methods (see @sec-classical for example), this is not the case for right-truncated data.
@@ -507,8 +505,8 @@ $$
 \begin{aligned}
 \calL(\bstheta)
   & \propto \prod_{i \in \calO}f_Y(t_i \mid \bstheta)\prod_{i \in \mathcal{RC}}S_Y(t_i \mid \bstheta)\nonumber\\
-  & = \prod_{i=1}^n f_y(t_i \mid \bstheta)^{\delta_i}S_Y(t_i \mid \bstheta)^{1-\delta_i}\\
-  & = \prod_{i=1}^n \frac{f_y(t_i \mid \bstheta)^{\delta_i}}{S_Y(t_i \mid \bstheta)^{\delta_i}}S_Y(t_i \mid \bstheta)\\
+  & = \prod_{i=1}^n f_Y(t_i \mid \bstheta)^{\delta_i}S_Y(t_i \mid \bstheta)^{1-\delta_i}\\
+  & = \prod_{i=1}^n \frac{f_Y(t_i \mid \bstheta)^{\delta_i}}{S_Y(t_i \mid \bstheta)^{\delta_i}}S_Y(t_i \mid \bstheta)\\
   & = \prod_{i=1}^n h_Y(t_i \mid \bstheta)^{\delta_i}S_Y(t_i \mid \bstheta)\nonumber,
 \end{aligned}
 $$ {#eq-right-censoring-likelihood}
@@ -517,12 +515,12 @@ where the last equality follows from (@eq-continuous-hazard).
 Equivalently, training a model on right-censored data by minimizing the negative log of (@eq-right-censoring-likelihood) is the MLE view of the same objective.
 
 Similar adjustments to the likelihood can be made for other types of censoring and in the presence of truncation\index{censoring}\index{truncation}.
-Let $\mathcal{C}_i$ denote the event-time information implied by the observed censoring pattern, such that [@Klein2003],
+Let $\mathcal{C}_i$ denote the event-time information implied by the observed censoring pattern, such that the likelihood contribution of subject $i$[@Klein2003] is given by
 
 $$
 \Pr(\mathcal{C}_i \mid \bstheta) =
 \begin{cases}
-\Pr(Y_i = t_i \mid \bstheta) = f_Y(t_i \mid \bstheta),  & \text{observed event}, \\
+f_Y(t_i \mid \bstheta),  & \text{observed event}, \\
 \Pr(Y_i > t_i \mid \bstheta) = S_Y(t_i \mid \bstheta),  & \text{right-censoring}, \\
 \Pr(Y_i < t_i \mid \bstheta) = F_Y(t_i \mid \bstheta),  & \text{left-censoring}, \\
 \Pr(l_i < Y_i \leq r_i \mid \bstheta) = S_Y(l_i \mid \bstheta) - S_Y(r_i \mid \bstheta),  & \text{interval-censoring}.
@@ -558,19 +556,18 @@ $$
 \end{cases}
 $$ {#eq-likelihood-truncation}
 
-The various combinations formed by substituting (@eq-likelihood-censoring) and (@eq-likelihood-truncation) into (@eq-likelihood-combined) are summarized in @tbl-likelihood-combinations.
+The conditional contribution in (@eq-likelihood-combined) rests on an assumption of *independent truncation*\index{truncation!independent}: the truncation time is independent of the event time $Y_i$, in the same spirit as the independent-censoring assumption discussed above.
+This is what justifies using the marginal event-time distribution in (@eq-likelihood-truncation) and treating the truncation bound as fixed; if the truncation time itself depended on $Y_i$, conditioning on inclusion would no longer remove the resulting selection bias.
 
-<!-- FIXME (ANDREAS): GPT THINKS THE RIGHT-CENSORED/RIGHT-TRUNCATION CONTRIBUTION SHOULD BE $\frac{F_Y(t_i^r\mid\bstheta)-F_Y(t_i\mid\bstheta)}{F_Y(t_i^r\mid\bstheta)}$ -->
-<!-- FIXME (ANDREAS): GPT THINKS THE LEFT-CENSORED/LEFT-TRUNCATION CONTRIBUTION SHOULD BE $\frac{F_Y(t_i\mid\bstheta)-F_Y(t_i^\ell\mid\bstheta)}{S_Y(t_i^\ell\mid\bstheta)}$ -->
+In almost all settings encountered in practice, combining (@eq-likelihood-censoring) and (@eq-likelihood-truncation) simplifies (@eq-likelihood-combined) to
 
-  | Censoring type    | Left-truncation | Right-truncation |
-| --- | --- | --- |
-| Event             | $\displaystyle \frac{f_Y(t_i\mid\bstheta)}{S_Y(t_i^\ell\mid\bstheta)}$ | $\displaystyle \frac{f_Y(t_i\mid\bstheta)}{F_Y(t_i^r\mid\bstheta)}$ |
-| Right-censored    | $\displaystyle \frac{S_Y(t_i\mid\bstheta)}{S_Y(t_i^\ell\mid\bstheta)}$ | $\displaystyle \frac{S_Y(t_i\mid\bstheta)}{F_Y(t_i^r\mid\bstheta)}$ |
-| Left-censored     | $\displaystyle \frac{F_Y(t_i\mid\bstheta)}{S_Y(t_i^\ell\mid\bstheta)}$ | $\displaystyle \frac{F_Y(t_i\mid\bstheta)}{F_Y(t_i^r\mid\bstheta)}$ |
-| Interval-censored | $\displaystyle \frac{S_Y(l_i\mid\bstheta)-S_Y(r_i\mid\bstheta)}{S_Y(t_i^\ell\mid\bstheta)}$ | $\displaystyle  \frac{S_Y(l_i\mid\bstheta)-S_Y(r_i\mid\bstheta)}{F_Y(t_i^r\mid\bstheta)}$   |
+$$
+\calL_i(\bstheta) = \frac{\Pr(\mathcal{C}_i \mid \bstheta)}{\Pr(\mathcal{T}_i \mid \bstheta)},
+$$
 
-: Likelihood contributions adjusted for censoring and truncation. {#tbl-likelihood-combinations}
+that is, the censoring contribution divided by the probability of being included in the sample.
+This holds whenever every event time consistent with the observed censoring pattern already falls within the truncation window, as is the case for the common combinations such as left-truncated, right-censored data.
+The simplification only breaks down for a few unusual pairings, for example left-censored *and* left-truncated observations, where the censored region extends beyond the truncation boundary; the contribution must then be obtained from the overlap $\Pr(\mathcal{C}_i \cap \mathcal{T}_i \mid \bstheta)$ in (@eq-likelihood-combined). Such cases are rarely encountered.
 
 ### Non-parametric estimation {#sec-surv-estimation-non-param}
 
@@ -587,7 +584,7 @@ Define $\tilde{Y} = k \Leftrightarrow Y \in [t_{(k)},t_{(k+1)})$ as the discrete
 Using the quantities introduced in @sec-data-rc, the discrete-time hazard\index{hazard function} (@eq-discrete-hazard) is estimated as the ratio of the number of events occurring at $t_{(k)}$ (@eq-risk-set-d) to the number of subjects at risk at $t_{(k)}$ (@eq-risk-set-n),
 
 $$
-h_{\tilde{Y}}(k) = P\left(Y\in [t_{(k)},t_{(k+1)}) \mid Y \geq t_{(k)}\right)=\frac{d_{t_{(k)}}}{n_{t_{(k)}}}.
+h_{\tilde{Y}}(k) = \Pr\left(Y\in [t_{(k)},t_{(k+1)}) \mid Y \geq t_{(k)}\right)=\frac{d_{t_{(k)}}}{n_{t_{(k)}}}.
 $$ {#eq-disc-haz-non-param}
 
 The survival probability\index{survival function} and the definition of the Kaplan-Meier estimator (@eq-km) follow from (@eq-discrete-surv-prob),
@@ -602,7 +599,7 @@ In this book, $\KMS$ specifically refers to the Kaplan-Meier estimator fit on so
 
 For illustration, consider the `tumor` dataset from @sec-data-rc.
 @fig-km-tumor shows the estimated survival probability obtained by applying the Kaplan-Meier estimator to the full dataset, containing observations of $n=776$ subjects.
-By definition, the survival function starts at $S(\tau)=1$ at $\tau=0$ and monotonically decreases towards $S(\tau)=0$ for $\tau \rightarrow \infty$. 
+By definition, the survival function starts at $S(\tau)=1$ at $\tau=0$ and monotonically decreases toward $S(\tau)=0$ for $\tau \rightarrow \infty$. 
 However, follow-ups are usually not infinite and in the presence of censoring, the survival function may not reach 0 by the end of the observation period.
 For the Kaplan-Meier estimator specifically, $\KMS(t_{(m)}) = 0$ only if there are no censored observations at the last observed outcome time, or equivalently, $d_{t_{(m)}} = n_{t_{(m)}}$.
 
@@ -649,7 +646,7 @@ $$
 \calR_\tau^\ell = \{i: t_i^\ell \ \leq \tau \leq t_i \}, 
 $$ {#eq-risk-lt}
 
-where $t_i, t_i^\ell$ are the outcome time and left truncation time of observation $i$ respectively.
+where $t_i, t_i^\ell$ are the outcome time and left-truncation time of observation $i$ respectively.
 This definition excludes individuals from the risk set until their left-truncation time has occurred.
 
 The number of individuals at risk at $\tau$ is then the cardinality of (@eq-risk-lt),
@@ -694,26 +691,26 @@ Thus,
 * $n_{t_{(1)}}^\ell = 6$
 * $S(t_{(1)}) = 1 - \frac{1}{6} \approx 0.8$
 
-In the presence of left-truncation, $n_{t_{(k)}}^\ell \leq  n_{t_{(k)}}$ and therefore $S(t_{(k)})^\ell \leq S(t_{(k)})$.
+In the presence of left-truncation, $n_{t_{(k)}}^\ell \leq  n_{t_{(k)}}$ and therefore $S^\ell(t_{(k)}) \leq S(t_{(k)})$.
 
-<!-- FIXME (ANDREAS): SHOULDN'T THIS BE "SURVIVAL PROBABILITIES WERE OVERESTIMATED"? I THINK UNDER/OVERESTIMATED IS A BIT CONFUSING ANYWAY. COULD WE INSTEAD SAY SOMETHING CLEARER LIKE "LARGER" -->
-@fig-infants-lt shows the difference between estimated survival probabilities when left-truncation is ignored (left panel) and taken into account (right panel), respectively.
-It is clear that the survival probabilities were underestimated in both groups, but more so in the group of infants whose mother died (thereby underestimating the effect of the mothers' death on infant survival).
+@fig-infants-lt shows the estimated survival probabilities when left-truncation is ignored (left panel) and when it is accounted for (right panel).
+Consistent with $S^\ell(t_{(k)}) \leq S(t_{(k)})$, ignoring left-truncation yields larger survival estimates in both groups.
+The gap between the curves is more pronounced for infants whose mother died, so ignoring left-truncation also understates the effect of the mother's death on infant survival.
 
 ![Left: Kaplan-Meier estimate of survival probabilities of infants depending on status of the mother ignoring left-truncation. Right: Kaplan-Meier estimate of survival probabilities adjusting for left-truncation.](Figures/survival/km-infants.png){#fig-infants-lt fig-alt="Two plots both with two Kaplan-Meier curves. The left plot shows a red curve staying relatively close to S(t)=1 and a blue curve with plateauing quickly around S(t)=0.6. The right plot is very similar and the curves have the same shapes except both curves are lower indicating lower survival probabilities for each group."}
 
 #### Interval-censoring {.unnumbered .unlisted}
 For interval-censored\index{censoring!interval} data, the Kaplan-Meier\index{Kaplan-Meier estimator} estimator is replaced by the nonparametric maximum likelihood estimator (NPMLE)\index{nonparametric maximum likelihood estimator} [@Zhigang2010; @Sun2006]. The NPMLE maximizes the likelihood derived in @sec-surv-estimation-param under interval-censoring without assuming a parametric form for $S_Y$.
 
-Closed-form maximization is not available; the standard tool is Turnbull's\index{Turnbull estimator} iterative *self-consistency algorithm* [@Turnbull1976], a special case of the expectation-maximization algorithm in which the unobserved exact event times are latent data.
+Because closed-form maximization is not available, the standard tool is Turnbull's\index{Turnbull estimator} iterative *self-consistency algorithm* [@Turnbull1976], a special case of the expectation-maximization algorithm in which the unobserved exact event times are treated as latent data.
 The intuition is that an observation $i$ should only contribute to the estimated probability of an event at a candidate time $\tau$ if its interval $(L_i, R_i]$ could plausibly have contained that event.
 
 The idea is to first construct an ordered grid $0 = \tau_0 < \tau_1 < \cdots < \tau_m$ by pooling the data's interval endpoints $\{0\} \cup \{L_1, R_1, \ldots, L_n, R_n\}$ and dropping duplicates. 
 The candidate event times are the right endpoints of the grid intervals $(\tau_{k-1}, \tau_k]$.
-The NPMLE is a step function on this grid; only intervals contained in some observation interval $(L_i, R_i]$ can carry positive mass [@Peto1973; @Turnbull1976], and Algorithm 2 assigns zero mass to the rest automatically.
+The NPMLE is a step function on this grid. 
+Only intervals contained in some observation interval $(L_i, R_i]$ can carry positive mass [@Peto1973; @Turnbull1976], and Algorithm 2 assigns zero mass to the rest automatically.
 Note that the $\tau_k$ are *constructed* grid points, distinct from the observed ordered event times $t_{(k)}$ (@eq-unique-ordered-event-times) used for the right-censored Kaplan-Meier in @sec-surv-km.
-A convenient initial estimate $\hatS^{0}$ is the right-endpoint Kaplan-Meier (each finite, that is not right-censored, $R_i$ is an event time) [@Turnbull1974; @Giolo2004].
-<!-- FIXME: I DON'T UNDERSTAND "right-endpoint Kaplan-Meier (each finite, that is not right-censored, $R_i$ is an event time)" -->
+A convenient initial estimate $\hatS^{0}$ is the *right-endpoint Kaplan-Meier*: for every observation that is not right-censored (i.e., with finite $R_i$), the right endpoint $R_i$ of its censoring interval is used as a surrogate for the unknown event time, and the ordinary Kaplan-Meier estimator is then applied [@Turnbull1974; @Giolo2004].
 
 ::: {.callout-note icon=false}
 
@@ -721,7 +718,7 @@ A convenient initial estimate $\hatS^{0}$ is the right-endpoint Kaplan-Meier (ea
 
 **Inputs:** observed intervals $\{(L_i, R_i] : i = 1,\ldots,n\}$; tolerance $\epsilon$ (default $10^{-3}$).
 
-1. Construct the grid $\tau_0 < \cdots < \tau_m$ from the pooled endpoints. For each subject $i$ and grid index $k$, define the *plausibility indicator*
+**Initialization:** construct the grid $\tau_0 < \cdots < \tau_m$ from the pooled endpoints. For each subject $i$ and grid index $k$, define the *plausibility indicator*
 
 $$
 w_{ik} = \II\bigl((\tau_{k-1}, \tau_k] \subseteq (L_i, R_i]\bigr),
@@ -756,7 +753,7 @@ The estimator is constant on each grid interval $(\tau_{k-1}, \tau_k]$. For plot
 
 ::::
 
-For illustration of the initial step of the algorithm, consider three subjects with intervals $(0, 5]$, $(2, 8]$, and $(4, 10]$. Pooling the endpoints gives $\{0, 2, 4, 5, 8, 10\}$, so $m=5$ and $\tau_0 = 0$, $\tau_1 = 2$, $\tau_2 = 4$, $\tau_3 = 5$, $\tau_4 = 8$, $\tau_5 = 10$. The plausibility-indicator matrix $\{w_{ik}\}$ from step 1 is
+For illustration of the initial step of the algorithm, consider three subjects with intervals $(0, 5]$, $(2, 8]$, and $(4, 10]$. Pooling the endpoints gives $\{0, 2, 4, 5, 8, 10\}$, so $m=5$ and $\tau_0 = 0$, $\tau_1 = 2$, $\tau_2 = 4$, $\tau_3 = 5$, $\tau_4 = 8$, $\tau_5 = 10$. The plausibility-indicator matrix $\{w_{ik}\}$ from the initialization is
 
 | subject $i$ | $(L_i, R_i]$ | $w_{i,1}$ | $w_{i,2}$ | $w_{i,3}$ | $w_{i,4}$ | $w_{i,5}$ |
 |---|---|---|---|---|---|---|
@@ -803,11 +800,11 @@ $$
 w(\tau \mid \xx_i) = \frac{1}{S_C(\tau \mid \xx_i)},
 $$ {#eq-ipcw}
 
-where $S_C(\tau \mid \xx_i)$ is the survival function of the censoring time, that is, the probability that the observation is uncensored up until $\tau$.
+where $S_C(\tau \mid \xx_i) = \Pr(C > \tau \mid \xx_i)$ is the survival function of the censoring time $C$, that is, the probability that the observation is uncensored up until $\tau$.
 Over time, the probability of remaining uncensored decreases and hence the value of the weights increases.
 When evaluated at uncensored event times, as in the example below, observations that remain uncensored at later time points receive larger weights.
 
-Under the simplifying assumption that censoring is independent of the covariates, the censoring distribution is usually estimated with the Kaplan-Meier estimator (@sec-surv-km-censoring).
+Under the simplifying assumption that censoring is independent of the covariates, $S_C$ reduces to its marginal counterpart and is usually estimated by the Kaplan-Meier estimator $\KMG$ (@sec-surv-km-censoring).
 The IPC weights are then obtained by plugging (@eq-km-censoring) into (@eq-ipcw),
 
 $$
@@ -828,7 +825,7 @@ For uncensored observations, the negative log-likelihood of the predicted probab
 The intuition is that the density should be highest at this time, resulting in a lower loss.
 The effect of IPC-weighting is illustrated in @tbl-ipcw-ex, which compares the unweighted and IPC-weighted loss contributions.
 
-| $t_i$ | $\delta_i$ | $\hat{G}(t_i)$ | $1 / \hat{G}(t_i)$ | $-\delta_i \log(\hatf(t_i \mid \xx_i))$ | $L_{NL}(\xx_i, \delta_i, t_i)$ |
+| $t_i$ | $\delta_i$ | $\KMG(t_i)$ | $1 / \KMG(t_i)$ | $-\delta_i \log(\hatf(t_i \mid \xx_i))$ | $L_{NL}(\xx_i, \delta_i, t_i)$ |
 |---|---|---|---|---|---|
 | 2      | 1            | 0.90                 | 1.11                                     | 0.50                                             | 0.56                                   |
 | 5      | 1            | 0.70                 | 1.43                                     | 0.50                                             | 0.71                                   |
@@ -847,7 +844,7 @@ To minimize the loss at later time points, a model must place greater emphasis o
 ## Key takeaways
 
 * The first step in any survival analysis is to understand the data and the type of censoring and/or truncation present.
-* Any dataset can have a combination of different types of censoring and truncation
+* Any dataset can have a combination of different types of censoring and truncation.
 * Non-parametric estimators are well equipped to deal with right-censoring and left-truncation.
 * Parametric estimation can naturally deal with different types of censoring and truncation, but requires assumptions about the distribution of the event times.
 
