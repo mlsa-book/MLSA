@@ -1296,7 +1296,7 @@ plot_data = bind_rows(
 p_discrete_time = ggplot(plot_data, aes(x = time, y = survival, color = model, linetype = complications)) +
   geom_step(data = filter(plot_data, model == "Kaplan-Meier"), linewidth = 1.2) +
   geom_line(data = filter(plot_data, model == "Discrete Time (GLM)"), linewidth = 1.2) +
-  ylab("S(t)") +
+  ylab("Survival probability") +
   xlab("time (days)") +
   ylim(c(0, 1)) +
   scale_color_manual(
@@ -1362,7 +1362,7 @@ plot_data_interaction = bind_rows(
 p_discrete_time_interaction = ggplot(plot_data_interaction, aes(x = time, y = survival, color = model, linetype = complications)) +
   geom_step(data = filter(plot_data_interaction, model == "Kaplan-Meier"), linewidth = 1.2) +
   geom_line(data = filter(plot_data_interaction, model == "Discrete Time (GLM, Interaction)"), linewidth = 1.2) +
-  ylab("S(t)") +
+  ylab("Survival probability") +
   xlab("time (days)") +
   ylim(c(0, 1)) +
   scale_color_manual(
@@ -1463,7 +1463,7 @@ plot_data_pem = bind_rows(
 p_pem = ggplot(plot_data_pem, aes(x = time, y = survival, color = model, linetype = complications)) +
   geom_step(data = filter(plot_data_pem, model == "Kaplan-Meier"), linewidth = 1.2) +
   geom_line(data = filter(plot_data_pem, model == "Piecewise Exponential (PEM)"), linewidth = 1.2) +
-  ylab("S(t)") +
+  ylab("Survival probability") +
   xlab("time (days)") +
   ylim(c(0, 1)) +
   scale_color_manual(
