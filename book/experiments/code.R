@@ -80,15 +80,15 @@ ggsave("book/Figures/introduction/gompertz.png", g_gp,
        height = 3.5, width = 7, units = "in", dpi = 600)
 
 ## Ranking
-library(tidyverse)
-library(survival)
-set.seed(260523)
-train <- sample(nrow(mgus2), nrow(mgus2) * 2/3)
-test <- setdiff(seq(nrow(mgus2)), train)
-fit1 <- coxph(Surv(futime, death) ~ ., mgus2[train,])
-tmax = seq.int(10, 300, length.out = 15)
-t80 <- quantile(mgus2$ptime, probs = 0.8, na.rm = TRUE)
-t90 <- quantile(mgus2$ptime, probs = 0.9, na.rm = TRUE)
+set.seed(260607)
+train <- sample(nrow(lung), nrow(lung) * 2/3)
+test <- setdiff(seq(nrow(lung)), train)
+fit1 <- coxph(Surv(time, status) ~ ., lung[train,])
+tmax = as.numeric(quantile(lung$time, probs = seq.int(0.1, 1, 0.1), na.rm = TRUE))
+t60 <- quantile(lung$time, probs = 0.6, na.rm = TRUE)
+t70 <- quantile(lung$time, probs = 0.7, na.rm = TRUE)
+t80 <- quantile(lung$time, probs = 0.8, na.rm = TRUE)
+t90 <- quantile(lung$time, probs = 0.9, na.rm = TRUE)
 timewts = c("n", "S", "n/G2")
 cindex_dat <- crossing(
   tmax = tmax,
@@ -100,21 +100,27 @@ cindex_dat <- crossing(
         fit1,
         ymax = tm,
         timewt = wt,
-        newdata = mgus2[test,]
+        newdata = lung[test,]
       )$concordance
     })
   )
 
+cindex_dat |>
+group_by(tmax) %>%
+  summarise(
+    diff = max(cindex) - min(cindex)
+  )
+
+
 g <- ggplot(cindex_dat, aes(x = tmax, y = cindex, color = timewt)) +
   geom_line(linewidth = 0.8) +
   geom_point(size = 1.2) +
-  geom_vline(xintercept = t80, linetype = 2, color = "gray40") +
-  geom_vline(xintercept = t90, linetype = 2, color = "gray40") +
+  geom_vline(xintercept = c(t60, t70, t80, t90), linetype = 2, color = "gray40") +
   labs(
     x = "Time cutoff",
     y = "C-index",
     color = "Weighting"
-  ) + ylim(0.5, 1)
+  )  + ylim(0.5,1)
 
 ggsave("book/Figures/evaluation/cindex.png", g,
        height = 3.5, width = 7, units = "in", dpi = 600)
