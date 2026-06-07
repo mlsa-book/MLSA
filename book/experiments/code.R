@@ -80,43 +80,51 @@ ggsave("book/Figures/introduction/gompertz.png", g_gp,
        height = 3.5, width = 7, units = "in", dpi = 600)
 
 ## Ranking
-s_t = tsk("whas")
-time = s_t$unique_times()
-c_t = s_t$data() %>% mutate(status = 1 - status) %>% as_task_surv(event = "status")
+set.seed(260607)
+train <- sample(nrow(lung), nrow(lung) * 2/3)
+test <- setdiff(seq(nrow(lung)), train)
+fit1 <- coxph(Surv(time, status) ~ ., lung[train,])
+tmax = as.numeric(quantile(lung$time, probs = seq.int(0.1, 1, 0.1), na.rm = TRUE))
+t60 <- quantile(lung$time, probs = 0.6, na.rm = TRUE)
+t70 <- quantile(lung$time, probs = 0.7, na.rm = TRUE)
+t80 <- quantile(lung$time, probs = 0.8, na.rm = TRUE)
+t90 <- quantile(lung$time, probs = 0.9, na.rm = TRUE)
+timewts = c("n", "S", "n/G2")
+cindex_dat <- crossing(
+  tmax = tmax,
+  timewt = timewts
+) |>
+  mutate(
+    cindex = map2_dbl(tmax, timewt, \(tm, wt) {
+      concordance(
+        fit1,
+        ymax = tm,
+        timewt = wt,
+        newdata = lung[test,]
+      )$concordance
+    })
+  )
 
-s_d = data.frame(t = time, surv = s_t$kaplan()$surv, W = "KMS")
-c_d = data.frame(t = time, surv = c_t$kaplan()$surv, W = "KMG")
-w_d = data.frame(t = time, surv = 1 / (c_t$kaplan()$surv^2), W = "KMG^-2")
+cindex_dat |>
+group_by(tmax) %>%
+  summarise(
+    diff = max(cindex) - min(cindex)
+  )
 
-cutoff = time[which(s_t$kaplan()$surv < 0.6)[1]]
 
-d = rbind(s_d, c_d, w_d) %>% as.data.frame()
-g = ggplot(d, aes(x = t, y = surv, color = W)) +
-  geom_line() +
-  ylim(0, 5) +
-  theme_classic() +
+g <- ggplot(cindex_dat, aes(x = tmax, y = cindex, color = timewt)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.2) +
+  geom_vline(xintercept = c(t60, t70, t80, t90), linetype = 2, color = "gray40") +
   labs(
-    y = "W(t)",
-    title = "Kaplan-Meier estimates and weighting on 'whas' data",
-    color = "Weight function") +
-  geom_vline(xintercept = cutoff, lty = 2, color = "gray") +
-  scale_color_discrete(labels = expression(hat(G)[KM], hat(G)[KM]^{-2}, hat(S)[KM]))
-ggsave("book/Figures/evaluation/weights.png", g, height = 3, units = "in",
-  dpi = 600)
+    x = "Time cutoff",
+    y = "C-index",
+    color = "Weighting"
+  )  + ylim(0.5,1)
 
-ids = c("W=1", "W=G^-1", "W=G^-2")
-m_inf = c(msr("surv.cindex"),
-msr("surv.cindex", weight_meth = "G"),
-msr("surv.cindex", weight_meth = "G2"))
+ggsave("book/Figures/evaluation/cindex.png", g,
+       height = 3.5, width = 7, units = "in", dpi = 600)
 
-m_80 = c(msr("surv.cindex", id = "W=1", cutoff = cutoff),
-msr("surv.cindex", weight_meth = "G", id = "W=G^-1", cutoff = cutoff),
-msr("surv.cindex", weight_meth = "G2", id = "W=G^-2", cutoff = cutoff))
-
-m = c(m_inf, m_80)
-
-set.seed(20231207)
-round(resample(s_t, lrn("surv.coxph"), rsmp("cv", folds = 3))$aggregate(m), 2)
 
 ## Calibration
 
