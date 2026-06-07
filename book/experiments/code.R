@@ -1759,33 +1759,53 @@ ggsave("book/Figures/evaluation/rocs.png", g_auc,
 
 ## Survtsk chapter RMST comparison
 yi = c(1,0.8,0.75,0.75,0.7,rep(0.6, 5))
-yj = c(1,0.9,0.85,0.6,0.5,rep(0, 5))
+yj = c(1,0.9,0.85,0.6,0.5,rep(0.1, 5))
 df <- data.frame(x = rep(0:9,2), y = c(yi, yj), Group=rep(c("i", "j"), each = 10))
 
-plot_rmst <- function(df, group) {
-  filtered_df <- df %>%
-    filter(Group == group, x <= 6)
-  rect_df <-  filtered_df %>%
+plot_rmst <- function(df, group, tau = 6) {
+  rect_df <- df %>%
+    filter(Group == group, x < tau) %>%
     arrange(x) %>%
-    mutate(xmin = x, xmax = lead(x), ymin = 0, ymax = y) %>%
-    filter(!is.na(xmax))
+    mutate(
+      xmin = x,
+      xmax = x + 1,
+      ymin = 0,
+      ymax = y
+    )
+
+  rmst_hat <- sum(rect_df$y)
 
   ggplot(df, aes(x = x, y = y, group = Group)) +
-    geom_step(aes(linetype = Group), lwd = 1) +
     geom_rect(
       data = rect_df,
       aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
       alpha = 0.3,
-      inherit.aes = FALSE) +
-    annotate("text", x = 2, y = 0.4,
-      label = as.expression(bquote(RMST[.(group)] * "(" * 6 * ")" == .(round(sum(filtered_df$y[-length(filtered_df$y)]), 2)))),
-      parse = TRUE) +
-    labs(x = "Time", y = "Survival probability", title = paste0("RMST(6) for group ", group))    
+      inherit.aes = FALSE
+    ) +
+    geom_step(aes(linetype = Group), linewidth = 1) +
+    geom_vline(xintercept = tau, linetype = "dotted", linewidth = 0.5) +
+    annotate(
+      "text",
+      x = 2,
+      y = 0.4,
+      label = as.expression(
+        bquote(RMST[.(group)] * "(" * .(tau) * ")" == .(round(rmst_hat, 2)))
+      ),
+      parse = TRUE
+    ) +
+    labs(
+      x = "Time",
+      y = "Survival probability",
+      title = paste0("RMST(", tau, ") for group ", group)
+    ) + theme(legend.position = "right")
 }
 
 p1 <- plot_rmst(df, "i")
 p2 <- plot_rmst(df, "j")
-p_rmst_survtsk <- (p1 + p2) + plot_layout(guides = "collect")
+
+p_rmst_survtsk <- (p1 + p2) +
+  plot_layout(guides = "collect")
+  
 
 ggsave("book/Figures/survtsk/rmst.png", p_rmst_survtsk,
        height = 3.5, width = 7.5, units = "in", dpi = 600)
