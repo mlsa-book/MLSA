@@ -80,43 +80,51 @@ ggsave("book/Figures/introduction/gompertz.png", g_gp,
        height = 3.5, width = 7, units = "in", dpi = 600)
 
 ## Ranking
-s_t = tsk("whas")
-time = s_t$unique_times()
-c_t = s_t$data() %>% mutate(status = 1 - status) %>% as_task_surv(event = "status")
+set.seed(260607)
+train <- sample(nrow(lung), nrow(lung) * 2/3)
+test <- setdiff(seq(nrow(lung)), train)
+fit1 <- coxph(Surv(time, status) ~ ., lung[train,])
+tmax = as.numeric(quantile(lung$time, probs = seq.int(0.1, 1, 0.1), na.rm = TRUE))
+t60 <- quantile(lung$time, probs = 0.6, na.rm = TRUE)
+t70 <- quantile(lung$time, probs = 0.7, na.rm = TRUE)
+t80 <- quantile(lung$time, probs = 0.8, na.rm = TRUE)
+t90 <- quantile(lung$time, probs = 0.9, na.rm = TRUE)
+timewts = c("n", "S", "n/G2")
+cindex_dat <- crossing(
+  tmax = tmax,
+  timewt = timewts
+) |>
+  mutate(
+    cindex = map2_dbl(tmax, timewt, \(tm, wt) {
+      concordance(
+        fit1,
+        ymax = tm,
+        timewt = wt,
+        newdata = lung[test,]
+      )$concordance
+    })
+  )
 
-s_d = data.frame(t = time, surv = s_t$kaplan()$surv, W = "KMS")
-c_d = data.frame(t = time, surv = c_t$kaplan()$surv, W = "KMG")
-w_d = data.frame(t = time, surv = 1 / (c_t$kaplan()$surv^2), W = "KMG^-2")
+cindex_dat |>
+group_by(tmax) %>%
+  summarise(
+    diff = max(cindex) - min(cindex)
+  )
 
-cutoff = time[which(s_t$kaplan()$surv < 0.6)[1]]
 
-d = rbind(s_d, c_d, w_d) %>% as.data.frame()
-g = ggplot(d, aes(x = t, y = surv, color = W)) +
-  geom_line() +
-  ylim(0, 5) +
-  theme_classic() +
+g <- ggplot(cindex_dat, aes(x = tmax, y = cindex, color = timewt)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.2) +
+  geom_vline(xintercept = c(t60, t70, t80, t90), linetype = 2, color = "gray40") +
   labs(
-    y = "W(t)",
-    title = "Kaplan-Meier estimates and weighting on 'whas' data",
-    color = "Weight function") +
-  geom_vline(xintercept = cutoff, lty = 2, color = "gray") +
-  scale_color_discrete(labels = expression(hat(G)[KM], hat(G)[KM]^{-2}, hat(S)[KM]))
-ggsave("book/Figures/evaluation/weights.png", g, height = 3, units = "in",
-  dpi = 600)
+    x = "Time cutoff",
+    y = "C-index",
+    color = "Weighting"
+  )  + ylim(0.5,1)
 
-ids = c("W=1", "W=G^-1", "W=G^-2")
-m_inf = c(msr("surv.cindex"),
-msr("surv.cindex", weight_meth = "G"),
-msr("surv.cindex", weight_meth = "G2"))
+ggsave("book/Figures/evaluation/cindex.png", g,
+       height = 3.5, width = 7, units = "in", dpi = 600)
 
-m_80 = c(msr("surv.cindex", id = "W=1", cutoff = cutoff),
-msr("surv.cindex", weight_meth = "G", id = "W=G^-1", cutoff = cutoff),
-msr("surv.cindex", weight_meth = "G2", id = "W=G^-2", cutoff = cutoff))
-
-m = c(m_inf, m_80)
-
-set.seed(20231207)
-round(resample(s_t, lrn("surv.coxph"), rsmp("cv", folds = 3))$aggregate(m), 2)
 
 ## Calibration
 
@@ -589,7 +597,8 @@ p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
   geom_vline(xintercept = 120, lty = 3) +
   # geom_step(data=km_sir_b, aes(col = pneumonia), lty = 2) +
   labs(
-    y = expression(P(Y <= tau~ "," ~ E(Y) == e))
+    x = expression("time, " * tau),
+    y = expression(hat(F)[q](tau))
   ) +
   coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
 
@@ -631,7 +640,8 @@ p_cens_vs_cr = ggplot(
     coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
     geom_vline(xintercept = 120, lty = 3) +
     labs(
-      y = expression(P(Y <= tau~ "," ~ E(Y) == 2)),
+      x = expression("time, " * tau),
+      y = expression(hat(F)[2](tau)),
       linetype = "assumption"
     )
 
@@ -880,18 +890,18 @@ pred_cond_df <- do.call(rbind, lapply(levels(events_df$sex), function(s) {
 }))
 
 g <- ggplot(df, aes(x = x, y = y, group = group))
-g1 <- g + geom_step(linewidth = 1.3, color = "gray")
-g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity()
+g1 <- g + geom_step(linewidth = 1.3, color = "gray") + labs(x = "Time", y = "Survival probability")
+g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity() + labs(x = "Time", y = "Survival probability")
 g3 <- g1 + geom_line(aes(x = x, y = y), data = pred_uncond_df,
                      inherit.aes = FALSE,
-                     color = "black", linewidth = 1)
+                     color = "black", linewidth = 1) + labs(x = "Time", y = "Survival probability")
 g4 <- g +
   geom_step(aes(color = sex), linewidth = 1.3, alpha = 0.5) +
   geom_line(aes(x = x, y = y, group = sex, color = sex),
             data = pred_cond_df,
-            inherit.aes = FALSE, linewidth = 1.5)
+            inherit.aes = FALSE, linewidth = 1.5) + labs(x = "Time", y = "Survival probability")
 
-g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S(t)") & guides(color  = "none")
+g_final <- (g1 + g2 + g3 + g4) & ylim(0, 1) & xlim(0, 50) & guides(color  = "none")
 
 ggsave("book/Figures/survtsk/heavisides.png",
   g_final, height=5, width=7, units="in", dpi=600)
@@ -1757,36 +1767,56 @@ ggsave("book/Figures/evaluation/rocs.png", g_auc,
 
 ## Survtsk chapter RMST comparison
 yi = c(1,0.8,0.75,0.75,0.7,rep(0.6, 5))
-yj = c(1,0.9,0.85,0.6,0.5,rep(0, 5))
-df <- data.frame(x = rep(0:9,2), y = c(yi, yj), Patient=rep(c("i", "j"), each = 10))
+yj = c(1,0.9,0.85,0.6,0.5,rep(0.1, 5))
+df <- data.frame(x = rep(0:9,2), y = c(yi, yj), Group=rep(c("i", "j"), each = 10))
 
-plot_rmst <- function(df, patient) {
-  filtered_df <- df %>%
-    filter(Patient == patient, x <= 5)
-  rect_df <-  filtered_df %>%
+plot_rmst <- function(df, group, tau = 6) {
+  rect_df <- df %>%
+    filter(Group == group, x < tau) %>%
     arrange(x) %>%
-    mutate(xmin = x, xmax = lead(x), ymin = 0, ymax = y) %>%
-    filter(!is.na(xmax))
+    mutate(
+      xmin = x,
+      xmax = x + 1,
+      ymin = 0,
+      ymax = y
+    )
 
-  ggplot(df, aes(x = x, y = y, group = Patient)) +
-    geom_step(aes(linetype = Patient), lwd = 1) +
+  rmst_hat <- sum(rect_df$y)
+
+  ggplot(df, aes(x = x, y = y, group = Group)) +
     geom_rect(
       data = rect_df,
       aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
       alpha = 0.3,
-      inherit.aes = FALSE) +
-    annotate("text", x = 2, y = 0.4,
-      label = as.expression(bquote(RMST[.(patient)] * "(" * 5 * ")" == .(round(sum(filtered_df$y), 2)))),
-      parse = TRUE) +
-    labs(x = "Time", y = "Survival probability", title = paste0("RMST(5) for patient ", patient))    
+      inherit.aes = FALSE
+    ) +
+    geom_step(aes(linetype = Group), linewidth = 1) +
+    geom_vline(xintercept = tau, linetype = "dotted", linewidth = 0.5) +
+    annotate(
+      "text",
+      x = 2,
+      y = 0.4,
+      label = as.expression(
+        bquote(RMST[.(group)] * "(" * .(tau) * ")" == .(round(rmst_hat, 2)))
+      ),
+      parse = TRUE
+    ) +
+    labs(
+      x = "Time",
+      y = "Survival probability",
+      title = paste0("RMST(", tau, ") for group ", group)
+    ) + theme(legend.position = "right")
 }
 
 p1 <- plot_rmst(df, "i")
 p2 <- plot_rmst(df, "j")
-p_rmst_survtsk <- (p1 + p2) + plot_layout(guides = "collect")
+
+p_rmst_survtsk <- (p1 + p2) +
+  plot_layout(guides = "collect")
+  
 
 ggsave("book/Figures/survtsk/rmst.png", p_rmst_survtsk,
-       height = 4, width = 9, units = "in", dpi = 600)
+       height = 3.5, width = 7.5, units = "in", dpi = 600)
 
 ## C-index interval censoring
 cases <- tibble::tribble(
