@@ -9,9 +9,8 @@ abstract: This chapter introduces calibration measures for evaluating probabilis
 # Calibration {#sec-eval-distr-calib}
 
 In the survival analysis context, calibration\index{calibration} measures evaluate the _average_ quality of predicted distributions.
-In general, there is a trade-off between discrimination\index{discrimination} and calibration.
-A model that makes accurate individual predictions (good discrimination) might be overfit to the data and make poor predictions on new, unseen data.
-Whereas a model that makes accurate population-level predictions (good calibration) might not separate individual observations well.
+Calibration and discrimination\index{discrimination} emphasize different aspects of predictive performance.
+A model that makes accurate individual predictions (good discrimination) might be overfit to the data and make poor predictions on new, unseen data; whereas a model that makes accurate population-level predictions (good calibration) might not separate individual observations well.
 
 The literature on calibration measures for survival analysis is comparatively limited [@Rahman2017], reflecting both conceptual and methodological challenges [@VanHouwelingen2000].
 Unlike metrics that evaluate predictions at the level of individual observations, calibration assesses the average agreement across the population.
@@ -42,7 +41,7 @@ $$
 \chi^2_{HL} = \sum^G_{g=1} \frac{(o_g - e_g)^2}{n_g\hat{p}_g(1 - \hat{p}_g)},
 $$
 
-where $G$ is the number of groups, $o_{g}$ and $e_{g}$ are the observed and expected number of events in group $g$, $n_g$ is the number of observations in group $g$ (usually $n_g = N/G$), and $\hat{p}_g$ is the average predicted probability of event in each group.
+where $G$ is the number of groups, $o_{g}$ and $e_{g}$ are the observed and expected number of events in group $g$, $n_g$ is the number of observations in group $g$ (usually $n_g = n/G$), and $\hat{p}_g$ is the average predicted probability of event in each group.
 Under the null hypothesis, the test statistic follows a $\chi^2_{G-2}$ distribution.\index{chi-squared@chi-squared, $\chi^2$}
 
 The most common adaptation to survival analysis appears to be the Nam-D'Agostino statistic [@Agostino2003]\index{Hosmer-Lemeshow!Nam-D'Agostino}.
@@ -61,7 +60,7 @@ Similarly, extension to other censoring and truncation types may follow using th
 Analysis of (@eq-hosmer-nd) indicates that the proportion of Type I errors increases with higher proportions of censoring [@Demler2015], leading to the adaptation:\index{Hosmer-Lemeshow!Greenwood-Nam-D'Agostino}
 
 $$
-\chi^2_{GND}(\tau) = \sum^G_{g=1} \frac{(\hat{F}_{g;KM}(\tau)n_g - \bar{\hatF}_{g}(\tau)n_g)^2}{\widehat{\mathrm{Var}}(\hat{F}_{g;KM}(\tau))}
+\chi^2_{GND}(\tau) = \sum^G_{g=1} \frac{(\hat{F}_{g;KM}(\tau) - \bar{\hatF}_{g}(\tau))^2}{\widehat{\mathrm{Var}}(\hat{F}_{g;KM}(\tau))} \sim \chi^2_{G-1},
 $$ {#eq-hosmer-gnd}
 
 where $\widehat{\mathrm{Var}}(\hat{F}_{g;KM}(\tau)) \equiv \widehat{\mathrm{Var}}(\hat{S}_{g;KM})$ is the Greenwood variance estimator (@eq-greenwood).\index{Kaplan-Meier estimator!Greenwood variance}
@@ -80,12 +79,11 @@ Event frequency calibration defines a model as well-calibrated if, across the en
 Formally, this result can be derived using counting process\index{counting process} theory (a full derivation is provided in Appendix 2 of @dataapplied).
 The core theoretical relation underlying event frequency calibration is:
 
-<!-- FIXME (RAPHAEL): should this be the observed time $T_i = \min(Y_i, C_i)$ rather than the true event time $Y_i$? Under censoring the martingale result is E[Delta_i] = E[H_i(T_i)] (compensator evaluated at the observed time): E[Delta_i] = Pr(Y_i <= C_i) < 1, whereas E[H_i(Y_i)] = 1 for a continuous true event time, so the identity with Y_i only holds without censoring. Using T_i also matches the estimator below, which evaluates H at the observed time t_i. -->
 $$
-\EE[\Delta_i] = \EE[H_i(Y_i)],
+\EE[\Delta_i] = \EE[H_i(T_i)],
 $$
 
-that is, for observation $i$ with true event time $Y_i$, the expectation of the true cumulative hazard\index{cumulative hazard function} evaluated at that time equals the expected number of events for that individual.
+that is, for observation $i$ with outcome time $T_i$, the expectation of the true cumulative hazard\index{cumulative hazard function} evaluated at that time equals the expected number of events for that individual.
 
 Hence, event frequency calibration tests whether the estimated cumulative hazard satisfies
 
@@ -118,15 +116,17 @@ Graphical methods compare the average predicted distribution to the expected dis
 ### Calibration plots {#sec-calib-km}
 
 Calibration plots\index{calibration!plots}, also known as reliability diagrams, are graphical summaries comparing predicted event probabilities with the ground truth [@Wilks1990].
-<!-- TODO (RAPHAEL): the implication "which ... means the KM curve estimated on the testing data" isn't clear to me — why does the single-event right-censored setting imply specifically KM on the *testing* data? And wasnt \KMS defined on train data? -->
-In survival analysis, the ground truth is established using a non-parametric estimator, which in the single-event, right-censored setting means the Kaplan-Meier curve estimated on the testing data, $\KMS$.\index{calibration!Kaplan-Meier}\index{Kaplan-Meier estimator}
-Let $\hatS(\cdot \mid \xx_i)$ be the survival function from the predicted survival distribution for observation $i$, then the average predicted survival function at time $\tau$ is
+In binary classification, the ground truth is represented by observed event frequencies within each group of interest.
+In survival analysis, censoring prevents direct calculation of event frequencies so these must be estimated.
+In single-event, right-censored survival analysis, the natural estimate is the Kaplan-Meier estimator fitted on the evaluation data, denoted here by $\hatS^*_{KM}$.\index{calibration!Kaplan-Meier}\index{Kaplan-Meier estimator}
+
+Let $\hatS(\cdot \mid \xx_i)$ be the survival function from the predicted survival distribution for observation $i$, then the average predicted survival function at time $\tau$ is:
 
 $$
 \bar{\hatS}(\tau) = \mean[n]{\hatS(\tau \mid \xx_i)}.
 $$ {#eq-surv-avg}
 
-Plotting (@eq-surv-avg) alongside $\KMS$ at all observed time points provides a visual comparison of how closely these curves align.
+Plotting (@eq-surv-avg) alongside $\hatS^*_{KM}$ at all observed time points provides a visual comparison of how closely these curves align.
 An example is given in @fig-eval-calib, a Cox proportional hazards model (CPH), random survival forest (RF), and relative risk tree (RRT) are all compared to the Kaplan-Meier estimator (KM).
 This figure highlights the advantages and disadvantages of this method.
 The relative risk tree is clearly poorly calibrated as it increasingly diverges from the Kaplan-Meier.
@@ -180,13 +180,13 @@ $$
 $$
 
 where $i = 1,\ldots,n$ are the indices of the observations, $\hatS(\cdot \mid \xx_i)$ are predicted survival functions, $y_i$ are observed event times, and $\lceil \cdot \rceil$ is the ceiling function.
+To avoid edge-case issues, the algorithm sets the predicted survival probability such that $\hatS(t_i \mid \xx_i) = 0$ is replaced with $1\times10^{-5}$.
 For example, say there are $5$ bins: $\{[0, 0.2], (0.2, 0.4], (0.4, 0.6], (0.6, 0.8], (0.8, 1]\}$. The predicted survival probability for observation $i$ is $\hatS(y_i|\xx_i) = 0.7$.
 Then, observation $i$ falls into the fourth bin: $\lceil 0.7 \times 5 \rceil = \lceil 3.5 \rceil = 4$.
 
-Extension to all observed outcomes, $t_i$, follows by partially allocating censored observations across multiple bins according to their conditional probability of belonging to each bin (Algorithm 2, @Haider2020); conditional event-independent censoring is assumed.
-To avoid any edge-case issues, the algorithm sets the predicted survival probability such that $\hatS(t_i \mid \xx_i) = 0$ is replaced with $1\times10^{-5}$.
-
 The observed number of events can now be defined simply as the number of observations in the corresponding set: $o_g = \vert \calB_g \vert$.
+
+Extension to all observed outcomes, $t_i$, follows by partially allocating censored observations across multiple bins according to their conditional probability of belonging to each bin (Algorithm 2, @Haider2020); conditional event-independent censoring is assumed.
 
 The D-calibration measure, based on the $\chi^2$ statistic, is then defined by:
 
@@ -194,7 +194,7 @@ $$
 D_{\chi^2}(\hat{\mathbf{S}}, \tt) :=  \frac{\sum^G_{g = 1} (o_g - \frac{n}{G})^2}{n/G}
 $$
 
-where $\hat{\mathbf{S}}$ is the vector of predicted survival probabilities and $\dvec{t}{n}$ are the observed outcomes.
+where $\hat{\mathbf{S}}$ is the vector of predicted survival functions and $\dvec{t}{n}$ are the observed outcomes.
 
 This measure has several useful properties.
 Firstly, the measure provides a simple quantitative summary through the test statistic and can be used to test the hypothesis that a model is 'D-calibrated' since, under the null, $D_{\chi^2}$ asymptotically follows a $\chi^2_{G-1}$ distribution, from which a $p$-value can be obtained.
