@@ -1760,27 +1760,27 @@ ggsave("book/Figures/evaluation/rocs.png", g_auc,
 ## Survtsk chapter RMST comparison
 yi = c(1,0.8,0.75,0.75,0.7,rep(0.6, 5))
 yj = c(1,0.9,0.85,0.6,0.5,rep(0, 5))
-df <- data.frame(x = rep(0:9,2), y = c(yi, yj), Patient=rep(c("i", "j"), each = 10))
+df <- data.frame(x = rep(0:9,2), y = c(yi, yj), Group=rep(c("i", "j"), each = 10))
 
-plot_rmst <- function(df, patient) {
+plot_rmst <- function(df, group) {
   filtered_df <- df %>%
-    filter(Patient == patient, x <= 6)
+    filter(Group == group, x <= 6)
   rect_df <-  filtered_df %>%
     arrange(x) %>%
     mutate(xmin = x, xmax = lead(x), ymin = 0, ymax = y) %>%
     filter(!is.na(xmax))
 
-  ggplot(df, aes(x = x, y = y, group = Patient)) +
-    geom_step(aes(linetype = Patient), lwd = 1) +
+  ggplot(df, aes(x = x, y = y, group = Group)) +
+    geom_step(aes(linetype = Group), lwd = 1) +
     geom_rect(
       data = rect_df,
       aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
       alpha = 0.3,
       inherit.aes = FALSE) +
     annotate("text", x = 2, y = 0.4,
-      label = as.expression(bquote(RMST[.(patient)] * "(" * 6 * ")" == .(round(sum(filtered_df$y[-length(filtered_df$y)]), 2)))),
+      label = as.expression(bquote(RMST[.(group)] * "(" * 6 * ")" == .(round(sum(filtered_df$y[-length(filtered_df$y)]), 2)))),
       parse = TRUE) +
-    labs(x = "Time", y = "Survival probability", title = paste0("RMST(6) for patient ", patient))    
+    labs(x = "Time", y = "Survival probability", title = paste0("RMST(6) for group ", group))    
 }
 
 p1 <- plot_rmst(df, "i")
@@ -1788,7 +1788,7 @@ p2 <- plot_rmst(df, "j")
 p_rmst_survtsk <- (p1 + p2) + plot_layout(guides = "collect")
 
 ggsave("book/Figures/survtsk/rmst.png", p_rmst_survtsk,
-       height = 4, width = 9, units = "in", dpi = 600)
+       height = 3.5, width = 7.5, units = "in", dpi = 600)
 
 ## C-index interval censoring
 cases <- tibble::tribble(
