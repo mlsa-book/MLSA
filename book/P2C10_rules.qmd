@@ -1,5 +1,5 @@
 ---
-uabstract: "This chapter introduces scoring rules as measures for evaluating probabilistic predictions in survival analysis, with a focus on assessing overall predictive performance through calibration and discrimination. The chapter first reviews scoring rules in classification settings, introducing concepts such as properness and strict properness through the Brier score and log loss. These ideas are then extended to censored survival data, where survival losses are formalized and their dependence on censoring assumptions is discussed. Common survival scoring rules are presented, including the integrated survival Brier score, right-censored log loss, and integrated survival absolute score, with attention given to their interpretation, weighting schemes, and theoretical properties. Particular emphasis is placed on the integrated survival Brier score and logarithmic losses, including discussion of properness and practical limitations. Prediction error curves are introduced as graphical tools for time-dependent evaluation, while baseline models and explained residual variation are discussed to improve interpretability of scores. The chapter concludes by considering extensions to competing risks settings and highlighting ongoing methodological challenges, including limited consensus regarding optimal scoring rule selection and practical implementation constraints."
+abstract: "This chapter introduces scoring rules as measures for evaluating probabilistic predictions in survival analysis, with a focus on assessing overall predictive performance through calibration and discrimination. The chapter first reviews scoring rules in classification settings, introducing concepts such as properness and strict properness through the Brier score and log loss. These ideas are then extended to censored survival data, where survival losses are formalized and their dependence on censoring assumptions is discussed. Common survival scoring rules are presented, including the integrated survival Brier score, right-censored log loss, and integrated survival absolute score, with attention given to their interpretation, weighting schemes, and theoretical properties. Particular emphasis is placed on the integrated survival Brier score and logarithmic losses, including discussion of properness and practical limitations. Prediction error curves are introduced as graphical tools for time-dependent evaluation, while baseline models and explained residual variation are discussed to improve interpretability of scores. The chapter concludes by considering extensions to competing risks settings and highlighting ongoing methodological challenges, including limited consensus regarding optimal scoring rule selection and practical implementation constraints."
 ---
 
 ::: {.content-visible when-format="html"}
@@ -16,11 +16,9 @@ While few scoring rules have been proposed in survival analysis, there has been 
 Before delving into these measures, this section begins by first describing scoring rules in the simpler classification setting.\index{Brier score}\index{log loss}
 
 Note that in the literature there is ambiguity around the definitions of scoring rule, loss, and score.
-Here, a *scoring rule* is a term for a function that takes as inputs a probabilistic prediction and an observed outcome.
-A *loss* is a scoring rule optimized at a minimum.
-<!-- FIXME (RAPHAEL): is this definition consistent with the rest of the book? In the deep learning chapters we simply use "loss" for the function we want to optimize, not specifically "a scoring rule optimized at a minimum". -->
-In the literature, _score_ appears to refer interchangeably to the sample mean of a loss, the loss itself, or a scoring rule optimized at a maximum.
-To avoid ambiguity, the term is avoided where possible except when referring to common scoring rules in the literature, such as the Brier score.
+Here, a *scoring rule* is a term for a function that takes as inputs a probabilistic prediction and an observed outcome and may have the properties: properness and strict properness (introduced below).
+A loss and score may sometimes be defined as a scoring rule that favours minimization or maximization respectively for the optimal prediction.
+To avoid confusion, it will always be made clear here whether a scoring rule is optimized at a minimum or maximum.
 
 Scoring rules are pointwise losses, meaning a loss is calculated for all observations and the sample mean is then calculated over all losses.
 Each scoring rule is therefore introduced for a single observation $i$ only.
@@ -71,6 +69,7 @@ L_{logloss}(\hatp_i, y_i) = -\log \hatp_i(y_i),
 $$ {#eq-logloss}
 
 where again $y_i \in \{0,1\}$ is the ground truth and $\hatp_i$ is a predicted probability distribution.
+The log loss is minimized at $0$ but is unbounded above.
 
 These losses are visualized in @fig-eval-brierlog, which highlights the properness of both losses [@Dawid2014] as they approach their minima as predicted probabilities come closer to the true outcome.
 It can also be seen from the scale of the plots that the log loss penalizes wrong predictions more strongly than the Brier score, which may be beneficial or not depending on the given use case.
@@ -169,10 +168,9 @@ At $\tau$ an observation will either have:
 
 Censored observations are discarded after the censoring time as evaluating predictions after this time is impossible as the ground truth is unknown.
 To compensate for removing observations, IPCW\index{inverse probability of censoring weights} (Box 3) is again used to upweight predictions as $\tau$ increases.
-<!-- FIXME (RAPHAEL): IPCW weights were explicitly defined with a lower-case $w$ earlier in the book (e.g. in the IPCW/discrimination sections) --- here they are written as upper-case $W_i$ (also in @tbl-ipcw-weights). Please reconcile to one notation. -->
-IPC weights, $W_i$ are defined such that observations are either weighted by $\hatG^{-1}(\tau)$ when they have not yet experienced the event or by their final observed time, $\hatG^{-1}(t_i)$, otherwise (@tbl-ipcw-weights).
+IPC weights, $w_i$ are defined such that observations are either weighted by $\hatG^{-1}(\tau)$ when they have not yet experienced the event or by their final observed time, $\hatG^{-1}(t_i)$, otherwise (@tbl-ipcw-weights).
 
-| $W_i := W(t_i, \delta_i)$ | $t_i > \tau$ | $t_i \leq \tau$ |
+| $w_i := w(t_i, \delta_i)$ | $t_i > \tau$ | $t_i \leq \tau$ |
 | - | - | - |
 | $\delta_i = 1$ | $\hatG^{-1}(\tau)$ | $\hatG^{-1}(t_i)$ |
 | $\delta_i = 0$ | $\hatG^{-1}(\tau)$ | $0$ |
@@ -199,18 +197,17 @@ Note this is analogous to the classification log loss in (@eq-logloss) with the 
 
 Now recall (@eq-objective-function) from @sec-surv-estimation-param, which gives the contribution from a single observation as:
 
-<!-- FIXME (RAPHAEL): check that $\mathcal{L}(t_i)$ is still usable here after the likelihood notation was redefined in Section 3.5.1 (@sec-surv-estimation-param). -->
 $$
-\mathcal{L}(t_i) \propto
+\mathcal{L}_i(\bstheta) \propto
 \begin{dcases}
-f(t_i), & \text{ if $i$ is uncensored }, \\
-S(t_i), & \text{ if $i$ is right-censored }, \\
-F(t_i), & \text{ if $i$ is left-censored }, \\
-S(l_i)-S(r_i), & \text{ if $i$ is interval-censored }, \\
+f(t_i \mid \bstheta), & \text{ if $i$ is uncensored }, \\
+S(t_i \mid \bstheta), & \text{ if $i$ is right-censored }, \\
+F(t_i \mid \bstheta), & \text{ if $i$ is left-censored }, \\
+S(l_i \mid \bstheta) - S(r_i \mid \bstheta), & \text{ if $i$ is interval-censored }, \\
 \end{dcases}
 $$
 
-where $r_i, l_i$ are the boundaries of the censoring interval (adaptations in the presence of left-truncation as described in @sec-surv-estimation-param may also be applied).
+where $r_i, l_i$ are the boundaries of the censoring interval and $\bstheta$ are model parameters (adaptations in the presence of left-truncation as described in @sec-surv-estimation-param may also be applied).
 
 The log loss can then be constructed depending on the type of censoring or truncation present in the data.
 For example, if only right-censoring is present then the right-censored log loss (RCLL) is defined as:\index{right-censored log loss}
@@ -370,8 +367,6 @@ In such settings, automated procedures, such as those used for hyperparameter op
 * Scoring rules are a useful tool for measuring a model's overall predictive ability, taking into account calibration and discrimination.
 * Proper scoring rules provide principled model comparison, which is important when choosing models in a benchmark experiment.
 * Scoring rules can be difficult to interpret but baselines and ERV representations can be a helpful way to overcome this.
-<!-- FIXME (RAPHAEL): not sure about this. Reporting multiple scoring rules also introduces multiplicity. Choosing a measure in advance and sticking with it is arguably the best strategy. Easiest fix here may be to simply remove this bullet. -->
-* There is no consensus about which scoring rule to use; in practice reporting multiple scoring rules ensures transparency of results.
 * For non- and semi-parametric survival models that return distribution predictions, estimates of $f(t)$ are not readily available and instead require numerical approximations (@sec-distributions-continuous). Consequently, naive application of logarithmic scoring rules, for example by treating a probability mass function as a density function, can heavily bias the results.
 
 ::::
