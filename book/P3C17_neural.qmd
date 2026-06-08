@@ -417,13 +417,13 @@ $$
 $$ {#eq-nnet-param-lik}
 
 A neural network then predicts $g(\xx_i \mid \bstheta) = \bsphi(\xx_i)$, as in @sec-nnet-deterministic-vs-probabilistic.
-Using the Weibull distribution as an example\index{Weibull distribution}, a network predicts two positive scalars: the scale $\lambda(\xx_i \mid \bstheta) > 0$ and shape $k(\xx_i \mid \bstheta) > 0$, with positivity again ensured by softplus or exponential response functions (@sec-nnet-activations).
+Using the Weibull distribution as an example\index{Weibull distribution}, a network predicts two positive scalars: the scale $\lambda(\xx_i \mid \bstheta) > 0$ and shape $\gamma(\xx_i \mid \bstheta) > 0$, with positivity again ensured by softplus or exponential response functions (@sec-nnet-activations).
 The training objective (assuming the accelerated failure time (AFT) parameterization\index{accelerated failure time}) is then,
 
 $$
 \begin{aligned}
-\hat{\bstheta} = \argmin_{\bstheta} -\sum_{i=1}^{n} \Bigl[\;&\delta_i \log f_{\Weib}\bigl(t_i \mid \lambda(\xx_i \mid \bstheta), k(\xx_i \mid \bstheta)\bigr) \\
-&+ (1 - \delta_i) \log S_{\Weib}\bigl(t_i \mid \lambda(\xx_i \mid \bstheta), k(\xx_i \mid \bstheta)\bigr)\Bigr],
+\hat{\bstheta} = \argmin_{\bstheta} -\sum_{i=1}^{n} \Bigl[\;&\delta_i \log f_{\Weib}\bigl(t_i \mid \lambda(\xx_i \mid \bstheta), \gamma(\xx_i \mid \bstheta)\bigr) \\
+&+ (1 - \delta_i) \log S_{\Weib}\bigl(t_i \mid \lambda(\xx_i \mid \bstheta), \gamma(\xx_i \mid \bstheta)\bigr)\Bigr],
 \end{aligned}
 $$
 
@@ -441,15 +441,15 @@ To illustrate how neural networks increase the flexibility of parametric surviva
 The dotted lines show Kaplan-Meier estimates stratified by `complications`, while the solid lines show survival curves predicted by the neural networks.
 All models use the same Weibull distribution, the FFNN architecture in @fig-ffnn-arch, and the Adam optimizer; they differ only in which Weibull parameters depend on the covariates.
 
-* **M1**: *scale only, single feature*: The scale parameter, $\lambda$, depends on `complications`, while the shape parameter $k$ is a single global value shared across all observations. This yields two survival curves with the same overall shape but different time scales.
-* **M2**: *scale only, all features*: $\lambda$ depends on all features while $k$ remains global. This produces individualized survival curves that differ in time scale but retain a common overall shape.
-* **M3**: *both parameters, single feature*: Both $\lambda$ and $k$ depend on `complications`. As a result, the two groups are allowed to have different shapes rather than simple rescalings of one another.
-* **M4**: *both parameters, all features*: Both $\lambda$ and $k$ depend on all features, producing fully individualized survival distributions. This is the most flexible specification and results in the greatest variation across predicted survival curves.
+* **M1**: *scale only, single feature*: The scale parameter, $\lambda$, depends on `complications`, while the shape parameter $\gamma$ is a single global value shared across all observations. This yields two survival curves with the same overall shape but different time scales.
+* **M2**: *scale only, all features*: $\lambda$ depends on all features while $\gamma$ remains global. This produces individualized survival curves that differ in time scale but retain a common overall shape.
+* **M3**: *both parameters, single feature*: Both $\lambda$ and $\gamma$ depend on `complications`. As a result, the two groups are allowed to have different shapes rather than simple rescalings of one another.
+* **M4**: *both parameters, all features*: Both $\lambda$ and $\gamma$ depend on all features, producing fully individualized survival distributions. This is the most flexible specification and results in the greatest variation across predicted survival curves.
 
 @fig-weibull-aft-nn illustrates how increasing the flexibility of the parametrization allows the model to represent increasingly complex survival patterns under the same model class and training procedure.
 However, as with all machine learning models, greater flexibility does not necessarily imply better generalization to unseen data and robust validation is still recommended.
 
-![Weibull AFT fit to the `tumor` data via a neural network, in four increasingly flexible parametrizations. *Top-left (M1)*: the scale, $\lambda$, depends on `complications`; the shape $k$ is global. *Top-right (M2)*: $\lambda$ depends on all features, $k$ is still global; the resulting curves are individualized in scale but share a common shape. *Bottom-left (M3)*: both $\lambda$ and $k$ depend on `complications`; the two curves exhibit different shapes. *Bottom-right (M4)*: both heads are FFNNs over all seven covariates and produce one Weibull distribution *per unique feature set*. Each curve is colored by complications status. Kaplan-Meier estimates are overlaid in each panel for reference.](Figures/neuralnetworks/weibull-aft-nn.png){#fig-weibull-aft-nn fig-alt="Four panels arranged in a 2-by-2 grid showing predicted survival curves vs. Kaplan-Meier estimates stratified by complications. Top-left (M1) shows two parallel smooth AFT curves (no complications in blue and complications in red), which are close but not fully overlapping Kaplan-Meier curves. Bottom-left (M3) shows the same curves but now with different shapes to another that allow them to almost perfectly overlap the Kaplan-Meier curves. Top-right (M2) show hundreds of red and blue curves but with roughly the same shape. Bottom-right (M4) shows hundreds of red and blue curves but now with unique shapes." width=100%}
+![Weibull AFT fit to the `tumor` data via a neural network, in four increasingly flexible parametrizations. *Top-left (M1)*: the scale, $\lambda$, depends on `complications`; the shape $\gamma$ is global. *Top-right (M2)*: $\lambda$ depends on all features, $\gamma$ is still global; the resulting curves are individualized in scale but share a common shape. *Bottom-left (M3)*: both $\lambda$ and $\gamma$ depend on `complications`; the two curves exhibit different shapes. *Bottom-right (M4)*: both heads are FFNNs over all seven covariates and produce one Weibull distribution *per unique feature set*. Each curve is colored by complications status. Kaplan-Meier estimates are overlaid in each panel for reference.](Figures/neuralnetworks/weibull-aft-nn.png){#fig-weibull-aft-nn fig-alt="Four panels arranged in a 2-by-2 grid showing predicted survival curves vs. Kaplan-Meier estimates stratified by complications. Top-left (M1) shows two parallel smooth AFT curves (no complications in blue and complications in red), which are close but not fully overlapping Kaplan-Meier curves. Bottom-left (M3) shows the same curves but now with different shapes to another that allow them to almost perfectly overlap the Kaplan-Meier curves. Top-right (M2) show hundreds of red and blue curves but with roughly the same shape. Bottom-right (M4) shows hundreds of red and blue curves but now with unique shapes." width=100%}
 
 @fig-weibull-aft-nn illustrates the general applicability and flexibility of this method.
 However, even when an appropriate survival distribution is selected, predictions remain constrained by the shape of that distribution's hazard or survival function.
