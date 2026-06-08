@@ -132,28 +132,44 @@ set.seed(20231211)
 t = tgen("simsurv")$generate(400)
 s = partition(t)
 
-prrt = as_learner(ppl("distrcompositor", lrn("surv.rpart")))$
-  train(t, s$train)$predict(t, s$test)
+# RRT: surv.rpart + AFT distr composition on a Kaplan-Meier baseline.
+# The current mlr3extralearners surv.rpart emits only `crank` (no `lp`), so
+# ppl("distrcompositor", lrn("surv.rpart")) short-circuits and returns no distr.
+# Earlier rpart exposed lp = crank, which the default distrcompositor
+# (form = "aft", overwrite = FALSE, scale_lp = FALSE) used to build an AFT distr
+# from a Kaplan-Meier baseline; we restore that by supplying lp = crank.
+prpart = lrn("surv.rpart")$train(t, s$train)$predict(t, s$test)
+pkm = lrn("surv.kaplan")$train(t, s$train)$predict(t, s$test)
+prp = PredictionSurv$new(row_ids = prpart$row_ids, truth = prpart$truth,
+  crank = prpart$crank, lp = prpart$crank)
+prrt = po("distrcompose",
+  param_vals = list(form = "aft", overwrite = FALSE, scale_lp = FALSE))$
+  predict(list(base = pkm, pred = prp))[[1]]
+
 pcox = lrn("surv.coxph")$train(t, s$train)$predict(t, s$test)
 pran = lrn("surv.ranger")$train(t, s$train)$predict(t, s$test)
 
-drrt = autoplot(prrt, "calib", t, s$test)$data
+# autoplot.PredictionSurv() now derives the KM reference (calib) and the dcalib
+# quantile extension (formerly extend_quantile = TRUE) from the prediction's own
+# $truth, so the task/row_ids/extend_quantile arguments are no longer passed.
+drrt = autoplot(prrt, "calib")$data
 drrt = drrt %>% filter(Group == "Pred") %>% mutate(Group = "RRT")
-dcox = autoplot(pcox, "calib", t, s$test)$data
+dcox = autoplot(pcox, "calib")$data
 dcox = dcox %>% mutate(Group = if_else(Group == "KM", "KM", "CPH"))
-dran = autoplot(pran, "calib", t, s$test)$data
+dran = autoplot(pran, "calib")$data
 dran = dran %>% filter(Group == "Pred") %>% mutate(Group = "RF")
 
 g = ggplot(rbind(dcox, dran, drrt), aes(x = x, y = y, color = Group)) +
-  geom_line() + theme_classic() + ylim(0, 1) +
+  geom_line() + theme_bw() + ylim(0, 1) +
   labs(x = "T", y = "S(T)", color = "Model")
 ggsave("book/Figures/evaluation/calibKM.png", g, height = 3, units = "in", dpi = 600)
+ggsave("book/Figures/evaluation/calibKM.svg", g, height = 3, units = "in")
 
-drrt = autoplot(prrt, "dcalib", t, s$test, extend_quantile = TRUE)$data
+drrt = autoplot(prrt, "dcalib")$data
 drrt = drrt %>% mutate(Group = "RRT")
-dcox = autoplot(pcox, "dcalib", t, s$test, extend_quantile = TRUE)$data
+dcox = autoplot(pcox, "dcalib")$data
 dcox = dcox %>% mutate(Group = "CPH")
-dran = autoplot(pran, "dcalib", t, s$test, extend_quantile = TRUE)$data
+dran = autoplot(pran, "dcalib")$data
 dran = dran %>% mutate(Group = "RF")
 
 dcal_coxp = as.numeric(pcox$score(msr("surv.dcalib", truncate = Inf, chisq = TRUE)))
@@ -169,13 +185,14 @@ scores = paste0(sprintf("   %s = %s (%s)", c("CPH", "RF", "RRT"), signif(c(dcal_
 scores = paste0("DCal (p-values):\n", scores)
 
 g = ggplot(rbind(dcox, dran, drrt), aes(x = p, y = q, color = Group)) +
-  geom_line() + theme_classic() + ylim(0, 1) + xlim(0, 1) +
+  geom_line() + theme_bw() + ylim(0, 1) + xlim(0, 1) +
   geom_abline(slope = 1, intercept = 0, color = "lightgray", lty = "dashed") +
   labs(x = "True (p)", y = "Predicted", color = "Model") +
   geom_label(aes(x = x, y = y), data.frame(x = 0.75, y = 0.1), label = scores,
   inherit.aes = FALSE, hjust = "left", size = 2.5)
 ggsave("book/Figures/evaluation/calibD.png", g, height = 3, units = "in",
   dpi = 600)
+ggsave("book/Figures/evaluation/calibD.svg", g, height = 3, units = "in")
 
 ## Decision trees
 
