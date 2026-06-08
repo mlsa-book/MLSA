@@ -2,9 +2,8 @@ on:
   pull_request:
     branches: [main]
     paths-ignore:
-      - '**/*.pdf'
-      - 'book/_book/**'
-      
+      - "**/*.pdf"
+      - "book/_book/**"
 
 name: build
 
@@ -23,20 +22,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.ref }}
 
-      - name: Check TODO/FIXMEs
-        run: |
-          #!/bin/bash
-
-          # Search TODO/FIXME and strip whitespace
-          count=$(grep -Rniwo --include="*.qmd" -e 'TODO\|FIXME' book/ | wc -l)
-          count=$(echo "$count" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-
-          # Warn if count>0
-          if [ "$count" -gt 0 ]; then
-              echo "::warning::There are $count FIXMEs/TODOs."
-          fi
-        shell: bash
-
       - name: Install Quarto
         uses: quarto-dev/quarto-actions/setup@v2
         with:
@@ -44,26 +29,3 @@ jobs:
 
       - name: Render book
         run: make render
-
-      - name: Upload pdf book
-        uses: actions/upload-artifact@v4
-        with:
-          name: MLSA
-          path: book/_book/Machine-Learning-in-Survival-Analysis.pdf
-          overwrite: true
-          retention-days: 5
-
-      - name: Add & Commit
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: EndBug/add-and-commit@v9.1.1
-        with:
-          add: book/_book/Machine-Learning-in-Survival-Analysis.pdf --force
-          message: "Push pdf"
-
-      - name: Comment link to pdf
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: thollander/actions-comment-pull-request@v2
-        with:
-          comment_tag: preview
-          message: |
-            [Book :open_book:](https://github.com/mlsa-book/MLSA/blob/${{ github.event.pull_request.head.ref }}/book/_book/Machine-Learning-in-Survival-Analysis.pdf)
