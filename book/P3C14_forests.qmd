@@ -28,11 +28,11 @@ This process is repeated recursively, potentially using different features at ea
 The final leaves are referred to as *terminal nodes*.\index{random forests!splitting rule}\index{random forests!terminal nodes}
 
 For example, (@fig-surv-ranfor) demonstrates a decision tree\index{decision tree} predicting the price that a car sells for in India (price in thousands of dollars).
-The dataset includes as variables: the transmission type (manual or automatic), registration year, and fuel type (petrol or diesel), number of owners, kilometers driven, seller type.
+The dataset includes as variables: transmission type (manual or automatic), registration year, fuel type (petrol or diesel), number of owners, kilometers driven, and seller type.
 The decision tree was trained with a maximum depth of 2 (the number of rows excluding the top), and it can be seen that with this restriction only the transmission type, registration year, and fuel type were selected variables.\index{random forests!maximum depth}
 During training, the algorithm identified that the first optimal variable to split the data was transmission type, partitioning the data into manual and automatic cars.
 Manual cars are further split by registration year whereas automatic cars are split by fuel type.
-The average sale prices in the final leaves are the terminal node predictions.
+The average sale prices in the final leaves are the terminal node predictions (@sec-tree-terminal-nodes).
 
 The graphic highlights several core features of decision trees:
 
@@ -42,7 +42,7 @@ The graphic highlights several core features of decision trees:
 
 To understand how random forests work, it is worth looking a bit more into the most important components of decision trees: splitting rules, stopping rules, and terminal node predictions.
 
-![Predicting the price a vehicle is sold for in India using a regression tree, dataset from kaggle.com/datasets/nehalbirla/vehicle-dataset-from-cardekho. Rounded rectangles are leaves, which indicate the variable that is being split. Edges are branches, which indicate the cut-off at which the variable is split. Variables are car transmission type (manual or automatic), fuel type (petrol or diesel) and registration year. The number at the top of the terminal nodes is the average selling price for all observations in that leaf. The numbers at the bottom of each leaf are the number of observations in the leaf, and the proportion of data contained in the leaf.](Figures/forests/cars.png){#fig-surv-ranfor fig-alt="Decision tree diagram with 7 boxes in a hierarchical top-down structure. The top box splits the data by transmission type, manual or automatic. Manual cars are then split into registration before or after 2014. Manual cars registered before 2014 are predicted to sell for $3.4K, whereas manual cars registered on or after 2014 are predicted to sell for $7.6K. On the other side of the plot, automatic cars are split according to whether they use petrol or diesel. Automatic, petrol cars are predicted to sell for $10K whereas automatic, diesel cars are predicted to sell for $26K."}
+![Predicting the price a vehicle is sold for in India using a regression tree, dataset from kaggle.com/datasets/nehalbirla/vehicle-dataset-from-cardekho. Rounded rectangles are leaves, which indicate the variable that is being split. Edges are branches, which indicate the cutoff at which the variable is split. Variables are car transmission type (manual or automatic), fuel type (petrol or diesel) and registration year. The number at the top of the terminal nodes is the average selling price for all observations in that leaf. The numbers at the bottom of each leaf are the number of observations in the leaf, and the proportion of data contained in the leaf.](Figures/forests/cars.png){#fig-surv-ranfor fig-alt="Decision tree diagram with 7 boxes in a hierarchical top-down structure. The top box splits the data by transmission type, manual or automatic. Manual cars are then split into registration before or after 2014. Manual cars registered before 2014 are predicted to sell for $3.4K, whereas manual cars registered on or after 2014 are predicted to sell for $7.6K. On the other side of the plot, automatic cars are split according to whether they use petrol or diesel. Automatic, petrol cars are predicted to sell for $10K whereas automatic, diesel cars are predicted to sell for $26K."}
 
 #### Splitting and stopping rules
 
@@ -50,7 +50,7 @@ Precisely how the data partitions/splits are derived and which variables are uti
 The goal in each partition is to find two resulting leaves that have the greatest difference between them and thus the maximal homogeneity within each leaf. 
 Hence, after each split, the data in each node should become increasingly similar.
 The splitting rule provides a way to measure the difference between nodes or the homogeneity within the resulting nodes.
-In regression, the most common splitting rule is to select a variable and cut-off (a threshold on the variable at which to separate observations) that minimizes the mean squared error in the two potential resulting leaves.
+In regression, the most common splitting rule is to select a variable and cutoff (a threshold on the variable at which to separate observations) that minimizes the mean squared error in the two potential resulting leaves.
 
 <!-- TODO (ANDREAS; MINOR): CHANGED 'L' TO CAL{A} AS ITS A SET BUT CAL{L} IS LIKELIHOOD. REVERT IF YOU HAVE A STRONG PREFERENCE OTHERWISE DELETE THIS COMMENT -->
 For all decision tree and random forest algorithms going forward, let $\mathcal{A}$ denote the set of observation indices in a leaf, with mean outcome:
@@ -79,16 +79,16 @@ This method is repeated from the first leaf to the last such that observations a
 
 Leaves are repeatedly split until a *stopping rule* has been triggered --- a criterion that tells the algorithm to stop partitioning data.\index{random forests!stopping rule}
 The stopping rule is usually a condition on the number of observations in each leaf such that leaves will continue to be split until some minimum number of observations has been reached in a leaf.
-Other conditions may be on the depth of the tree (as in @fig-surv-ranfor which is restricted to a maximum depth of 2), which corresponds to the number of levels of splitting.\index{random forest!maximum depth}
+Other conditions may be on the depth of the tree (as in @fig-surv-ranfor which is restricted to a maximum depth of 2), which corresponds to the number of levels of splitting.\index{random forests!maximum depth}
 Stopping rules are often used together, for example by setting a maximum tree depth *and* prespecifying a minimum number of observations per leaf.
 Deciding the number of minimum observations and/or the maximum depth can be performed with tuning (@sec-ml-opt).
 
-#### Terminal node predictions
+#### Terminal node predictions {#sec-tree-terminal-nodes}
 
-The final major component of decision trees are *terminal node predictions*.\index{random forest!terminal node}
+The final major component of decision trees is *terminal node predictions*.\index{random forests!terminal node}
 As the name suggests, this is the part of the algorithm that determines how to actually make a prediction for a new observation.
 A prediction is made by 'dropping' the new data 'down' the tree according to the optimal splits that were found during training.
-The resulting prediction is then a simple baseline statistic computed from the training data that fell into the corresponding node.
+The resulting prediction is then a simple baseline statistic computed from the training data in the corresponding node.
 In regression, this is commonly the sample mean of the training outcome data.
 
 Returning to @fig-surv-ranfor, say a new data point is \{transmission = Manual, fuel = Diesel, year = 2015\}, then in the first split the left branch is taken as 'transmission = Manual', in the second split the right branch is taken as 'year' $= 2015 \geq 2014$, hence the new data point lands in the second terminal leaf and is predicted to sell for $7,600.
@@ -96,7 +96,7 @@ The 'fuel' variable is ignored as it is only considered for automatic vehicles.
 @fig-surv-ranfor-pred illustrates this prediction path through the tree.
 This also highlights another powerful feature of random forests: as the final predictions are simple statistics based on training data, all potential predictions can be saved in the original trained model and no complex computations are required in the prediction algorithm.
 
-![Prediction path through the regression tree from @fig-surv-ranfor for a new observation with transmission = Manual, fuel = Diesel, year = 2015. The active path (solid teal arrows) leads through the 'transmission = Manual' split and the 'year $\geq$ 2014' split to the terminal node predicting a sale price of \$7.6K (amber border). Inactive branches are shown in grey with dashed lines. The 'fuel' variable is not used on this path, as fuel type is only evaluated for automatic vehicles.](Figures/forests/cars-prediction-path.png){#fig-surv-ranfor-pred fig-alt="Decision tree from previous figure with a prediction path highlighted for a new observation from Manual transmission to Registration year greater than 2013 to the final terminal node prediction of $7.6K."}
+![Prediction path through the regression tree from @fig-surv-ranfor for a new observation with transmission = Manual, fuel = Diesel, year = 2015. The active path (solid teal arrows) leads through the 'transmission = Manual' split and the 'year $\geq$ 2014' split to the terminal node predicting a sale price of \$7.6K (amber border). Inactive branches are shown in gray with dashed lines. The 'fuel' variable is not used on this path, as fuel type is only evaluated for automatic vehicles.](Figures/forests/cars-prediction-path.png){#fig-surv-ranfor-pred fig-alt="Decision tree from previous figure with a prediction path highlighted for a new observation from Manual transmission to Registration year greater than 2013 to the final terminal node prediction of $7.6K."}
 
 ### Random forests
 
@@ -119,7 +119,7 @@ In random forest implementations this is more common than standard subsampling w
 Commonly, the bootstrapped sample size is the same as the original.
 However, as the same value may be sampled multiple times, on average the resulting data only contains around 63.2\% unique observations [@Efron1997].
 Randomness is further injected to decorrelate the trees by randomly subsetting the candidates of features to consider at each split of a tree.
-Therefore, every split of every tree may consider a different subset of variables.\index{random forest!decorrelation}
+Therefore, every split of every tree may consider a different subset of variables.\index{random forests!decorrelation}
 This process is repeated for $B$ trees, with the final output being a collection of trained decision trees.
 
 Prediction from a random forest for new data $\xx_*$ follows by making predictions from the individual trees and aggregating the results by some function $\sigma$, which is usually the sample mean for regression:
@@ -134,7 +134,7 @@ As discussed above, individual decision trees result in predictions with high va
 Random forests decrease this variance by aggregating predictions over a large sample of decorrelated trees, where a high degree of difference between trees is promoted through the use of bootstrapped samples and random candidate feature selection at each split.
 
 Usually many (hundreds or thousands) trees are grown, which makes random forests robust to changes in data with more stable predictions.
-Other advantages include having tunable and meaningful hyperparameters, including: the number of variables to consider for a single tree, the splitting rule, and the stopping rule.
+Other advantages include having tunable and meaningful hyperparameters, including: the number of variables to consider for a single split, the splitting rule, and the stopping rule.
 
 While random forests are considered a black box, in that one cannot be reasonably expected to inspect thousands of individual trees, variable importance\index{variable importance} can still be aggregated across trees, for example by counting the frequency a variable was selected across trees, calculating the minimal depth at which a variable was used for splitting, or via permutation-based feature importance.
 Hence random forest models are usually more interpretable than many alternative methods.
@@ -231,7 +231,7 @@ Moreover, likelihood-based methods are implemented in relatively few off-the-she
 ### Terminal node prediction {#sec-surv-ml-models-ranfor-nodes}
 
 Similarly to the regression setting, RSF predictions are typically based on simple estimates computed from the training data that fall within the terminal nodes.
-As seen throughout this book, the choice of estimator in the survival setting depends on the prediction task of interest, which are now considered in turn.\index{random survival forests!terminal node prediction}
+As seen throughout this book, the choice of estimator in the survival setting depends on the prediction task of interest; these tasks are now considered in turn.\index{random survival forests!terminal node prediction}
 
 Terminal node predictions are only useful when there are sufficient uncensored observations in each terminal node.
 Hence, a common RSF stopping rule is to set a threshold on the minimum number of _uncensored_ observations per leaf, meaning a leaf is not split if doing so would result in too few uncensored observations to make meaningful predictions.\index{random survival forests!stopping rule}\index{random survival forests!minimum node size}
@@ -269,7 +269,7 @@ $$
 F(x) = \sum^n_{i=1} w_i F_i(x),
 $$
 
-for some weights $w_i, i = 1, \ldots n$.
+for some weights $w_i, i = 1, \ldots, n$.
 Substituting $F = 1 - S$ and noting $\sum w_i = 1$ gives the computation $S(x) = \sum^n_{i=1} w_i S_i(x)$, allowing the bootstrapped survival function to exactly represent the mixture distribution defined by the tree-specific survival functions:
 
 $$
@@ -347,7 +347,7 @@ As Gray's test targets the CIF directly, it could be preferred when the CIF is t
 
 Following @Ishwaran2014, the splitting statistic is obtained by substituting an augmented risk set into (@eq-cr-exp) in place of $n_{t_{(k)}}$.
 Motivated by the Fine-Gray subdistribution hazard framework (@sec-classical-ph-cr), the augmented risk set retains subjects who experienced a competing event.
-In practice, this is implemented by adding all competing-event subjects observed before $t_{\tbk}$ back into the risk set [@Fine1999]:
+In practice, this is implemented by adding all competing-event subjects observed before $\tbk$ back into the risk set [@Fine1999]:
 <!-- TODO (ANDREAS; MINOR): COULD THE BELOW USE THE SAME RISK SET DEFINITION AS IN FINE-GRAY SECTION AND THEN DEFINE TILDE{N} AS THE CARDINALITY? CLEANER AND MORE INTUITIVE IF SO  -->
 
 $$
@@ -357,7 +357,7 @@ $$
 The observed cause-$q$ events are unchanged:
 
 $$
-o^l_{q,t_{(k)}} = \sum_{i \in \mathcal{A}^l} \II(t_i = t_{(k)},\, \delta_i = q).
+o^l_{q,t_{(k)}} = \sum_{i \in \mathcal{A}^l} \II(t_i = t_{(k)},\, q_i = q).
 $$
 
 The expected count replaces $n_{t_{(k)}}$ with $\tilde{n}_{q,t_{(k)}}$ (and $n^l_{t_{(k)}}$ with $\tilde{n}^l_{q,t_{(k)}}$) in (@eq-cr-exp):
@@ -447,6 +447,8 @@ $\phi_{q;Boot}(\xx_*)$ is computed as in (@eq-phi-boot).
 
 * Random forests are highly flexible algorithms that allow the various components to be adapted and altered without major changes to the underlying algorithm. This allows random survival forests (RSFs) to be readily available in many open-source packages.
 * RSFs have in-built variable selection and tend to perform well on high-dimensional data, routinely outperforming other models [@Herrmann2020; @Spooner2020; @Burk2026].
+<!-- FIXME (RAPHAEL): can we really cite @Herrmann2020 and @Burk2026 for RSFs "routinely outperforming other models"? Both benchmark studies (and the wider literature) tend to find the Cox PH hard to beat, and where it is beaten it is usually by CoxBoost or other ML models rather than RSFs specifically. Additionally, @Burk2026 covers only low-dimensional data, so it cannot support a claim about high-dimensional performance. Please soften/re-scope this takeaway and/or cite more appropriate references. -->
+
 * RSFs also have in-built variable importance measures that aid interpretability, although should still be considered black boxes.
 * Due to the large number of trees and repeated bootstrapping, RSFs can be more computationally intensive than simpler survival models. However, they are typically less demanding than, say, neural networks (@sec-nnet) and other deep learning methods. Moreover, RSFs are embarrassingly parallel: individual trees can be trained independently, allowing efficient distribution across CPUs or compute nodes and straightforward parallelization of the workload.
 * Too few trees lead to limitations similar to those of decision trees, whereas larger forests can incur increased computational costs and gains eventually diminish beyond a certain number of trees. Most software provides sensible defaults for the number of trees, and early stopping can also be used.
@@ -460,7 +462,9 @@ $\phi_{q;Boot}(\xx_*)$ is computed as in (@eq-phi-boot).
 * A comprehensive review of random survival forests (RSFs) is provided in Bou-Hamad (2011) [@Bou-Hamad2011], which includes extensions to time-varying covariates and different censoring types.
 * The discussion of decision trees omitted many methods for growing and pruning trees, see @Breiman1984 for full detail.
 * RSFs have been shown to perform well in benchmark experiments on high-dimensional data, see @Herrmann2020 and @Spooner2020 for examples.
-* This chapter considered the most 'traditional' forms of RSFs. Conditional inference forests are popular in the regression setting and whilst they are under-researched in survival, see @Hothorn2005 for literature on the topic. A more recent method that appears to perform well is the (accelerated) oblique random survival forest discussed in @Jaeger2022.
-* Bayesian Additive Regression Trees (BART) [@Chipman2010] provide a Bayesian ensemble alternative in which survival quantities such as hazards or event probabilities can be modeled using sums of shallow trees. For survival analysis, this has been adapted to non-parametric estimators [@Sparapani2016] and parametric models [@Bonato2010].
+<!-- FIXME (RAPHAEL): same concern as the key takeaways bullet above --- @Herrmann2020 and @Spooner2020 tend to find the Cox PH hard to beat (and where it is beaten, often by CoxBoost or other ML models rather than RSFs specifically), so "RSFs perform well on high-dimensional data" may overstate what these references actually show. Please re-scope/soften consistently with the takeaway. -->
+
+* This chapter considered the most 'traditional' forms of RSFs. Conditional inference forests are popular in the regression setting and while they are under-researched in survival, see @Hothorn2005 for literature on the topic. A more recent method that appears to perform well is the (accelerated) oblique random survival forest discussed in @Jaeger2022.
+* Bayesian Additive Regression Trees (BART) [@Chipman2010] provide a Bayesian ensemble alternative in which survival quantities such as hazards or event probabilities can be modeled using sums of shallow trees. For survival analysis, this has been adapted to nonparametric estimators [@Sparapani2016] and parametric models [@Bonato2010].
 
 ::::
