@@ -2502,9 +2502,8 @@ dat$hazard <- loglogistic_hazard(dat$T, dat$Shape, scale = 1)
 
 g = ggplot(dat, aes(x = T, y = hazard, color = factor(Shape))) +
   geom_line(linewidth = 0.8) +
-  labs(x = "t", y = "Log-logistic Hazard, h(t)", color = "Shape") +
-  coord_cartesian(xlim = c(0, 5), ylim = c(0, 5)) +
-  theme(aspect.ratio = 1)
+  labs(x = "t", y = "Log-logistic hazard, h(t)", color = "Shape") +
+  coord_cartesian(xlim = c(0, 5), ylim = c(0, 5))
 
 ggsave("book/Figures/classical/llog_hazard.png", g,
-       width = 4.5, height = 3, units = "in", dpi = 300)
+       width = 6, height = 2.5, units = "in", dpi = 600)

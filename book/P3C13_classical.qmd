@@ -126,9 +126,8 @@ Let $i_{(k)}$ denote the subject who experienced the event at ordered event time
 Cox noted the contribution of an individual could be defined as the probability of a subject, $i_{(k)}$, experiencing the event at $\tbk$, given that someone in the risk set experienced the event at that time. 
 The likelihood contribution of this $k$th event is given by:
 
-<!-- FIXME (RAPHAEL): is the $\ell_i$ notation for the likelihood contribution still correct/consistent given the likelihood-definition changes in the survival chapter (@sec-surv-estimation-param)? -->
 $$
-\ell^{Cox}_{i_{(k)}}
+\calL^{Cox}_{i_{(k)}}
 =\frac{h_0\left(\tbk\right)\exp\left(\eta_{i_{(k)}}\right)}
 {\sum_{j\in \calR_{\tbk}} h_0\left(\tbk\right)\exp\left(\eta_j\right)}
 =\frac{\exp\left(\eta_{i_{(k)}}\right)}
@@ -140,7 +139,7 @@ Note how the baseline hazard $h_0$ cancels out in the likelihood contribution an
 For the estimation of $\bsbeta$, the baseline hazard can be considered a "nuisance parameter"\index{baseline hazard} and the likelihood for the entire data set can be defined as: \index{Cox proportional hazards!partial likelihood}
 
 $$
-\mathcal{L}_{PL}(\bsbeta) = \prod_{k=1}^m \ell^{Cox}_{i_{(k)}} = \prod_{k=1}^m \left(\frac{\exp(\eta_{i_{(k)}})}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}\right),
+\mathcal{L}_{PL}(\bsbeta) = \prod_{k=1}^m \calL^{Cox}_{i_{(k)}} = \prod_{k=1}^m \left(\frac{\exp(\eta_{i_{(k)}})}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}\right),
 $$ {#eq-partial}
 
 which is referred to as a *partial likelihood* [@Cox1975] as it omits the baseline hazard and so captures only part of the full likelihood, rather than fully specifying the distribution of event times.
@@ -313,31 +312,31 @@ Observe that in this definition the left-hand side is the same as the standard r
 Anyone that has been censored ($q_i = 0$) before $\tau$ is removed from the risk set.
 
 The definition of the subdistribution risk (@eq-riskset-sd) is equivalent to defining the subdistribution hazard for cause $q$ as:
-$$
 
+$$
 \begin{aligned}
 &h^{SD}_{q}(\tau) = \\
 &\lim_{\dtau \to 0} \frac{\Pr\left(E(\tau + \dtau) = q \mid E(\tau-) = 0 \vee \left(E(\tau-) \in \{1,\ldots,Q\} \setminus \{q\}\right)\right)}{\dtau}.
 \end{aligned}
 $$ {#eq-hazard-sd}
 
-This extends the cause-specific hazard (@eq-cause-specific-hazard), which conditions only on remaining event-free ($E(\tau-) = 0$), by additionally retaining in the conditioning set those who have already experienced a competing event (who can never transition to $q$).
+This extends the cause-specific hazard (@eq-cause-specific-hazard), which conditions only on remaining event-free ($E(\tau-) = 0$), by additionally retaining in the conditioning set those who have already experienced a competing event and thus could never transition to $q$.
 
 @Fine1999 proposed a proportional hazards formulation of the subdistribution hazard (@eq-hazard-sd) as: \index{proportional hazards!subdistribution}
 
 $$
-h_{FG;q}(\tau \mid \xx_i)= h^{SD}_{q;0}(\tau)\exp(\eta_i),
+h_{FG;q}(\tau \mid \xx_i)= h^{SD}_{q;0}(\tau)\exp(\eta_{q;i}),
 $$ {#eq-cox-sd}
 
-with (@eq-hazard-sd) being the target for the subdistribution baseline hazard $h^{SD}_{q;0}(\tau)$.
+with (@eq-hazard-sd) being the target for the subdistribution baseline hazard $h^{SD}_{q;0}(\tau)$, and where $\eta_{q;i}$ is the linear predictor for observation $i$ and cause $q$.
 Applying the Fine-Gray model assumes proportional hazards for the subdistribution hazard of the cause of interest.
 An equivalent formulation in terms of the CIF is given by:
 
 $$
-F_{FG;q}(\tau \mid \xx_i) = 1 - \left(1 - F^{SD}_{q;0}(\tau)\right)^{\exp(\eta_i)},
+F_{FG;q}(\tau \mid \xx_i) = 1 - \left(1 - F^{SD}_{q;0}(\tau)\right)^{\exp(\eta_{q;i})}.
 $$ {#eq-fg-cif}
 
-This mirrors the proportional hazards survival form $S_{PH} = S_0(\tau)^{\exp(\eta_i)}$ (@eq-ph-surv): here $1 - F_q(\tau)$ plays the role of the survival function (in place of the all-cause survival), so the hazard-survival relationship (@eq-surv-haz) gives $1 - F_q(\tau \mid \xx_i) = (1 - F^{SD}_{q;0}(\tau))^{\exp(\eta_i)}$, which rearranges to (@eq-fg-cif).
+This mirrors the proportional hazards survival form $S_{PH} = S_0(\tau)^{\exp(\eta_{q;i})}$ (@eq-ph-surv) but with $1 - F_q(\tau)$ playing the role of the survival function in place of the all-cause survival.
 
 The parameters of (@eq-cox-sd) are estimated using a weighted partial likelihood [@Fine1999]:
 $$
@@ -350,35 +349,35 @@ $$
 w_{kj} := \frac{G_{KM}(\tbkq)}{G_{KM}(\min\{\tbkq, t_j\})},
 $$
 where $G_{KM}$ is the Kaplan-Meier estimate of the censoring distribution $\Pr(C > \tau)$ (@sec-surv-km), obtained by treating censoring ($q_i = 0$) as the event of interest and all events, of any cause, as censored observations. \index{Kaplan-Meier estimator}\index{inverse probability of censoring weights}
-The subdistribution risk set definition in (@eq-riskset-sd) means that the denominator of (@eq-fg-likelihood) is a weighted sum over individuals, $j \in \calR^{SD}_{q;\tbkq}$,  at time $\tbkq$ who have either yet to experience an event ($t_j \geq \tbkq$) or experienced a different event ($t_j < \tbkq \wedge q_i \in \{1,\ldots,Q\} \setminus \{q\}$).
+The subdistribution risk set definition in (@eq-riskset-sd) means that the denominator of (@eq-fg-likelihood) is a weighted sum over individuals, $j \in \calR^{SD}_{q;\tbkq}$,  at time $\tbkq$ who have either yet to experience an event ($t_j \geq \tbkq$) or experienced a different event ($t_j < \tbkq \wedge q_j \in \{1,\ldots,Q\} \setminus \{q\}$).
 The weighting function handles these cases as follows:
 
 1. If $t_j \geq \tbkq$ then $w_{kj} = 1$ and thus observations that have not experienced any event contribute fully to the denominator.
 2. If $t_j < \tbkq$ then $w_{kj} < 1$ as $G_{KM}$ is a monotonically decreasing function and $w_{kj}$ continues to decrease as the distance between $t_j$ and $\tbkq$ increases. Thus the contribution from observations that have experienced competing events reduces over time.
 
-When $Q>1$, if no observation that has experienced a competing event is in the risk set at any cause-$q$ event time, all weights equal $1$ and (@eq-fg-likelihood) coincides with the cause-specific Cox partial likelihood (@eq-partial-cr).
-When $Q=1$ (no competing events), the subdistribution risk set (@eq-riskset-sd) reduces to the standard risk set (@eq-risk-set) --- only the first condition can ever hold --- and the subdistribution hazard reduces to the usual hazard, exactly recovering the single-event Cox PH model (@eq-ph).
+If no observation that has experienced a competing event is in the risk set at any cause-$q$ event time, all weights equal $1$ and (@eq-fg-likelihood) coincides with the cause-specific Cox partial likelihood (@eq-partial-cr).
+If there are no competing events at all, $Q=1$, then the subdistribution risk set (@eq-riskset-sd) reduces to the standard risk set (@eq-risk-set) as only the first condition can ever hold, and the subdistribution hazard reduces to the usual hazard, recovering the single-event Cox PH model (@eq-ph).
 
 Finally, prediction of the subdistribution cumulative hazard follows by updating the Breslow estimator (@eq-breslow) to incorporate the subdistribution risk set definition and applying the same weighting as in (@eq-fg-likelihood) to compensate for competing events:  \index{Cox proportional hazards!Breslow estimator}
 
 $$
-\hat{H}^{SD}_{Bres;q}(\tau) = \sum_{k:\tbkq \leq \tau} \frac{d_{\tbkq}}{\sum_{j \in \calR^{SD}_{q;\tbkq}} w_{kj}\exp(\hat{\eta}_j)},
+\hat{H}^{SD}_{Bres;q}(\tau) = \sum_{k:\tbkq \leq \tau} \frac{d_{\tbkq}}{\sum_{j \in \calR^{SD}_{q;\tbkq}} w_{kj}\exp(\hat{\eta}_{q;j})},
 $$
 
 which can be substituted into (@eq-fg-cif) via (@eq-surv-haz):
 
 $$
-\hat F_{FG;q}(\tau \mid \xx_i) = 1 - \exp\left(-\hat H^{SD}_{Bres;q}(\tau)\right)^{\exp(\hat \eta_i)}.
+\hat{F}_{FG;q}(\tau \mid \xx_i) = 1 - \exp\left(-\hat H^{SD}_{Bres;q}(\tau)\exp(\hat{\eta}_{q;i})\right).
 $$
 
 The Fine-Gray model should be carefully considered before being used as a predictive model.
 The subdistribution risk set definition, which includes competing events, treats all causes as non-terminal (even if realistically impossible), which means an observation could be considered at risk of the event of interest even after experiencing a terminal event (like death).
 Moreover, combining subdistribution CIF estimates across causes can result in probabilities that exceed $1$, which should be impossible as events are mutually exclusive and exhaustive [@Austin2022b].
 Finally, fitting multiple subdistribution models requires the PH assumption to hold simultaneously across all causes, which is often difficult to justify and may even be impossible: the cause-specific CIFs must sum to at most one, so proportional subdistribution hazards cannot hold for every cause at once [@Grambauer2010; @bonnevilleWhyYouShould2024].
-Even when the subdistribution PH assumption is misspecified, however, the estimated subdistribution hazard ratio still provides a useful summary of a covariate's effect on the cause-specific CIF [@Grambauer2010].
 
 The Fine-Gray model is most appropriate when only one cause is of interest, which is often the case in clinical settings; for example, predicting death from disease while treating discharge as a competing risk.
 In such settings, coefficients from a subdistribution model may be more intuitive to interpret than those from cause-specific models\index{proportional hazards!cause-specific} as they directly relate covariates to event incidence via (@eq-fg-cif), which is often the quantity of primary interest [@Austin2017b]. 
+Moreover, even when the subdistribution PH assumption is misspecified, the estimated subdistribution hazard ratio still provides a useful summary of a covariate's effect on the cause-specific CIF [@Grambauer2010].
 
 ## Accelerated failure time {#sec-surv-models-param}
 
@@ -412,7 +411,7 @@ This is shown by the middle, blue curve in @fig-dogs.
 These illustrative curves demonstrate how the same modifier yields different behavior under PH and AFT assumptions.
 Of course, there is no reason a five-fold acceleration on the AFT (time) scale should correspond to a five-fold hazard ratio on the PH scale.
 Increasing the hazard ratio to approximately $395$ brings the PH survival curve much closer to the AFT curve, matching its median survival (dashed blue line in @fig-dogs).
-Nevertheless, under the proportional hazards assumption it is not possible to recover the *shape* of the AFT curve --- the only exception being the Weibull distribution, which can be expressed as both a PH and an AFT model.
+Nevertheless, under the proportional hazards assumption it is not possible to recover the *shape* of the AFT curve, with the only exception being the Weibull distribution, which can be expressed as both a PH and an AFT model.\index{Weibull distribution}
 
 ![Comparing human (black) and dog lifespans, with the dog modeled by an AFT model (red, a five-fold acceleration of time) and PH models (blue). The solid blue curve uses a hazard ratio of $5$ (the same numerical factor as the AFT acceleration); the dashed blue curve uses the much larger hazard ratio ($\approx 395$) needed to match the AFT dog's median survival, yet still cannot reproduce its shape. Human lifespan modeled with Gompertz(0.09, 0.00005).](Figures/classical/dogs.png){#fig-dogs fig-alt="Survival time T is on the x-axis (0 to 80) and survival probability S(T) on the y-axis (0 to 1). All curves start at S(T)=1. The black curve (human) stays near 1 until about T=40 then declines gently to about 0.48 at T=80. The solid blue curve (dog, PH with hazard ratio 5) stays near 1 until about T=35 then declines, passing 0.5 around T=60. The red curve (dog, AFT) stays near 1 until about T=10 then drops steeply between T=12 and T=20 to near 0. The dashed blue curve (dog, PH with hazard ratio 395) lies much closer to the red AFT curve, crossing 0.5 near T=16, but with a more gradual shape: it begins to decline around T=5 and reaches near 0 only around T=35."}
 
@@ -432,10 +431,12 @@ where $\eta_i = \xx_i^\trans\bsbeta$ is the linear predictor for observation $i$
 
 Note three key differences compared to the PH model.
 
-Firstly, $\exp(-\eta_i)$ is modeled instead of $\exp(\eta_i)$, so the linear predictor relates to risk in the opposite direction to the PH model: a larger $\eta_i$ lengthens survival ($S_{AFT}(\tau \mid \xx_i) > S_{AFT}(\tau \mid \xx_j)$ for $\eta_i > \eta_j$, since $S_0$ is decreasing and $\tau e^{-\eta_i} < \tau e^{-\eta_j}$), whereas in a PH model a larger $\eta_i$ raises the hazard, reducing survival. 
-Interpreting the AFT linear predictor as a risk score therefore reverses the book's 'high value, high risk' convention, so its sign should be flipped before it is used for relative-risk prediction.
-Secondly, the baseline risk now clearly depends on both the linear predictor as well as time.
-Thirdly, an increase in a covariate results in a multiplicative effect on survival time, rather than the multiplicative effect on hazard seen in a PH model. This is often viewed as an advantage of AFT models as survival times may be simpler to interpret than hazard ratios.
+1. $\exp(-\eta_i)$ is modeled instead of $\exp(\eta_i)$, which means the linear predictor relates to risk in the opposite direction to the PH model.
+As $\eta_i$ increases, the inner expression of (@eq-aft-surv), $\tau e^{-\eta_i}$, tends to zero and as $S_0$ is a decreasing function, it follows that $S_0(\tau e^{-\eta_i})$ tends to one.
+In a PH model, a larger $\eta_i$ raises the hazard, reducing survival. 
+Interpreting the AFT linear predictor as a risk score therefore reverses the book's 'high value, high risk' convention, so its sign should be flipped before being used for relative-risk prediction.
+1. The baseline risk now clearly depends on both the linear predictor as well as time.
+2. An increase in a covariate results in a multiplicative effect on survival time, rather than the multiplicative effect on hazard seen in a PH model. This is often viewed as an advantage of AFT models as survival times may be simpler to interpret than hazard ratios.
 
 This third point is visualized in @fig-phaft in which a covariate is increased by $\log(2)$.
 The left panel shows that the estimated hazard function from a PH model is double the baseline at all time points --- the multiplicative effect is seen on the y-axis (risk).
@@ -477,11 +478,10 @@ When the chosen distribution is well specified, AFTs can provide a useful altern
 ![Log-logistic hazard curves with a fixed scale parameter of 1 and a changing shape parameter. x-axis is time and y-axis is the log-logistic hazard as a function of time.](Figures/classical/llog_hazard.png){#fig-logloghaz fig-alt="Five log-logistic hazard curves. Each represents a distinct representation of the hazard. When the shape parameter is 0.5, the curve starts at (0, 4) then curves down to (5,0). In contrast, when the shape parameter is 7, the curve starts at (0,0) then peaks at around (1.2, 4.5) then slopes down to (5, 1.5)."}
 
 As with the PH model, AFT models can be fit using maximum likelihood estimation of the full-likelihood (@sec-surv-estimation-param) by plugging distribution functions into (@eq-aft-surv)-(@eq-aft-haz).
-<!-- FIXME (RAPHAEL): here and elsewhere, please use $Y$ (the variable of interest, introduced earlier) rather than $X$ for the random variable. $X$ was introduced as the covariate vector/random variable, and here it is introduced as the survival time, then one line later $x$ switches roles to a feature/covariate --- very confusing for beginners. Suggest $Y \sim \Exp(\lambda)$, $h_Y$, $S_Y$. -->
-Using the exponential distribution as an example, first recall that if $X \sim \Exp(\lambda)$ then,
+Using the exponential distribution as an example, first recall that if $Y \sim \Exp(\lambda)$ then,
 
 $$
-h_X(\tau) = \lambda \quad \text{and} \quad S_X(\tau) = \exp(-\lambda\tau).
+h_Y(\tau) = \lambda \quad \text{and} \quad S_Y(\tau) = \exp(-\lambda\tau).
 $$
 
 Giving the Exponential-AFT survival and hazard functions: \index{accelerated failure time!exponential}
@@ -538,29 +538,25 @@ O_{PO}(\tau \mid \xx_i) =  O_0(\tau)\exp(\eta_i)
 $$
 
 where $O_0$ is the baseline odds.
+A log-logistic distribution is often assumed for the baseline odds and the model is fit by maximum likelihood estimation on the full likelihood [@Bennett1983], discussed further in the next section.\index{maximum likelihood estimator}
 
-<!-- FIXME (RAPHAEL): here and elsewhere, if you mean a specific feature use $x_p$ (with coefficient $\beta_p$) rather than $x_i$/$\beta_i$ --- the $i$ index is reserved for subject $i$. ($\xx_i$ above, the covariate vector for subject $i$, is correct.) -->
-By the same logic as the proportional hazards model, this model assumes $O(\tau \mid \xx_i) \propto \exp(\eta_i)$ and by analogous maths to (@eq-ph-hazard-ratio), a unit increase in a covariate, $x_i$, multiplies the odds of surviving past $\tau$ by $\exp(\beta_i)$ where $\beta_i$ is the corresponding coefficient.
+By the same logic as the proportional hazards model, this model assumes $O(\tau \mid \xx_i) \propto \exp(\eta_i)$.
+For a model with single covariate $x$ and coefficient $\beta$, by analogous maths to (@eq-ph-hazard-ratio), a unit increase in $x$, multiplies the odds of surviving past $\tau$ by $\exp(\beta)$.
 
 A useful implication of the PO model is the convergence of hazard functions, which states $h_i(\tau)/h_0(\tau) \rightarrow 1$ as $\tau \rightarrow \infty$ [@Kirmani2001].
 To see this, note that the PO model can be represented in terms of the hazard function via [@Collett2014]:
 
 $$
-h_{PO}(\tau \mid \xx_i) =  h_0(\tau)\left(1 - \frac{S_0(\tau)}{(\exp(\eta_i) - 1)^{-1} + S_0(\tau)} \right)
+h_{PO}(\tau \mid \xx_i) =  \frac{h_0(\tau)}{1 + \Big(S_0(\tau)(\exp(\eta_i) - 1)\Big)}.
 $$ {#eq-po}
 
-Dividing by the baseline hazard yields:
+Dividing by the baseline hazard,
 
 $$
-\begin{aligned}
-\frac{h_{PO}(\tau \mid \xx_i)}{h_0(\tau)}
-&= 1 - \frac{S_0(\tau)}{(\exp(\eta_i) - 1)^{-1} + S_0(\tau)} \\
-&=  \frac{(\exp(\eta_i) - 1)^{-1} }{(\exp(\eta_i) - 1)^{-1} + S_0(\tau)} \\
-&= \frac{1}{1 + \Big(S_0(\tau)(\exp(\eta_i) - 1)\Big)}.
-\end{aligned}
+\frac{h_{PO}(\tau \mid \xx_i)}{h_0(\tau)} = \frac{1}{1 + \Big(S_0(\tau)(\exp(\eta_i) - 1)\Big)},
 $$ {#eq-po-ratio}
 
-When $\tau \rightarrow \infty$, it holds that $S_0(\tau) \rightarrow 0$ and (@eq-po-ratio) $\rightarrow 1$.
+and as $\tau \rightarrow \infty$, it holds that $S_0(\tau) \rightarrow 0$ and (@eq-po-ratio) $\rightarrow 1$.
 As such, every individual's hazard approaches the baseline hazard over a long period of time.
 This assumption holds in several contexts, most commonly in medical domains where death is the event of interest.
 For example, take two patients with a disease, patient $i$ receives treatment and patient $j$ does not.
@@ -581,10 +577,6 @@ The treatment effect reduces the hazard for observation $i$ at early time-points
 However, at the later time-point, the hazard is similar for both observations.
 This example highlights a similarity to AFT models (@sec-surv-models-param): under the survival-odds parameterization, larger values of $\eta$ decrease the hazard.
 Therefore, once again, care must be taken when using these models for relative risk predictions to ensure a consistent interpretation of risk.
-
-<!-- TODO (RAPHAEL): why partial likelihood / semiparametric here? The section introduces only the general PO form (in parallel with PH and AFT), and a semiparametric PO model is never set up --- so jumping to "the partial likelihood of a semiparametric proportional odds model" is unmotivated. Coming straight after AFT, a reader would expect the fully parametric treatment. Please clarify or restructure (e.g. state up front that PO is used parametrically, with the semiparametric route only noted in passing). -->
-There is no simple closed form expression for the partial likelihood of a semiparametric proportional odds model. \index{maximum likelihood estimator}
-A log-logistic distribution is often assumed for the baseline odds and the model is fit by maximum likelihood estimation on the full likelihood [@Bennett1983], discussed further in the next section.
 
 ## Flexible parametric models {#sec-flexible}
 
@@ -607,13 +599,13 @@ $$
 \log{O}_{RP}(\tau \mid \xx_i) = s(\tau \mid \bsnu,\mathbf{k}) + \eta_i,
 $$ {#eq-rp-odds}
 
-where $\bsnu$ are spline coefficients to be fitted by maximum likelihood estimation, $\mathbf{k}$ are the positions of $K$ knots, and $s$ is the restricted cubic spline function in log time defined by, \index{splines}
+where $\bsnu$ are spline coefficients to be fitted by maximum likelihood estimation, $\mathbf{k}$ are the positions of $K$ internal knots, and $s$ is the restricted cubic spline function in log time defined by, \index{splines}
 
 $$
 s(\tau \mid \bsnu,\mathbf{k}) = \nu_0 + \nu_1\log(\tau) + \nu_2 B_1(\log(\tau)) + \ldots + \nu_{K+1} B_K(\log(\tau)),
 $$
 
-$B_j$ is the basis function at knot $k_j$ defined by,
+$B_j$ is the basis function at knot $k_j$ defined by,\index{basis functions}
 
 $$
 B_j(x) = (x - k_j)^3_+ - \omega_j(x - k_{min})^3_+ - (1 - \omega_j)(x - k_{max})^3_+,
@@ -683,17 +675,17 @@ $$
 where each $f_j$ is a smooth, possibly non-linear function of its covariate. 
 If all $f_j$ are linear functions then this recovers the standard linear predictor $\eta = x_1\beta_1 + \ldots + x_p\beta_p$.
 
-In practice each $f_j$ is represented as a linear combination of $M_j$ known basis functions,
+In practice, each $f_j$ is represented as a linear combination of $M_j$ known basis functions,\index{basis functions}
 
 $$
 f_j(x_j) = \sum_{m=1}^{M_j} \nu_{jm} B_{jm}(x_j),
 $$ {#eq-gam-basis}
 
-where the $B_{jm}$ are the basis functions and the $\nu_{jm}$ are the corresponding basis coefficients to be estimated.
-Many basis systems can be used, including natural cubic splines, B-splines and the closely related penalized B-splines (P-splines) [@Eilers1996], and thin-plate regression splines [@Wood2003]; simpler choices such as step functions or polynomial bases are also possible (see @Wood2017 for a comprehensive treatment). \index{splines}
+where $B_{jm}$ are the basis functions and the $\nu_{jm}$ are the corresponding basis coefficients to be estimated.
+Many basis systems can be used, including natural cubic splines, B-splines and the closely related penalized B-splines (P-splines) [@Eilers1996], and thin-plate regression splines [@Wood2003]; simpler choices such as step functions or polynomial bases are also possible (see @Wood2017 for a comprehensive treatment).\index{splines}
 
-Because a rich basis can easily overfit, estimation is usually combined with a penalty on the basis coefficients that discourages overly wiggly fits.
-Collecting all parameters in $\bstheta$, the functions are then estimated by optimizing a penalized criterion of the general form
+Highly flexible basis functions can easily overfit the data, so estimation is usually combined with a penalty on the basis coefficients.
+Collecting all parameters in $\bstheta$, the functions are estimated by optimizing a penalized criterion of the general form
 
 $$
 L(\bstheta) + \xi P(\bstheta),
@@ -706,8 +698,8 @@ $$
 P(\bstheta) = \sum_{m=2}^{M_j} (\nu_{jm} - \nu_{j,m-1})^2,
 $$
 
-which shrinks neighbouring coefficients towards one another and thereby penalizes abrupt changes in $f_j$.
-As $\xi \to 0$ the estimate approaches the unpenalized fit, whereas a large $\xi$ forces each $f_j$ towards a straight line.
+which shrinks neighboring coefficients towards one another and thereby penalizes abrupt changes in $f_j$.
+As $\xi \to 0$, the estimate approaches the unpenalized fit, whereas a large $\xi$ forces each $f_j$ towards a straight line.
 Flexible parametric models like the Royston-Parmar model (@sec-flexible) are additive models that use splines to model the baseline hazard, and are implemented in the $\texttt{flexsurv}$ package [@pkgflexsurv]. Additive Cox models, which instead estimate smooth functions of the covariates directly within the proportional hazards framework, are described in @Hastie1990.
 
 The constructions above make the predictor considerably more flexible, but they still assume each effect is a smooth function of a single covariate, rule out interactions between covariates, and require the predictor to be prespecified --- the modeler must decide in advance which features are modeled via splines and how.
@@ -728,8 +720,9 @@ In these cases, using all variables for modeling results in worse interpretabili
 
 To improve model performance, one can therefore apply feature selection methods to reduce the number of variables the model uses. \index{feature selection}\index{dimension reduction}
 Feature selection is often grouped into three categories: 1) wrappers; 2) embedded methods; and 3) filters.
-Wrappers fit multiple models on subsets of variables and select the best-performing subsets. This is often computationally infeasible in the context of very large datasets.
-This section does not consider general algorithms such as principal component analysis, see further reading below for suggested additional material that covers these areas.
+Wrappers fit multiple models on subsets of variables and select the best-performing subsets.
+This is often computationally infeasible in the context of very large datasets and as such does not generalize well to survival analysis.
+This section does not consider general algorithms such as principal component analysis, see further reading below for suggested material that covers these areas.
 
 #### Embedded methods {.unlisted .unnumbered}
 Embedded methods refer to those that are incorporated during model fitting.
@@ -769,7 +762,7 @@ The number of features to select, or the threshold to exceed, can be treated as 
 @Bommert2021 compared 14 filter methods for high-dimensional survival data and found that the most powerful method was a simple variance filter:
 
 $$
-V(\xx_{\cdot j}) = \text{Var}(\xx_{\cdot j})
+V(\xx_{\cdot j}) = \Var(\xx_{\cdot j})
 $$
 
 where $\xx_{\cdot j}$ is the $j$th variable in the data and $V$ is the resulting score.
@@ -801,7 +794,7 @@ Models are then trained on the bootstrapped data.
 
 Model-based boosting fits a sequence of models that iteratively improve predictive performance by correcting errors from previous iterations.\index{boosting}
 The initial model is fit to the training data and subsequent models are fit on the same features but using pseudo-residuals as targets, resulting in a sequence of regression tasks.
-These _pseudo-residuals_ are the negative gradient (@sec-ml-gradient-descent) of a chosen loss function evaluated at the previous iteration; this process is revisited to in detail in @sec-boost. \index{gradient descent} \index{pseudo-residuals}
+These _pseudo-residuals_ are the negative gradient (@sec-ml-gradient-descent) of a chosen loss function evaluated at the previous iteration; this process is revisited in detail in @sec-boost. \index{gradient descent} \index{pseudo-residuals}
 Fitting each subsequent model to the pseudo-residuals focuses learning on the remaining prediction error and incrementally improves the overall ensemble.
 In survival analysis, many of the losses discussed in Part II can be incorporated into this framework, with the choice of loss depending on the prediction task of interest.
 Model-based boosting is a general framework and may underperform the purpose-built algorithms discussed in @sec-boost.
@@ -867,6 +860,6 @@ One particularly popular form of stacking in survival analysis is the _SuperLear
 * Extensions of the proportional hazards framework include more general hazard-based models that allow covariates to act simultaneously on the hazard and time scales. An example is the general hazards model of [@Chen2001]. While flexible, such models do not appear common in predictive modeling but are instead preferred for inference [for example, @Tong2013; @Rubio2019; @Rubio2022].
 * @Collett2014 and @Kalbfleisch1980 both provide comprehensive reading for foundational statistical models. The former is slightly less technical and covers extensions to multiple settings.
 * For more abstract feature selection algorithms that can be applied to any data (survival or otherwise), see @Chandrashekar2014 and @Guyon2003.
-* Kernel-based approaches not covered here have been suggested for smooth nonparametric estimates of the baseline hazard (@Gefeller1992; @Muller1994).
+* Kernel-based approaches not covered here have been suggested for smooth nonparametric estimates of the baseline hazard [@Gefeller1992; @Muller1994].
 
 ::::
