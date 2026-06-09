@@ -2508,3 +2508,68 @@ g = ggplot(dat, aes(x = T, y = hazard, color = factor(Shape))) +
 
 ggsave("book/Figures/classical/llog_hazard.png", g,
        width = 4.5, height = 3, units = "in", dpi = 300)
+
+##------------------
+## Logloss and Brier
+##------------------
+p <- seq(0.001, 0.999, length.out = 500)
+
+df <- data.frame(
+  Prediction = rep(p, 4),
+  Value = c(
+    (1 - p)^2, p^2,
+    -log(p), -log(1 - p)
+  ),
+  Class = rep(c("y1", "y0", "y1", "y0"), each = length(p)),
+  Loss = rep(c("Brier score", "Log loss"), each = 2 * length(p))
+)
+
+
+brier <- ggplot(subset(df, Loss == "Brier score"),
+                aes(Prediction, Value, colour = Class)) +
+  geom_line(linewidth = 1) +
+  scale_y_continuous(limits = c(0, 1.05), breaks = seq(0, 1, 0.25)) +
+  annotate(
+    "label", x = 0.10, y = 1.00,
+    label = "y[i] == 1",
+    parse = TRUE
+  ) +
+  annotate(
+    "label", x = 0.90, y = 1.00,
+    label = "y[i] == 0",
+    parse = TRUE,
+  ) +
+  labs(
+    x = expression(Prediction ~ hat(y)[i]),
+    y = "Brier score"
+  ) +
+  theme(legend.position = "none")
+
+logloss <- ggplot(subset(df, Loss == "Log loss"),
+                  aes(Prediction, Value, colour = Class)) +
+  geom_line(linewidth = 1) +
+  scale_y_continuous(
+    limits = c(0, 3.15),
+    breaks = c(0, log(2), 1, 2, 3),
+    labels = c("0", "0.69", "1", "2", "3")
+  ) +
+  annotate(
+    "label", x = 0.15, y = 3.00,
+    label = "y[i] == 1",
+    parse = TRUE
+  ) +
+  annotate(
+    "label", x = 0.85, y = 3.00,
+    label = "y[i] == 0",
+    parse = TRUE,
+  ) +
+  labs(
+    x = expression(Prediction ~ hat(y)[i]),
+    y = "Log loss"
+  ) +
+  theme(legend.position = "none")
+
+
+
+ggsave("book/Figures/evaluation/brier_logloss.png", brier + logloss,
+      width = 5.5, height = 3, units = "in")
