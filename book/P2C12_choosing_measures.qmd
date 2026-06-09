@@ -1,5 +1,5 @@
 ---
-abstract: "This chapter provides practical guidance on selecting evaluation measures in survival analysis, emphasizing alignment between the chosen metric and the goal of the analysis. Discrimination measures are recommended for assessing ranking performance, calibration methods for evaluating agreement between predicted and observed outcomes, and scoring rules for capturing overall predictive accuracy. For discrimination, Harrell’s C and Uno’s C are highlighted as robust default choices, with the latter preferred under heavier censoring. Calibration is best assessed visually using comparisons to the Kaplan–Meier estimator for single models, while D-calibration is recommended for comparing models. For overall performance, the integrated survival Brier score and the right-censored log-loss are proposed, with results reported using explained residual variation to aid interpretation. The chapter also discusses measure selection for model tuning, recommending scoring rules for general use and Uno’s C for ranking-focused tasks, while noting ongoing uncertainty in evaluating survival time predictions."
+abstract: "This chapter provides practical guidance on selecting evaluation measures in survival analysis, emphasizing alignment between the measure and the goal of analysis. Discrimination measures are recommended when the goal is to assess ranking performance, calibration methods when the goal is to assess agreement between predicted and observed outcomes, and scoring rules when the goal is to assess overall predictive accuracy. For discrimination, Harrell's concordance index and Uno's concordance index are highlighted as practical default choices, with Uno's concordance index preferred when a single evaluation measure is reported under heavier censoring. Calibration of a single model is best assessed visually using comparisons to the Kaplan-Meier estimator, while distribution calibration can support model comparison. For overall performance, the survival Brier score at a time point of interest, the integrated survival Brier score, and the right-censored log loss are recommended, with explained residual variation used to aid interpretation. For automated model optimization, scoring rules are recommended for general use, while Harrell's concordance index is preferred for ranking-focused tuning. Evaluation of survival time predictions remains uncertain and should be treated cautiously."
 
 ---
 
@@ -9,23 +9,28 @@ abstract: "This chapter provides practical guidance on selecting evaluation meas
 
 # Choosing Measures {#sec-choosing-measures}
 
-There are many survival measures to choose from and selecting the right one for the task might seem daunting.
-We have put together a few heuristics to support decision making.
-Evaluation should always be according to the goals of analysis, which means using discrimination measures to evaluate rankings, calibration measures to evaluate average performance, and scoring rules to evaluate overall performance and distribution predictions.
+There are many survival measures\index{survival measures} to choose from, and selecting the right one for a given task may seem daunting.
+Below are a few heuristics to support decision-making.
+First and foremost, evaluation should always be according to the goals of analysis, which means using discrimination measures\index{discrimination} to evaluate relative risk predictions\index{relative risks}, calibration\index{calibration} measures to evaluate average agreement between predictions and observed outcomes, and scoring rules\index{scoring rules} to evaluate overall performance and distribution predictions.
 
-For discrimination measures, we recommend Harrell's and Uno's C.
-Whilst others can assess time-dependent trends, these are also captured in scoring rules.
-In practice the choice of measure matters less than ensuring your reporting is transparent and honest [@Therneau2020; @Sonabend2021].
+For discrimination measures, consider Harrell's C and Uno's C.\index{concordance index!Harrell's C}\index{concordance index!Uno's C}
+While other discrimination measures can assess time-dependent ranking performance, time-dependent predictive performance can also be examined through scoring rules.
+If only one measure is to be reported, then Uno's C may be preferred.
+Although Uno's C can have higher variance than Harrell's C [@Rahman2017; @Schmid2012], it is less likely to overestimate concordance as censoring increases [@Rahman2017].
+Moreover, the variance can be transparently captured and reported through techniques such as bootstrapping.
+In practice, the choice of measure matters less than ensuring your reporting is transparent and honest [@Therneau2020; @Sonabend2021].\index{C-hacking}
 
-To assess a single model's calibration, graphical comparisons to the Kaplan-Meier provide a useful and interpretable method to quickly see if a model is a good fit to the data (@sec-calib-km).
-When choosing between models, we recommend D-calibration, which can be meaningful optimized and thus used for comparison.
+To assess the calibration of a single model, graphical comparisons to the Kaplan-Meier estimator\index{Kaplan-Meier estimator} provide a useful and interpretable way to assess model fit (@sec-calib-km). \index{calibration!plots}
+When choosing between models, D-calibration\index{calibration!d-calibration} can be meaningfully optimized and thus used for model comparison.
 
-When picking scoring rules, we recommend using both the ISBS and RCLL.
-If a model outperforms another with respect to both measures then that can be a strong indicator of performance.
-When reporting scoring rules, we recommend the ERV representation which provides a meaningful interpretation as 'performance increase over baseline'.
+When picking scoring rules, the survival Brier score (@eq-sbs) provides a useful score for developing prediction error curves (@sec-pecs).
+For a quantity that summarizes overall predictive ability, the integrated SBS (@eq-igs) is most commonly used in the literature though its properness is susceptible to different censoring patterns.
+The RCLL\index{right-censored log loss} (@sec-rules-log) is intuitive and is proven strictly proper when censoring is conditionally event-independent [@Rindt2022; @Yanagisawa2023], but may require numerical approximation of the density function (@sec-distributions-continuous).
+Most importantly, the choice of evaluation measure(s) should be decided up-front and not selected based on preliminary results.
+When reporting scoring rules, consider the ERV representation which provides a meaningful interpretation as "performance increase over baseline".\index{explained residual variation}
 
-Given the lack of research, if you are interested in survival time predictions then treat evaluation with caution and check for new developments in the literature.
+Given the limited research currently available, evaluation of survival time predictions should be treated with caution and new developments in the literature should be monitored.
 
-For automated model optimization, we recommend tuning with a scoring rule, which should capture discrimination and calibration simultaneously [@Rindt2022; @Yanagisawa2023; FIXME ECML].
-Though if you are only ever using a model for ranking, then we recommend tuning with Uno's C.
-Whilst it does have higher variance compared to other concordance measures [@Rahman2017; @Schmid2012], it performs better than Harrell's C as censoring increases [@Rahman2017].
+For automated model optimization\index{tuning}, tuning with a scoring rule should capture discrimination and calibration simultaneously [@Kopper2026; @Rindt2022; @Yanagisawa2023].
+However, if you are developing a model to maximize separation and calibration truly matters less, then prefer Harrell's C over Uno's C, as any bias in the measure should affect models similarly, making lower variance potentially preferable.
+Finally, avoid using a measure of calibration alone for tuning, as that will push models towards acting like a non-parametric estimator.
