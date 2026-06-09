@@ -1,5 +1,5 @@
 ---
-abstract: "This chapter introduces random forests as an ensemble learning method and outlines their extension to survival analysis through random survival forests (RSFs). It begins by describing decision trees, focusing on their key components: splitting rules, stopping criteria, and terminal node predictions. While decision trees are interpretable and capable of capturing non-linear effects and interactions, they suffer from high variance and instability. Random forests address these limitations by combining many trees trained on bootstrapped samples with additional randomness introduced through feature subsampling, resulting in improved predictive performance and robustness. The chapter then extends these ideas to censored data. In RSFs, standard regression splitting rules are replaced with survival-specific criteria, most commonly the log-rank test, to account for time-to-event outcomes. Terminal node predictions are adapted to estimate survival quantities such as survival functions and cumulative hazards using nonparametric estimators. The framework further generalizes to competing risks through appropriate modifications to splitting rules and node estimators. Finally, the chapter discusses relative risk prediction and practical considerations, emphasizing the flexibility and strong empirical performance of RSFs in high-dimensional survival settings."
+abstract: "This chapter introduces random forests as an ensemble learning method and outlines their extension to survival analysis through random survival forests. It begins by describing decision trees, focusing on their key components: splitting rules, stopping criteria, and terminal node predictions. While decision trees are interpretable and capable of capturing non-linear effects and interactions, they suffer from high variance and instability. Random forests address these limitations by combining many trees trained on bootstrapped samples with additional randomness introduced through feature subsampling, resulting in improved predictive performance and robustness. The chapter then extends these ideas to censored data. In random survival forests, standard regression splitting rules are replaced with survival-specific criteria, most commonly the log-rank test, to account for time-to-event outcomes. Terminal node predictions are adapted to estimate survival quantities such as survival functions and cumulative hazards using nonparametric estimators. The framework further generalizes to competing risks through appropriate modifications to splitting rules and node estimators. Finally, the chapter discusses relative risk prediction and practical considerations, emphasizing the flexibility and strong empirical performance of random survival forests in high-dimensional survival settings."
 ---
 
 ::: {.content-visible when-format="html"}
@@ -90,7 +90,7 @@ A prediction is made by 'dropping' the new data 'down' the tree according to the
 The resulting prediction is then a simple baseline statistic computed from the training data in the corresponding node.
 In regression, this is commonly the sample mean of the training outcome data.
 
-Returning to @fig-surv-ranfor, say a new data point is \{transmission = Manual, fuel = Diesel, year = 2015\}, then in the first split the left branch is taken as 'transmission = Manual', in the second split the right branch is taken as 'year' $= 2015 \geq 2014$, hence the new data point lands in the second terminal leaf and is predicted to sell for $7,600.
+Returning to @fig-surv-ranfor, say a new data point is \{transmission = Manual, fuel = Diesel, year = 2015\}, then in the first split the left branch is taken as 'transmission = Manual', in the second split the right branch is taken as 'year' $= 2015 \geq 2014$, hence the new data point lands in the second terminal leaf and is predicted to sell for $7,600$.
 The 'fuel' variable is ignored as it is only considered for automatic vehicles.
 @fig-surv-ranfor-pred illustrates this prediction path through the tree.
 This also highlights another powerful feature of random forests: as the final predictions are simple statistics based on training data, all potential predictions can be saved in the original trained model and no complex computations are required in the prediction algorithm.
@@ -102,9 +102,8 @@ This also highlights another powerful feature of random forests: as the final pr
 Decision trees often overfit the training data, hence they have high variance, perform poorly on new data, and are not robust to even small changes in the original training data.\index{overfitting}
 Moreover, important variables can end up being ignored as only subsets of dominant variables are selected for splitting.
 
-To counter these problems, *random forests* are designed to improve prediction accuracy and decrease variance.\index{random forests}
-Random forests treat individual decision trees as *weak learners*, which are not intended to be individually optimized.\index{weak learners}
-Instead, each tree captures a small amount of information about the data, which are combined to form a powerful representation of the dataset.
+_Random forests_ treat individual decision trees as high-variance base learners.
+Each tree may be unstable on its own, but averaging predictions over many decorrelated trees produces a more stable predictor.\index{random forests}
 Random forests utilize bootstrap aggregation, or *bagging*  [@Breiman1996a], to aggregate many decision trees as follows:\index{bagging}
 
 1. **for** $b = 1,\ldots,B$:
@@ -120,6 +119,8 @@ However, as the same value may be sampled multiple times, on average the resulti
 Randomness is further injected to decorrelate the trees by randomly subsetting the candidates of features to consider at each split of a tree.
 Therefore, every split of every tree may consider a different subset of variables.\index{random forests!decorrelation}
 This process is repeated for $B$ trees, with the final output being a collection of trained decision trees.
+The number of trees is a hyperparameter, but in practice\index{random forests!hyperparameters!number of trees} $B$ is usually chosen to be large, with early stopping used to grow trees until validation performance stabilizes.\index{early stopping} 
+Beyond this point, additional trees mainly increase computational cost while providing diminishing improvements in predictive performance.
 
 Prediction from a random forest for new data $\xx_*$ follows by making predictions from the individual trees and aggregating the results by some function $\sigma$, which is usually the sample mean for regression:
 
@@ -137,7 +138,7 @@ Other advantages include having tunable and meaningful hyperparameters, includin
 
 While random forests are considered a black box, in that one cannot be reasonably expected to inspect thousands of individual trees, variable importance\index{variable importance} can still be aggregated across trees, for example by counting the frequency a variable was selected across trees, calculating the minimal depth at which a variable was used for splitting, or via permutation-based feature importance.
 Hence random forest models are usually more interpretable than many alternative methods.
-Finally, random forests are less prone to overfitting and this can be relatively easily controlled by using *early-stopping* methods, for example by continually growing trees until the performance of the model stops improving.\index{early-stopping}
+Finally, random forests are less prone to overfitting than individual trees as predictions are averaged across many decorrelated trees.
 
 ## Random survival forests
 
@@ -221,7 +222,7 @@ The likelihood-ratio statistic evaluates whether model fit improves after a cand
 An advantage of likelihood-based methods is that alternative censoring mechanisms and truncation can be incorporated naturally through the likelihood formulation (@eq-objective-function).
 However, specifying an appropriate parametric form for each fit is non-trivial, and assumptions that poorly reflect the data may lead to inferior splits.
 In principle, likelihood-based splitting rules may yield trees that better fit the data.
-However, random forests are built from weak learners, so optimizing the fit of each individual tree may be unnecessary and any gains may be outweighed by sensitivity to model assumptions.
+Random forests are built from many base learners whose predictions are stabilized through averaging, so optimizing the fit of each individual tree may be unnecessary and any gains may be outweighed by sensitivity to model assumptions.
 Moreover, likelihood-based methods are implemented in relatively few off-the-shelf software packages and there is limited research formally comparing them with alternative splitting rules.
 
 ### Terminal node prediction {#sec-surv-ml-models-ranfor-nodes}
@@ -230,9 +231,10 @@ Similarly to the regression setting, RSF predictions are typically based on simp
 As seen throughout this book, the choice of estimator in the survival setting depends on the prediction task of interest; these tasks are now considered in turn.\index{random survival forests!terminal node prediction}
 
 Terminal node predictions are only useful when there are sufficient uncensored observations in each terminal node.
-Hence, a common RSF stopping rule is to set a threshold on the minimum number of _uncensored_ observations per leaf, meaning a leaf is not split if doing so would result in too few uncensored observations to make meaningful predictions.\index{random survival forests!stopping rule}\index{random survival forests!minimum node size}
-When the minimum uncensored node size is not exposed as a hyperparameter in software, this value can either be tuned indirectly through the standard minimum node size hyperparameter or approximated using the heuristic: software default minimum node size divided by the uncensored proportion in the data.
-For example, if the default is $10$ and $30\%$ of the data are censored, then the minimum uncensored node size is $\lceil 10/0.7 \rceil = 15$.
+Hence, a common RSF stopping rule is to set a threshold on the minimum number of _uncensored_ observations per leaf, meaning that a leaf is not split if doing so would result in too few uncensored observations to make meaningful predictions.\index{random survival forests!stopping rule}\index{random survival forests!hyperparameters!minimum node size}
+When the minimum uncensored node size is not exposed as a hyperparameter, it can be tuned indirectly through the standard minimum node size.
+Alternatively, a useful heuristic is to take the recommended default minimum node size and divide it by the uncensored proportion in the data.
+For example, if the default minimum node size is $10$ and $30\%$ of the data are censored, then the adjusted minimum node size is $\lceil 10/0.7 \rceil = 15$.
 
 #### Probabilistic predictions {.unnumbered .unlisted}
 
@@ -297,7 +299,7 @@ Both the splitting rule and the terminal node estimator must be adapted to accou
 
 #### Splitting rules
 
-Following @Ishwaran2014, splitting rules can be separated into *cause-specific* and _composite_ splitting rules.
+Splitting rules can be separated into *cause-specific* and _composite_ splitting rules [@Ishwaran2014].
 Cause-specific rules target a single cause $q$ and are appropriate when the primary interest is in one particular cause.
 Composite rules aggregate information across all $Q$ causes and are appropriate when the goal is to predict all cause-specific hazards or CIFs simultaneously.
 Composite rules produce a single splitting statistic by taking a variance-weighted sum of the per-cause statistics across all $Q$ causes [@Ishwaran2014]. \index{random survival forests!composite splitting rules}
@@ -340,8 +342,8 @@ While the generalized log-rank rule detects variables that affect the cause-$q$ 
 As Gray's test targets the CIF directly, it could be preferred when the CIF is the prediction of interest in the competing risks setting [@Ishwaran2014].
 
 Following @Ishwaran2014, the splitting statistic is obtained by substituting an augmented risk set into (@eq-cr-exp) in place of $n_{t_{(k)}}$.
-Motivated by the Fine-Gray subdistribution hazard framework (@sec-classical-ph-cr), the augmented risk set retains subjects who experienced a competing event.
-In practice, this is implemented by adding all competing-event subjects observed before $\tbk$ back into the risk set [@Fine1999]:
+Motivated by the Fine-Gray subdistribution hazard framework (@sec-classical-ph-cr), the augmented risk set retains subjects who experienced a competing event before $\tbk$.
+In practice, this is implemented by adding subjects who experienced a competing event before $\tbk$ back into the risk set [@Fine1999]:
 
 $$
 \tilde{n}_{q,t_{(k)}} = n_{t_{(k)}} + \sum_{j:\, t_{(j)} < t_{(k)}} \sum_{q' \neq q} d_{q',t_{(j)}}.
@@ -400,7 +402,7 @@ $$ {#eq-surv-ranfor-boot-cif}
 
 As with the bootstrapped Kaplan-Meier prediction (@eq-surv-kaplan-boot), the ensemble CIF also represents a mixture of the per-tree distributions.
 
-### Relative risks predictions {#sec-rsf-risks}
+### Relative risk predictions {#sec-rsf-risks}
 
 The most common method to estimate the average relative risk appears to be a transformation from the Nelson-Aalen method [@Ishwaran2008], which exploits results from counting processes to provide a measure of expected mortality [@dataapplied]; the same result is used in the event frequency calibration measure discussed in @sec-alpha. \index{random survival forests!relative risk}
 The logic is that the resulting estimation is proportional to the expected number of events in $\mathcal{A}_b(\xx_*)$ and it is natural to assume a terminal node with more expected events represents a higher risk group.
@@ -436,10 +438,8 @@ $\phi_{q;Boot}(\xx_*)$ is computed as in (@eq-phi-boot).
 ## Key takeaways
 
 * Random forests are highly flexible algorithms that allow the various components to be adapted and altered without major changes to the underlying algorithm. This allows random survival forests (RSFs) to be readily available in many open-source packages.
-* RSFs have in-built variable selection and tend to perform well on high-dimensional data, routinely outperforming other models [@Herrmann2020; @Spooner2020; @Burk2026].
-<!-- FIXME (RAPHAEL): can we really cite @Herrmann2020 and @Burk2026 for RSFs "routinely outperforming other models"? Both benchmark studies (and the wider literature) tend to find the Cox PH hard to beat, and where it is beaten it is usually by CoxBoost or other ML models rather than RSFs specifically. Additionally, @Burk2026 covers only low-dimensional data, so it cannot support a claim about high-dimensional performance. Please soften/re-scope this takeaway and/or cite more appropriate references. -->
-
-* RSFs also have in-built variable importance measures that aid interpretability, although should still be considered black boxes.
+* RSFs have built-in variable selection and tend to perform well on high-dimensional data and have been seen to outperform other models [@Herrmann2020; @Spooner2020; @Burk2026].
+* RSFs also have built-in variable importance measures that aid interpretability, although should still be considered black boxes.
 * Due to the large number of trees and repeated bootstrapping, RSFs can be more computationally intensive than simpler survival models. However, they are typically less demanding than, say, neural networks (@sec-nnet) and other deep learning methods. Moreover, RSFs are embarrassingly parallel: individual trees can be trained independently, allowing efficient distribution across CPUs or compute nodes and straightforward parallelization of the workload.
 * Too few trees lead to limitations similar to those of decision trees, whereas larger forests can incur increased computational costs and gains eventually diminish beyond a certain number of trees. Most software provides sensible defaults for the number of trees, and early stopping can also be used.
 
@@ -451,9 +451,6 @@ $\phi_{q;Boot}(\xx_*)$ is computed as in (@eq-phi-boot).
 
 * A comprehensive review of random survival forests (RSFs) is provided in Bou-Hamad (2011) [@Bou-Hamad2011], which includes extensions to time-varying covariates and different censoring types.
 * The discussion of decision trees omitted many methods for growing and pruning trees, see @Breiman1984 for full detail.
-* RSFs have been shown to perform well in benchmark experiments on high-dimensional data, see @Herrmann2020 and @Spooner2020 for examples.
-<!-- FIXME (RAPHAEL): same concern as the key takeaways bullet above --- @Herrmann2020 and @Spooner2020 tend to find the Cox PH hard to beat (and where it is beaten, often by CoxBoost or other ML models rather than RSFs specifically), so "RSFs perform well on high-dimensional data" may overstate what these references actually show. Please re-scope/soften consistently with the takeaway. -->
-
 * This chapter considered the most 'traditional' forms of RSFs. Conditional inference forests are popular in the regression setting and while they are under-researched in survival, see @Hothorn2005 for literature on the topic. A more recent method that appears to perform well is the (accelerated) oblique random survival forest discussed in @Jaeger2022.
 * Bayesian Additive Regression Trees (BART) [@Chipman2010] provide a Bayesian ensemble alternative in which survival quantities such as hazards or event probabilities can be modeled using sums of shallow trees. For survival analysis, this has been adapted to nonparametric estimators [@Sparapani2016] and parametric models [@Bonato2010].
 
