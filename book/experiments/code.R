@@ -2468,7 +2468,6 @@ ggsave("book/Figures/survtsk/predict_types.png", final_pt,
 #####
 # SVR
 #####
-library(ggplot2)
 
 df <- data.frame(
   x = c(1.8, 2.4, 2.7, 3.0, 3.3, 4.4, 4.2, 4.5, 5.7, 6.2, 6.5, 5),
@@ -2514,14 +2513,14 @@ geom_ribbon(
     aes(x = 4.5, xend = 4.5, y = upper(4.5), yend = 7),
     arrow = arrow(ends = "both", length = unit(0.12, "inches")),
   ) +
-  annotate("text", x = 4.65, y = 6.5, label = expression(xi[i]^"*"), color = "black", size = 6) +
+  annotate("text", x = 4.65, y = 6.5, label = expression(zeta[i]^"*"), color = "black", size = 6) +
 
   # xi': point below lower epsilon tube
   geom_segment(
     aes(x = 5.7, xend = 5.7, y = 3.8, yend = lower(5.7)),
     arrow = arrow(ends = "both", length = unit(0.12, "inches")),
   ) +
-  annotate("text", x = 5.9, y = 4.3, label = expression(xi[i]^minute), color = "black", size = 6) +
+  annotate("text", x = 5.9, y = 4.3, label = expression(zeta[i]^minute), color = "black", size = 6) +
 
   annotate("text", x = 6.5, y = 8.2, label = expression(y + epsilon), hjust = 0, color = "#0cb702", size = 6) +
   annotate("text", x = 7.1, y = line(7.55),  label = "y", hjust = 0, size = 6) +
