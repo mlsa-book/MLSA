@@ -515,10 +515,26 @@ age = seq.int(1, 100, 1)
 surv = pgompertz(age, 0.00005, 0.09, FALSE)
 ph_surv = surv^5
 aft_surv = round(pgompertz(age*5, 0.00005, 0.09, FALSE), 2)
-df = data.frame(age, survival = c(surv, ph_surv, aft_surv), Species = rep(c("Human", "Dog (PH)", "Dog (AFT)"), each = 100))
+# A 5x acceleration of time (AFT) and a 5x hazard ratio (PH) act on different
+# scales, so the same factor 5 is not comparable. The PH hazard ratio that
+# matches the AFT dog's *median* survival is much larger (~395), because the
+# Gompertz baseline hazard is near zero at young ages.
+med_aft = uniroot(function(a) pgompertz(a * 5, 0.00005, 0.09, FALSE) - 0.5, c(1, 100))$root
+cstar = log(0.5) / log(pgompertz(med_aft, 0.00005, 0.09, FALSE))
+ph_match_surv = surv^cstar
+lab_match = sprintf("Dog (PH, HR=%.0f)", cstar)
+df = data.frame(
+  age = rep(age, 4),
+  survival = c(surv, ph_surv, aft_surv, ph_match_surv),
+  Species = factor(rep(c("Human", "Dog (PH, HR=5)", "Dog (AFT)", lab_match), each = 100),
+                   levels = c("Human", "Dog (AFT)", "Dog (PH, HR=5)", lab_match)))
 
-g <- ggplot(df, aes(x = age, y = survival, group = Species, color = Species)) + geom_line() + xlim(0, 80) + labs(x = "T", y = "S(T)") +
-  scale_color_manual(values = c("Human" = "black", "Dog (AFT)" = "red", "Dog (PH)" = "blue"), aesthetics = c("color","fill"))
+g <- ggplot(df, aes(x = age, y = survival, color = Species, linetype = Species)) +
+  geom_line() + xlim(0, 80) + labs(x = "T", y = "S(T)") +
+  scale_color_manual(values = setNames(c("black", "red", "blue", "blue"),
+    c("Human", "Dog (AFT)", "Dog (PH, HR=5)", lab_match))) +
+  scale_linetype_manual(values = setNames(c("solid", "solid", "solid", "dashed"),
+    c("Human", "Dog (AFT)", "Dog (PH, HR=5)", lab_match)))
 
 ggsave("book/Figures/classical/dogs.png", g, height = 4, units = "in",
   dpi = 600)
@@ -2486,11 +2502,9 @@ dat$hazard <- loglogistic_hazard(dat$T, dat$Shape, scale = 1)
 
 g = ggplot(dat, aes(x = T, y = hazard, color = factor(Shape))) +
   geom_line(linewidth = 0.8) +
-  labs(
-    x = "t",
-    y = "Log-logistic Hazard, h(t)",
-    color = "Shape"
-  ) + ylim(0, 5) + xlim(0, 5)
+  labs(x = "t", y = "Log-logistic Hazard, h(t)", color = "Shape") +
+  coord_cartesian(xlim = c(0, 5), ylim = c(0, 5)) +
+  theme(aspect.ratio = 1)
 
 ggsave("book/Figures/classical/llog_hazard.png", g,
-       width = 7, height = 3, units = "in", dpi = 300)
+       width = 4.5, height = 3, units = "in", dpi = 300)

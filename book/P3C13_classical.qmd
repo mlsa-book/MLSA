@@ -382,9 +382,9 @@ In such settings, coefficients from a subdistribution model may be more intuitiv
 
 ## Accelerated failure time {#sec-surv-models-param}
 
-While proportional hazards models are powerful predictive tools, they do not always represent real-world phenomena well.
-The _accelerated failure time_ (AFT) model is a popular alternative which models the effect of covariates as acceleration factors that act multiplicatively on time.
-In contrast to the PH model, AFT models are all fully-parametric. \index{accelerated failure time}
+Proportional hazards models are popular tools, but they do not always represent real-world phenomena well.
+The _accelerated failure time_ (AFT) model is a common alternative which models the effect of covariates as acceleration factors that act multiplicatively on time.
+In contrast to the PH model, AFT models are usually fully-parametric. \index{accelerated failure time}
 A semiparametric model has been suggested [@Buckley1979] however this is not widely used as it lacks "theoretical justification" and is "not reliable" [@Wei1992].\index{accelerated failure time!Buckley-James estimator}
 Similarly, while it is theoretically possible to fit cause-specific AFT models for the competing risks setting, this does not appear common in practice.
 
@@ -410,8 +410,11 @@ $$
 This is shown by the middle, blue curve in @fig-dogs.
 
 These illustrative curves demonstrate how the same modifier yields different behavior under PH and AFT assumptions.
+Of course, there is no reason a five-fold acceleration on the AFT (time) scale should correspond to a five-fold hazard ratio on the PH scale.
+Increasing the hazard ratio to approximately $395$ brings the PH survival curve much closer to the AFT curve, matching its median survival (dashed blue line in @fig-dogs).
+Nevertheless, under the proportional hazards assumption it is not possible to recover the *shape* of the AFT curve --- the only exception being the Weibull distribution, which can be expressed as both a PH and an AFT model.
 
-![Comparing human (black) and dog lifespans where the latter is modeled using an AFT model (red) versus a PH model (blue). Clearly the AFT model is (sadly) a better reflection of reality. Human lifespan modeled with Gompertz(0.09, 0.00005).](Figures/classical/dogs.png){#fig-dogs fig-alt="Survival time is on the x-axis and survival probability on the y-axis. The top, black curve models a human life span smoothly decreasing from S(T)=1 to S(T)=0.5 between T=0 and T=80. The middle, blue curve represents a dog's lifespan under the PH assumption. The survival probability drops close to S(T)=0 by T=0 but is positive and is even above 0.8 at T=30. The bottom, red line represents a dog's lifespan under the AFT assumption. The curve drops to 0 by T=20 but with low survival probability from around T=16."}
+![Comparing human (black) and dog lifespans, with the dog modeled by an AFT model (red, a five-fold acceleration of time) and PH models (blue). The solid blue curve uses a hazard ratio of $5$ (the same numerical factor as the AFT acceleration); the dashed blue curve uses the much larger hazard ratio ($\approx 395$) needed to match the AFT dog's median survival, yet still cannot reproduce its shape. Human lifespan modeled with Gompertz(0.09, 0.00005).](Figures/classical/dogs.png){#fig-dogs fig-alt="Survival time T is on the x-axis (0 to 80) and survival probability S(T) on the y-axis (0 to 1). All curves start at S(T)=1. The black curve (human) stays near 1 until about T=40 then declines gently to about 0.48 at T=80. The solid blue curve (dog, PH with hazard ratio 5) stays near 1 until about T=35 then declines, passing 0.5 around T=60. The red curve (dog, AFT) stays near 1 until about T=10 then drops steeply between T=12 and T=20 to near 0. The dashed blue curve (dog, PH with hazard ratio 395) lies much closer to the red AFT curve, crossing 0.5 near T=16, but with a more gradual shape: it begins to decline around T=5 and reaches near 0 only around T=35."}
 
 More generally, the accelerated failure time model estimates survival functions as:\index{accelerated failure time}
 
@@ -425,38 +428,42 @@ $$
 h_{AFT}(\tau \mid \xx_i) = e^{-\eta_i} h_0(\tau e^{-\eta_i}).
 $$ {#eq-aft-haz}
 
+where $\eta_i = \xx_i^\trans\bsbeta$ is the linear predictor for observation $i$ (as before), and $S_0$ and $h_0$ are the baseline survival and hazard functions.
+
 Note three key differences compared to the PH model.
-Firstly, $\exp(-\eta_i)$ is modeled instead of $\exp(\eta_i)$, therefore for values $\eta_i > \eta_j$ it holds that $h_{PH}(\tau \mid \xx_i) > h_{PH}(\tau \mid \xx_j)$ but $h_{AFT}(\tau \mid \xx_i) < h_{AFT}(\tau \mid \xx_j)$: larger values of $\eta_i$ increase survival time and thus decrease relative risk.
-This means that interpreting the AFT linear predictor alone results in a 'high value, low risk' interpretation, which is the reverse of the convention used throughout this book.
-Special care must therefore be taken when using AFT models for relative risk prediction and the sign of the predictions should be reversed to preserve a consistent interpretation of risk.
+
+Firstly, $\exp(-\eta_i)$ is modeled instead of $\exp(\eta_i)$, so the linear predictor relates to risk in the opposite direction to the PH model: a larger $\eta_i$ lengthens survival ($S_{AFT}(\tau \mid \xx_i) > S_{AFT}(\tau \mid \xx_j)$ for $\eta_i > \eta_j$, since $S_0$ is decreasing and $\tau e^{-\eta_i} < \tau e^{-\eta_j}$), whereas in a PH model a larger $\eta_i$ raises the hazard, reducing survival. 
+Interpreting the AFT linear predictor as a risk score therefore reverses the book's 'high value, high risk' convention, so its sign should be flipped before it is used for relative-risk prediction.
 Secondly, the baseline risk now clearly depends on both the linear predictor as well as time.
 Thirdly, an increase in a covariate results in a multiplicative effect on survival time, rather than the multiplicative effect on hazard seen in a PH model. This is often viewed as an advantage of AFT models as survival times may be simpler to interpret than hazard ratios.
 
 This third point is visualized in @fig-phaft in which a covariate is increased by $\log(2)$.
 The left panel shows that the estimated hazard function from a PH model is double the baseline at all time points --- the multiplicative effect is seen on the y-axis (risk).
 In contrast, the right panel shows how the survival function from an AFT model decreases at double the speed to the baseline --- the multiplicative effect is now on the x-axis (time).
+
+
+![Comparing increasing a covariate $x_i$ between PH (left) and AFT (right) models. An increase of $x_i + \log(2)$ multiplies $h(t)$ by $\exp(\log(2)) = 2$ in a PH model. Whereas the result in the AFT is to multiply time $t$ by $2$, hence for any $t$, the AFT model reaches $S(t)$ in half the time as the baseline.](Figures/classical/compare.png){#fig-phaft fig-alt="Two line graphs. Left has 't' on x-axis and 'y' 'h(t)' on y-axis. A blue line (PH model) runs in parallel, vertically above, a black line (baseline). The right graph has 'S(t)' on the y-axis and shows a red line (AFT model) running in parallel but to the left of the baseline. The graph demonstrates how PH acts multiplicatively on the hazard but the AFT acts on the survival function."}
+
 Another way to demonstrate this effect is through the log-linear form of the accelerated failure time model:\index{accelerated failure time!log-linear}
 
 $$
-\log(t_i) = \mu + \eta_i + \sigma\epsilon_i,
+\log(\tau) = \mu + \eta + \sigma\epsilon,
 $$ {#eq-aft-log}
 
-where $\sigma$ is a scale parameter, $\epsilon_i$ is an error term, and $\mu$ is an intercept.
-Now consider the difference in $t_i$ when $\eta_i$ is increased by one (assuming just one covariate):
+where $\sigma$ is a scale parameter, $\epsilon$ is an error term, and $\mu$ is an intercept.
+Now consider the difference in $\tau$ when $x$ is increased by one (assuming just one covariate):
 
 $$
-\log(t_i \mid x_i + 1) - \log(t_i \mid x_i) = (\mu + \beta (x_i + 1) + \sigma\epsilon_i) - (\mu + \beta x_i + \sigma\epsilon_i) = \beta,
+\log(\tau \mid x + 1) - \log(\tau \mid x) = (\mu + \beta (x + 1) + \sigma\epsilon) - (\mu + \beta x + \sigma\epsilon) = \beta,
 $$
 
 and taking exponentials of both sides gives,
 
 $$
-\frac{t_i \mid x_i + 1}{t_i \mid x_i} = \exp(\beta),
+\frac{\tau \mid x + 1}{\tau \mid x} = \exp(\beta),
 $$
 
 showing that increasing a covariate by one unit multiplies the survival time by $\exp(\beta)$.
-
-![Comparing increasing a covariate $x_i$ between PH (left) and AFT (right) models. An increase of $x_i + \log(2)$ multiplies $h(t)$ by $\exp(\log(2)) = 2$ in a PH model. Whereas the result in the AFT is to multiply time $t$ by $2$, hence for any $t$, the AFT model reaches $S(t)$ in half the time as the baseline.](Figures/classical/compare.png){#fig-phaft fig-alt="Two line graphs. Left has 't' on x-axis and 'y' 'h(t)' on y-axis. A blue line (PH model) runs in parallel, vertically above, a black line (baseline). The right graph has 'S(t)' on the y-axis and shows a red line (AFT model) running in parallel but to the left of the baseline. The graph demonstrates how PH acts multiplicatively on the hazard but the AFT acts on the survival function."}
 
 ### Parametric AFTs
 
@@ -465,11 +472,12 @@ Common distribution choices include Weibull, exponential, log-logistic, and log-
 The Weibull distribution, with the exponential distribution as a special case, is unique as it can be parameterized as either a PH model or an AFT model.
 By contrast, the log-logistic and log-Normal distributions are commonly used as AFT models but do not imply PH covariate effects.
 For example, @fig-logloghaz visualizes the hazard function of the log-logistic distribution, which can be non-monotonic and allows the baseline risk of an event to increase before decreasing.
-When the chosen distribution is well specified, AFTs can provide a useful and powerful alternative to PH models, especially when covariate effects are more naturally interpreted as time ratios than hazard ratios [@Patel2006; @Qi2009; @Zare2015].
+When the chosen distribution is well specified, AFTs can provide a useful alternative to PH models, especially when covariate effects are more naturally interpreted as time ratios than hazard ratios [@Patel2006; @Qi2009; @Zare2015].
 
 ![Log-logistic hazard curves with a fixed scale parameter of 1 and a changing shape parameter. x-axis is time and y-axis is the log-logistic hazard as a function of time.](Figures/classical/llog_hazard.png){#fig-logloghaz fig-alt="Five log-logistic hazard curves. Each represents a distinct representation of the hazard. When the shape parameter is 0.5, the curve starts at (0, 4) then curves down to (5,0). In contrast, when the shape parameter is 7, the curve starts at (0,0) then peaks at around (1.2, 4.5) then slopes down to (5, 1.5)."}
 
 As with the PH model, AFT models can be fit using maximum likelihood estimation of the full-likelihood (@sec-surv-estimation-param) by plugging distribution functions into (@eq-aft-surv)-(@eq-aft-haz).
+<!-- FIXME (RAPHAEL): here and elsewhere, please use $Y$ (the variable of interest, introduced earlier) rather than $X$ for the random variable. $X$ was introduced as the covariate vector/random variable, and here it is introduced as the survival time, then one line later $x$ switches roles to a feature/covariate --- very confusing for beginners. Suggest $Y \sim \Exp(\lambda)$, $h_Y$, $S_Y$. -->
 Using the exponential distribution as an example, first recall that if $X \sim \Exp(\lambda)$ then,
 
 $$
@@ -487,7 +495,7 @@ The Exponential-AFT right-censored likelihood follows from (@eq-right-censoring-
 $$
 \begin{aligned}
 \mathcal{L}(\bstheta) &= \prod_{i=1}^n h_Y(t_i \mid \bstheta)^{\delta_i}S_Y(t_i \mid \bstheta) \\
-&= \prod_{i=1}^n \Big(\lambda e^{-\eta_i})^{\delta_i}\Big(\exp(-\lambda t_i e^{-\eta_i})\Big) \\
+&= \prod_{i=1}^n \Big(\lambda e^{-\eta_i}\Big)^{\delta_i}\Big(\exp(-\lambda t_i e^{-\eta_i})\Big) \\
 &= \prod_{i=1}^n \lambda^{\delta_i} \exp(-\lambda t_i e^{-\eta_i} - \delta_i\eta_i), \\
 \end{aligned}
 $$
@@ -506,9 +514,9 @@ and extensions to other censoring types and truncation follow by specifying the 
 ## Proportional odds {#sec-proportionalodds}
 
 Proportional odds (PO) models [@Bennett1983] are the final of the three major linear model classes in survival analysis. \index{proportional odds}
-In contrast to the PH and AFT models just discussed, proportional odds models appear to be rarely, if ever, used on their own to make inferences about underlying data or as predictive models.
-Instead, they are more commonly found as components within neural networks (@sec-nnet) or in flexible parametric models (@sec-flexible). \index{flexible parametric models}
-Therefore, this section very briefly describes the motivation for the model and its key properties.
+In contrast to the PH and AFT models just discussed, proportional odds models are used less widely.
+They are discussed in more detail in flexible parametric models (@sec-flexible). \index{flexible parametric models}
+This section briefly describes the motivation for the model and its key properties.
 
 As the name may suggest, the proportional odds model is analogous to the proportional hazards model except with the goal of modeling odds instead of hazards.
 In general, let $p$ be the probability of an event occurring, then the _odds_ of the event are: \index{odds}
@@ -531,6 +539,7 @@ $$
 
 where $O_0$ is the baseline odds.
 
+<!-- FIXME (RAPHAEL): here and elsewhere, if you mean a specific feature use $x_p$ (with coefficient $\beta_p$) rather than $x_i$/$\beta_i$ --- the $i$ index is reserved for subject $i$. ($\xx_i$ above, the covariate vector for subject $i$, is correct.) -->
 By the same logic as the proportional hazards model, this model assumes $O(\tau \mid \xx_i) \propto \exp(\eta_i)$ and by analogous maths to (@eq-ph-hazard-ratio), a unit increase in a covariate, $x_i$, multiplies the odds of surviving past $\tau$ by $\exp(\beta_i)$ where $\beta_i$ is the corresponding coefficient.
 
 A useful implication of the PO model is the convergence of hazard functions, which states $h_i(\tau)/h_0(\tau) \rightarrow 1$ as $\tau \rightarrow \infty$ [@Kirmani2001].
@@ -551,11 +560,11 @@ $$
 \end{aligned}
 $$ {#eq-po-ratio}
 
-When $\tau \rightarrow \infty$, it holds that $S_0(\tau) \rightarrow 0$ and as such (@eq-po-ratio) $\rightarrow 1$.
+When $\tau \rightarrow \infty$, it holds that $S_0(\tau) \rightarrow 0$ and (@eq-po-ratio) $\rightarrow 1$.
 As such, every individual's hazard approaches the baseline hazard over a long period of time.
-This assumption holds in several contexts and commonly in medical domains in which death is the event of interest.
+This assumption holds in several contexts, most commonly in medical domains where death is the event of interest.
 For example, take two patients with a disease, patient $i$ receives treatment and patient $j$ does not.
-Let $\exp(\eta_i) = 4$ and $\exp(\eta_j) = 1$ be their respective risks and let $S_0(0) = 1$ and $S_0(5) = 0.01$ be baseline survival at times $0$ and $5$.
+Let $\exp(\eta_i) = 4$ and $\exp(\eta_j) = 1$ be their respective survival odds ratios (relative to baseline) and let $S_0(0) = 1$ and $S_0(5) = 0.01$ be baseline survival at times $0$ and $5$.
 Following (@eq-po), for patient $i$:
 
 $$
@@ -571,8 +580,9 @@ $$
 The treatment effect reduces the hazard for observation $i$ at early time-points.
 However, at the later time-point, the hazard is similar for both observations.
 This example highlights a similarity to AFT models (@sec-surv-models-param): under the survival-odds parameterization, larger values of $\eta$ decrease the hazard.
-Care must therefore again be taken when using these models for relative risk predictions to ensure a consistent interpretation of risk.
+Therefore, once again, care must be taken when using these models for relative risk predictions to ensure a consistent interpretation of risk.
 
+<!-- TODO (RAPHAEL): why partial likelihood / semiparametric here? The section introduces only the general PO form (in parallel with PH and AFT), and a semiparametric PO model is never set up --- so jumping to "the partial likelihood of a semiparametric proportional odds model" is unmotivated. Coming straight after AFT, a reader would expect the fully parametric treatment. Please clarify or restructure (e.g. state up front that PO is used parametrically, with the semiparametric route only noted in passing). -->
 There is no simple closed form expression for the partial likelihood of a semiparametric proportional odds model. \index{maximum likelihood estimator}
 A log-logistic distribution is often assumed for the baseline odds and the model is fit by maximum likelihood estimation on the full likelihood [@Bennett1983], discussed further in the next section.
 
@@ -581,38 +591,38 @@ A log-logistic distribution is often assumed for the baseline odds and the model
 Royston-Parmar flexible parametric models  [@Royston2002] extend PH and PO models by estimating the baseline hazard with natural cubic splines. \index{flexible parametric models}
 The model was designed to keep the form of the PH or PO methods but without estimating a potentially misleading baseline hazard (for semiparametric models) or misspecifying the survival distribution (for fully-parametric models).
 
-The crux of the method is to use splines to model time on a log-scale and to either estimate the log cumulative Hazard for PH models, or the log Odds for PO models.
+The crux of the method is to use splines to model time on a log-scale and to either estimate the log cumulative hazard for PH models, or the log odds for PO models.
 For the flexible PH model, a Weibull distribution is the basis for the baseline distribution, whereas a log-logistic distribution is assumed for the baseline odds in the flexible PO model. \index{proportional hazards}\index{proportional odds}\index{Weibull distribution}\index{log-logistic distribution}
-The full derivation of the model requires a lot of mathematical exposition which is not included here, a recommended summary of the model is given in @Collett2014. 
+A recommended summary of the model is given in @Collett2014. 
 
 The flexible parametric Royston-Parmar (RP) proportional hazards and proportional odds model are respectively defined by:
 
 $$
-\log{H}_{RP}(\tau \mid \xx_i) = s(\tau \mid \bsgamma,\mathbf{k}) + \eta_i,
+\log{H}_{RP}(\tau \mid \xx_i) = s(\tau \mid \bsnu,\mathbf{k}) + \eta_i,
 $$ {#eq-rp-hazard}
 
 and
 
 $$
-\log{O}_{RP}(\tau \mid \xx_i) = s(\tau \mid \bsgamma,\mathbf{k}) + \eta_i,
+\log{O}_{RP}(\tau \mid \xx_i) = s(\tau \mid \bsnu,\mathbf{k}) + \eta_i,
 $$ {#eq-rp-odds}
 
-where $\bsgamma$ are spline coefficients to be estimated by maximum likelihood estimation, $\mathbf{k}$ are the positions of $K$ knots, and $s$ is the restricted cubic spline function in log time defined by, \index{splines}
+where $\bsnu$ are spline coefficients to be fitted by maximum likelihood estimation, $\mathbf{k}$ are the positions of $K$ knots, and $s$ is the restricted cubic spline function in log time defined by, \index{splines}
 
 $$
-s(\tau \mid \bsgamma,\mathbf{k}) = \gamma_0 + \gamma_1\log(\tau) + \gamma_2\nu_1(\log(\tau)) + \ldots + \gamma_{K}\nu_K(\log(\tau)),
+s(\tau \mid \bsnu,\mathbf{k}) = \nu_0 + \nu_1\log(\tau) + \nu_2 B_1(\log(\tau)) + \ldots + \nu_{K+1} B_K(\log(\tau)),
 $$
 
-$\nu_j$ is the basis function at knot $k_j$ defined by,
+$B_j$ is the basis function at knot $k_j$ defined by,
 
 $$
-\nu_j(x) = (x - k_j)^3_+ - \lambda_j(x - k_{min})^3_+ - (1 - \lambda_j)(x - k_{max})^3_+,
+B_j(x) = (x - k_j)^3_+ - \omega_j(x - k_{min})^3_+ - (1 - \omega_j)(x - k_{max})^3_+,
 $$
 
-where,
+where the weight $\omega_j$, determined entirely by the knot locations, is chosen so that $B_j$ is linear beyond the boundary knots,
 
 $$
-\lambda_j = \frac{k_{max} - k_j}{k_{max} - k_{min}},
+\omega_j = \frac{k_{max} - k_j}{k_{max} - k_{min}},
 $$
 
 and $(x - y)_+ = \max\{0, (x - y)\}$ for any $x, y$, and where $k_{min}$ and $k_{max}$ are the boundaries of the cubic spline, meaning the curve is linear when $\log(t) < k_{min}$ or $\log(t) > k_{max}$.
@@ -623,58 +633,92 @@ $$
 \log(H_{WeibullPH}(\tau \mid \xx_i)) = \log\big((\lambda \tau^\gamma) \exp(\eta_i)\big) = \log(\lambda) + \gamma\log(\tau) + \eta_i
 $$ 
 
-Setting $\gamma_0 = \log(\lambda)$ and $\gamma_1 = \gamma$ yields (@eq-rp-hazard) when there are no knots.
+Setting $\nu_0 = \log(\lambda)$ and $\nu_1 = \gamma$ yields (@eq-rp-hazard) when there are no knots.
 Analogous results can be shown between (@eq-rp-odds) and the log-logistic distribution.
 
 To fit the model, the number and position of knots are theoretically tunable, although Royston and Parmar advised against tuning and suggest often only one internal knot is required and the placement of the knot does not make a significant difference to performance [@Royston2002]. \index{tuning}
 While increasing knots can increase model overfitting, @Bower2019 showed up to seven knots does not significantly increase model bias.
-The model's primary advantage is its flexibility to model non-linear effects and can also be extended to time-dependent covariates.
+The model's primary advantage is its flexibility to model non-linear effects (see also @sec-nonlinear) and can also be extended to time-dependent covariates.
 The Royston-Parmar model can be fit by maximum likelihood estimation, making estimation of smooth survival functions under this framework straightforward using readily available off-the-shelf software.
-Despite advantages, the model appears to be limited in common use which makes it difficult to verify its utility across different contexts [@Ng2018].
 
 In the same manner as other proportional hazards models, the Royston-Parmar model can be extended to competing risks by modeling cause-specific hazards, considering only one event at a time and censoring competing events [@Hinchliffe2013].
 
 ## Improving foundational models {#sec-classical-improving}
 
 A number of model-agnostic algorithms have been created to improve a model's predictive ability.
-When applied to foundational algorithms, these methods can be used to create powerful models that outperform machine learning alternatives.
-As each could be the subject of a whole book, this section remains brief and just covers the general overview.
-These are split into methods for:
+Such extensions of foundational models can lead to substantial performance improvements.
 
-1. modeling non-linear data effects;
-2. reducing the number of variables in a dataset; and
+Three extensions are discussed briefly:
+
+1. modeling non-linear feature effects;
+2. reducing the number of variables used by the model, either by feature selection or by shrinking their effects toward zero; and
 3. combining predictions from multiple models.
 
-### Non-linear effects
+### Non-linear effects {#sec-nonlinear}
 
 One of the major limitations of the models discussed so far is the assumption of a linear relationship between covariates and outcomes (on the scale of the predictor).
 At first, one might view the Cox model as non-linear due to the presence of the exponential function.
-However, the linearity becomes clear when the model is equivalently expressed as: \index{non-linear effects}
+However, the linearity becomes clear when the model is written in terms of its linear predictor $\eta$: \index{non-linear effects}
 
 $$
-\log\left(\frac{h(\tau \mid \xx_i)}{h_0(\tau)}\right) = x_1\beta_1 + \ldots + x_p\beta_p.
+\eta = x_1\beta_1 + \ldots + x_p\beta_p.
 $$
 
 Consider modeling the time until disease progression with covariates representing age (continuous) and treatment (binary):
 
 $$
-\log\left(\frac{h(\tau \mid \xx_i)}{h_0(\tau)}\right) = x_{age_i}\beta_{age} + x_{trt_i}\beta_{trt}.
+\eta = x_{age}\beta_{age} + x_{trt}\beta_{trt}.
 $$
 
-In this form, increasing age from $1$ to $21$ or $81$ to $101$ has the same effect on the log hazard ratio; this is clearly not realistic.
+In this form, increasing age from $1$ to $21$ or $81$ to $101$ has the same effect on the linear predictor $\eta$; this is clearly not realistic.
 There are many approaches to relaxing linearity; these are discussed extensively elsewhere and not repeated here, @Hastie2013 covers non-linear modeling in detail.
 
-In brief, PH and AFT can be extended to _generalized additive models_ (GAM) in the same manner as a regression model. \index{generalized additive model}
-For example for the Cox model,
+In brief, the models discussed in this chapter can be extended to _additive models_ in the same manner as a regression model. \index{additive model}
+For example,
 
 $$
-\log\left(\frac{h_i(\tau \mid \xx_i)}{h_0(\tau)}\right) = f_1(x_1) + \ldots + f_p(x_p),
+\eta = f_1(x_1) + \ldots + f_p(x_p),
 $$
 
 where each $f_j$ is a smooth, possibly non-linear function of its covariate. 
-If all $f_j$ are the identity function then this reduces to the standard Cox model.
-The functions $f_j$ are often chosen to be natural splines, but step functions, polynomial bases, or any other transformation can be used. \index{splines}
-The Royston-Parmar model (@sec-flexible) is a special case of a GAM where splines are used to model the baseline hazard.
+If all $f_j$ are linear functions then this recovers the standard linear predictor $\eta = x_1\beta_1 + \ldots + x_p\beta_p$.
+
+In practice each $f_j$ is represented as a linear combination of $M_j$ known basis functions,
+
+$$
+f_j(x_j) = \sum_{m=1}^{M_j} \nu_{jm} B_{jm}(x_j),
+$$ {#eq-gam-basis}
+
+where the $B_{jm}$ are the basis functions and the $\nu_{jm}$ are the corresponding basis coefficients to be estimated.
+Many basis systems can be used, including natural cubic splines, B-splines and the closely related penalized B-splines (P-splines) [@Eilers1996], and thin-plate regression splines [@Wood2003]; simpler choices such as step functions or polynomial bases are also possible (see @Wood2017 for a comprehensive treatment). \index{splines}
+
+Because a rich basis can easily overfit, estimation is usually combined with a penalty on the basis coefficients that discourages overly wiggly fits.
+Collecting all parameters in $\bstheta$, the functions are then estimated by optimizing a penalized criterion of the general form
+
+$$
+L(\bstheta) + \xi P(\bstheta),
+$$ {#eq-gam-penalized}
+
+where $L(\bstheta)$ is a loss function, typically the negative log-likelihood, $P(\bstheta)$ is a penalty on the basis coefficients, and $\xi \geq 0$ is a tuning parameter governing the trade-off between goodness-of-fit and smoothness.
+A common choice penalizes squared differences between adjacent coefficients [@Eilers1996], for a single function $f_j$,
+
+$$
+P(\bstheta) = \sum_{m=2}^{M_j} (\nu_{jm} - \nu_{j,m-1})^2,
+$$
+
+which shrinks neighbouring coefficients towards one another and thereby penalizes abrupt changes in $f_j$.
+As $\xi \to 0$ the estimate approaches the unpenalized fit, whereas a large $\xi$ forces each $f_j$ towards a straight line.
+Flexible parametric models like the Royston-Parmar model (@sec-flexible) are additive models that use splines to model the baseline hazard, and are implemented in the $\texttt{flexsurv}$ package [@pkgflexsurv]. Additive Cox models, which instead estimate smooth functions of the covariates directly within the proportional hazards framework, are described in @Hastie1990.
+
+The constructions above make the predictor considerably more flexible, but they still assume each effect is a smooth function of a single covariate, rule out interactions between covariates, and require the predictor to be prespecified --- the modeler must decide in advance which features are modeled via splines and how.
+More generally, the predictor can be written as
+
+$$
+\eta = g(\xx \mid \bstheta),
+$$ {#eq-general-predictor}
+
+where $\bstheta$ collects all parameters of the model and $g$ is a general function of the features that may include non-linear effects, interactions, and non-smooth components.
+Machine learning models such as random forests (@sec-ranfor), gradient boosting (@sec-boost), and neural networks (@sec-nnet) are designed to learn such functions directly from data, without the need to prespecify the range of possible effects.
 
 ### Dimension reduction and feature selection
 
@@ -682,14 +726,14 @@ In a predictive modeling problem, only a small subset of variables in datasets t
 Other variables are either redundant, providing no more information than their counterparts, or irrelevant, they do not influence the outcome.
 In these cases, using all variables for modeling results in worse interpretability, increased computational complexity, and often inferior model performance as models tend to overfit the training data and generalize poorly to new data.
 
-To improve model performance, one can therefore apply feature selection methods to reduce the number of variables in the dataset. \index{feature selection}\index{dimension reduction}
+To improve model performance, one can therefore apply feature selection methods to reduce the number of variables the model uses. \index{feature selection}\index{dimension reduction}
 Feature selection is often grouped into three categories: 1) wrappers; 2) embedded methods; and 3) filters.
-Wrappers fit multiple models on subsets of variables and select the best-performing subsets. This is often computationally infeasible in the context of very large datasets, and as such wrappers have less relevance in survival analysis, which often tackles very high-dimensional datasets such as genomic datasets and detailed time-series economic data.
-This section only looks at methods specific to survival analysis and does not consider general algorithms such as principal component analysis, see further reading below for suggested additional material that covers these areas.
+Wrappers fit multiple models on subsets of variables and select the best-performing subsets. This is often computationally infeasible in the context of very large datasets.
+This section does not consider general algorithms such as principal component analysis, see further reading below for suggested additional material that covers these areas.
 
 #### Embedded methods {.unlisted .unnumbered}
 Embedded methods refer to those that are incorporated during model fitting.
-Many machine learning models incorporate embedded methods and thus reduce a dataset's size as part of the training process.
+Many machine learning models incorporate embedded methods and thus reduce the number of variables the model relies on as part of the training process.
 Models that do not apply feature selection during training tend to perform poorly when there is a large number of variables in a dataset.
 One model that straddles the line of foundational and machine learning methodology is the elastic Cox model, which incorporates the lasso and ridge regularization methods.
 Given a generic learning algorithm, lasso and ridge regularization constrain the model coefficients subject to the $\ell^1$-norm and $\ell^2$-norm respectively.
@@ -778,7 +822,7 @@ $$
 \mathbf{Z} = 
 \begin{bmatrix}
 \hat{\eta}^{(1)}_{1} & \hat{\eta}^{(2)}_{1} & \hat{\eta}^{(3)}_{1} \\
-\vdots & \ddots & \vdots \\
+\vdots & \vdots & \vdots \\
 \hat{\eta}^{(1)}_{m} & \hat{\eta}^{(2)}_{m} & \hat{\eta}^{(3)}_{m} \\
 \end{bmatrix},
 $$
@@ -806,7 +850,7 @@ One particularly popular form of stacking in survival analysis is the _SuperLear
 
 ## Key takeaways
 
-* Foundational statistical models broadly fall into three categories: nonparametric estimators, semiparametric models that include a baseline estimate, and fully-parametric models.
+* Foundational statistical models broadly fall into three categories: nonparametric estimators, semiparametric models that include a non-parametric baseline estimate, and fully-parametric models.
 * Nonparametric estimators are used throughout survival analysis, often as components in more complex machine learning models.
 * Proportional hazards and accelerated failure time models encode different assumptions but both are powerful predictive tools.
 * The boundary between machine learning and statistical models is fuzzy, and simpler survival models can outperform more complex machine learning alternatives [@Burk2026].
@@ -823,6 +867,6 @@ One particularly popular form of stacking in survival analysis is the _SuperLear
 * Extensions of the proportional hazards framework include more general hazard-based models that allow covariates to act simultaneously on the hazard and time scales. An example is the general hazards model of [@Chen2001]. While flexible, such models do not appear common in predictive modeling but are instead preferred for inference [for example, @Tong2013; @Rubio2019; @Rubio2022].
 * @Collett2014 and @Kalbfleisch1980 both provide comprehensive reading for foundational statistical models. The former is slightly less technical and covers extensions to multiple settings.
 * For more abstract feature selection algorithms that can be applied to any data (survival or otherwise), see @Chandrashekar2014 and @Guyon2003.
-* Kernel-based approaches have been suggested for smooth nonparametric estimates of the baseline hazard, these do not appear commonly used in practice but details can be found in @Gefeller1992 and @Muller1994.
+* Kernel-based approaches not covered here have been suggested for smooth nonparametric estimates of the baseline hazard (@Gefeller1992; @Muller1994).
 
 ::::
