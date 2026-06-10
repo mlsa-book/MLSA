@@ -165,11 +165,11 @@ class WeibullNet(torch.nn.Module):
 
     @staticmethod
     def _make_head(p: int):
-        # FFNN(p -> 4 -> 3 -> 1) with tanh — matches @fig-ffnn-arch.
+        # FFNN(p -> 3 -> 4 -> 1) with tanh — matches @fig-ffnn-arch.
         return torch.nn.Sequential(
-            torch.nn.Linear(p, 4), torch.nn.Tanh(),
-            torch.nn.Linear(4, 3), torch.nn.Tanh(),
-            torch.nn.Linear(3, 1),
+            torch.nn.Linear(p, 3), torch.nn.Tanh(),
+            torch.nn.Linear(3, 4), torch.nn.Tanh(),
+            torch.nn.Linear(4, 1),
         )
 
     def forward(self, x: torch.Tensor):
@@ -293,10 +293,10 @@ GRID_T = grid.numpy()
 
 fig, axes = plt.subplots(2, 2, figsize=(9.5, 7.0), sharey=True, sharex=True)
 titles = [
-    "M1: $\\log\\lambda(\\mathrm{compl.})$, $k$ global",
-    "M2: $\\log\\lambda(\\mathbf{x})$, $k$ global",
-    "M3: $\\log\\lambda(\\mathrm{compl.})$, $\\log k(\\mathrm{compl.})$",
-    "M4: $\\log\\lambda(\\mathbf{x})$, $\\log k(\\mathbf{x})$",
+    "M1: $\\log\\lambda(\\mathrm{compl.})$, $\\gamma$ global",
+    "M2: $\\log\\lambda(\\mathbf{x})$, $\\gamma$ global",
+    "M3: $\\log\\lambda(\\mathrm{compl.})$, $\\log\\gamma(\\mathrm{compl.})$",
+    "M4: $\\log\\lambda(\\mathbf{x})$, $\\log\\gamma(\\mathbf{x})$",
 ]
 
 for ax, title in zip(axes.flat, titles):
@@ -429,7 +429,7 @@ _xt = torch.as_tensor((_x - _xm) / _xs).unsqueeze(-1)
 _yt = torch.as_tensor((_y - _ym) / _ys)
 
 
-def _fit_ffnn(xt, yt, hidden=(4, 3), activation=torch.nn.Tanh,
+def _fit_ffnn(xt, yt, hidden=(3, 4), activation=torch.nn.Tanh,
               epochs=5000, lr=5e-3, wd=1e-3):
     layers = []
     d = xt.shape[-1]
@@ -485,16 +485,16 @@ print(f"Saved {FIG_DIR / 'mcycle-tanh-vs-relu.png'}")
 
 
 class _DistributionalFFNN(torch.nn.Module):
-    """FFNN trunk matching @fig-ffnn-arch: 1 -> 4 -> 3 with tanh,
+    """FFNN trunk matching @fig-ffnn-arch: 1 -> 3 -> 4 with tanh,
     then two heads for mu and log sigma."""
     def __init__(self):
         super().__init__()
         self.trunk = torch.nn.Sequential(
-            torch.nn.Linear(1, 4), torch.nn.Tanh(),
-            torch.nn.Linear(4, 3), torch.nn.Tanh(),
+            torch.nn.Linear(1, 3), torch.nn.Tanh(),
+            torch.nn.Linear(3, 4), torch.nn.Tanh(),
         )
-        self.head_mu = torch.nn.Linear(3, 1)
-        self.head_log_sigma = torch.nn.Linear(3, 1)
+        self.head_mu = torch.nn.Linear(4, 1)
+        self.head_log_sigma = torch.nn.Linear(4, 1)
 
     def forward(self, x):
         h = self.trunk(x)
@@ -523,7 +523,7 @@ _sigma_mc = np.exp(_ls_mc.numpy()) * _ys
 # (same tanh trunk, two losses) for @sec-nnet-deterministic-vs-probabilistic.
 #
 # Both panels use the same architecture as the distributional model above
-# (trunk = 1 -> 32 -> 32 with tanh) — the left panel has a single output
+# (trunk = 1 -> 3 -> 4 with tanh) — the left panel has a single output
 # head trained with MSE, the right has the existing two-headed (mu, log
 # sigma) model trained with heteroscedastic Gaussian NLL.
 #
@@ -532,14 +532,14 @@ _sigma_mc = np.exp(_ls_mc.numpy()) * _ys
 
 
 class _DeterministicFFNN(torch.nn.Module):
-    """FFNN matching @fig-ffnn-arch: 1 -> 4 -> 3 -> 1 with tanh."""
+    """FFNN matching @fig-ffnn-arch: 1 -> 3 -> 4 -> 1 with tanh."""
     def __init__(self):
         super().__init__()
         self.trunk = torch.nn.Sequential(
-            torch.nn.Linear(1, 4), torch.nn.Tanh(),
-            torch.nn.Linear(4, 3), torch.nn.Tanh(),
+            torch.nn.Linear(1, 3), torch.nn.Tanh(),
+            torch.nn.Linear(3, 4), torch.nn.Tanh(),
         )
-        self.head = torch.nn.Linear(3, 1)
+        self.head = torch.nn.Linear(4, 1)
 
     def forward(self, x):
         return self.head(self.trunk(x)).squeeze(-1)
