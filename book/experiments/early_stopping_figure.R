@@ -91,12 +91,12 @@ g <- ggplot(dat, aes(iter, loss, colour = set)) +
   scale_y_continuous(expand = expansion(mult = c(0.04, 0.08))) +
   scale_colour_manual(values = cols, name = NULL) +
   labs(x = "Iteration", y = "Loss (MSE)") +
-  theme_bw(base_size = 13) +
+  theme_bw() +
   theme(legend.position = c(0.015, 0.985), legend.justification = c(0, 1),
         legend.background = element_rect(fill = "white", colour = "grey80"))
 
 ggsave(file.path(fig_dir, "early-stopping.png"), g,
-       width = 6, height = 4, units = "in", dpi = 300)
+       width = 6, height = 3, units = "in", dpi = 600)
 
 cat(sprintf("Early-stopping iteration: %d (of %d)\n", stop_it, n_steps))
 cat(sprintf("Val MSE at stop = %.1f; final val MSE = %.1f\n",

@@ -138,7 +138,7 @@ Moreover, testing performance on a single dataset only provides limited insight 
 This issue is especially pronounced in modern pre-trained generative AI models\index{artificial intelligence!generative}, where there is often an implicit assumption by users that these models will perform well across a wide range of domains without task-specific validation.
 Trusting a model's performance requires two elements: firstly, quantifying performance using appropriate and interpretable measures\index{performance measure}; secondly, clearly specifying what exactly is being assessed and how.
 
-### Evaluation
+### Evaluation {#sec-ml-evaluation}
 
 To understand whether a model is 'good', its predictions are evaluated with a *loss function*\index{loss function}\index{model evaluation}.
 In general, losses compare an observed outcome with a prediction object, which could be a numeric value, a class probability vector, or a predicted distribution.
@@ -157,7 +157,7 @@ Estimation of the generalization error requires *data splitting*\index{data spli
 Another benefit of data splitting is to help detect model overfitting\index{overfitting}, which occurs when models learn patterns specific to the training data that do not generalize to new data.
 Overfitting can be mitigated through methods that constrain model complexity and reduce the tendency to fit noise in the training data; examples include feature selection\index{feature selection}, penalization\index{penalization} methods, and early stopping\index{early stopping}.
 
-### Resampling and benchmarking
+### Resampling and benchmarking {#sec-ml-resampling}
 
 The simplest method to estimate the generalization error is *holdout resampling*\index{resampling!holdout}, which is the process of partitioning the data into one training dataset and one testing dataset, with the model trained on the former and predictions made for the latter.
 Using 2/3 of the data for training and 1/3 for testing is a common splitting ratio [@Kohavi1995].
@@ -258,7 +258,7 @@ $$ {#eq-ml-gd}
 
 where $\alpha > 0$ is the *learning rate*,\index{learning rate} also known as the step size as it controls the size of the parameter update at each iteration.
 If $\alpha$ is too small, then convergence is slow, but too large values mean iterations can overshoot or oscillate.
-In machine learning models $\alpha$ is typically tuned\index{tuning} (@sec-ml-opt) or adaptive and combined with early stopping. 
+In machine learning models $\alpha$ is typically tuned\index{tuning} (@sec-ml-opt) or adaptive and combined with early stopping\index{early stopping} (@sec-ml-early-stopping).
 
 Starting from an arbitrary initial guess $\bstheta^{0}$, (@eq-ml-gd) is repeated to drive $\bstheta$ towards a minimum of $L$.
 
@@ -322,20 +322,24 @@ For large datasets, gradient descent is often replaced by _stochastic_, or _mini
 
 ## Early stopping {#sec-ml-early-stopping}
 
-Iterative learning algorithms such as gradient descent (@sec-ml-gradient-descent), gradient boosting\index{boosting} (@sec-boost), and neural networks\index{neural networks} (@sec-nnet) improve their fit to the training data at every iteration.
-Continuing this process for too long leads to overfitting\index{overfitting}: the model starts to capture noise specific to the training data and generalizes poorly to new observations.
-The number of iterations therefore acts as a parameter that controls model complexity, and _early stopping_\index{early stopping} is a simple and widely used method for choosing it.
+Many machine learning models, including gradient boosting machines\index{gradient boosting machines} (@sec-boost) and neural networks\index{neural networks} (@sec-nnet), depend on iteration to fit parameters to the training data.\index{iteration}
+Continuing this process for too long leads to overfitting\index{overfitting} in which the model starts to capture noise specific to the training data and generalizes poorly to new observations.
+The number of iterations is therefore a hyperparameter controlling model complexity.
+Instead of tuning this hyperparameter, a common technique is to use _early stopping_\index{early stopping}.
 
-Rather than training until the training loss is fully minimized, early stopping monitors predictive performance on a held-out validation set (@sec-ml-eval) as training proceeds.
-As the number of iterations increases, the training loss decreases steadily, whereas the validation loss typically decreases at first and then begins to increase once the model starts to overfit.
-Training is halted at the iteration with the best validation performance, and the parameters from that iteration are retained.
+Early stopping monitors predictive performance on a held-out validation set (@sec-ml-resampling) as training proceeds.
+This validation set is typically a subset of the training dataset, meaning that it is common for a dataset, $\calD$, to be split into $\calD_{train}$ for training the model, $\calD_{validation}$ for monitoring performance _during_ training, and $\calD_{test}$ for evaluating performance _after_ training.
+These datasets can be created using any of the resampling methods in @sec-ml-resampling.
+As discussed in @sec-ml-evaluation, evaluating a model on the training data results in overoptimistic estimates of the true generalization error.
+As the number of iterations increases, the training error decreases steadily, whereas the validation error typically decreases at first and then begins to increase once the model starts to overfit.
 @fig-early-stopping illustrates this on the gradient-descent example of @sec-ml-gradient-descent, using part of the data for training and the remainder for validation.
 
-![Early stopping on the gradient-descent example (@sec-ml-gradient-descent), with part of the data used for training and the rest for validation. As gradient descent proceeds, the training loss decreases steadily, whereas the validation loss first decreases and then increases as the model begins to overfit. Early stopping returns the model from the iteration with the lowest validation loss (dashed line); the shaded region marks the overfitting iterations that are avoided.](Figures/introduction/early-stopping.png){#fig-early-stopping fig-alt="Line plot with iteration on a logarithmic x-axis and loss (mean squared error) on the y-axis. The blue training-loss curve decreases steadily and flattens at a low value. The red validation-loss curve decreases to a minimum at an early iteration, marked by a dashed vertical line and a point, and then rises steeply to a high value. The region to the right of the minimum is lightly shaded to indicate the overfitting iterations that early stopping avoids." width=75%}
+![Early stopping on the gradient-descent example (@sec-ml-gradient-descent), with part of the data used for training and the rest for validation. As gradient descent proceeds, the training loss decreases steadily, whereas the validation loss first decreases and then increases as the model begins to overfit. Early stopping returns the model from the iteration with the lowest validation loss (dashed line); the shaded region marks the overfitting iterations that are avoided.](Figures/introduction/early-stopping.png){#fig-early-stopping fig-alt="Line plot with iteration on a logarithmic x-axis (1, 10, 100, 1000, 10000) and loss (mean squared error) on the y-axis. A blue training-loss curve decreases steadily and flattens at a low value. A red validation-loss curve decreases to a minimum around iteration 200, marked by a dashed vertical line and a red point, and then rises steeply to a high value. The region to the right of the minimum is lightly shaded to indicate the overfitting iterations that early stopping avoids."}
 
-In practice, the validation loss rarely improves smoothly from one iteration to the next, so a _patience_ parameter is used: training continues until the validation loss has failed to improve for a set number of consecutive iterations, at which point the algorithm stops.
-Early stopping is computationally cheaper than tuning the number of iterations directly (@sec-ml-opt), as a single training run both fits the model and selects the stopping point.
-It can also be viewed as a form of regularization, since limiting the number of iterations restricts how closely the model can fit the training data, in a similar spirit to how shrinkage or penalty terms constrain model complexity.
+Theoretically, training could be stopped as soon as the validation loss starts to increase, visualized by the red point in @fig-early-stopping.
+However, the validation loss rarely improves smoothly from one iteration to the next, so a _patience_ hyperparameter is used, which is the number of consecutive iterations in which the validation loss must fail to improve before stopping the training algorithm.\index{early stopping!patience}
+Early stopping is computationally cheaper than tuning the number of iterations directly (@sec-ml-opt), which would require repeatedly fitting complete models.
+Early stopping can also be viewed as a form of regularization\index{regularization}, as limiting the number of iterations restricts how closely the model can fit the training data, in a similar spirit to how shrinkage or penalty terms constrain model complexity.
 
 ## Conclusion
 
