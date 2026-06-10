@@ -1,5 +1,5 @@
 """Fit two Cox-NN variants (proportional hazards) on the tumor data with
-the @fig-ffnn-arch (p -> 4 -> 3 -> 1, tanh) architecture and save the
+the @fig-ffnn-arch (p -> 3 -> 4 -> 1, tanh) architecture and save the
 comparison figure.
 
     C1: Cox-NN on `complications` only (1 input)
@@ -57,14 +57,14 @@ def cox_nll(eta, t, delta):
     return -((eta - log_cum) * d_s).sum() / d_s.sum().clamp_min(1.0)
 
 
-class FFNN43Cox(torch.nn.Module):
-    """Reference FFNN of @fig-ffnn-arch: p -> 4 -> 3 -> 1, tanh activations."""
+class FFNN34Cox(torch.nn.Module):
+    """Reference FFNN of @fig-ffnn-arch: p -> 3 -> 4 -> 1, tanh activations."""
     def __init__(self, p):
         super().__init__()
         self.net = torch.nn.Sequential(
-            torch.nn.Linear(p, 4), torch.nn.Tanh(),
-            torch.nn.Linear(4, 3), torch.nn.Tanh(),
-            torch.nn.Linear(3, 1, bias=False),
+            torch.nn.Linear(p, 3), torch.nn.Tanh(),
+            torch.nn.Linear(3, 4), torch.nn.Tanh(),
+            torch.nn.Linear(4, 1, bias=False),
         )
     def forward(self, x):
         return self.net(x).squeeze(-1)
@@ -80,8 +80,8 @@ def fit(model, x, epochs=1500, lr=0.02, wd=0.0):
     return model.eval()
 
 
-torch.manual_seed(0); m1 = fit(FFNN43Cox(p=1), x_comp)
-torch.manual_seed(0); m3 = fit(FFNN43Cox(p=x_full.shape[1]), x_full, wd=1e-3)
+torch.manual_seed(0); m1 = fit(FFNN34Cox(p=1), x_comp)
+torch.manual_seed(0); m3 = fit(FFNN34Cox(p=x_full.shape[1]), x_full, wd=1e-3)
 
 
 # ---- Breslow baseline + survival functions -------------------------------
