@@ -80,43 +80,51 @@ ggsave("book/Figures/introduction/gompertz.png", g_gp,
        height = 3.5, width = 7, units = "in", dpi = 600)
 
 ## Ranking
-s_t = tsk("whas")
-time = s_t$unique_times()
-c_t = s_t$data() %>% mutate(status = 1 - status) %>% as_task_surv(event = "status")
+set.seed(260607)
+train <- sample(nrow(lung), nrow(lung) * 2/3)
+test <- setdiff(seq(nrow(lung)), train)
+fit1 <- coxph(Surv(time, status) ~ ., lung[train,])
+tmax = as.numeric(quantile(lung$time, probs = seq.int(0.1, 1, 0.1), na.rm = TRUE))
+t60 <- quantile(lung$time, probs = 0.6, na.rm = TRUE)
+t70 <- quantile(lung$time, probs = 0.7, na.rm = TRUE)
+t80 <- quantile(lung$time, probs = 0.8, na.rm = TRUE)
+t90 <- quantile(lung$time, probs = 0.9, na.rm = TRUE)
+timewts = c("n", "S", "n/G2")
+cindex_dat <- crossing(
+  tmax = tmax,
+  timewt = timewts
+) |>
+  mutate(
+    cindex = map2_dbl(tmax, timewt, \(tm, wt) {
+      concordance(
+        fit1,
+        ymax = tm,
+        timewt = wt,
+        newdata = lung[test,]
+      )$concordance
+    })
+  )
 
-s_d = data.frame(t = time, surv = s_t$kaplan()$surv, W = "KMS")
-c_d = data.frame(t = time, surv = c_t$kaplan()$surv, W = "KMG")
-w_d = data.frame(t = time, surv = 1 / (c_t$kaplan()$surv^2), W = "KMG^-2")
+cindex_dat |>
+group_by(tmax) %>%
+  summarise(
+    diff = max(cindex) - min(cindex)
+  )
 
-cutoff = time[which(s_t$kaplan()$surv < 0.6)[1]]
 
-d = rbind(s_d, c_d, w_d) %>% as.data.frame()
-g = ggplot(d, aes(x = t, y = surv, color = W)) +
-  geom_line() +
-  ylim(0, 5) +
-  theme_classic() +
+g <- ggplot(cindex_dat, aes(x = tmax, y = cindex, color = timewt)) +
+  geom_line(linewidth = 0.8) +
+  geom_point(size = 1.2) +
+  geom_vline(xintercept = c(t60, t70, t80, t90), linetype = 2, color = "gray40") +
   labs(
-    y = "W(t)",
-    title = "Kaplan-Meier estimates and weighting on 'whas' data",
-    color = "Weight function") +
-  geom_vline(xintercept = cutoff, lty = 2, color = "gray") +
-  scale_color_discrete(labels = expression(hat(G)[KM], hat(G)[KM]^{-2}, hat(S)[KM]))
-ggsave("book/Figures/evaluation/weights.png", g, height = 3, units = "in",
-  dpi = 600)
+    x = "Time cutoff",
+    y = "C-index",
+    color = "Weighting"
+  )  + ylim(0.5,1)
 
-ids = c("W=1", "W=G^-1", "W=G^-2")
-m_inf = c(msr("surv.cindex"),
-msr("surv.cindex", weight_meth = "G"),
-msr("surv.cindex", weight_meth = "G2"))
+ggsave("book/Figures/evaluation/cindex.png", g,
+       height = 3.5, width = 7, units = "in", dpi = 600)
 
-m_80 = c(msr("surv.cindex", id = "W=1", cutoff = cutoff),
-msr("surv.cindex", weight_meth = "G", id = "W=G^-1", cutoff = cutoff),
-msr("surv.cindex", weight_meth = "G2", id = "W=G^-2", cutoff = cutoff))
-
-m = c(m_inf, m_80)
-
-set.seed(20231207)
-round(resample(s_t, lrn("surv.coxph"), rsmp("cv", folds = 3))$aggregate(m), 2)
 
 ## Calibration
 
@@ -124,28 +132,44 @@ set.seed(20231211)
 t = tgen("simsurv")$generate(400)
 s = partition(t)
 
-prrt = as_learner(ppl("distrcompositor", lrn("surv.rpart")))$
-  train(t, s$train)$predict(t, s$test)
+# RRT: surv.rpart + AFT distr composition on a Kaplan-Meier baseline.
+# The current mlr3extralearners surv.rpart emits only `crank` (no `lp`), so
+# ppl("distrcompositor", lrn("surv.rpart")) short-circuits and returns no distr.
+# Earlier rpart exposed lp = crank, which the default distrcompositor
+# (form = "aft", overwrite = FALSE, scale_lp = FALSE) used to build an AFT distr
+# from a Kaplan-Meier baseline; we restore that by supplying lp = crank.
+prpart = lrn("surv.rpart")$train(t, s$train)$predict(t, s$test)
+pkm = lrn("surv.kaplan")$train(t, s$train)$predict(t, s$test)
+prp = PredictionSurv$new(row_ids = prpart$row_ids, truth = prpart$truth,
+  crank = prpart$crank, lp = prpart$crank)
+prrt = po("distrcompose",
+  param_vals = list(form = "aft", overwrite = FALSE, scale_lp = FALSE))$
+  predict(list(base = pkm, pred = prp))[[1]]
+
 pcox = lrn("surv.coxph")$train(t, s$train)$predict(t, s$test)
 pran = lrn("surv.ranger")$train(t, s$train)$predict(t, s$test)
 
-drrt = autoplot(prrt, "calib", t, s$test)$data
+# autoplot.PredictionSurv() now derives the KM reference (calib) and the dcalib
+# quantile extension (formerly extend_quantile = TRUE) from the prediction's own
+# $truth, so the task/row_ids/extend_quantile arguments are no longer passed.
+drrt = autoplot(prrt, "calib")$data
 drrt = drrt %>% filter(Group == "Pred") %>% mutate(Group = "RRT")
-dcox = autoplot(pcox, "calib", t, s$test)$data
+dcox = autoplot(pcox, "calib")$data
 dcox = dcox %>% mutate(Group = if_else(Group == "KM", "KM", "CPH"))
-dran = autoplot(pran, "calib", t, s$test)$data
+dran = autoplot(pran, "calib")$data
 dran = dran %>% filter(Group == "Pred") %>% mutate(Group = "RF")
 
 g = ggplot(rbind(dcox, dran, drrt), aes(x = x, y = y, color = Group)) +
-  geom_line() + theme_classic() + ylim(0, 1) +
+  geom_line() + theme_bw() + ylim(0, 1) +
   labs(x = "T", y = "S(T)", color = "Model")
 ggsave("book/Figures/evaluation/calibKM.png", g, height = 3, units = "in", dpi = 600)
+ggsave("book/Figures/evaluation/calibKM.svg", g, height = 3, units = "in")
 
-drrt = autoplot(prrt, "dcalib", t, s$test, extend_quantile = TRUE)$data
+drrt = autoplot(prrt, "dcalib")$data
 drrt = drrt %>% mutate(Group = "RRT")
-dcox = autoplot(pcox, "dcalib", t, s$test, extend_quantile = TRUE)$data
+dcox = autoplot(pcox, "dcalib")$data
 dcox = dcox %>% mutate(Group = "CPH")
-dran = autoplot(pran, "dcalib", t, s$test, extend_quantile = TRUE)$data
+dran = autoplot(pran, "dcalib")$data
 dran = dran %>% mutate(Group = "RF")
 
 dcal_coxp = as.numeric(pcox$score(msr("surv.dcalib", truncate = Inf, chisq = TRUE)))
@@ -161,13 +185,14 @@ scores = paste0(sprintf("   %s = %s (%s)", c("CPH", "RF", "RRT"), signif(c(dcal_
 scores = paste0("DCal (p-values):\n", scores)
 
 g = ggplot(rbind(dcox, dran, drrt), aes(x = p, y = q, color = Group)) +
-  geom_line() + theme_classic() + ylim(0, 1) + xlim(0, 1) +
+  geom_line() + theme_bw() + ylim(0, 1) + xlim(0, 1) +
   geom_abline(slope = 1, intercept = 0, color = "lightgray", lty = "dashed") +
   labs(x = "True (p)", y = "Predicted", color = "Model") +
   geom_label(aes(x = x, y = y), data.frame(x = 0.75, y = 0.1), label = scores,
   inherit.aes = FALSE, hjust = "left", size = 2.5)
 ggsave("book/Figures/evaluation/calibD.png", g, height = 3, units = "in",
   dpi = 600)
+ggsave("book/Figures/evaluation/calibD.svg", g, height = 3, units = "in")
 
 ## Decision trees
 
@@ -589,7 +614,8 @@ p_sir_cifs = ggplot(cif_sir_b, aes(x = time, y = cif)) +
   geom_vline(xintercept = 120, lty = 3) +
   # geom_step(data=km_sir_b, aes(col = pneumonia), lty = 2) +
   labs(
-    y = expression(P(Y <= tau~ "," ~ E(Y) == e))
+    x = expression("time, " * tau),
+    y = expression(hat(F)[q](tau))
   ) +
   coord_cartesian(xlim = c(0, 125), ylim=c(0, 1))
 
@@ -631,7 +657,8 @@ p_cens_vs_cr = ggplot(
     coord_cartesian(xlim = c(0, 125), ylim=c(0, 1)) +
     geom_vline(xintercept = 120, lty = 3) +
     labs(
-      y = expression(P(Y <= tau~ "," ~ E(Y) == 2)),
+      x = expression("time, " * tau),
+      y = expression(hat(F)[2](tau)),
       linetype = "assumption"
     )
 
@@ -880,18 +907,18 @@ pred_cond_df <- do.call(rbind, lapply(levels(events_df$sex), function(s) {
 }))
 
 g <- ggplot(df, aes(x = x, y = y, group = group))
-g1 <- g + geom_step(linewidth = 1.3, color = "gray")
-g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity()
+g1 <- g + geom_step(linewidth = 1.3, color = "gray") + labs(x = "Time", y = "Survival probability")
+g2 <- g + geom_step(aes(alpha = alpha), linewidth = 1.3) + scale_alpha_identity() + labs(x = "Time", y = "Survival probability")
 g3 <- g1 + geom_line(aes(x = x, y = y), data = pred_uncond_df,
                      inherit.aes = FALSE,
-                     color = "black", linewidth = 1)
+                     color = "black", linewidth = 1) + labs(x = "Time", y = "Survival probability")
 g4 <- g +
   geom_step(aes(color = sex), linewidth = 1.3, alpha = 0.5) +
   geom_line(aes(x = x, y = y, group = sex, color = sex),
             data = pred_cond_df,
-            inherit.aes = FALSE, linewidth = 1.5)
+            inherit.aes = FALSE, linewidth = 1.5) + labs(x = "Time", y = "Survival probability")
 
-g_final <- (g1 + g2 + g3 + g4) + ylim(0, 1) + xlim(0, 50) & labs(x = "t", y = "S(t)") & guides(color  = "none")
+g_final <- (g1 + g2 + g3 + g4) & ylim(0, 1) & xlim(0, 50) & guides(color  = "none")
 
 ggsave("book/Figures/survtsk/heavisides.png",
   g_final, height=5, width=7, units="in", dpi=600)
@@ -1757,36 +1784,56 @@ ggsave("book/Figures/evaluation/rocs.png", g_auc,
 
 ## Survtsk chapter RMST comparison
 yi = c(1,0.8,0.75,0.75,0.7,rep(0.6, 5))
-yj = c(1,0.9,0.85,0.6,0.5,rep(0, 5))
-df <- data.frame(x = rep(0:9,2), y = c(yi, yj), Patient=rep(c("i", "j"), each = 10))
+yj = c(1,0.9,0.85,0.6,0.5,rep(0.1, 5))
+df <- data.frame(x = rep(0:9,2), y = c(yi, yj), Group=rep(c("i", "j"), each = 10))
 
-plot_rmst <- function(df, patient) {
-  filtered_df <- df %>%
-    filter(Patient == patient, x <= 5)
-  rect_df <-  filtered_df %>%
+plot_rmst <- function(df, group, tau = 6) {
+  rect_df <- df %>%
+    filter(Group == group, x < tau) %>%
     arrange(x) %>%
-    mutate(xmin = x, xmax = lead(x), ymin = 0, ymax = y) %>%
-    filter(!is.na(xmax))
+    mutate(
+      xmin = x,
+      xmax = x + 1,
+      ymin = 0,
+      ymax = y
+    )
 
-  ggplot(df, aes(x = x, y = y, group = Patient)) +
-    geom_step(aes(linetype = Patient), lwd = 1) +
+  rmst_hat <- sum(rect_df$y)
+
+  ggplot(df, aes(x = x, y = y, group = Group)) +
     geom_rect(
       data = rect_df,
       aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax),
       alpha = 0.3,
-      inherit.aes = FALSE) +
-    annotate("text", x = 2, y = 0.4,
-      label = as.expression(bquote(RMST[.(patient)] * "(" * 5 * ")" == .(round(sum(filtered_df$y), 2)))),
-      parse = TRUE) +
-    labs(x = "Time", y = "Survival probability", title = paste0("RMST(5) for patient ", patient))    
+      inherit.aes = FALSE
+    ) +
+    geom_step(aes(linetype = Group), linewidth = 1) +
+    geom_vline(xintercept = tau, linetype = "dotted", linewidth = 0.5) +
+    annotate(
+      "text",
+      x = 2,
+      y = 0.4,
+      label = as.expression(
+        bquote(RMST[.(group)] * "(" * .(tau) * ")" == .(round(rmst_hat, 2)))
+      ),
+      parse = TRUE
+    ) +
+    labs(
+      x = "Time",
+      y = "Survival probability",
+      title = paste0("RMST(", tau, ") for group ", group)
+    ) + theme(legend.position = "right")
 }
 
 p1 <- plot_rmst(df, "i")
 p2 <- plot_rmst(df, "j")
-p_rmst_survtsk <- (p1 + p2) + plot_layout(guides = "collect")
+
+p_rmst_survtsk <- (p1 + p2) +
+  plot_layout(guides = "collect")
+  
 
 ggsave("book/Figures/survtsk/rmst.png", p_rmst_survtsk,
-       height = 4, width = 9, units = "in", dpi = 600)
+       height = 3.5, width = 7.5, units = "in", dpi = 600)
 
 ## C-index interval censoring
 cases <- tibble::tribble(
@@ -2417,3 +2464,69 @@ ggsave("book/Figures/survtsk/predict_types.svg", final_pt,
        width = 9.5, height = 6.5, units = "in")
 ggsave("book/Figures/survtsk/predict_types.png", final_pt,
        width = 9.5, height = 6.5, units = "in", dpi = 300)
+
+
+##------------------
+## Logloss and Brier
+##------------------
+p <- seq(0.001, 0.999, length.out = 500)
+
+df <- data.frame(
+  Prediction = rep(p, 4),
+  Value = c(
+    (1 - p)^2, p^2,
+    -log(p), -log(1 - p)
+  ),
+  Class = rep(c("y1", "y0", "y1", "y0"), each = length(p)),
+  Loss = rep(c("Brier score", "Log loss"), each = 2 * length(p))
+)
+
+
+brier <- ggplot(subset(df, Loss == "Brier score"),
+                aes(Prediction, Value, colour = Class)) +
+  geom_line(linewidth = 1) +
+  scale_y_continuous(limits = c(0, 1.05), breaks = seq(0, 1, 0.25)) +
+  annotate(
+    "label", x = 0.10, y = 1.00,
+    label = "y[i] == 1",
+    parse = TRUE
+  ) +
+  annotate(
+    "label", x = 0.90, y = 1.00,
+    label = "y[i] == 0",
+    parse = TRUE,
+  ) +
+  labs(
+    x = expression(Prediction ~ hat(y)[i]),
+    y = "Brier score"
+  ) +
+  theme(legend.position = "none")
+
+logloss <- ggplot(subset(df, Loss == "Log loss"),
+                  aes(Prediction, Value, colour = Class)) +
+  geom_line(linewidth = 1) +
+  scale_y_continuous(
+    limits = c(0, 3.15),
+    breaks = c(0, log(2), 1, 2, 3),
+    labels = c("0", "0.69", "1", "2", "3")
+  ) +
+  annotate(
+    "label", x = 0.15, y = 3.00,
+    label = "y[i] == 1",
+    parse = TRUE
+  ) +
+  annotate(
+    "label", x = 0.85, y = 3.00,
+    label = "y[i] == 0",
+    parse = TRUE,
+  ) +
+  labs(
+    x = expression(Prediction ~ hat(y)[i]),
+    y = "Log loss"
+  ) +
+  theme(legend.position = "none")
+
+
+
+ggsave("book/Figures/evaluation/brier_logloss.png", brier + logloss,
+      width = 5.5, height = 3, units = "in")
