@@ -1,5 +1,5 @@
 """Fit two CoxTime variants on the tumor data with the @fig-ffnn-arch
-(p+1 -> 4 -> 3 -> 1, tanh) architecture and save the comparison figure.
+(p+1 -> 3 -> 4 -> 1, tanh) architecture and save the comparison figure.
 
 Variants follow the C-labeling parallel to the Weibull M-variants:
     C3: CoxTime on `complications` only (1 + 1 = 2 inputs)
@@ -77,14 +77,14 @@ def cox_time_nll(g_fn, x: torch.Tensor) -> torch.Tensor:
     return loss / ev.numel()
 
 
-class FFNN43CoxTime(torch.nn.Module):
-    """Reference FFNN of @fig-ffnn-arch: p+1 -> 4 -> 3 -> 1, tanh activations."""
+class FFNN34CoxTime(torch.nn.Module):
+    """Reference FFNN of @fig-ffnn-arch: p+1 -> 3 -> 4 -> 1, tanh activations."""
     def __init__(self, p):
         super().__init__()
         self.net = torch.nn.Sequential(
-            torch.nn.Linear(p + 1, 4), torch.nn.Tanh(),
-            torch.nn.Linear(4, 3),     torch.nn.Tanh(),
-            torch.nn.Linear(3, 1, bias=False),
+            torch.nn.Linear(p + 1, 3), torch.nn.Tanh(),
+            torch.nn.Linear(3, 4),     torch.nn.Tanh(),
+            torch.nn.Linear(4, 1, bias=False),
         )
 
     def forward(self, x, t_in):
@@ -103,9 +103,9 @@ def fit(model, x, epochs=1500, lr=0.02, wd=0.0):
 
 
 torch.manual_seed(0)
-m_c3 = fit(FFNN43CoxTime(p=1), x_comp)
+m_c3 = fit(FFNN34CoxTime(p=1), x_comp)
 torch.manual_seed(0)
-m_c4 = fit(FFNN43CoxTime(p=x_full.shape[1]), x_full, wd=1e-3)
+m_c4 = fit(FFNN34CoxTime(p=x_full.shape[1]), x_full, wd=1e-3)
 
 
 # ---- CoxTime survival: discrete Breslow over event times -----------------
