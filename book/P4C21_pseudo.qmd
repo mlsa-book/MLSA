@@ -55,13 +55,13 @@ $$
 \hat{\psi}(\tau \mid \xx_i) = g(\xx_i\mid\hat{\bstheta}_\tau).
 $$
 
-Rather than learning $g(\cdot)$ directly, the model often learns a *predictor function* $\eta(\xx_i\mid\bstheta_\tau)$, combined with a transformation via a known *response function* $r(\cdot)$, such that 
+Rather than learning $g(\cdot)$ directly, the model often learns a *predictor function*, $\eta(\xx_i\mid\bstheta_\tau)$, combined with a transformation via a known *response function*, $r(\cdot)$, such that 
 
 $$
 g(\xx_i\mid\bstheta_\tau) = r(\eta(\xx_i\mid\bstheta_\tau)).
 $$ {#eq-pseudo-value-response-function}
 
-The response function maps the predictor $\eta$ to the target space (similarly to the discussion in @sec-nnet-activations).
+The response function maps the predictor $\eta$ to the target space (as with neural networks; @sec-nnet-activations).
 Its inverse $r^{-1}(\cdot)$ is the *link function*, commonly used in generalized linear models.\index{link function}
 A response function is often required as pseudo-values can take any value on $\Reals$ but the target quantity of interest might be constrained to a smaller set, for example survival probabilities must be within $[0,1]$.
 The model may be estimated with the response function embedded in the fitting process, as in generalized estimating equations [@hardinGeneralizedEstimatingEquations2012], or the response may be applied to the predictions, as in many machine learning methods.
@@ -72,7 +72,7 @@ Finally, @sec-pseudo-value-eha extends this reduction to competing risks and mul
 
 ## Pseudo-values for survival probabilities {#sec-pseudo-value-S}
 
-This section details the use of pseudo-values for survival distribution predictions at selected time points.\index{reduction!pseudo-value regression!survival probabilities}
+This section details the use of pseudo-values for survival probability predictions at selected time points.\index{reduction!pseudo-value regression!survival probabilities}
 For illustration, consider the tumor dataset (introduced in @tbl-surv-data-tumor), which contains right-censored data for $n=776$ observations on time-until-death after operation (in days) and features 'age' and 'complications', which indicates whether complications occurred during tumor removal.
 For this example, a simple linear model is used for (@eq-pseudo-value-expectation-2) but any (machine learning) regression model could be used in practice.
 
@@ -96,12 +96,11 @@ While the differences in leave-one-out Kaplan-Meier estimates may appear small (
 
 : Illustration of pseudo-value calculation for the first 4 subjects from the tumor dataset at time point $\tau = 1000$ days. The table shows the overall Kaplan-Meier estimate $\KMS(\tau)$ calculated for all $776$ subjects, the leave-one-out Kaplan-Meier estimate $\KMS^{-i}(\tau)$ (obtained by omitting subject $i$), and the calculated pseudo-value $\tildey_i(\tau)$. The features age and complications are not used for the calculation of the pseudo-values but are included in the regression step. {#tbl-pseudo-value-calculation}
 
-A linear model is then fit to these pseudo-values, shown in @tbl-pseudo-value-calculation, giving
+A linear model is then fit to these pseudo-values (@tbl-pseudo-value-calculation), giving
 
 $$
 \hat{S}(\tau \mid \xx_i) = \hat{\tilde{y}}_i(\tau) = \xx_i^\trans\hat{\bsbeta}_{\tau}.
 $$ {#eq-pseudo-value-S-lm}
-
 
 To illustrate some of the main advantages of this method, consider fitting the pseudo-values using a linear model of the form:
 
@@ -112,12 +111,12 @@ $$ {#eq-pseudo-value-S-lm-complications}
 for time points $\tau \in \{1000, 2000, 3000\}$ days. 
 
 The results are shown in @fig-pseudo-lm, where the black dots indicate the survival probability predictions from (@eq-pseudo-value-S-lm-complications) and the solid curves are Kaplan-Meier estimates of the survival probabilities stratified by the 'complications' variable.
-At first glance this may seem surprising, as the pseudo-values are computed from a single, *unstratified* Kaplan-Meier estimator, yet the predictions closely match the *stratified* estimates.
+Despite the pseudo-values being computed from a single, *unstratified* Kaplan-Meier estimator, the predictions still closely match the *stratified* estimates.
 The reason is that a separate regression is fitted at each time point $\tau$, with the coefficients estimated independently, so the difference between groups is free to vary over time.
 The separation between the curves suggests the proportional hazards assumption may not hold for this data, which the pseudo-value approach accommodates naturally, since the group effect $\hat{\beta}_{\tau,1}$ is not constrained to be constant across $\tau$.
 
 In this example the identity response function is used, so the model places no constraint on the target space, $g(\xx\mid\bstheta_\tau) = \eta(\xx\mid\bstheta_\tau) = \xx^\trans\bstheta_\tau$, and the predictions could in principle fall outside $[0,1]$.
-Nonetheless, all of the estimated survival probabilities here lie within the valid range.
+Nonetheless, all of the estimated survival probabilities lay within the valid range.
 A practical advantage of this parametrization is that the fitted coefficients are directly interpretable on the survival-probability scale, unlike a Cox model, whose coefficients are interpretable only as hazard ratios. 
 For example, $\hat{\beta}_{1000,1} \approx -0.23$, so at $\tau = 1000$ days the expected survival probability for patients with complications is around 23 percentage points lower than for those without complications.
 This interpretability also carries to other time points, for example at $\tau = 2000$ days, $\hat{\beta}_{2000,1} \approx -0.18$, and at $\tau = 3000$ days, $\hat{\beta}_{3000,1} \approx -0.13$; thus, the average effect of complications depends on $\tau$ and decreases over time (complications have a time-varying effect).\index{time-varying effects}
@@ -143,7 +142,7 @@ The resulting estimates are in @tbl-pseudo-lm-age, where the effects of age and 
 |     3000|       -0.1050| -0.0071|
 : Estimates of the effects of complications, $\hat{\beta}_{\tau,1}$, and age, $\hat{\beta}_{\tau,2}$, on the survival probability at different time points $\tau \in \{1000, 2000, 3000\}$ days. {#tbl-pseudo-lm-age}
 
-Conditional on $\tau$, the interpretation is equivalent to a standard multiple linear regression model. For example, at $\tau = 1000$ days, the effect of age is $\hat{\beta}_{1000,2} \approx -0.0032$, which means that, given everything else being equal, the expected survival probability is reduced by around 0.32 percentage points per additional year of age.
+Conditional on $\tau$, the interpretation is equivalent to a standard multiple linear regression model. For example, at $\tau = 1000$ days, the effect of age is $\hat{\beta}_{1000,2} \approx -0.0032$, which means that, holding the other covariates fixed, the expected survival probability is reduced by around 0.32 percentage points per additional year of age.
 In contrast, at $\tau=2000$ days, the survival probability is reduced by around 0.70 percentage points per additional year of age (7 percentage points for a 10-year difference), meaning age has more than double the impact for later time points.
 Therefore, even as the number of covariates increases, the pseudo-value approach remains a highly interpretable reduction.
 
@@ -186,7 +185,7 @@ $$
 $$
 
 where $x_{i,1}$ as before and $x_{i,2}$ is the age of subject $i$.
-The respective estimates are $\hat{\beta}_{1000,1} \approx -230$ and $\hat{\beta}_{1000,2} \approx -3$, such that, everything else being equal, the expected RMST is reduced by around 3 days per year of age.
+The respective estimates are $\hat{\beta}_{1000,1} \approx -230$ and $\hat{\beta}_{1000,2} \approx -3$, such that, holding the other covariates fixed, the expected RMST is reduced by around 3 days per year of age.
 The effect of complications, $\hat{\beta}_{1000,1}$, is slightly reduced when age is included and can be interpreted as the effect of complications on RMST adjusted for age.
 
 ## Choice of response function {#sec-pseudo-value-response-function}
@@ -270,7 +269,6 @@ Once calculated, these pseudo-values can be used as target variables in regressi
 Using the identity function for the response, one can directly interpret the feature effects on the cumulative incidence of a specific event type.
 
 ### Pseudo-values for multi-state models {#sec-pseudo-value-occupation-prob}
-<!-- TODO: when eha section is updated to contain definitions of state occupation probabilities, update this section accordingly -->
 
 In multi-state settings (@sec-multi-state), pseudo-values can be used to estimate state occupation probabilities conditional on features.\index{reduction!pseudo-value regression!multi-state models}
 These represent the probability of being in state $q$ at time $\tau$.
