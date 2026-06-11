@@ -827,13 +827,14 @@ tp_xgb_df <- ndf |>
             trans_prob)
 
 # --- Combine into a long-format frame and plot -------------------------------
+method_levels <- c("Aalen-Johansen", "GBM")
 build_aj_long <- function(tp, arm) {
   ts <- tp[[1]]$time
   data.frame(
     time       = rep(ts, 4),
     transition = rep(c("0->1", "0->2", "1->0", "1->2"), each = length(ts)),
     Treatment  = factor(arm, levels = c("Placebo", "Prednisone")),
-    method     = factor("AJ", levels = c("AJ", "XGBoost")),
+    method     = factor("Aalen-Johansen", levels = method_levels),
     trans_prob = c(tp[[1]]$pstate2, tp[[1]]$pstate3,
                    tp[[2]]$pstate1, tp[[2]]$pstate3))
 }
@@ -846,7 +847,7 @@ df_tp_cmp <- bind_rows(
   tp_xgb_df |>
     mutate(transition = unname(relabel_mstate[transition]),
            Treatment  = factor(treat, levels = c("Placebo", "Prednisone")),
-           method     = factor("XGBoost", levels = c("AJ", "XGBoost"))) |>
+           method     = factor("GBM", levels = method_levels)) |>
     select(time, transition, Treatment, method, trans_prob)
 )
 
@@ -856,7 +857,7 @@ p_tp_cmp <- ggplot(df_tp_cmp,
   geom_step(linewidth = 0.7) +
   facet_wrap(~ transition) +
   scale_colour_manual(values = c("steelblue", "firebrick4")) +
-  scale_linetype_manual(values = c("AJ" = "solid", "XGBoost" = "dotted")) +
+  scale_linetype_manual(values = c("Aalen-Johansen" = "dotted", "GBM" = "solid")) +
   coord_cartesian(xlim = c(0, 4000), ylim = c(0, 1)) +
   labs(x = "Time", y = "Transition probability", linetype = "Method") +
   theme_bw(base_size = 12) +
@@ -1985,9 +1986,7 @@ cox_cif <- function(prof_df, cox_d, cox_e, grid) {
     bind_cols(prof_df[rep(1, length(grid) * 2), , drop = FALSE])
 }
 
-## ---- (4) Random Survival Forest (native competing risks) ----
-rsf_marg <- rfsrc(Surv(time, status) ~ pneu, data = sir, ntree = 500,
-                  cause = c(1, 2), seed = 42)
+## ---- (4) Random Survival Forest (native competing risks; used by adjusted fig) ----
 rsf_adj  <- rfsrc(Surv(time, status) ~ pneu + age + sex, data = sir, ntree = 500,
                   cause = c(1, 2), seed = 42)
 
@@ -2002,6 +2001,44 @@ rsf_cif <- function(prof_df, rsf_fit) {
   }))
 }
 
+## ---- (5) Reduction-based RSF (two single-event forests combined via the reduction) ----
+## Fit one single-event RSF per cause (discharge / death) and combine the
+## cause-specific cumulative hazards into CIFs using the same discrete reduction
+## as the Cox / PAM CIF combination above.
+rsf_disch_marg <- rfsrc(Surv(time, stat_e) ~ pneu, data = sir_disch,
+                        ntree = 500, seed = 42)
+rsf_death_marg <- rfsrc(Surv(time, stat_e) ~ pneu, data = sir_death,
+                        ntree = 500, seed = 42)
+
+# Step-constant cumulative-hazard evaluator from a single-event rfsrc fit.
+rsf_chf_eval <- function(rsf_fit, prof_df, grid) {
+  pred <- predict(rsf_fit, newdata = prof_df)
+  ti   <- pred$time.interest
+  chf  <- pred$chf                      # n_profiles x n_times (single-event)
+  t(apply(chf, 1, function(chf_row)
+    approxfun(c(0, ti), c(0, chf_row), method = "constant", rule = 2, f = 0)(grid)))
+}
+
+rsf_red_cif <- function(prof_df, rsf_d, rsf_e, grid) {
+  H_d_mat <- rsf_chf_eval(rsf_d, prof_df, grid)
+  H_e_mat <- rsf_chf_eval(rsf_e, prof_df, grid)
+  intlen  <- diff(c(0, grid))
+  bind_rows(lapply(seq_len(nrow(prof_df)), function(i) {
+    H_d <- H_d_mat[i, ]; H_e <- H_e_mat[i, ]
+    h_d <- ifelse(intlen > 0, diff(c(0, H_d)) / intlen, 0)
+    h_e <- ifelse(intlen > 0, diff(c(0, H_e)) / intlen, 0)
+    H_all  <- cumsum((h_d + h_e) * intlen)
+    S_prev <- c(1, head(exp(-H_all), -1))
+    cif_d  <- cumsum(S_prev * h_d * intlen)
+    cif_e  <- cumsum(S_prev * h_e * intlen)
+    bind_rows(
+      data.frame(time = grid, cif = cif_d, cause = "Discharge"),
+      data.frame(time = grid, cif = cif_e, cause = "Death")
+    ) |>
+      bind_cols(prof_df[rep(i, length(grid) * 2), , drop = FALSE])
+  }))
+}
+
 ## ---- Marginal verification figure: PAM/Cox/RSF recover AJ ----
 profs_marg <- data.frame(
   pneu = factor(c("No pneumonia","Pneumonia"),
@@ -2011,31 +2048,32 @@ profs_marg_pam <- profs_marg
 profs_marg_pam$age <- median(sir$age)
 profs_marg_pam$sex <- factor("M", levels = c("F","M"))
 
-pam_marg_df <- bind_rows(lapply(seq_len(nrow(profs_marg_pam)), function(i)
-  pred_pam_cif(profs_marg_pam[i,], pam_disch_marg, pam_death_marg, ped_disch))) |>
-  select(time, cif, cause, pneu) |>
-  mutate(method = "PAM", cause = factor(cause, levels = c("Discharge","Death")))
-
 cox_marg_df <- bind_rows(lapply(seq_len(nrow(profs_marg)), function(i)
   cox_cif(profs_marg[i,, drop = FALSE], cox_disch_marg, cox_death_marg, common_grid))) |>
   mutate(method = "Cox PH", cause = factor(cause, levels = c("Discharge","Death")))
 
-rsf_marg_df <- rsf_cif(profs_marg, rsf_marg) |>
-  mutate(method = "RSF", cause = factor(cause, levels = c("Discharge","Death")))
+rsf_red_marg_df <- rsf_red_cif(profs_marg, rsf_disch_marg, rsf_death_marg,
+                               common_grid) |>
+  select(time, cif, cause, pneu) |>
+  mutate(method = "RSF (reduction)",
+         cause  = factor(cause, levels = c("Discharge","Death")))
 
-marg_df <- bind_rows(aj_df, pam_marg_df, cox_marg_df, rsf_marg_df) |>
-  mutate(method = factor(method,
-                         levels = c("Aalen-Johansen","PAM","Cox PH","RSF")))
+method_levels_marg <- c("Aalen-Johansen", "Cox PH", "RSF (reduction)")
+marg_df <- bind_rows(aj_df, cox_marg_df, rsf_red_marg_df) |>
+  mutate(method = factor(method, levels = method_levels_marg))
 
 p_marg <- ggplot(marg_df, aes(time, cif, color = method, linetype = method)) +
   geom_step(linewidth = 0.7) +
   facet_grid(cause ~ pneu) +
-  scale_color_manual(values = c("Aalen-Johansen"="black","PAM"="#377eb8",
-                                "Cox PH"="#e41a1c","RSF"="#4daf4a")) +
-  scale_linetype_manual(values = c("Aalen-Johansen"="solid","PAM"="dashed",
-                                   "Cox PH"="dotdash","RSF"="dotted")) +
+  scale_color_manual(values = c("Aalen-Johansen"="black",
+                                "Cox PH"="#e41a1c",
+                                "RSF (reduction)"="#377eb8")) +
+  scale_linetype_manual(values = c("Aalen-Johansen"="dotted",
+                                   "Cox PH"="solid",
+                                   "RSF (reduction)"="solid")) +
   labs(x = "Time (days)", y = "Cumulative incidence",
        color = NULL, linetype = NULL) +
+  theme_bw() +
   theme(legend.position = "bottom") +
   coord_cartesian(xlim = c(0, 120), ylim = c(0, 1))
 
