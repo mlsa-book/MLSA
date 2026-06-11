@@ -1309,22 +1309,23 @@ plot_data = bind_rows(
 )
 
 # Create plot - use color for model, linetype for complications
-p_discrete_time = ggplot(plot_data, aes(x = time, y = survival, color = model, linetype = complications)) +
+p_discrete_time = ggplot(plot_data, aes(x = time, y = survival, color = complications, linetype = model)) +
   geom_step(data = filter(plot_data, model == "Kaplan-Meier"), linewidth = 1.2) +
   geom_line(data = filter(plot_data, model == "Discrete Time (GLM)"), linewidth = 1.2) +
   ylab("Survival probability") +
   xlab("time (days)") +
   ylim(c(0, 1)) +
   scale_color_manual(
-    values = c("Kaplan-Meier" = "black", "Discrete Time (GLM)" = "steelblue"),
-    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Discrete Time (GLM)" = "Discrete Time (GLM)")
+    values = c("no" = "#5B7CA8", "yes" = "#C2185B"),
+    labels = c("no" = "No complications", "yes" = "Complications")
   ) +
   scale_linetype_manual(
-    values = c("no" = "solid", "yes" = "dashed"),
-    labels = c("no" = "No Complications", "yes" = "Complications")
+    values = c("Kaplan-Meier" = "dotted", "Discrete Time (GLM)" = "solid"),
+    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Discrete Time (GLM)" = "Discrete Time (GLM)")
   ) +
+  theme_bw() +
   theme(legend.position = "bottom") +
-  guides(color = guide_legend(title = "Model"), linetype = guide_legend(title = "Complications"))
+  guides(color = guide_legend(title = "Complications"), linetype = guide_legend(title = "Model"))
 
 ggsave("book/Figures/reductions/discrete-time-complications-glm.png", p_discrete_time, 
        height=4, width=8, units="in", dpi=600)
@@ -1375,22 +1376,23 @@ plot_data_interaction = bind_rows(
 )
 
 # Create plot - use color for model, linetype for complications
-p_discrete_time_interaction = ggplot(plot_data_interaction, aes(x = time, y = survival, color = model, linetype = complications)) +
+p_discrete_time_interaction = ggplot(plot_data_interaction, aes(x = time, y = survival, color = complications, linetype = model)) +
   geom_step(data = filter(plot_data_interaction, model == "Kaplan-Meier"), linewidth = 1.2) +
   geom_line(data = filter(plot_data_interaction, model == "Discrete Time (GLM, Interaction)"), linewidth = 1.2) +
   ylab("Survival probability") +
   xlab("time (days)") +
   ylim(c(0, 1)) +
   scale_color_manual(
-    values = c("Kaplan-Meier" = "black", "Discrete Time (GLM, Interaction)" = "steelblue"),
-    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Discrete Time (GLM, Interaction)" = "Discrete Time (GLM)")
+    values = c("no" = "#5B7CA8", "yes" = "#C2185B"),
+    labels = c("no" = "No complications", "yes" = "Complications")
   ) +
   scale_linetype_manual(
-    values = c("no" = "solid", "yes" = "dashed"),
-    labels = c("no" = "No Complications", "yes" = "Complications")
+    values = c("Kaplan-Meier" = "dotted", "Discrete Time (GLM, Interaction)" = "solid"),
+    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Discrete Time (GLM, Interaction)" = "Discrete Time (GLM)")
   ) +
+  theme_bw() +
   theme(legend.position = "bottom") +
-  guides(color = guide_legend(title = "Model"), linetype = guide_legend(title = "Complications"))
+  guides(color = guide_legend(title = "Complications"), linetype = guide_legend(title = "Model"))
 
 ggsave("book/Figures/reductions/discrete-time-complications-glm-interaction.png", p_discrete_time_interaction, 
        height=4, width=8, units="in", dpi=600)
@@ -1476,22 +1478,23 @@ plot_data_pem = bind_rows(
 )
 
 # Create plot - use color for model, linetype for complications
-p_pem = ggplot(plot_data_pem, aes(x = time, y = survival, color = model, linetype = complications)) +
+p_pem = ggplot(plot_data_pem, aes(x = time, y = survival, color = complications, linetype = model)) +
   geom_step(data = filter(plot_data_pem, model == "Kaplan-Meier"), linewidth = 1.2) +
   geom_line(data = filter(plot_data_pem, model == "Piecewise Exponential (PEM)"), linewidth = 1.2) +
   ylab("Survival probability") +
   xlab("time (days)") +
   ylim(c(0, 1)) +
   scale_color_manual(
-    values = c("Kaplan-Meier" = "black", "Piecewise Exponential (PEM)" = "steelblue"),
-    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Piecewise Exponential (PEM)" = "Piecewise Exponential (PEM)")
+    values = c("no" = "#5B7CA8", "yes" = "#C2185B"),
+    labels = c("no" = "No complications", "yes" = "Complications")
   ) +
   scale_linetype_manual(
-    values = c("no" = "solid", "yes" = "dashed"),
-    labels = c("no" = "No Complications", "yes" = "Complications")
+    values = c("Kaplan-Meier" = "dotted", "Piecewise Exponential (PEM)" = "solid"),
+    labels = c("Kaplan-Meier" = "Kaplan-Meier", "Piecewise Exponential (PEM)" = "Piecewise Exponential (PEM)")
   ) +
+  theme_bw() +
   theme(legend.position = "bottom") +
-  guides(color = guide_legend(title = "Model"), linetype = guide_legend(title = "Complications"))
+  guides(color = guide_legend(title = "Complications"), linetype = guide_legend(title = "Model"))
 
 ggsave("book/Figures/reductions/pem-complications-interaction.png", p_pem, 
        height=4, width=8, units="in", dpi=600)
