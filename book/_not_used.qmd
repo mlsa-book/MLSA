@@ -133,10 +133,10 @@ mention limitation: baseline hazard is assumed to be smooth over entire follow-u
 
 ### Example: Gradient boosted trees
 
-Recall from section @sec-surv-ml-models-boost-regr the definition of boosting. Such models can be used to estimate the GAM model from @sec-pam using univariate GAM models as base learners (reference mboost and friends XXX). However, we can also use trees as base learners, which is often preferred, especially in combination with the popular XGBoost implementation (@cheng2016xgboost).
+Recall from @sec-surv-ml-models-boost-regr the definition of boosting. Such models can be used to estimate the GAM model from @sec-pam using univariate GAM models as base learners (reference mboost and friends XXX). However, we can also use trees as base learners, which is often preferred, especially in combination with the popular XGBoost implementation (@cheng2016xgboost).
 (Cite Bender 2021 XXX)
 
-Once again, the variable representing time $t_j$ is included as numeric variable in the model. A split w.r.t. to $t_j$ implies a change in the hazard rate before and after the split. Interactions between other features and $t_j$ are also learned automatically and allow time-varying effects and non-proportional hazards. 
+Once again, the variable representing time $t_j$ is included as numeric variable in the model. A split w.r.t. to $t_j$ implies a change in the hazard function before and after the split. Interactions between other features and $t_j$ are also learned automatically and allow time-varying effects and non-proportional hazards. 
 
 To apply gradient boosting to the piecewise exponential model, we need to specify the loss function and derive the corresponding gradients (pseudo-residuals) for the Poisson regression model with offset.
 
@@ -163,9 +163,9 @@ where $g_{m-1}(\xx_i, t_j)$ is the current estimate of the log-hazard from the p
 
 The pseudo-residual @eq-poisson-pseudo-residual represents the difference between the observed event indicator $\delta_{ij}$ and the predicted expected number of events $\hat{\mu}_{ij}^{(m-1)}$, which is the natural residual for Poisson regression.
 
-**Initial guess:** The initial guess $g_0(\xx_i, t_j)$ is typically set to a constant value. A common choice is to set $g_0(\xx_i, t_j) = \log(\bar{h})$, where $\bar{h}$ is the overall average hazard rate, estimated as
+**Initial guess:** The initial guess $g_0(\xx_i, t_j)$ is typically set to a constant value. A common choice is to set $g_0(\xx_i, t_j) = \log(\bar{h})$, where $\bar{h}$ is the overall average hazard function, estimated as
 $$\bar{h} = \frac{\sum_{i=1}^n \sum_{j=1}^{J_i} \delta_{ij}}{\sum_{i=1}^n \sum_{j=1}^{J_i} t_{ij}},$$
-which is the total number of events divided by the total time at risk. Alternatively, one can simply initialize $g_0(\xx_i, t_j) = 0$ for all observations, which corresponds to an initial hazard rate of $h_0 = 1$.
+which is the total number of events divided by the total time at risk. Alternatively, one can simply initialize $g_0(\xx_i, t_j) = 0$ for all observations, which corresponds to an initial hazard function of $h_0 = 1$.
 
 **Update step:** At each iteration $m$, a regression tree $h_m$ is fitted to the pseudo-residuals $r_{ijm}$ using the features $(\xx_i, t_j)$ as predictors. The tree partitions the feature space and assigns a constant value to each leaf node. The model is then updated as
 $$g_m(\xx_i, t_j) = g_{m-1}(\xx_i, t_j) + \nu h_m(\xx_i, t_j),$${#eq-poisson-boost-update}
@@ -189,7 +189,7 @@ The complete gradient boosting algorithm for Poisson regression with offset usin
 
 3. **Return:** Final model $\hat{g}(\xx_i, t_j) = g_M(\xx_i, t_j)$.
 
-**Prediction:** For new observations with features $\xx^*$ and time $t_j^*$, the predicted log-hazard is $\hat{g}(\xx^*, t_j^*) = g_M(\xx^*, t_j^*)$, and the predicted hazard rate is $\hat{h}(\xx^*, t_j^*) = \exp(\hat{g}(\xx^*, t_j^*))$.
+**Prediction:** For new observations with features $\xx^*$ and time $t_j^*$, the predicted log-hazard is $\hat{g}(\xx^*, t_j^*) = g_M(\xx^*, t_j^*)$, and the predicted hazard function is $\hat{h}(\xx^*, t_j^*) = \exp(\hat{g}(\xx^*, t_j^*))$.
 
 The algorithm iteratively improves the model by fitting trees to the residuals from the previous iteration. Each tree captures patterns in the data that were not well explained by the previous model, and the shrinkage parameter $\nu$ ensures that updates are gradual, reducing overfitting. The offset term $\log(t_{ij})$ is implicitly accounted for in the pseudo-residual calculation, as the predicted expected number of events $\hat{\mu}_{ij}^{(m-1)} = \exp(g_{m-1}(\xx_i, t_j))t_{ij}$ includes the time at risk $t_{ij}$. 
 
