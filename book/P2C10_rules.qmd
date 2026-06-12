@@ -319,15 +319,15 @@ For example, the non-integrated, cause-specific survival Brier score for event $
 
 $$
 \begin{aligned}
-L_{SBS;\tilde{q}}(\tau, \{\hatF_{i;q}\}^Q_{q=1}, t_i, q_i \mid \KMG) = {} & \frac{(1 - \hatF_{i;\tilde{q}}(\tau))^2 \, \II(t_i \leq \tau, q_i = \tilde{q})}{\KMG(t_i)} \\
-& + \frac{\hatF_{i;\tilde{q}}^2(\tau) \, \II(t_i \leq \tau, q_i \notin \{0, \tilde{q}\})}{\KMG(t_i)} \\
-& + \frac{\hatF_{i;\tilde{q}}^2(\tau) \, \II(t_i > \tau)}{\KMG(\tau)},
+L_{SBS;\tilde{q}}(\tau, \{\hatF_{q;i}\}^Q_{q=1}, t_i, q_i \mid \KMG) = {} & \frac{(1 - \hatF_{\tilde{q};i}(\tau))^2 \, \II(t_i \leq \tau, q_i = \tilde{q})}{\KMG(t_i)} \\
+& + \frac{\hatF_{\tilde{q};i}^2(\tau) \, \II(t_i \leq \tau, q_i \notin \{0, \tilde{q}\})}{\KMG(t_i)} \\
+& + \frac{\hatF_{\tilde{q};i}^2(\tau) \, \II(t_i > \tau)}{\KMG(\tau)},
 \end{aligned}
 $$ {#eq-sbs-cs}
 
-where $\hatF_{i;\tilde{q}}$ is the predicted cause-specific CIF for cause $\tilde{q}$, $\KMG$ is a marginal Kaplan-Meier estimate of the censoring distribution, and $q_i$ is the cause experienced by observation $i$ (with $q_i = 0$ denoting a censored observation).
+where $\hatF_{\tilde{q};i}$ is the predicted cause-specific CIF for cause $\tilde{q}$, $\KMG$ is a marginal Kaplan-Meier estimate of the censoring distribution, and $q_i$ is the cause experienced by observation $i$ (with $q_i = 0$ denoting a censored observation).
 The three terms correspond to observations that, by time $\tau$, have experienced the cause of interest $\tilde{q}$, have experienced a competing event, or remain event-free, respectively; observations censored before $\tau$ contribute zero.
-When there are no competing risks ($Q = 1$), $1 - \hatF_{i;\tilde{q}} = \hatS_i$ and (@eq-sbs-cs) reduces to (@eq-sbs).
+When there are no competing risks ($Q = 1$), $1 - \hatF_{\tilde{q};i} = \hatS_i$ and (@eq-sbs-cs) reduces to (@eq-sbs).
 
 @Bender2021, for example, evaluate competing-risks models using the integrated form of this score, integrating (@eq-sbs-cs) for each cause up to the 25th, 50th, and 75th percentiles of the observed event times.
 Such cause-specific scores are currently implemented in survival software such as `pec` and `riskRegression` [@pkgriskregression; @pkgpec].
@@ -336,10 +336,10 @@ This method results in one loss per cause, which can be useful to optimize a mod
 @Lee2018a instead use a single, all-cause, discrete-time loss similar to the RCLL\index{DeepHit}:
 
 $$
-L_{DeepHit}(\hatS_i, \{\hatF_{i;q}\}^Q_{q=1}, t_i, \delta_i, q_i) = -\log[\delta_i\hatp_{i;q_i}(t_i) + (1-\delta_i)\hatS_i(t_i)],
+L_{DeepHit}(\hatS_i, \{\hatF_{q;i}\}^Q_{q=1}, t_i, \delta_i, q_i) = -\log[\delta_i\hatp_{q_i;i}(t_i) + (1-\delta_i)\hatS_i(t_i)],
 $$ {#eq-ll-deephit}
 
-where $\hatp_{i;q_i}(t_i)$ is the predicted probability mass for the observed cause $q_i$ at time $t_i$, which can be derived from $\hatF_{i;q_i}$, and $\delta_i$ is $0$ if observation $i$ is right-censored or $1$ if they experience any cause.
+where $\hatp_{q_i;i}(t_i)$ is the predicted probability mass for the observed cause $q_i$ at time $t_i$, which can be derived from $\hatF_{q_i;i}$, and $\delta_i$ is $0$ if observation $i$ is right-censored or $1$ if they experience any cause.
 This loss is the log-likelihood term of the DeepHit training objective, which additionally includes a ranking component to promote discrimination [@Lee2018a].
 @Lee2018a use it to train their model rather than as an evaluation measure.
 
@@ -347,12 +347,12 @@ Recently, an all-cause logarithmic scoring rule, termed here the _all-cause log 
 
 $$
 \begin{aligned}
-& L_{ACLL}(\tau^*, \hatS_i, \{\hatF_{i;q}\}^Q_{q=1}, t_i, q_i \mid \hatG) = \\
-& \quad -\int^{\tau^*}_0 \left[\sum^Q_{q=1} \frac{\II(t_i \leq \tau, q_i = q)\log(\hatF_{i;q}(\tau))}{\hatG(t_i)} + \frac{\II(t_i > \tau)\log(\hatS_i(\tau))}{\hatG(\tau)}\right] \dtau,
+& L_{ACLL}(\tau^*, \hatS_i, \{\hatF_{q;i}\}^Q_{q=1}, t_i, q_i \mid \hatG) = \\
+& \quad -\int^{\tau^*}_0 \left[\sum^Q_{q=1} \frac{\II(t_i \leq \tau, q_i = q)\log(\hatF_{q;i}(\tau))}{\hatG(t_i)} + \frac{\II(t_i > \tau)\log(\hatS_i(\tau))}{\hatG(\tau)}\right] \dtau,
 \end{aligned}
 $$ {#eq-acll}
 
-where $\hatS_i$ is the predicted all-cause survival function for observation $i$ and $\hatF_{i;q}$ is the predicted CIF for observation $i$ and cause $q$.\index{cumulative incidence function}
+where $\hatS_i$ is the predicted all-cause survival function for observation $i$ and $\hatF_{q;i}$ is the predicted CIF for observation $i$ and cause $q$.\index{cumulative incidence function}
 @Alberge2025 introduce the loss in the context of a boosting algorithm (@sec-boost), where the censoring survival function $\hatG$ is estimated iteratively alongside the event model (Box 3).
 
 Note that (@eq-acll) introduces a minus sign to re-express the loss as a quantity to be minimized, to be more consistent with other losses in this chapter.
