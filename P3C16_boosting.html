@@ -367,11 +367,11 @@ window.Quarto = {
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#sec-surv-ml-models-boost-regr" id="toc-sec-surv-ml-models-boost-regr" class="nav-link active" data-scroll-target="#sec-surv-ml-models-boost-regr"><span class="header-section-number">14.1</span> GBMs for Regression</a></li>
-  <li><a href="#sec-surv-ml-models-boost-surv" id="toc-sec-surv-ml-models-boost-surv" class="nav-link" data-scroll-target="#sec-surv-ml-models-boost-surv"><span class="header-section-number">14.2</span> GBMs for Survival Analysis</a>
+  <li><a href="#sec-surv-ml-models-boost-regr" id="toc-sec-surv-ml-models-boost-regr" class="nav-link active" data-scroll-target="#sec-surv-ml-models-boost-regr"><span class="header-section-number">14.1</span> GBMs for regression</a></li>
+  <li><a href="#sec-surv-ml-models-boost-surv" id="toc-sec-surv-ml-models-boost-surv" class="nav-link" data-scroll-target="#sec-surv-ml-models-boost-surv"><span class="header-section-number">14.2</span> GBMs for survival analysis</a>
   <ul class="collapse">
-  <li><a href="#sec-boost-likelihood" id="toc-sec-boost-likelihood" class="nav-link" data-scroll-target="#sec-boost-likelihood"><span class="header-section-number">14.2.1</span> Likelihood Boosting</a></li>
-  <li><a href="#sec-boost-loss" id="toc-sec-boost-loss" class="nav-link" data-scroll-target="#sec-boost-loss"><span class="header-section-number">14.2.2</span> Loss Boosting</a></li>
+  <li><a href="#sec-boost-likelihood" id="toc-sec-boost-likelihood" class="nav-link" data-scroll-target="#sec-boost-likelihood"><span class="header-section-number">14.2.1</span> Likelihood boosting</a></li>
+  <li><a href="#sec-boost-loss" id="toc-sec-boost-loss" class="nav-link" data-scroll-target="#sec-boost-loss"><span class="header-section-number">14.2.2</span> Measure-based boosting</a></li>
   </ul></li>
   <li><a href="#conclusion" id="toc-conclusion" class="nav-link" data-scroll-target="#conclusion"><span class="header-section-number">14.3</span> Conclusion</a></li>
   </ul>
@@ -397,7 +397,7 @@ window.Quarto = {
 <div>
   <div class="abstract">
     <div class="block-title">Abstract</div>
-    This chapter introduces gradient boosting machines (GBMs) for regression and then describes the extensions to survival analysis. GBMs are highly modular and flexible ensemble methods that can optimize any differentiable loss function by sequentially fitting ‘weak’ learners to the residuals of previous models. GBMs extend naturally to survival analysis by using loss functions suitable for the survival setting, such as likelihoods associated with PH and AFT models, as well as differentiable adaptations to the C-index. Survival GBMs often make ranking predictions but can also be composed to survival distribution predictions, for example when using boosting to estimate proportional hazards and accelerated failure time models. GBMs have been demonstrated to perform well on both low- and high-dimensional data in survival analysis and are therefore a popular class of machine learning model within this domain. However, GBMs can be computationally expensive and may require specialist software such as XGBoost to optimize performance.
+    This chapter introduces gradient boosting machines for regression and describes their extension to survival analysis. Gradient boosting machines are flexible ensemble methods that sequentially combine weak learners by fitting each new learner to the remaining error from the current model. Their modular structure makes them well suited to survival analysis, since different survival objectives can be optimized by changing the loss function. The chapter first presents the standard regression algorithm, including pseudo-residuals, shrinkage, subsampling, and early stopping. It then discusses survival extensions based on likelihoods from proportional hazards and accelerated failure time models, including Cox-type boosting, accelerated failure time boosting, and penalized CoxBoost. Finally, it describes boosting methods that optimize smoothed discrimination measures, such as differentiable approximations to the concordance index. Survival boosting methods often produce scalar risk scores, but likelihood-based approaches can also provide survival distribution predictions when embedded in proportional hazards or accelerated failure time models. The chapter emphasizes both the flexibility and practical limitations of boosting, including computational cost, hyperparameter sensitivity, and reduced interpretability as the number of boosting iterations increases.
   </div>
 </div>
 
@@ -405,47 +405,33 @@ window.Quarto = {
 </header>
 
 
-<div class="callout callout-style-default callout-warning callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Warning</span>Minor changes expected!
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<p><strong>This page is a work in progress and minor changes will be made over time.</strong></p>
-</div>
-</div>
 <p>Similarly to random forests, boosting is an ensemble method that creates a powerful model from a combination of <em>weak</em> learners that make poor predictions individually. However, the two methods differ in how individual learners are selected and combined: in random forests, each decision tree is grown independently and predictions are averaged. In boosting, weak learners are fit sequentially with errors from one learner used to train the next, and predictions are made by a weighted linear combination of all learners (<a href="#fig-boosting" class="quarto-xref">Figure&nbsp;<span>14.1</span></a>).</p>
 <section id="sec-surv-ml-models-boost-regr" class="level2" data-number="14.1">
-<h2 data-number="14.1" class="anchored" data-anchor-id="sec-surv-ml-models-boost-regr"><span class="header-section-number">14.1</span> GBMs for Regression</h2>
-<p>Gradient Boosting Machines (GBMs) are the most widely used family of boosting algorithms. The general idea is to choose a differentiable loss function and iteratively improve predictions by fitting weak learners to the remaining errors from the current model. <a href="#fig-boosting" class="quarto-xref">Figure&nbsp;<span>14.1</span></a> illustrates this process in a least-squares regression setting, where the negative gradient corresponds to the ordinary residual (truth minus prediction). This procedure can be understood as follows:</p>
+<h2 data-number="14.1" class="anchored" data-anchor-id="sec-surv-ml-models-boost-regr"><span class="header-section-number">14.1</span> GBMs for regression</h2>
+<p>Gradient boosting machines (GBMs) are among the most widely used families of boosting algorithms. The general idea, inspired by gradient descent (<a href="P1C3_machinelearning.html#sec-ml-gradient-descent" class="quarto-xref"><span>Section 2.6.1</span></a>), is to choose a differentiable loss function and iteratively improve predictions by fitting weak learners to the remaining errors from the current model. These errors correspond to the negative gradients, or pseudo-residuals. <a href="#fig-boosting" class="quarto-xref">Figure&nbsp;<span>14.1</span></a> illustrates this process in a least-squares regression setting, where the negative gradient corresponds to the ordinary residual, which is the observed outcome minus the current prediction. This procedure can be understood as follows:</p>
 <ol type="1">
-<li>An initial simple model is fit to the data to obtain the first set of predictions.</li>
+<li>An initial, simple model is fit to the data to obtain the first set of predictions.</li>
 <li>The errors of this model are computed by comparing predictions to the observed outcomes.</li>
 <li>A weak learner is fit to these errors, focusing on patterns that the previous model failed to capture.</li>
 <li>The new learner is added to the existing model, improving the overall prediction.</li>
 <li>This is repeated with each learner correcting the errors of the current model.</li>
 </ol>
 <p>Predictions are therefore built up gradually as a sum of many weak learners, each making a small contribution to the final model.</p>
-<div id="fig-boosting" class="quarto-float quarto-figure quarto-figure-center anchored" alt="TODO">
+<div id="fig-boosting" class="quarto-float quarto-figure quarto-figure-center anchored" alt="Diagram of least-squares gradient boosting shown for iterations 1, 2, and M, with horizontal dots marking the iterations omitted in between, arranged in three horizontal bands. Bottom band (training data): the covariates paired with the current target, as (X, y) for iteration 1, then (X, r_1), and (X, r_M-1) for iteration M. Middle band (weak learner): a small decision tree g_m(X) is fit to each dataset. Top band (residuals): the updated residuals r_m = r_m-1 minus g_m(X), drawn as point clusters that shrink across iterations. In the first iteration an upward 'Fit' arrow runs from the data to the tree and an upward 'Predict' arrow runs from the tree to the residuals; an arrow labelled 'Use residuals as target' carries the residuals down to the next iteration's training data. A final orange 'Aggregate' arrow sums the weak learners into the prediction y-hat = g_1(X) + ... + g_M(X).">
 <figure class="quarto-float quarto-float-fig figure">
 <div aria-describedby="fig-boosting-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-<img src="Figures/boosting/boosting.png" class="img-fluid figure-img" alt="TODO">
+<img src="Figures/boosting/boosting.png" class="img-fluid figure-img" alt="Diagram of least-squares gradient boosting shown for iterations 1, 2, and M, with horizontal dots marking the iterations omitted in between, arranged in three horizontal bands. Bottom band (training data): the covariates paired with the current target, as (X, y) for iteration 1, then (X, r_1), and (X, r_M-1) for iteration M. Middle band (weak learner): a small decision tree g_m(X) is fit to each dataset. Top band (residuals): the updated residuals r_m = r_m-1 minus g_m(X), drawn as point clusters that shrink across iterations. In the first iteration an upward 'Fit' arrow runs from the data to the tree and an upward 'Predict' arrow runs from the tree to the residuals; an arrow labelled 'Use residuals as target' carries the residuals down to the next iteration's training data. A final orange 'Aggregate' arrow sums the weak learners into the prediction y-hat = g_1(X) + ... + g_M(X).">
 </div>
 <figcaption class="quarto-float-caption-bottom quarto-float-caption quarto-float-fig" id="fig-boosting-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
-Figure&nbsp;14.1: Least squares gradient boosting, where each weak learner (a decision tree) is fit to the residuals (negative gradient of squared error loss).
+Figure&nbsp;14.1: Least squares gradient boosting, where each weak learner (here, a decision tree) is fit to the residuals (negative gradient of squared error loss).
 </figcaption>
 </figure>
 </div>
-<p>Practically, a number of important hyper-parameters are used to control and optimize the algorithm whilst reducing overfitting. These are:</p>
-<p><strong>Number of iterations</strong>, <span class="math inline">\(M\)</span>: The number of iterations is often claimed to be the most important hyper-parameter in GBMs and it has been demonstrated that a value too small will result in underfitting, whilst a value too large will result in overfitting <span class="citation" data-cites="Buhlmann2006 Hastie2001 Schmid2008a">(<a href="P5C26_references.html#ref-Buhlmann2006" role="doc-biblioref">Buhlmann 2006</a>; <a href="P5C26_references.html#ref-Hastie2001" role="doc-biblioref">Hastie et al. 2001</a>; <a href="P5C26_references.html#ref-Schmid2008a" role="doc-biblioref">Schmid and Hothorn 2008a</a>)</span>. This underlines the general idea of boosting weak learners to slowly form a single powerful model.</p>
-<p><strong>Step-size</strong>, <span class="math inline">\(\nu\)</span>: The step-size parameter is a shrinkage parameter that controls the contribution of each weak learner at each iteration. Several studies have demonstrated that GBMs perform better when shrinkage is applied and a value of <span class="math inline">\(\nu \leq 0.1\)</span> is often suggested <span class="citation" data-cites="Buhlmann2007 Hastie2001 Friedman2001 Lee2018 Schmid2008a">(<a href="P5C26_references.html#ref-Buhlmann2007" role="doc-biblioref">Buhlmann and Hothorn 2007</a>; <a href="P5C26_references.html#ref-Hastie2001" role="doc-biblioref">Hastie et al. 2001</a>; <a href="P5C26_references.html#ref-Friedman2001" role="doc-biblioref">Friedman 2001</a>; <a href="P5C26_references.html#ref-Lee2018" role="doc-biblioref">Lee et al. 2019</a>; <a href="P5C26_references.html#ref-Schmid2008a" role="doc-biblioref">Schmid and Hothorn 2008a</a>)</span>. The optimal values of <span class="math inline">\(\nu\)</span> and <span class="math inline">\(M\)</span> depend on each other, such that smaller values of <span class="math inline">\(\nu\)</span> require larger values of <span class="math inline">\(M\)</span>, and vice versa. This is intuitive as smaller <span class="math inline">\(\nu\)</span> results in slower learning and therefore more iterations are required to fit the model. A practical procedure is to set <span class="math inline">\(\nu\)</span> to a small value (e.g.&nbsp;<span class="math inline">\(0.1\)</span>) and <span class="math inline">\(M\)</span> to a large value, then stop the algorithm when the performance on a validation set stops improving (early stopping). This avoids the need for computationally expensive tuning to find the optimal combination of <span class="math inline">\(\nu\)</span> and <span class="math inline">\(M\)</span>.</p>
-<p><strong>Subsampling proportion</strong>, <span class="math inline">\(\phi\)</span>: Sampling a fraction, <span class="math inline">\(\phi\)</span>, of the training data at each iteration can improve performance and reduce runtime <span class="citation" data-cites="Hastie2001">(<a href="P5C26_references.html#ref-Hastie2001" role="doc-biblioref">Hastie et al. 2001</a>)</span>, with <span class="math inline">\(\phi = 0.5\)</span> often used. Motivated by the success of bagging in random forests, stochastic gradient boosting <span class="citation" data-cites="Friedman1999">(<a href="P5C26_references.html#ref-Friedman1999" role="doc-biblioref">Friedman 1999</a>)</span> randomly samples the data in each iteration. It appears that subsampling performs best when also combined with shrinkage <span class="citation" data-cites="Hastie2001">(<a href="P5C26_references.html#ref-Hastie2001" role="doc-biblioref">Hastie et al. 2001</a>)</span>. Selection of <span class="math inline">\(\phi\)</span> is usually performed by nested cross-validation.</p>
-<p>In addition to these parameters, the hyper-parameters of the underlying weak learner are also commonly tuned.</p>
-<p>If using a decision tree, then it is usual to restrict the number of terminal nodes in the tree to be between <span class="math inline">\(4\)</span> and <span class="math inline">\(8\)</span>, which corresponds to two or three splits in the tree. Including these hyper-parameters, and some differentiable loss, <span class="math inline">\(L\)</span>, the general gradient boosting machine algorithm is as follows:</p>
+<p>Practically, a number of important hyperparameters are used to control and optimize the algorithm while reducing overfitting. These are:</p>
+<p><strong>Number of iterations</strong>, <span class="math inline">\(M\)</span>: The number of iterations is often claimed to be the most important hyperparameter in GBMs and it has been demonstrated that a value too small will result in underfitting, while a value too large will result in overfitting <span class="citation" data-cites="Buhlmann2006 Hastie2001 Schmid2008a">(<a href="P5C26_references.html#ref-Buhlmann2006" role="doc-biblioref">Buhlmann 2006</a>; <a href="P5C26_references.html#ref-Hastie2001" role="doc-biblioref">Hastie et al. 2001</a>; <a href="P5C26_references.html#ref-Schmid2008a" role="doc-biblioref">Schmid and Hothorn 2008a</a>)</span>. This underlines the general idea of boosting weak learners to slowly construct a single powerful model.</p>
+<p><strong>Step size</strong>, <span class="math inline">\(\alpha\)</span>: The step size parameter is a shrinkage parameter that controls the contribution of the weak learner at each iteration. Several studies have demonstrated that GBMs perform better when shrinkage is applied and a value of <span class="math inline">\(\alpha \leq 0.1\)</span> is often suggested <span class="citation" data-cites="Buhlmann2007 Hastie2001 Friedman2001 Lee2018 Schmid2008a">(<a href="P5C26_references.html#ref-Buhlmann2007" role="doc-biblioref">Buhlmann and Hothorn 2007</a>; <a href="P5C26_references.html#ref-Hastie2001" role="doc-biblioref">Hastie et al. 2001</a>; <a href="P5C26_references.html#ref-Friedman2001" role="doc-biblioref">Friedman 2001</a>; <a href="P5C26_references.html#ref-Lee2018" role="doc-biblioref">Lee et al. 2019</a>; <a href="P5C26_references.html#ref-Schmid2008a" role="doc-biblioref">Schmid and Hothorn 2008a</a>)</span>. The optimal values of <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(M\)</span> depend on each other, such that smaller values of <span class="math inline">\(\alpha\)</span> require larger values of <span class="math inline">\(M\)</span>, and vice versa. This is intuitive as smaller <span class="math inline">\(\alpha\)</span> results in slower learning and therefore more iterations are required to fit the model. A practical procedure is to set <span class="math inline">\(\alpha\)</span> to a small value (such as <span class="math inline">\(0.1\)</span>) and <span class="math inline">\(M\)</span> to a very large value (such as <span class="math inline">\(10,\!000\)</span>), then use early stopping (<a href="P1C3_machinelearning.html#sec-ml-early-stopping" class="quarto-xref"><span>Section 2.6.2</span></a>) to halt the algorithm once performance on a validation set stops improving. This avoids the need for computationally expensive tuning to find the optimal combination of <span class="math inline">\(\alpha\)</span> and <span class="math inline">\(M\)</span>.</p>
+<p><strong>Subsampling proportion</strong>, <span class="math inline">\(\phi\)</span>: Sampling a fraction, <span class="math inline">\(\phi\)</span>, of the training data at each iteration can improve performance and reduce runtime <span class="citation" data-cites="Hastie2001">(<a href="P5C26_references.html#ref-Hastie2001" role="doc-biblioref">Hastie et al. 2001</a>)</span>, with <span class="math inline">\(\phi = 0.5\)</span> often used although ideally it should be tuned. Motivated by the success of bagging in random forests, stochastic gradient boosting <span class="citation" data-cites="Friedman1999">(<a href="P5C26_references.html#ref-Friedman1999" role="doc-biblioref">Friedman 1999</a>)</span> randomly samples the data in each iteration. Subsampling appears to perform best when combined with shrinkage <span class="citation" data-cites="Hastie2001">(<a href="P5C26_references.html#ref-Hastie2001" role="doc-biblioref">Hastie et al. 2001</a>)</span>.</p>
+<p>In addition to these parameters, the hyperparameters of the underlying weak learner are also commonly tuned. When using decision trees, it is usual to restrict the number of terminal nodes in the tree to be between <span class="math inline">\(4\)</span> and <span class="math inline">\(8\)</span>, which corresponds to two or three splits in the tree. With these hyperparameters and some differentiable loss <span class="math inline">\(L\)</span>, the general gradient boosting machine algorithm is given in Algorithm 2.</p>
 <div class="callout callout-style-default callout-note no-icon callout-titled">
 <div class="callout-header d-flex align-content-center">
 <div class="callout-icon-container">
@@ -458,135 +444,265 @@ Figure&nbsp;14.1: Least squares gradient boosting, where each weak learner (a de
 <div class="callout-body-container callout-body">
 <ol type="1">
 <li><span class="math inline">\(\hat{g}_0 \gets \text{ Initial guess}\)</span></li>
-<li><strong>For</strong> <span class="math inline">\(m = 1,...,M\)</span>:</li>
+<li><strong>for</strong> <span class="math inline">\(m = 1,\ldots,M\)</span>:</li>
 <li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="math inline">\(\{(\mathbf{x}_i', y_i')\}^{n'}_1 \gets\)</span> Random sample of size <span class="math inline">\(n' = \lfloor \phi n \rfloor\)</span> from <span class="math inline">\(\{(\mathbf{x}_i, y_i)\}_1^n\)</span></li>
-<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="math inline">\(r_{im} \gets -[\frac{\partial L(y'_i, \hat{g}_{m-1}(\mathbf{x}'_i))}{\partial \hat{g}_{m-1}(\mathbf{x}'_i)}], \forall i \in \{1,\ldots,n'\}\)</span></li>
+<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="math inline">\(\displaystyle r_{im} \gets -\frac{\partial L(y'_i, \hat{g}_{m-1}(\mathbf{x}'_i))}{\partial \hat{g}_{m-1}(\mathbf{x}'_i)}, \forall i \in \{1,\ldots,n'\}\)</span></li>
 <li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="math inline">\(\tilde{g}_m \gets\)</span> Fit the weak learner to <span class="math inline">\((\mathbf{X}', \mathbf{r}_m)\)</span></li>
-<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="math inline">\(\hat{g}_m \gets \hat{g}_{m-1} + \nu \tilde{g}_m\)</span></li>
-<li><strong>end For</strong></li>
+<li>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="math inline">\(\hat{g}_m \gets \hat{g}_{m-1} + \alpha \tilde{g}_m\)</span></li>
+<li><strong>end for</strong></li>
 <li><strong>return</strong> <span class="math inline">\(\hat{g}_0, \{\tilde{g}_m\}^M_1\)</span></li>
 </ol>
 <p>Note:</p>
 <ol type="1">
 <li><span class="math inline">\(\tilde{g}_m\)</span> is the weak learner in iteration <span class="math inline">\(m\)</span> trained on pseudo-residuals computed from the cumulative model from the previous iteration, <span class="math inline">\(\hat{g}_{m-1}\)</span>. The returned object can be written as the final cumulative model, <span class="math inline">\(\hat{g}_M\)</span>, although in practice the model is computationally stored as the set of trained learners.</li>
-<li>The initial guess (or <em>offset</em>), <span class="math inline">\(\hat{g}_0\)</span>, is often the best constant prediction under the chosen loss, <span class="math inline">\(\hat{g}_0 = \mathop{\mathrm{arg\,min}}_c \sum_{i=1}^n L(y_i, c)\)</span>. For regression with mean squared error loss this reduces to the mean of the training data, <span class="math inline">\(\hat{g}_0 = \bar{\mathbf{y}}\)</span>.</li>
-<li>Line 4 is the calculation of the negative gradient, which is equivalent to calculating the residuals in a regression problem with the mean squared error loss.</li>
-<li>Lines 5-6 differ between implementations, with some fitting multiple weak learners and selecting the one that minimizes a simple optimization problem. The version above is simplest to implement and quickest to run, whilst still providing good model performance.</li>
+<li>The initial guess (or <em>offset</em>), <span class="math inline">\(\hat{g}_0\)</span>, is often the best constant prediction under the chosen loss, <span class="math inline">\(\hat{g}_0 = \mathop{\mathrm{arg\,min}}_c \sum_{i=1}^n L(y_i, c)\)</span>. For regression, using the mean squared error loss reduces to the mean of the training data, <span class="math inline">\(\hat{g}_0 = \bar{y}\)</span>.</li>
+<li>Line 4 is the calculation of the negative gradient (<a href="P1C3_machinelearning.html#sec-ml-gradient-descent" class="quarto-xref"><span>Section 2.6.1</span></a>), which is equivalent to calculating the residuals in a regression problem with the mean squared error loss.</li>
+<li>Lines 5–6 differ between implementations, with some fitting <em>multiple</em> weak learners and selecting the one that minimizes the objective function. When candidate learners are fit separately to individual features, this is known as <em>componentwise</em> boosting; see Further Reading for references. The version above is conceptually simplest and straightforward to implement, while still providing good model performance.</li>
 </ol>
 </div>
 </div>
-<p>Once the model is trained, predictions are made for new data, <span class="math inline">\(\mathbf{x}^*\)</span> with</p>
+<p>Once the model is trained, predictions are made for new data, <span class="math inline">\(\mathbf{x}_*\)</span> with:</p>
 <p><span class="math display">\[
-\hat{g}_M(\mathbf{x}^*) = \hat{g}_0 + \nu \sum^M_{m=1} \tilde{g}_m(\mathbf{x}^*)
+\hat{g}_M(\mathbf{x}_*) = \hat{g}_0 + \alpha \sum^M_{m=1} \tilde{g}_m(\mathbf{x}_*).
 \]</span></p>
-<p>GBMs provide a flexible, modular algorithm, primarily comprised of a differentiable loss to minimize, <span class="math inline">\(L\)</span>, and the selection of weak learners. Perhaps the most common weak learners are decision trees, linear least squares <span class="citation" data-cites="Friedman2001">(<a href="P5C26_references.html#ref-Friedman2001" role="doc-biblioref">Friedman 2001</a>)</span> and smoothing splines <span class="citation" data-cites="Buhlmann2003">(<a href="P5C26_references.html#ref-Buhlmann2003" role="doc-biblioref">Bühlmann and Yu 2003</a>)</span>. The use of trees means that the structure of the resulting prediction function can vary substantially, for example using stumps (trees with only one split) results in an additive model with main effects only, whereas decision trees with an extra layer yield two-way interactions.</p>
-<p>This chapter focuses on tree-based learners, which are primarily used for survival analysis, due to the flexibility demonstrated in <a href="P3C14_forests.html" class="quarto-xref"><span>Chapter 12</span></a>. See references at the end of the chapter for other weak learners. Extension to survival analysis therefore follows by considering alternative losses.</p>
+<p>GBMs provide a flexible, modular algorithm, primarily composed of a differentiable loss to minimize, <span class="math inline">\(L\)</span>, and the selection of weak learners. Perhaps the most common weak learners are decision trees, linear least squares <span class="citation" data-cites="Friedman2001">(<a href="P5C26_references.html#ref-Friedman2001" role="doc-biblioref">Friedman 2001</a>)</span> and smoothing splines <span class="citation" data-cites="Buhlmann2003">(<a href="P5C26_references.html#ref-Buhlmann2003" role="doc-biblioref">Bühlmann and Yu 2003</a>)</span>. Trees allow the structure of the resulting prediction function to vary substantially; for example, using stumps (trees with only one split) results in an additive model with main effects only, whereas decision trees with an extra layer yield two-way interactions. This chapter focuses on tree-based learners, which are primarily used for survival analysis, due to the flexibility demonstrated in <a href="P3C14_forests.html" class="quarto-xref"><span>Chapter 12</span></a>. See references at the end of the chapter for other weak learners.</p>
 </section>
 <section id="sec-surv-ml-models-boost-surv" class="level2" data-number="14.2">
-<h2 data-number="14.2" class="anchored" data-anchor-id="sec-surv-ml-models-boost-surv"><span class="header-section-number">14.2</span> GBMs for Survival Analysis</h2>
-<p>Unlike other machine learning algorithms that historically ignored survival analysis, early GBM papers considered boosting in a survival context <span class="citation" data-cites="Ridgeway1999">(<a href="P5C26_references.html#ref-Ridgeway1999" role="doc-biblioref">Ridgeway 1999</a>)</span>; though there appears to be a decade gap before further considerations were made in the survival setting. Subsequently, <span class="citation" data-cites="Hothorn2005">Hothorn et al. (<a href="P5C26_references.html#ref-Hothorn2005" role="doc-biblioref">2005</a>)</span>, <span class="citation" data-cites="Schmid2008b">Schmid and Hothorn (<a href="P5C26_references.html#ref-Schmid2008b" role="doc-biblioref">2008b</a>)</span>, <span class="citation" data-cites="Schmid2008a">Schmid and Hothorn (<a href="P5C26_references.html#ref-Schmid2008a" role="doc-biblioref">2008a</a>)</span>, and <span class="citation" data-cites="Binder2008">Binder and Schumacher (<a href="P5C26_references.html#ref-Binder2008" role="doc-biblioref">2008</a>)</span> adapted GBMs to a framework suitable for survival analysis — the developments discussed in this chapter.</p>
-<p>In principle, boosting could be applied to models that directly predict a full survival distribution by optimizing a proper scoring rule (<a href="P2C10_rules.html" class="quarto-xref"><span>Chapter 8</span></a>). However, in standard boosting, each iteration updates a single real-valued function, targeting the residual error. When the target is instead a full survival distribution, a scoring rule can be used to aggregate errors across time, which makes it difficult to attribute errors to specific regions of the prediction and therefore to construct effective updates. For this reason, boosting methods in survival analysis are most commonly applied to models that produce a scalar risk score.</p>
-<p>This section begins with boosting approaches based on the foundational survival models introduced in <a href="P3C13_classical.html" class="quarto-xref"><span>Chapter 11</span></a>, specifically proportional hazards (PH) and accelerated failure time (AFT) models (<a href="#sec-boost-likelihood" class="quarto-xref"><span>Section 14.2.1</span></a>). In the case of the AFT models, the model parameters are estimated directly, which specifies a full survival distribution prediction. The discussion then extends to approaches that do not assume a specific model form, but instead directly optimize a measure of discrimination (<a href="#sec-boost-loss" class="quarto-xref"><span>Section 14.2.2</span></a>), which are usually used to evaluate relative risk predictions (<span class="quarto-unresolved-ref">?sec-crank</span>).</p>
+<h2 data-number="14.2" class="anchored" data-anchor-id="sec-surv-ml-models-boost-surv"><span class="header-section-number">14.2</span> GBMs for survival analysis</h2>
+<p>Unlike other model classes, survival analysis was considered in early GBM papers <span class="citation" data-cites="Ridgeway1999">(<a href="P5C26_references.html#ref-Ridgeway1999" role="doc-biblioref">Ridgeway 1999</a>)</span>, although there appears to have been a decade-long gap before further advances were made. Subsequently, <span class="citation" data-cites="Hothorn2005">Hothorn et al. (<a href="P5C26_references.html#ref-Hothorn2005" role="doc-biblioref">2005</a>)</span>, <span class="citation" data-cites="Schmid2008b">Schmid and Hothorn (<a href="P5C26_references.html#ref-Schmid2008b" role="doc-biblioref">2008b</a>)</span>, <span class="citation" data-cites="Schmid2008a">Schmid and Hothorn (<a href="P5C26_references.html#ref-Schmid2008a" role="doc-biblioref">2008a</a>)</span>, and <span class="citation" data-cites="Binder2008">Binder and Schumacher (<a href="P5C26_references.html#ref-Binder2008" role="doc-biblioref">2008</a>)</span> further developed GBM frameworks for survival analysis, which are discussed in this chapter.</p>
+<p>In principle, boosting could be applied to models that directly predict a full survival distribution by optimizing a proper scoring rule (<a href="P2C10_rules.html" class="quarto-xref"><span>Chapter 8</span></a>). However, standard boosting updates a single real-valued function at each iteration by fitting to the residual errors. When the target is a full survival distribution, scoring rules aggregate prediction errors across time, making it difficult to attribute errors to specific regions of the prediction and construct effective updates. This may partly explain why boosting methods in survival analysis are often applied to models that produce scalar risk scores.</p>
+<p>This section begins with boosting approaches based on the foundational survival models introduced in <a href="P3C13_classical.html" class="quarto-xref"><span>Chapter 11</span></a>, specifically proportional hazards (PH) and accelerated failure time (AFT) models (<a href="#sec-boost-likelihood" class="quarto-xref"><span>Section 14.2.1</span></a>). In the case of the AFT models, the model parameters are estimated directly, which specifies a full survival distribution prediction. The discussion then extends to approaches that do not assume a specific model form, but instead directly optimize discriminatory ability by using a concordance index (<a href="P2C8_rank.html" class="quarto-xref"><span>Chapter 6</span></a>) as the loss (<a href="#sec-boost-loss" class="quarto-xref"><span>Section 14.2.2</span></a>).</p>
 <section id="sec-boost-likelihood" class="level3" data-number="14.2.1">
-<h3 data-number="14.2.1" class="anchored" data-anchor-id="sec-boost-likelihood"><span class="header-section-number">14.2.1</span> Likelihood Boosting</h3>
-<p>The negative log-likelihood of the semi-parametric PH and fully-parametric AFT models can be derived from the (partial) likelihoods presented in <a href="P1C4_survival.html#sec-surv-estimation-param" class="quarto-xref"><span>Section 3.5.1</span></a>. At each iteration, the weak learner in Algorithm 2 is given by,</p>
+<h3 data-number="14.2.1" class="anchored" data-anchor-id="sec-boost-likelihood"><span class="header-section-number">14.2.1</span> Likelihood boosting</h3>
+<p>The negative log-likelihood of the semi-parametric PH and fully-parametric AFT models can be derived from the (partial) likelihoods presented in <a href="P3C13_classical.html#sec-ph-parametric" class="quarto-xref"><span>Section 11.2.2</span></a> and <a href="P3C13_classical.html#sec-surv-models-param" class="quarto-xref"><span>Section 11.3</span></a> respectively.</p>
+<section id="cox-proportional-hazards-boosting" class="level4" data-number="14.2.1.1">
+<h4 data-number="14.2.1.1" class="anchored" data-anchor-id="cox-proportional-hazards-boosting"><span class="header-section-number">14.2.1.1</span> Cox proportional hazards boosting</h4>
+<p>To boost a Cox-type model, at each iteration, the weak learner in Algorithm 2 is taken to be a linear predictor,</p>
 <p><span id="eq-boost-lp"><span class="math display">\[
-g_m(\mathbf{x}_i) = \mathbf{x}_i^\top\boldsymbol{\beta}^{(m)},
+g_m(\mathbf{x}_i) = \eta_{i;m} = \mathbf{x}_i^\top\boldsymbol{\beta}_m,
 \tag{14.1}\]</span></span></p>
-<p>where <span class="math inline">\(\boldsymbol{\beta}^{(m)}\)</span> are the updated coefficients in iteration <span class="math inline">\(m\)</span> and <span class="math inline">\(\boldsymbol{\beta}^{(0)} = 0\)</span>.</p>
-<p>The Cox partial likelihood <span class="citation" data-cites="Cox1972 Cox1975">(<a href="P5C26_references.html#ref-Cox1972" role="doc-biblioref">Cox 1972</a>, <a href="P5C26_references.html#ref-Cox1975" role="doc-biblioref">1975</a>)</span> is given by</p>
-<!-- TODO: COPY FROM MERGED FOUNDATIONAL MODELS CHAPTER -->
+<p>where <span class="math inline">\(\eta_{i;m}\)</span> is the updated linear predictor in iteration <span class="math inline">\(m\)</span> and <span class="math inline">\(\eta_{i;0} = 0\)</span>.</p>
+<p>Recall the Cox partial likelihood (<a href="P3C13_classical.html#eq-partial" class="quarto-xref"><span>11.7</span></a>) given by <span class="citation" data-cites="Cox1972 Cox1975">(<a href="P5C26_references.html#ref-Cox1972" role="doc-biblioref">Cox 1972</a>, <a href="P5C26_references.html#ref-Cox1975" role="doc-biblioref">1975</a>)</span>,</p>
 <p><span class="math display">\[
-L^{PH}(\boldsymbol{\beta}) = \prod^n_{i:\delta_i=1} \frac{\exp(\eta_i)}{\sum^n_{j \in \mathcal{R}_{t_i}} \exp(\eta_j)}
+\mathcal{L}_{PL}(\boldsymbol{\beta}) = \prod_{k=1}^{\tilde{n}} \left(\frac{\exp(\eta_{i_{(k)}})}{\sum_{j \in \mathcal{R}_{t_{(k)}}} \exp(\eta_j)}\right),
 \]</span></p>
-<p>with corresponding negative log-likelihood</p>
-<p><span class="math display">\[
--l^{PH}(\boldsymbol{\beta}) = -\sum^n_{i=1} \delta_i \Big[\eta_i \ - \ \log\Big(\sum^n_{j \in \mathcal{R}_{t_i}} \exp(\eta_i)\Big)\Big]
-\]</span></p>
-<p>where <span class="math inline">\(\mathcal{R}_{t_i}\)</span> is the set of patients at risk at time <span class="math inline">\(t_i\)</span> and <span class="math inline">\(\eta_i = \mathbf{x}_i^\top\boldsymbol{\beta}\)</span>.</p>
-<p>The gradient of <span class="math inline">\(-l^{PH}\)</span> at iteration <span class="math inline">\(m\)</span> is then given by substituting (<a href="#eq-boost-lp" class="quarto-xref"><span>14.1</span></a>) for <span class="math inline">\(\eta_i\)</span> into the partial likelihood <span class="citation" data-cites="Ridgeway1999">(<a href="P5C26_references.html#ref-Ridgeway1999" role="doc-biblioref">Ridgeway 1999</a>)</span>:</p>
-<p><span class="math display">\[
-r_{im} := \delta_i - \sum^n_{j=1} \delta_j \frac{\mathbb{I}(t_i \geq t_j) \exp(\hat{g}_{m-1}(\mathbf{x}_i))}{\sum_{k \in \mathcal{R}_{t_j}} \exp(\hat{g}_{m-1}(\mathbf{x}_k))}.
-\]</span></p>
-<p>For non-PH data, boosting an AFT model can outperform boosted PH models <span class="citation" data-cites="Schmid2008b">(<a href="P5C26_references.html#ref-Schmid2008b" role="doc-biblioref">Schmid and Hothorn 2008b</a>)</span>. Recall from <a href="P3C13_classical.html#sec-surv-models-param" class="quarto-xref"><span>Section 11.3</span></a> the log-linear AFT model is defined by</p>
-<p><span class="math display">\[
-\log(t_i) = \mu + \eta_i + \sigma\epsilon_i
-\]</span></p>
-<p>where <span class="math inline">\(\sigma\)</span> is a scale parameter, <span class="math inline">\(\epsilon_i\)</span> is an error term, and <span class="math inline">\(\mu\)</span> is an intercept. By assuming a distribution on <span class="math inline">\(\epsilon\)</span>, a distribution is assumed for the full parametric distribution of the survival time; which has the advantage that further composition through semi-parametric estimators (<a href="P1C6_survtsk.html" class="quarto-xref"><span>Chapter 5</span></a>) is not required to obtain a distribution prediction.</p>
-<p>The model is boosted by alternately updating <span class="math inline">\(\hat{g}_m\)</span> and <span class="math inline">\(\hat{\sigma}_m\)</span> at each iteration. First the location parameter is updated using boosting as usual, and then the scale parameter is re-estimated given the updated model. Assuming a location-scale distribution with location <span class="math inline">\(\hat{g}_{m-1}(\mathbf{x}_i)\)</span> and scale <span class="math inline">\(\hat{\sigma}_{m-1}\)</span>, the negative log-likelihood evaluated at the estimates from the previous iteration is <span class="citation" data-cites="Klein2003">(<a href="P5C26_references.html#ref-Klein2003" role="doc-biblioref">Klein and Moeschberger 2003</a>)</span></p>
-<p><span class="math display">\[
-\begin{split}
--l^{AFT}_m(\boldsymbol{\beta})
-&amp; = -\sum^n_{i=1} \Bigg[ \delta_i\Bigg(- \log\hat{\sigma}_{m-1} + \log f_W\Big(\frac{\log(t_i) - \hat{g}_{m-1}(\mathbf{x}_i)}{\hat{\sigma}_{m-1}}\Big)\Bigg) \\
-&amp; + (1-\delta_i)\Bigg(\log S_W\Big(\frac{\log(t_i) - \hat{g}_{m-1}(\mathbf{x}_i)}{\hat{\sigma}_{m-1}}\Big)\Bigg) \Bigg]
-\end{split},
-\]</span></p>
-<p>usually <span class="math inline">\(\sigma_0 = 1\)</span> <span class="citation" data-cites="Schmid2008b">(<a href="P5C26_references.html#ref-Schmid2008b" role="doc-biblioref">Schmid and Hothorn 2008b</a>)</span>. The pseudo-residuals,</p>
-<p><span class="math display">\[
-r_{im} = -\frac{\partial(-l^{AFT}_m)}{\partial \hat{g}_{m-1}(\mathbf{x}_i)}
-\]</span></p>
-<p>are computed and used to update <span class="math inline">\(\hat{g}_m\)</span> following Algorithm 2. The only change to the algorithm is a final step in each iteration where the scale parameter is updated using the newly calculated <span class="math inline">\(\hat{g}_m\)</span>:</p>
-<p><span class="math display">\[
-\hat{\sigma}_m := \mathop{\mathrm{arg\,min}}_\sigma \ -l^{AFT}_m(\boldsymbol{\beta}).
-\]</span></p>
-<p>As well as boosting fully-parametric AFTs, one could also consider boosting semi-parametric AFTs, for example using the Gehan loss <span class="citation" data-cites="Johnson2011">(<a href="P5C26_references.html#ref-Johnson2011" role="doc-biblioref">Johnson and Long 2011</a>)</span> or using Buckley-James imputation <span class="citation" data-cites="Wang2010">(<a href="P5C26_references.html#ref-Wang2010" role="doc-biblioref">Wang and Wang 2010</a>)</span>. However, known problems with semi-parametric AFT models and the Buckley-James procedure <span class="citation" data-cites="Wei1992">(<a href="P5C26_references.html#ref-Wei1992" role="doc-biblioref">Wei 1992</a>)</span>, as well as a lack of off-shelf implementation, mean that these methods are rarely used in practice.</p>
-<p>The flexibility of boosting means extensions to other censoring and truncation types follow simply by replacing the likelihood functions above with the corresponding objective functions in <a href="P1C4_survival.html#sec-surv-estimation-param" class="quarto-xref"><span>Section 3.5.1</span></a>.</p>
-<section id="penalized-boosting" class="level4 unnumbered unlisted">
-<h4 class="unnumbered unlisted anchored" data-anchor-id="penalized-boosting">Penalized Boosting</h4>
-<p>‘CoxBoost’ is an alternative method to boost Cox models and has been demonstrated to perform well in experiments. The algorithm can be interpreted as a componentwise boosting procedure for Cox models, where at each iteration a single covariate is selected, alongside mandatory (or ‘forced’) covariates, and coefficients are updated using a penalized second-order optimization step <span class="citation" data-cites="Binder2008">(<a href="P5C26_references.html#ref-Binder2008" role="doc-biblioref">Binder and Schumacher 2008</a>)</span>. In medical domains the inclusion of mandatory covariates may be essential, either for model interpretability, or due to prior expert knowledge. CoxBoost deviates from the algorithm presented above by instead using an offset-based approach for generalized linear models <span class="citation" data-cites="Tutz2007">(<a href="P5C26_references.html#ref-Tutz2007" role="doc-biblioref">Tutz and Binder 2007</a>)</span>.</p>
-<p>Let <span class="math inline">\(\mathcal{I}= \{1,...,p\}\)</span> be the indices of the covariates, let <span class="math inline">\(\mathcal{I}_{mand}\)</span> be the indices of the mandatory covariates that must be included in all iterations, and let <span class="math inline">\(\mathcal{I}_{opt} = \mathcal{I}\setminus \mathcal{I}_{mand}\)</span> be the indices of the optional covariates that may be included in any iteration. In each iteration, the algorithm considers models that include all mandatory covariates together with a single optional covariate, selecting the covariate that yields the greatest improvement in the penalized likelihood:</p>
-<p><span class="math display">\[
-\mathcal{I}_{mk} = \mathcal{I}_{mand} \cup \{k\}, k \in \mathcal{I}_{opt}
-\]</span></p>
-<p>In addition, a penalty matrix <span class="math inline">\(\mathbf{P} \in \mathbb{R}^{p \times p}\)</span> is considered such that <span class="math inline">\(P_{ii} &gt; 0\)</span> implies that covariate <span class="math inline">\(i\)</span> is penalized and <span class="math inline">\(P_{ii} = 0\)</span> means no penalization. In practice, this is usually a diagonal matrix <span class="citation" data-cites="Binder2008">(<a href="P5C26_references.html#ref-Binder2008" role="doc-biblioref">Binder and Schumacher 2008</a>)</span> and by setting <span class="math inline">\(P_{ii} = 0, i \in \mathcal{I}_{mand}\)</span> and <span class="math inline">\(P_{ii} &gt; 0, i \not\in \mathcal{I}_{mand}\)</span>, only optional (non-mandatory) covariates are penalized. The penalty matrix <em>can</em> vary with each iteration, which allows for a highly flexible approach. However, in implementation a simpler approach is to use the same penalty in each iteration, which could be a single number, so the same penalty is applied to all penalized covariates, or a single matrix, such that the penalty differs between covariates but stays the same in each iteration <span class="citation" data-cites="pkgcoxboost">(<a href="P5C26_references.html#ref-pkgcoxboost" role="doc-biblioref">Binder 2013</a>)</span>.</p>
-<p>At the <span class="math inline">\(m\)</span>-th iteration and the <span class="math inline">\(k\)</span>-th set of indices to consider (<span class="math inline">\(k = 1,...,p\)</span>), the loss to optimize is the penalized partial-log likelihood given by</p>
-<!-- TODO: USE SAME NOTATION AS ABOVE PENALIZED LIKELIHOOD FOR RISK SET, CURRENTLY BROKEN -->
-<p><span id="eq-coxboost"><span class="math display">\[
-\begin{split}
-l_{pen}(\gamma_{mk}) &amp;= \sum^n_{i=1} \delta_i \Big[\eta_{i,m-1} + \mathbf{x}_{i,\mathcal{I}_{mk}}\gamma^\top_{mk}
--\log\Big(\sum^n_{j = 1} \mathbb{I}(t_j \leq t_i) \exp(\eta_{i,{m-1}} + \mathbf{x}_{i, \mathcal{I}_{mk}}\gamma^\top_{mk})\Big)\Big] \\
-&amp;- \lambda\gamma^\top_{mk}\mathbf{P}_{mk}\gamma_{mk}
-\end{split},
+<p>with corresponding negative log-likelihood (<a href="P3C13_classical.html#eq-lpartial" class="quarto-xref"><span>11.8</span></a>):</p>
+<p><span id="eq-lpartial-two"><span class="math display">\[
+-\ell_{PL}(\boldsymbol{\beta}) = -\sum_{k=1}^{\tilde{n}} \left(\eta_{i_{(k)}} - \log \left(\sum_{j \in \mathcal{R}_{t_{(k)}}} \exp(\eta_j)\right)\right),
 \tag{14.2}\]</span></span></p>
-<p>where <span class="math inline">\(\eta_{i,m} = \mathbf{x}_i^\top\boldsymbol{\beta}^{(m)}\)</span>, <span class="math inline">\(\gamma_{mk}\)</span> are the coefficients corresponding to the candidate covariate set <span class="math inline">\(\mathcal{I}_{mk}\)</span>; <span class="math inline">\(\mathbf{P}_{mk}\)</span> is the penalty matrix; and <span class="math inline">\(\lambda\)</span> is a penalty hyper-parameter to be tuned or selected.</p>
-<p>In each iteration, all potential candidate sets (the union of mandatory covariates and one other covariate) are updated by <span class="math display">\[
-\hat{\gamma}_{mk} = \mathbf{I}^{-1}_{pen}(\hat{\gamma}_{(m-1)k})U(\hat{\gamma}_{(m-1)k})
-\]</span></p>
-<p>where <span class="math inline">\(U(\gamma)\)</span> and <span class="math inline">\(\mathbf{I}_{pen}(\gamma)\)</span> are the first and second derivatives of the unpenalized partial-log-likelihood. This is the key difference between CoxBoost and standard gradient boosting as CoxBoost uses updates based on Fisher scoring iterations (including both the first and the second derivatives), whereas the latter only makes use of the gradient (first derivative).</p>
-<p>The optimal set is then found as <span class="math display">\[
-k^* := \mathop{\mathrm{arg\,max}}_k \ l_{pen}(\hat{\gamma}_{mk})
-\]</span></p>
-<p>and the estimated coefficients are updated with</p>
+<p>where <span class="math inline">\(t_{(k)}\)</span> is the <span class="math inline">\(k\)</span>th ordered event time for <span class="math inline">\(\tilde{n} &lt; n\)</span> event times, <span class="math inline">\(\mathcal{R}_{t_i}\)</span> is the set of patients at risk at time <span class="math inline">\(t_i\)</span> (assuming no ties).</p>
+<p>The negative gradient of <span class="math inline">\(-\ell_{PL}(\boldsymbol{\beta})\)</span> at iteration <span class="math inline">\(m\)</span> is then given by substituting (<a href="#eq-boost-lp" class="quarto-xref"><span>14.1</span></a>) for <span class="math inline">\(\eta_i\)</span> into the negative log-likelihood (<a href="#eq-lpartial-two" class="quarto-xref"><span>14.2</span></a>) and differentiating <span class="citation" data-cites="Ridgeway1999">(<a href="P5C26_references.html#ref-Ridgeway1999" role="doc-biblioref">Ridgeway 1999</a>)</span>:</p>
 <p><span class="math display">\[
-\hat{\beta}_m = \hat{\beta}_{m-1} + \hat{\gamma}_{mk^*}, \quad k^* \in \mathcal{I}_{mk}
+r_{im} := \delta_i - \sum^{\tilde{n}}_{k=1} \frac{\mathbb{I}(t_i \geq t_{(k)}) \exp(\hat{g}_{m-1}(\mathbf{x}_i))}{\sum_{j \in \mathcal{R}_{t_{(k)}}} \exp(\hat{g}_{m-1}(\mathbf{x}_j))}.
 \]</span></p>
-<p>This deviates from the standard GBM algorithm by directly optimizing <span class="math inline">\(l_{pen}\)</span> and not its gradient, additionally model coefficients are iteratively updated instead of a more general model form.</p>
-<p>CoxBoost is extended to the competing risks setting by boosting a subdistribution PH model <span class="citation" data-cites="Binder2009">(<a href="P5C26_references.html#ref-Binder2009" role="doc-biblioref">Binder et al. 2009</a>)</span>. In this setting, (<a href="#eq-coxboost" class="quarto-xref"><span>14.2</span></a>) is replaced by the log-likelihood from the Fine and Gray model (<a href="P3C13_classical.html#sec-classical-ph-cr" class="quarto-xref"><span>Section 11.2.3</span></a>) with an analogous penalty function. The rest of the procedure follows the same.</p>
+</section>
+<section id="accelerated-failure-time-boosting" class="level4" data-number="14.2.1.2">
+<h4 data-number="14.2.1.2" class="anchored" data-anchor-id="accelerated-failure-time-boosting"><span class="header-section-number">14.2.1.2</span> Accelerated failure time boosting</h4>
+<p>For non-PH data, boosting an AFT model can outperform boosted PH models <span class="citation" data-cites="Schmid2008b">(<a href="P5C26_references.html#ref-Schmid2008b" role="doc-biblioref">Schmid and Hothorn 2008b</a>)</span>. Recall from <a href="P3C13_classical.html#sec-surv-models-param" class="quarto-xref"><span>Section 11.3</span></a> the log-linear AFT model (<a href="P3C13_classical.html#eq-aft-log" class="quarto-xref"><span>11.24</span></a>) defined by:</p>
+<p><span class="math display">\[
+\log(t_i) = \mu + \eta_i + \sigma\epsilon_i,
+\]</span></p>
+<p>where <span class="math inline">\(\sigma\)</span> is a scale parameter, <span class="math inline">\(\epsilon_i\)</span> is an error term, and <span class="math inline">\(\mu\)</span> is an intercept. The model is now boosted by updating</p>
+<p><span class="math display">\[
+\hat{g}_m(\mathbf{x}_i) = \mu + \eta_i,
+\]</span></p>
+<p>and then estimating <span class="math inline">\(\hat{\sigma}_m\)</span> using the updated <span class="math inline">\(\hat{g}_m\)</span>; usually <span class="math inline">\(\sigma_0 = 1\)</span> <span class="citation" data-cites="Schmid2008b">(<a href="P5C26_references.html#ref-Schmid2008b" role="doc-biblioref">Schmid and Hothorn 2008b</a>)</span>. Rearranging (<a href="P3C13_classical.html#eq-aft-log" class="quarto-xref"><span>11.24</span></a>) in terms of <span class="math inline">\(\epsilon_i\)</span> and <span class="math inline">\(\hat{g}\)</span> gives,</p>
+<p><span id="eq-aft-error"><span class="math display">\[
+\epsilon_i = \frac{\log(t_i) - \hat{g}_m(\mathbf{x}_i)}{\sigma}.
+\tag{14.3}\]</span></span></p>
+<p>By assuming a distribution on <span class="math inline">\(\epsilon_i\)</span>, a distribution is assumed for the full parametric distribution of the survival time, giving the AFT log-likelihood <span class="citation" data-cites="Klein2003">(<a href="P5C26_references.html#ref-Klein2003" role="doc-biblioref">Klein and Moeschberger 2003</a>)</span>,</p>
+<p><span id="eq-aft-likelihood"><span class="math display">\[
+\begin{split}
+-l^{AFT}(g, \sigma)
+&amp; = -\sum^n_{i=1} \Bigg[ \delta_i\Bigg(- \log{\sigma} + \log f_{\epsilon}\Big(\frac{\log(t_i) - g(\mathbf{x}_i)}{\sigma}\Big)\Bigg) \\
+&amp; + (1-\delta_i)\Bigg(\log S_{\epsilon}\Big(\frac{\log(t_i) - g(\mathbf{x}_i)}{\sigma}\Big)\Bigg) \Bigg]
+\end{split},
+\tag{14.4}\]</span></span></p>
+<p>where <span class="math inline">\(f_{\epsilon}, S_{\epsilon}\)</span> are the density and survival functions of <span class="math inline">\(\epsilon\)</span> respectively assuming a shared error distribution for all observations, and the expressions within <span class="math inline">\(f_{\epsilon}\)</span> and <span class="math inline">\(S_{\epsilon}\)</span> are a substitution of the error term (<a href="#eq-aft-error" class="quarto-xref"><span>14.3</span></a>). At iteration <span class="math inline">\(m\)</span>, (<a href="#eq-aft-likelihood" class="quarto-xref"><span>14.4</span></a>) is evaluated at <span class="math inline">\((\hat{g}_{m-1}, \hat{\sigma}_{m-1})\)</span> to compute the pseudo-residuals used to update <span class="math inline">\(\hat{g}_m\)</span> following Algorithm 2,</p>
+<p><span class="math display">\[
+r_{im} = -\frac{\partial(-l^{AFT}(\hat{g}_{m-1}, \hat{\sigma}_{m-1}))}{\partial \hat{g}_{m-1}(\mathbf{x}_i)}.
+\]</span></p>
+<p>The only change to the algorithm is a final step in each iteration where the scale parameter is re-estimated conditional on the updated <span class="math inline">\(\hat{g}_m\)</span>, by minimizing (<a href="#eq-aft-likelihood" class="quarto-xref"><span>14.4</span></a>) with respect to <span class="math inline">\(\sigma\)</span>:</p>
+<p><span class="math display">\[
+\hat{\sigma}_m := \mathop{\mathrm{arg\,min}}_{\sigma &gt; 0} \ -l^{AFT}(\hat{g}_m, \sigma),
+\]</span></p>
+<p>which is the conditional maximum likelihood estimate of <span class="math inline">\(\sigma\)</span> given the current boosted fit and is usually obtained by a one-dimensional numerical optimization over <span class="math inline">\(\sigma &gt; 0\)</span>.</p>
+<p>As well as boosting fully-parametric AFTs, one could consider boosting semi-parametric AFTs, for example, with the Gehan loss <span class="citation" data-cites="Johnson2011">(<a href="P5C26_references.html#ref-Johnson2011" role="doc-biblioref">Johnson and Long 2011</a>)</span> or using Buckley-James imputation <span class="citation" data-cites="Wang2010">(<a href="P5C26_references.html#ref-Wang2010" role="doc-biblioref">Wang and Wang 2010</a>)</span>. However, known problems with semi-parametric AFT models and the Buckley-James procedure <span class="citation" data-cites="Wei1992">(<a href="P5C26_references.html#ref-Wei1992" role="doc-biblioref">Wei 1992</a>)</span>, as well as a lack of off-the-shelf implementation, mean that these methods appear to be rarely used in practice.</p>
+<p>The flexibility of boosting allows extensions to other censoring and truncation types to follow simply by replacing the likelihood functions above with the corresponding objective functions in <a href="P1C4_survival.html#sec-surv-estimation-param" class="quarto-xref"><span>Section 3.5.1</span></a>.</p>
+</section>
+<section id="penalized-boosting" class="level4" data-number="14.2.1.3">
+<h4 data-number="14.2.1.3" class="anchored" data-anchor-id="penalized-boosting"><span class="header-section-number">14.2.1.3</span> Penalized boosting</h4>
+<p>‘CoxBoost’ <span class="citation" data-cites="Binder2008">(<a href="P5C26_references.html#ref-Binder2008" role="doc-biblioref">Binder and Schumacher 2008</a>)</span> is an alternative method to boost Cox models and has been demonstrated to perform well in experiments <span class="citation" data-cites="Burk2026">(<a href="P5C26_references.html#ref-Burk2026" role="doc-biblioref">Burk et al. 2026</a>)</span>. The algorithm can be interpreted as a <em>componentwise</em> boosting procedure for Cox models, where at each iteration a single covariate is selected, alongside mandatory (or ‘forced’) covariates, and coefficients are updated using a penalized second-order optimization step <span class="citation" data-cites="Binder2008">(<a href="P5C26_references.html#ref-Binder2008" role="doc-biblioref">Binder and Schumacher 2008</a>)</span>. In medical domains the inclusion of mandatory covariates may be essential, either for model interpretability, or due to prior expert knowledge. CoxBoost deviates from Algorithm 2 by instead using an offset-based approach for generalized linear models <span class="citation" data-cites="Tutz2007">(<a href="P5C26_references.html#ref-Tutz2007" role="doc-biblioref">Tutz and Binder 2007</a>)</span>.</p>
+<p>As this method is more technically involved than standard gradient boosting, consider the following motivational example (<a href="#tbl-coxboost" class="quarto-xref">Table&nbsp;<span>14.1</span></a>). Suppose treatment group is considered clinically essential and must always be included in the model, while age and a biomarker are optional covariates. In each boosting iteration, CoxBoost considers candidate updates componentwise by adding one optional covariate at a time to the mandatory covariate. In this example, the two candidate updates are therefore treatment group with age or treatment group with the biomarker. At each iteration, the candidate update with the lower loss (in bold) is selected and added to the coefficient vector. For example, in iteration <span class="math inline">\(1\)</span>, the update using age gives a lower loss than the update using the biomarker, so the coefficients for treatment group and age are updated. In iteration <span class="math inline">\(2\)</span>, the update using the biomarker gives a lower loss, so the coefficients for treatment group and the biomarker are updated instead. The optional covariate that is not selected in a given iteration is left unchanged. The running coefficient vector <span class="math inline">\(\hat{\boldsymbol{\beta}}_m\)</span> plays the same role as the cumulative boosted predictor <span class="math inline">\(\hat{g}_m\)</span> in Algorithm 2. The vector <span class="math inline">\(\hat{\boldsymbol{\gamma}}_{mk}\)</span> is the candidate increment being considered in iteration <span class="math inline">\(m\)</span> for candidate set <span class="math inline">\(k\)</span>. For the selected candidate <span class="math inline">\(k^*\)</span>, <span class="math inline">\(\hat{\boldsymbol{\gamma}}_{mk^*}\)</span> is added to <span class="math inline">\(\hat{\boldsymbol{\beta}}_{m-1}\)</span> to obtain <span class="math inline">\(\hat{\boldsymbol{\beta}}_m\)</span>, analogous to adding the new learner contribution <span class="math inline">\(\alpha \tilde{g}_m\)</span> in standard gradient boosting.</p>
+<div id="tbl-coxboost" class="quarto-float quarto-figure quarto-figure-center anchored">
+<figure class="quarto-float quarto-float-tbl figure">
+<figcaption class="quarto-float-caption-top quarto-float-caption quarto-float-tbl" id="tbl-coxboost-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+Table&nbsp;14.1: Three iterations of the CoxBoost algorithm with one mandatory covariate ‘trt’ and two optional covariates ‘age’ and ‘bio’. First column is iteration number, with one row per candidate optional covariate. Second column is the covariate under consideration with the resulting loss in third column (bold is the smaller loss and therefore the selected covariate). Columns four and five are the incremental updates in iteration <span class="math inline">\(m\)</span> to the mandatory covariate and the selected optional covariate; in practice, increments are estimated for all candidate sets in each iteration, but only the increments for the selected candidate <span class="math inline">\(k^*\)</span> are shown here for clarity. Columns six to eight are the accumulated coefficients for all covariates.
+</figcaption>
+<div aria-describedby="tbl-coxboost-caption-0ceaefa1-69ba-4598-a22c-09a6ac19f8ca">
+<table class="caption-top table">
+<colgroup>
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 15%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+<col style="width: 12%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;"><span class="math inline">\(m\)</span></th>
+<th style="text-align: left;">Candidate covariate</th>
+<th style="text-align: right;">Loss after update</th>
+<th style="text-align: center;"><span class="math inline">\(\hat{\gamma}_{mk^*,\text{trt}}\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(\hat{\gamma}_{mk^*,\text{opt}}\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(\hat{\beta}_{m,\text{trt}}\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(\hat{\beta}_{m,\text{age}}\)</span></th>
+<th style="text-align: right;"><span class="math inline">\(\hat{\beta}_{m,\text{bio}}\)</span></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">0</td>
+<td style="text-align: left;">–</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: right;">0.00</td>
+<td style="text-align: right;">0.00</td>
+<td style="text-align: right;">0.00</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">Age</td>
+<td style="text-align: right;"><strong>1.42</strong></td>
+<td style="text-align: center;">0.08</td>
+<td style="text-align: right;">0.15</td>
+<td style="text-align: right;">0.08</td>
+<td style="text-align: right;">0.15</td>
+<td style="text-align: right;">0.00</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">1</td>
+<td style="text-align: left;">Biomarker</td>
+<td style="text-align: right;">1.55</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: right;">0.08</td>
+<td style="text-align: right;">0.15</td>
+<td style="text-align: right;">0.00</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">Age</td>
+<td style="text-align: right;">1.31</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: right;">0.08</td>
+<td style="text-align: right;">0.15</td>
+<td style="text-align: right;">0.00</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">2</td>
+<td style="text-align: left;">Biomarker</td>
+<td style="text-align: right;"><strong>1.20</strong></td>
+<td style="text-align: center;">0.03</td>
+<td style="text-align: right;">0.20</td>
+<td style="text-align: right;">0.11</td>
+<td style="text-align: right;">0.15</td>
+<td style="text-align: right;">0.20</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">Age</td>
+<td style="text-align: right;"><strong>1.11</strong></td>
+<td style="text-align: center;">-0.02</td>
+<td style="text-align: right;">0.06</td>
+<td style="text-align: right;">0.09</td>
+<td style="text-align: right;">0.21</td>
+<td style="text-align: right;">0.20</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">3</td>
+<td style="text-align: left;">Biomarker</td>
+<td style="text-align: right;">1.18</td>
+<td style="text-align: center;">–</td>
+<td style="text-align: right;">–</td>
+<td style="text-align: right;">0.09</td>
+<td style="text-align: right;">0.21</td>
+<td style="text-align: right;">0.20</td>
+</tr>
+</tbody>
+</table>
+</div>
+</figure>
+</div>
+<p>After the final iteration in <a href="#tbl-coxboost" class="quarto-xref">Table&nbsp;<span>14.1</span></a>, the fitted model for observation <span class="math inline">\(i\)</span> is therefore</p>
+<p><span class="math display">\[
+\hat{h}(\tau \mid \mathbf{x}_i) = \hat{h}_0(\tau)\exp(0.09x_{i,\mathrm{trt}} + 0.21x_{i,\mathrm{age}} + 0.20x_{i,\mathrm{bio}}),
+\]</span></p>
+<p>where the coefficients are the final accumulated values in <span class="math inline">\(\hat{\boldsymbol{\beta}}_3\)</span>.</p>
+<p>To formally introduce the model, let <span class="math inline">\(\mathcal{I}= \{1,\ldots,p\}\)</span> be the indices of the covariates, let <span class="math inline">\(\mathcal{I}_{\text{mand}}\)</span> be the indices of the mandatory covariates that <em>must</em> be included in all iterations, and let <span class="math inline">\(\mathcal{I}_{\text{opt}} = \mathcal{I}\setminus \mathcal{I}_{\text{mand}}\)</span> be the indices of the optional covariates that <em>may</em> be included in any iteration. In each iteration, the algorithm considers models that include all mandatory covariates together with a single optional covariate, selecting the covariate that yields the greatest improvement in the penalized likelihood:</p>
+<p><span class="math display">\[
+\mathcal{I}_{mk} = \mathcal{I}_{\text{mand}} \cup \{k\}, \quad k \in \mathcal{I}_{\text{opt}}.
+\]</span></p>
+<p>In addition, a penalty matrix <span class="math inline">\(\mathbf{P} \in \mathbb{R}^{p \times p}\)</span> is considered such that <span class="math inline">\(P_{ii} &gt; 0\)</span> implies that covariate <span class="math inline">\(i\)</span> is penalized and <span class="math inline">\(P_{ii} = 0\)</span> means no penalization. In practice, this is usually a diagonal matrix <span class="citation" data-cites="Binder2008">(<a href="P5C26_references.html#ref-Binder2008" role="doc-biblioref">Binder and Schumacher 2008</a>)</span> and by setting <span class="math inline">\(P_{ii} = 0, i \in \mathcal{I}_{\text{mand}}\)</span> and <span class="math inline">\(P_{ii} &gt; 0, i \not\in \mathcal{I}_{\text{mand}}\)</span>, only optional (non-mandatory) covariates are penalized. The penalty matrix <em>can</em> vary with each iteration, which allows for a highly flexible approach. In practice, a simpler approach is to use the same penalty matrix in each iteration and to apply the same penalty factor to all penalized covariates <span class="citation" data-cites="pkgcoxboost">(<a href="P5C26_references.html#ref-pkgcoxboost" role="doc-biblioref">Binder 2013</a>)</span>.</p>
+<p>At the <span class="math inline">\(m\)</span>-th iteration and the <span class="math inline">\(k\)</span>-th set of indices to consider, the loss to optimize is the penalized partial log-likelihood given by,</p>
+<p><span id="eq-coxboost"><span class="math display">\[
+\begin{aligned}
+&amp;l_{pen}(\boldsymbol{\gamma}_{mk}) = \\
+&amp;\sum_{\tau=1}^{\tilde{n}} \left[\eta_{i_{(\tau)},m-1} + \mathbf{x}_{i_{(\tau)},\mathcal{I}_{mk}}^\top\boldsymbol{\gamma}_{mk} - \log\left(\sum_{j \in \mathcal{R}_{t_{(\tau)}}} \exp\left(\eta_{j,m-1} + \mathbf{x}_{j,\mathcal{I}_{mk}}^\top\boldsymbol{\gamma}_{mk}\right)\right)\right] - \lambda\boldsymbol{\gamma}^\top_{mk}\mathbf{P}\boldsymbol{\gamma}_{mk}.
+\end{aligned}
+\tag{14.5}\]</span></span></p>
+<p>where <span class="math inline">\(\eta_{i,m} = \mathbf{x}_i^\top\boldsymbol{\beta}_m\)</span>, <span class="math inline">\(\boldsymbol{\gamma}_{mk}\)</span> are the coefficient updates corresponding to the candidate covariate set <span class="math inline">\(\mathcal{I}_{mk}\)</span>, <span class="math inline">\(\mathbf{P}\)</span> is the penalty matrix (assuming the same in every iteration), <span class="math inline">\(\lambda\)</span> is a penalty hyperparameter, and <span class="math inline">\(t_{(\tau)}\)</span> is the <span class="math inline">\(\tau\)</span>th ordered event time for <span class="math inline">\(\tilde{n} &lt; n\)</span> unique event times (assuming no ties).</p>
+<p>In each iteration, all potential candidate sets are considered and the optimal set is the one that results in the largest improvement in the penalized partial log-likelihood. Note that CoxBoost uses Fisher scoring iterations to update the coefficient estimates, using both first and second derivatives, whereas standard GBMs only use first derivatives.</p>
+<p>The optimal set is then found as,</p>
+<p><span class="math display">\[
+k^* := \mathop{\mathrm{arg\,max}}_k \ l_{pen}(\hat{\boldsymbol{\gamma}}_{mk}),
+\]</span></p>
+<p>and the estimated coefficients are updated by,</p>
+<p><span class="math display">\[
+\hat{\beta}_{m, j} =
+\begin{cases}
+\hat{\beta}_{m-1, j} + \hat{\gamma}_{mk^*,j}, &amp; j \in \mathcal{I}_{mk^*}, \\
+\hat{\beta}_{m-1, j}, &amp; j \notin \mathcal{I}_{mk^*},
+\end{cases}
+\quad j = 1, \ldots, p,
+\]</span></p>
+<p>where <span class="math inline">\(\hat{\gamma}_{mk^*,j}\)</span> is the <span class="math inline">\(j\)</span>th element in <span class="math inline">\(\hat{\boldsymbol{\gamma}}_{mk^*}\)</span>. In words, <span class="math inline">\(\hat{\boldsymbol{\beta}}_m\)</span> is the cumulative coefficient vector after iteration <span class="math inline">\(m\)</span>, while <span class="math inline">\(\hat{\boldsymbol{\gamma}}_{mk^*}\)</span> is the selected increment at that iteration. Thus CoxBoost updates the fitted linear predictor by adding the selected coefficient increment, analogous to adding a new weak learner in standard gradient boosting. At iteration <span class="math inline">\(m\)</span>, the components of <span class="math inline">\(\hat{\boldsymbol{\beta}}\)</span> in the optimal set <span class="math inline">\(\mathcal{I}_{mk^*}\)</span> are increased by <span class="math inline">\(\hat{\boldsymbol{\gamma}}_{mk^*}\)</span>, while all other components remain unchanged.</p>
+<p>CoxBoost is extended to the competing risks setting by boosting a subdistribution PH model <span class="citation" data-cites="Binder2009">(<a href="P5C26_references.html#ref-Binder2009" role="doc-biblioref">Binder et al. 2009</a>)</span>. In this setting, (<a href="#eq-coxboost" class="quarto-xref"><span>14.5</span></a>) is replaced by the log-likelihood from the Fine and Gray model (<a href="P3C13_classical.html#sec-classical-ph-cr" class="quarto-xref"><span>Section 11.2.3</span></a>) with an analogous penalty function, and the remaining steps proceed similarly.</p>
 </section>
 </section>
 <section id="sec-boost-loss" class="level3" data-number="14.2.2">
-<h3 data-number="14.2.2" class="anchored" data-anchor-id="sec-boost-loss"><span class="header-section-number">14.2.2</span> Loss Boosting</h3>
-<p>Instead of optimizing models based on a given model form, one could instead estimate <span class="math inline">\(\hat{\eta}\)</span> by optimizing a loss (Part II). Common loss choices are discrimination measures, such as Uno’s or Harrell’s C <span class="citation" data-cites="Chen2013 Mayr2014">(<a href="P5C26_references.html#ref-Chen2013" role="doc-biblioref">Chen et al. 2013</a>; <a href="P5C26_references.html#ref-Mayr2014" role="doc-biblioref">Mayr and Schmid 2014</a>)</span>.</p>
-<p>Consider Uno’s C (<a href="P2C8_rank.html#sec-cindex" class="quarto-xref"><span>Section 6.1</span></a>) where the ranking prediction in iteration <span class="math inline">\(m\)</span> is given by the prediction from the previous iteration:</p>
-<p><span class="math display">\[
-C_U(\hat{g}_{m-1}, \mathbf{X}, \mathbf{t}, \boldsymbol{\delta}|\tau) = \frac{\sum_{i\neq j} [\hat{G}_{KM}(t_i)]^{-2}\mathbb{I}(t_i &lt; t_j, \hat{g}_{m-1}(\mathbf{x}_i) &gt; \hat{g}_{m-1}(\mathbf{x}_j), t_i &lt; \tau)\delta_i}{\sum_{i\neq j}[\hat{G}_{KM}(t_i)]^{-2}\mathbb{I}(t_i &lt; t_j, t_i &lt; \tau)\delta_i},
-\]</span></p>
+<h3 data-number="14.2.2" class="anchored" data-anchor-id="sec-boost-loss"><span class="header-section-number">14.2.2</span> Measure-based boosting</h3>
+<p>Instead of optimizing a likelihood tied to a specific model form, such as a PH or AFT model, boosting can also directly optimize an evaluation measure (Part II). Common choices are discrimination measures, such as Uno’s or Harrell’s C <span class="citation" data-cites="Chen2013 Mayr2014">(<a href="P5C26_references.html#ref-Chen2013" role="doc-biblioref">Chen et al. 2013</a>; <a href="P5C26_references.html#ref-Mayr2014" role="doc-biblioref">Mayr and Schmid 2014</a>)</span>.</p>
+<p>Consider Uno’s C (<a href="P2C8_rank.html#sec-cindex" class="quarto-xref"><span>Section 6.1</span></a>), which at iteration <span class="math inline">\(m\)</span> is evaluated using the prediction from the previous iteration, <span class="math inline">\(\hat{g}_{m-1}\)</span>:</p>
+<p><span id="eq-unoc"><span class="math display">\[
+\begin{aligned}
+&amp;C_U(\hat{g}_{m-1}, \mathbf{X}, \mathbf{t}, \boldsymbol{\delta}\mid \tau) =\\
+&amp;\quad\frac
+{\sum_{i\neq j} \delta_i(\hat{G}_{KM}(t_i))^{-2}\mathbb{I}(t_i &lt; t_j, t_i &lt; \tau)\mathbb{I}(\hat{g}_{m-1}(\mathbf{x}_i) &gt; \hat{g}_{m-1}(\mathbf{x}_j))}
+{\sum_{i\neq j}\delta_i(\hat{G}_{KM}(t_i))^{-2}\mathbb{I}(t_i &lt; t_j, t_i &lt; \tau)},
+\end{aligned}
+\tag{14.6}\]</span></span></p>
 <p>where <span class="math inline">\(\hat{G}_{KM}\)</span> is the Kaplan-Meier estimate of the censoring distribution.</p>
-<p>The GBM algorithm requires that the chosen loss be differentiable with respect to <span class="math inline">\(\hat{g}(\mathbf{x})\)</span>. However, <span class="math inline">\(C_U\)</span> is not differentiable due to the indicator term. Replacing the indicator with a sigmoid function creates a differentiable loss <span class="citation" data-cites="Ma2006">(<a href="P5C26_references.html#ref-Ma2006" role="doc-biblioref">Ma and Huang 2006</a>)</span>:</p>
-<p><span class="math display">\[
-K(x, y|\omega) = \frac{1}{1 + \exp((y - x)/\omega)},
-\]</span></p>
-<p>where <span class="math inline">\(\omega\)</span> is a tunable hyper-parameter controlling the smoothness of the approximation. Smaller values of <span class="math inline">\(\omega\)</span> produce a closer approximation to the indicator function but may lead to unstable gradients, whereas larger values yield smoother but more biased approximations.</p>
-<p>The measure to optimize is then,</p>
+<p>The GBM algorithm requires that the optimized objective be differentiable with respect to <span class="math inline">\(\hat{g}(\mathbf{x})\)</span>. However, the indicator term is not differentiable with respect to the prediction scores. The measure can be made differentiable by replacing the indicator with a logistic sigmoid function <span class="citation" data-cites="Ma2006">(<a href="P5C26_references.html#ref-Ma2006" role="doc-biblioref">Ma and Huang 2006</a>)</span>:</p>
+<p><span id="eq-boost-logistic"><span class="math display">\[
+K(x, y \mid \omega) = \frac{1}{1 + \exp((y - x)/\omega)},
+\tag{14.7}\]</span></span></p>
+<p>where <span class="math inline">\(\omega\)</span> is a tunable hyperparameter controlling the smoothness of the approximation. Smaller values of <span class="math inline">\(\omega\)</span> produce a closer approximation to the indicator function but may lead to unstable gradients, whereas larger values yield smoother gradients at the cost of a poorer approximation to the indicator function.</p>
+<p>Replacing <span class="math inline">\(\mathbb{I}(\hat{g}_{m-1}(\mathbf{x}_i) &gt; \hat{g}_{m-1}(\mathbf{x}_j))\)</span> in (<a href="#eq-unoc" class="quarto-xref"><span>14.6</span></a>) with (<a href="#eq-boost-logistic" class="quarto-xref"><span>14.7</span></a>) yields the smooth objective to optimize,</p>
 <p><span id="eq-surv-gbm-cus"><span class="math display">\[
-C_{USmooth}(\hat{g}_{m-1}, \mathbf{X}, \mathbf{t}, \boldsymbol{\delta}|\omega) = \sum_{i \neq j} \frac{k_{ij}(\mathbf{t}, \boldsymbol{\delta})}{1 + \exp\big[(\hat{g}_{m-1}(\mathbf{x}_j) - \hat{g}_{m-1}(\mathbf{x}_i))/\omega\big]}
-\tag{14.3}\]</span></span></p>
-<p>with</p>
-<p><span class="math display">\[
-k_{ij}(\mathbf{t}, \boldsymbol{\delta}) = \frac{\delta_i (\hat{G}_{KM}(t_i))^{-2}\mathbb{I}(t_i &lt; t_j)}{\sum_{i \neq j} \delta_i(\hat{G}_{KM}(t_i))^{-2}\mathbb{I}(t_i &lt; t_j)}
-\]</span></p>
-<p>The GBM algorithm is then followed as normal with the above loss (<a href="#eq-surv-gbm-cus" class="quarto-xref"><span>14.3</span></a>) and its gradient. This algorithm may be more insensitive to overfitting than others <span class="citation" data-cites="Mayr2016">(<a href="P5C26_references.html#ref-Mayr2016" role="doc-biblioref">Mayr et al. 2016</a>)</span>, however stability selection <span class="citation" data-cites="Meinshausen2010">(<a href="P5C26_references.html#ref-Meinshausen2010" role="doc-biblioref">Meinshausen and Bühlmann 2010</a>)</span>, which is implemented in off-shelf software packages <span class="citation" data-cites="pkgmboost">(<a href="P5C26_references.html#ref-pkgmboost" role="doc-biblioref">Hothorn et al. 2020</a>)</span>, can be considered for variable selection.</p>
-<p>Similarly to likelihood boosting, flexibility is again a key advantage here for extensions to other censoring and truncation types and also to competing risks. For example, the all-cause logarithmic score introduced in <a href="P2C10_rules.html#sec-rules-ext" class="quarto-xref"><span>Section 8.5</span></a> can be used to boost survival models that optimize overall predictive ability <span class="citation" data-cites="Alberge2025">(<a href="P5C26_references.html#ref-Alberge2025" role="doc-biblioref">Alberge et al. 2025</a>)</span>.</p>
+\begin{aligned}
+&amp;C_{\tilde{U}}(\hat{g}_{m-1}, \mathbf{X}, \mathbf{t}, \boldsymbol{\delta}\mid \omega, \tau) =\\
+&amp;\quad\frac{\sum_{i \neq j} \delta_i (\hat{G}_{KM}(t_i))^{-2}\mathbb{I}(t_i &lt; t_j, t_i &lt; \tau)K(\hat{g}_{m-1}(\mathbf{x}_i), \hat{g}_{m-1}(\mathbf{x}_j) \mid \omega)}
+{\sum_{i \ne j} \delta_i (\hat{G}_{KM}(t_i))^{-2}\mathbb{I}(t_i &lt; t_j, t_i &lt; \tau)}.
+\end{aligned}
+\tag{14.8}\]</span></span></p>
+<p>The GBM algorithm is then followed as normal with the <em>negative</em> smoothed C-index (<a href="#eq-surv-gbm-cus" class="quarto-xref"><span>14.8</span></a>) and its gradient. One advantage of this method is that it may be relatively insensitive to overfitting, meaning discrimination performance can remain stable even with many boosting iterations <span class="citation" data-cites="Mayr2016">(<a href="P5C26_references.html#ref-Mayr2016" role="doc-biblioref">Mayr et al. 2016</a>)</span>.</p>
+<p>Similarly to likelihood boosting, flexibility is again a key advantage here for extensions to other censoring and truncation types and also to competing risks. For example, the all-cause logarithmic score (<a href="P2C10_rules.html#sec-rules-ext" class="quarto-xref"><span>Section 8.5</span></a>) can be used to boost survival models by optimizing overall predictive performance across all competing event types <span class="citation" data-cites="Alberge2025">(<a href="P5C26_references.html#ref-Alberge2025" role="doc-biblioref">Alberge et al. 2025</a>)</span>.</p>
 </section>
 </section>
 <section id="conclusion" class="level2" data-number="14.3">
@@ -602,25 +718,10 @@ k_{ij}(\mathbf{t}, \boldsymbol{\delta}) = \frac{\delta_i (\hat{G}_{KM}(t_i))^{-2
 </div>
 <div class="callout-body-container callout-body">
 <ul>
-<li>GBMs are a highly flexible and powerful machine learning tool due to their modular nature, where any differentiable loss and any weak base-learner can be combined. This makes them particularly useful in the survival setting as they can be easily adapted to different survival settings.</li>
-<li>There is evidence that boosting models can outperform the Cox PH even in low-dimensional settings <span class="citation" data-cites="Schmid2008b">(<a href="P5C26_references.html#ref-Schmid2008b" role="doc-biblioref">Schmid and Hothorn 2008b</a>)</span>, which is not something all machine learning models can claim.</li>
-<li>GBMs can perform very well in high-dimensional settings due to variable selection that can take place both during covariate selection as weak learners are chosen to optimize performance in each step, and within the base learners (especially when using trees).</li>
-</ul>
-</div>
-</div>
-<div class="callout callout-style-default callout-important no-icon callout-titled">
-<div class="callout-header d-flex align-content-center">
-<div class="callout-icon-container">
-<i class="callout-icon no-icon"></i>
-</div>
-<div class="callout-title-container flex-fill">
-<span class="screen-reader-only">Important</span>Limitations
-</div>
-</div>
-<div class="callout-body-container callout-body">
-<ul>
-<li>Boosting, especially with tree-based learners, can be increasingly difficult to interpret as the number of iterations increases. However, there are several methods for increasing interpretability, such as variable importance and SHAPs <span class="citation" data-cites="Lundberg2017">(<a href="P5C26_references.html#ref-Lundberg2017" role="doc-biblioref">Lundberg and Lee 2017</a>)</span>.</li>
-<li>Boosting methods are often computationally intensive. However, dedicated software packages such as <span class="math inline">\(\textbf{xgboost}\)</span> <span class="citation" data-cites="pkgxgboost">(<a href="P5C26_references.html#ref-pkgxgboost" role="doc-biblioref">Chen et al. 2020</a>)</span> offer highly optimized implementations. This allows more complex models and extensive hyperparameter tuning to be performed within reasonable time and memory constraints, which can translate into improved predictive performance.</li>
+<li>GBMs are a highly flexible and powerful machine learning tool due to their modular nature, where many differentiable losses and weak base learners can be combined. This makes them particularly useful in survival analysis as they can be easily adapted to different settings.</li>
+<li>GBMs can perform very well in high-dimensional settings due to variable selection that can take place both during covariate selection (for componentwise models) and within the base learners (especially when using trees).</li>
+<li>Boosting, especially with tree-based learners, can be increasingly difficult to interpret as the number of iterations increases. However, there are several methods for increasing interpretability, such as built-in variable importance methods and SHAP values <span class="citation" data-cites="Lundberg2017">(<a href="P5C26_references.html#ref-Lundberg2017" role="doc-biblioref">Lundberg and Lee 2017</a>)</span>.</li>
+<li>Boosting methods are often computationally intensive. However, dedicated software packages such as <span class="math inline">\(\texttt{xgboost}\)</span> <span class="citation" data-cites="pkgxgboost">(<a href="P5C26_references.html#ref-pkgxgboost" role="doc-biblioref">Chen et al. 2020</a>)</span> offer highly optimized implementations. This allows more complex models and extensive hyperparameter tuning to be performed within reasonable time and memory constraints, which can translate into improved predictive performance.</li>
 </ul>
 </div>
 </div>
@@ -635,11 +736,13 @@ k_{ij}(\mathbf{t}, \boldsymbol{\delta}) = \frac{\delta_i (\hat{G}_{KM}(t_i))^{-2
 </div>
 <div class="callout-body-container callout-body">
 <ul>
-<li><span class="citation" data-cites="Buhlmann2003">Bühlmann and Yu (<a href="P5C26_references.html#ref-Buhlmann2003" role="doc-biblioref">2003</a>)</span>; <span class="citation" data-cites="pkgmboost">Hothorn et al. (<a href="P5C26_references.html#ref-pkgmboost" role="doc-biblioref">2020</a>)</span>; <span class="citation" data-cites="Wang2010">Wang and Wang (<a href="P5C26_references.html#ref-Wang2010" role="doc-biblioref">2010</a>)</span> for more general information and background on componentwise GBMs</li>
-<li><span class="citation" data-cites="Friedman2001">Friedman (<a href="P5C26_references.html#ref-Friedman2001" role="doc-biblioref">2001</a>)</span>; <span class="citation" data-cites="Wang2010">Wang and Wang (<a href="P5C26_references.html#ref-Wang2010" role="doc-biblioref">2010</a>)</span> for linear least squares weak learners</li>
-<li><span class="citation" data-cites="Buhlmann2003">Bühlmann and Yu (<a href="P5C26_references.html#ref-Buhlmann2003" role="doc-biblioref">2003</a>)</span>; <span class="citation" data-cites="Friedman2001">Friedman (<a href="P5C26_references.html#ref-Friedman2001" role="doc-biblioref">2001</a>)</span> for decision tree weak learners</li>
-<li><span class="citation" data-cites="Ridgeway1999">Ridgeway (<a href="P5C26_references.html#ref-Ridgeway1999" role="doc-biblioref">1999</a>)</span> for early research into GBMs for survival analysis</li>
-<li><span class="citation" data-cites="Johnson2011">Johnson and Long (<a href="P5C26_references.html#ref-Johnson2011" role="doc-biblioref">2011</a>)</span> and <span class="citation" data-cites="Wang2010">Wang and Wang (<a href="P5C26_references.html#ref-Wang2010" role="doc-biblioref">2010</a>)</span> for semi-parametric AFT boosting</li>
+<li>Many boosting implementations use a componentwise approach, where candidate base learners are fit to single features in each iteration and only the learner providing the greatest improvement in the objective is updated. For more information, see <span class="citation" data-cites="Buhlmann2003">Bühlmann and Yu (<a href="P5C26_references.html#ref-Buhlmann2003" role="doc-biblioref">2003</a>)</span>; <span class="citation" data-cites="pkgmboost">Hothorn et al. (<a href="P5C26_references.html#ref-pkgmboost" role="doc-biblioref">2020</a>)</span>; <span class="citation" data-cites="Wang2010">Wang and Wang (<a href="P5C26_references.html#ref-Wang2010" role="doc-biblioref">2010</a>)</span>.</li>
+<li>For linear least squares weak learners, see <span class="citation" data-cites="Friedman2001">Friedman (<a href="P5C26_references.html#ref-Friedman2001" role="doc-biblioref">2001</a>)</span>; <span class="citation" data-cites="Wang2010">Wang and Wang (<a href="P5C26_references.html#ref-Wang2010" role="doc-biblioref">2010</a>)</span>.</li>
+<li>For decision tree weak learners, see <span class="citation" data-cites="Buhlmann2003">Bühlmann and Yu (<a href="P5C26_references.html#ref-Buhlmann2003" role="doc-biblioref">2003</a>)</span>; <span class="citation" data-cites="Friedman2001">Friedman (<a href="P5C26_references.html#ref-Friedman2001" role="doc-biblioref">2001</a>)</span>.</li>
+<li>Early research into GBMs for survival analysis can be found in <span class="citation" data-cites="Ridgeway1999">Ridgeway (<a href="P5C26_references.html#ref-Ridgeway1999" role="doc-biblioref">1999</a>)</span>.</li>
+<li>Semi-parametric AFT boosting is explored in <span class="citation" data-cites="Johnson2011">Johnson and Long (<a href="P5C26_references.html#ref-Johnson2011" role="doc-biblioref">2011</a>)</span> and <span class="citation" data-cites="Wang2010">Wang and Wang (<a href="P5C26_references.html#ref-Wang2010" role="doc-biblioref">2010</a>)</span>.</li>
+<li>The accelerated failure time model is implemented at scale in XGBoost with log-normal, log-logistic, and Weibull error distributions, providing full parametric survival distribution predictions and supporting left-, right-, and interval-censoring <span class="citation" data-cites="Barnwal2022">(<a href="P5C26_references.html#ref-Barnwal2022" role="doc-biblioref">Barnwal et al. 2022</a>)</span>.</li>
+<li>For fully nonparametric hazard estimation, BoXHED is a tree-based gradient-boosted estimator of the (possibly time-varying) hazard function that accommodates time-dependent covariates, with later versions extending to recurrent events and competing risks <span class="citation" data-cites="Wang2020 pakbin.boxhed2.2023">(<a href="P5C26_references.html#ref-Wang2020" role="doc-biblioref">Wang et al. 2020</a>; <a href="P5C26_references.html#ref-pakbin.boxhed2.2023" role="doc-biblioref">Pakbin et al. 2023</a>)</span>.</li>
 </ul>
 </div>
 </div>
@@ -648,6 +751,9 @@ k_{ij}(\mathbf{t}, \boldsymbol{\delta}) = \frac{\delta_i (\hat{G}_{KM}(t_i))^{-2
 <div id="refs" class="references csl-bib-body hanging-indent" role="list" style="display: none">
 <div id="ref-Alberge2025" class="csl-entry" role="listitem">
 Alberge, Julie, Vincent Maladière, Olivier Grisel, Judith Abécassis, and Gaël Varoquaux. 2025. <span>“<span class="nocase">Survival Models: Proper Scoring Rule and Stochastic Optimization with Competing Risks</span>.”</span> <em>Proceedings of the 28th International Conference on Artificial Intelligence and Statistics (AISTATS)</em>, Proceedings of machine learning research, vol. 258: 3619–27. <a href="https://proceedings.mlr.press/v258/alberge25a.html">https://proceedings.mlr.press/v258/alberge25a.html</a>.
+</div>
+<div id="ref-Barnwal2022" class="csl-entry" role="listitem">
+Barnwal, Avinash, Hyunsu Cho, and Toby Hocking. 2022. <span>“<span class="nocase">Survival Regression with Accelerated Failure Time Model in XGBoost</span>.”</span> <em>Journal of Computational and Graphical Statistics</em> 31 (4): 1292–302. <a href="https://doi.org/10.1080/10618600.2022.2067548">https://doi.org/10.1080/10618600.2022.2067548</a>.
 </div>
 <div id="ref-pkgcoxboost" class="csl-entry" role="listitem">
 Binder, Harald. 2013. <em><span class="nocase">CoxBoost: Cox models by likelihood based boosting for a single survival endpoint or competing risks</span></em>. CRAN.
@@ -666,6 +772,9 @@ Buhlmann, Peter, and Torsten Hothorn. 2007. <span>“<span class="nocase">Boosti
 </div>
 <div id="ref-Buhlmann2003" class="csl-entry" role="listitem">
 Bühlmann, Peter, and Bin Yu. 2003. <span>“<span class="nocase">Boosting With the L2 Loss</span>.”</span> <em>Journal of the American Statistical Association</em> 98 (462): 324–39. <a href="https://doi.org/10.1198/016214503000125">https://doi.org/10.1198/016214503000125</a>.
+</div>
+<div id="ref-Burk2026" class="csl-entry" role="listitem">
+Burk, Lukas, John Zobolas, Bernd Bischl, Andreas Bender, Marvin N. Wright, and Raphael Sonabend. 2026. <span>“<span class="nocase">A large-scale neutral comparison study of survival models on low-dimensional data</span>.”</span> <em>Bioinformatics</em> 42 (5): btag186. <a href="https://doi.org/10.1093/bioinformatics/btag186">https://doi.org/10.1093/bioinformatics/btag186</a>.
 </div>
 <div id="ref-pkgxgboost" class="csl-entry" role="listitem">
 Chen, Tianqi, Tong He, Michael Benesty, et al. 2020. <em><span class="nocase">xgboost: Extreme Gradient Boosting</span></em>. CRAN. <a href="https://cran.r-project.org/package=xgboost">https://cran.r-project.org/package=xgboost</a>.
@@ -715,8 +824,8 @@ Mayr, Andreas, Benjamin Hofner, and Matthias Schmid. 2016. <span>“<span class=
 <div id="ref-Mayr2014" class="csl-entry" role="listitem">
 Mayr, Andreas, and Matthias Schmid. 2014. <span>“<span class="nocase">Boosting the concordance index for survival data–a unified framework to derive and evaluate biomarker combinations</span>.”</span> <em>PloS One</em> 9 (1): e84483–83. <a href="https://doi.org/10.1371/journal.pone.0084483">https://doi.org/10.1371/journal.pone.0084483</a>.
 </div>
-<div id="ref-Meinshausen2010" class="csl-entry" role="listitem">
-Meinshausen, Nicolai, and Peter Bühlmann. 2010. <span>“<span class="nocase">Stability selection</span>.”</span> <em>Journal of the Royal Statistical Society: Series B (Statistical Methodology)</em> 72 (4): 417–73. <a href="https://doi.org/10.1111/j.1467-9868.2010.00740.x">https://doi.org/10.1111/j.1467-9868.2010.00740.x</a>.
+<div id="ref-pakbin.boxhed2.2023" class="csl-entry" role="listitem">
+Pakbin, Arash, Xiaochen Wang, Bobak J. Mortazavi, and Donald K. K. Lee. 2023. <em><span>BoXHED2</span>.0: <span>Scalable</span> Boosting of Dynamic Survival Analysis</em>. arXiv:2103.12591. Http://arxiv.org/abs/2103.12591; arXiv. <a href="https://doi.org/10.48550/arXiv.2103.12591">https://doi.org/10.48550/arXiv.2103.12591</a>.
 </div>
 <div id="ref-Ridgeway1999" class="csl-entry" role="listitem">
 Ridgeway, Greg. 1999. <span>“<span class="nocase">The state of boosting</span>.”</span> <em>Computing Science and Statistics</em> 31: 172–81.
@@ -729,6 +838,9 @@ Schmid, Matthias, and Torsten Hothorn. 2008b. <span>“<span class="nocase">Flex
 </div>
 <div id="ref-Tutz2007" class="csl-entry" role="listitem">
 Tutz, Gerhard, and Harald Binder. 2007. <span>“<span>Boosting Ridge Regression</span>.”</span> <em>Computational Statistics &amp; Data Analysis</em> 51 (February): 6044–59. <a href="https://doi.org/10.1016/j.csda.2006.11.041">https://doi.org/10.1016/j.csda.2006.11.041</a>.
+</div>
+<div id="ref-Wang2020" class="csl-entry" role="listitem">
+Wang, Xiaochen, Arash Pakbin, Bobak J. Mortazavi, Hongyu Zhao, and Donald K. K. Lee. 2020. <span>“<span class="nocase">BoXHED: Boosted eXact Hazard Estimator with Dynamic Covariates</span>.”</span> <em>Proceedings of the 37th International Conference on Machine Learning</em>, Proceedings of machine learning research, vol. 119: 9973–82. <a href="https://proceedings.mlr.press/v119/wang20o.html">https://proceedings.mlr.press/v119/wang20o.html</a>.
 </div>
 <div id="ref-Wang2010" class="csl-entry" role="listitem">
 Wang, Zhu, and C Y Wang. 2010. <span>“<span class="nocase">Buckley-James Boosting for Survival Analysis with High-Dimensional Biomarker Data</span>.”</span> <em>Statistical Applications in Genetics and Molecular Biology</em> (Berlin, Boston) 9 (1). https://doi.org/<a href="https://doi.org/10.2202/1544-6115.1550">https://doi.org/10.2202/1544-6115.1550</a>.
