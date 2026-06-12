@@ -2492,6 +2492,326 @@ ggsave("book/Figures/survtsk/predict_types.svg", final_pt,
 ggsave("book/Figures/survtsk/predict_types.png", final_pt,
        width = 9.5, height = 6.5, units = "in", dpi = 300)
 
+#####
+# SVR
+#####
+
+df <- data.frame(
+  x = c(1.8, 2.4, 2.7, 3.0, 3.3, 4.4, 4.2, 4.5, 5.7, 6.2, 6.5, 5),
+  y = c(1.4, 2.2, 2.6, 3.4, 1.2, 2.0, 2.8, 7, 3.8, 5.2, 6.2, 4.2)
+)
+
+eps <- 1
+line <- function(x) x
+upper <- function(x) x + eps
+lower <- function(x) x - eps
+
+df$support <- with(
+  df,
+  y >= upper(x) | y <= lower(x)
+)
+
+tube <- data.frame(
+  x = seq(0.5, 8.5, length.out = 200)
+)
+
+g_svm = ggplot(df, aes(x, y)) +
+geom_ribbon(
+    data = tube,
+    aes(
+      x = x,
+      ymin = lower(x),
+      ymax = upper(x)
+    ),
+    inherit.aes = FALSE,
+    fill = "grey90",
+    alpha = 0.5
+  ) +
+
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.8) +
+  geom_abline(intercept = eps, slope = 1, linetype = "dashed", color = "#0cb702", linewidth = 0.75) +
+  geom_abline(intercept = -eps, slope = 1, linetype = "dashed", color = "#ed68ed", linewidth = 0.75) +
+
+  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 18)) +
+  scale_color_manual(values = c(`FALSE` = "#f8766d", `TRUE` = "#619cff")) +
+
+  # xi*: point above upper epsilon tube
+  geom_segment(
+    aes(x = 4.5, xend = 4.5, y = upper(4.5), yend = 7),
+    arrow = arrow(ends = "both", length = unit(0.12, "inches")),
+  ) +
+  annotate("text", x = 4.65, y = 6.5, label = expression(zeta[i]^"*"), color = "black", size = 6) +
+
+  # xi': point below lower epsilon tube
+  geom_segment(
+    aes(x = 5.7, xend = 5.7, y = 3.8, yend = lower(5.7)),
+    arrow = arrow(ends = "both", length = unit(0.12, "inches")),
+  ) +
+  annotate("text", x = 5.9, y = 4.3, label = expression(zeta[i]^minute), color = "black", size = 6) +
+
+  annotate("text", x = 6.5, y = 8.2, label = expression(y + epsilon), hjust = 0, color = "#0cb702", size = 6) +
+  annotate("text", x = 7.1, y = line(7.55),  label = "y", hjust = 0, size = 6) +
+  annotate("text", x = 6.9, y = lower(7.55), label = expression(y - epsilon), hjust = 0, color = "#ed68ed", size = 6) +
+
+    geom_point(
+    aes(shape = support, color = support),
+    size = 2.7,
+    show.legend = FALSE
+  ) +
+
+  coord_cartesian(xlim = c(0.5, 8), ylim = c(0.5, 8.7), expand = FALSE) +
+  labs(x = "x", y = "g(x)")
+
+ggsave("book/Figures/svm/regression.png", g_svm,
+       width = 7.5, height = 4.3, units = "in", dpi = 600)
+
+
+#####
+# SSVM
+#####
+
+df <- data.frame(
+  x = c(1.7, 2.2, 2.4, 2.6, 3.0, 3.3, 3.9, 4.2, 5.2, 5.7, 6.1, 6.5),
+  y = c(1.4, 2.2, 2.8, 5.2, 3.5, 2.0, 6.8, 2.4, 7.0, 1.2, 4.7, 7.1),
+  support = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
+              TRUE, FALSE, TRUE, TRUE, TRUE, FALSE)
+)
+
+line <- function(x) x + 0.2
+
+g_svm_surv <- ggplot(df, aes(x, y)) +
+  geom_abline(intercept = 0.2, slope = 1, linewidth = 0.8) +
+
+
+  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 18)) +
+  scale_color_manual(values = c(`FALSE` = "#f8766d", `TRUE` = "#619cff")) +
+
+  # xi double dagger: finite upper bound, above fitted line
+  geom_segment(
+    aes(x = 3.9, xend = 3.9, y = line(3.9), yend = 6.8),
+    color = "#0cb702",
+    arrow = arrow(ends = "both", length = unit(0.12, "inches"))
+  ) +
+  annotate(
+    "text",
+    x = 4.4, y = 6.45,
+    label = expression(xi[i]^"*" * "," ~ i %in% U),
+    size = 5
+  ) +
+
+  # xi dagger: finite lower bound, below fitted line
+  geom_segment(
+    aes(x = 5.7, xend = 5.7, y = 1.2, yend = line(5.7)),
+    color = "#ed68ed",
+    arrow = arrow(ends = "both", length = unit(0.12, "inches"))
+  ) +
+  annotate(
+    "text",
+    x = 6.2, y = 2.15,
+    label = expression(xi[i]^minute * "," ~ i %in% L),
+    size = 5
+  ) +
+
+  annotate("text", x = 7.2, y = 7.7, label = "t", size = 6) +
+
+    geom_point(
+    aes(shape = support, color = support),
+    size = 2.8,
+    show.legend = FALSE
+  ) +
+
+  coord_cartesian(xlim = c(0.6, 8), ylim = c(0.5, 8.4), expand = FALSE) +
+  labs(x = "x", y = "g(x)")
+
+ggsave("book/Figures/svm/survival.png", g_svm_surv,
+       width = 7.5, height = 4.3, units = "in", dpi = 600)
+
+####
+# SVM pairs
+####
+set.seed(2)
+
+dat <- data.frame(
+  i = 1:6,
+  t = 1:6,
+  status = c("censored", "uncensored", "censored", "uncensored", "censored", "censored")
+)
+
+pairs <- data.frame(
+  i = c(2, 3, 4, 5, 6),
+  j = c(1, 2, 2, 4, 4),
+  x = c(2, 3, 4, 5, 6),
+  xj = c(1, 2, 2, 4, 4),
+  y_drop = c(0.55, 0.9, 1.4, 1.6, 2.3)
+)
+
+pairs$xj_arrow <- pairs$xj + runif(nrow(pairs), -0.07, 0.07)
+pairs$lab_y <- pairs$y_drop - 0.17
+
+g_cp <- ggplot(dat, aes(t, i)) +
+  geom_segment(data = pairs,
+               aes(x = x, xend = x, y = i, yend = y_drop, colour = factor(i)),
+               inherit.aes = FALSE, linewidth = 0.8) +
+  geom_point(aes(shape = status, fill = status, colour = status),
+             size = 6, stroke = 1.1) +
+  geom_segment(data = pairs,
+               aes(x = x, xend = xj_arrow, y = y_drop, yend = y_drop, colour = factor(i)),
+               inherit.aes = FALSE, linewidth = 0.8) +
+  geom_segment(data = pairs,
+               aes(x = xj_arrow, xend = xj_arrow, y = y_drop, yend = j-0.2, colour = factor(i)),
+               inherit.aes = FALSE, linewidth = 0.8,
+               arrow = arrow(length = unit(0.12, "inches"))) +
+
+  geom_text(data = pairs,
+            aes(x = (x + xj) / 2 + 0.05, y = lab_y,
+                label = paste0("(i=", i, ", j(i)=", j, ")"), colour = factor(i)),
+            inherit.aes = FALSE, size = 5, hjust = 0.5) +
+  scale_shape_manual(values = c(censored = 21, uncensored = 22)) +
+  scale_fill_manual(values = c(censored = "#d9e8ff", uncensored = "#ffd6d6")) +
+  scale_colour_manual(values = c(
+    censored = "#7aa6d9",
+    uncensored = "#e06666",
+    `2` = "#8a8cff", `3` = "#4caf50", `4` = "#66bb6a",
+    `5` = "#f4a742", `6` = "#ff6f69"
+  )) +
+  labs(x = "Outcome time", y = "Observation") +
+  theme(
+    legend.position = "none"
+  )
+
+ggsave("book/Figures/svm/comparable.png", g_cp,
+       width = 7.5, height = 4.3, units = "in", dpi = 600)
+
+#####
+# SVM hyperplane
+#####
+
+set.seed(1)
+
+pts <- data.frame(
+  x1 = runif(10, 0.5, 5.5),
+  x2 = runif(10, 0.5, 5.5)
+)
+
+pts$y_hat <- alpha + beta1 * pts$x1 + beta2 * pts$x2
+pts$resid <- rnorm(10, 0, 0.65)
+pts$y_obs <- pts$y_hat + pts$resid
+
+# Project fitted and observed points
+fit_proj <- project(pts$x1, pts$x2, pts$y_hat)
+obs_proj <- project(pts$x1, pts$x2, pts$y_obs)
+
+pts$xp_fit <- fit_proj$xp
+pts$yp_fit <- fit_proj$yp
+pts$xp_obs <- obs_proj$xp
+pts$yp_obs <- obs_proj$yp
+pts$resid_abs <- abs(pts$resid)
+
+# Panel A: line
+dat_line <- data.frame(
+  x = seq(0, 6, length.out = 30)
+)
+dat_line$y <- 1 + 0.8 * dat_line$x
+
+pts_line <- data.frame(
+  x = seq(0.5, 5.5, length.out = 8)
+)
+pts_line$y <- 1 + 0.8 * pts_line$x + rnorm(8, 0, 0.45)
+
+p1 <- ggplot() +
+ geom_segment(
+  data = pts_line,
+  aes(
+    x = x,
+    xend = x,
+    y = 1 + 0.8 * x,
+    yend = y
+  ),
+  linewidth = 0.3,
+  alpha = 0.7
+) +
+  geom_point(data = pts_line, aes(x, y), size = 2.2, alpha = 0.7) +
+  geom_line(data = dat_line, aes(x, y), linewidth = 0.9) +
+  annotate("text", x = 4.1, y = 2.0,
+           label = "y == alpha + x * beta[1]",
+           parse = TRUE, size = 5) +
+  labs(
+    x = "x", y = "y") +
+  coord_cartesian(xlim = c(0, 6), ylim = c(0.5, 6.5))
+
+# Panel B: projected plane / hyperplane
+grid <- expand.grid(
+  x1 = seq(0, 6, length.out = 13),
+  x2 = seq(0, 6, length.out = 13)
+)
+
+# Oblique projection into 2D
+grid$xp <- grid$x1 + 0.45 * grid$x2
+grid$yp <- 1 + 0.55 * grid$x1 + 0.35 * grid$x2 - 0.25 * grid$x2
+
+lines_x1 <- do.call(rbind, lapply(split(grid, grid$x2), function(d) {
+  d[order(d$x1), ]
+}))
+
+lines_x2 <- do.call(rbind, lapply(split(grid, grid$x1), function(d) {
+  d[order(d$x2), ]
+}))
+
+p2 <- ggplot() +
+geom_segment(
+  data = pts,
+  aes(
+    x = xp_fit,
+    y = yp_fit,
+    xend = xp_obs,
+    yend = yp_obs
+  ),
+  linewidth = 0.3,
+  alpha = 0.7
+) +
+  geom_path(
+    data = lines_x1,
+    aes(x = xp, y = yp, group = x2),
+    linewidth = 0.35,
+    alpha = 0.4
+  ) +
+  geom_path(
+    data = lines_x2,
+    aes(x = xp, y = yp, group = x1),
+    linewidth = 0.35,
+    alpha = 0.4
+  ) +
+  annotate("text", x = 5.2, y = 1.25,
+           label = "y == alpha + x[1] * beta[1] + x[2] * beta[2]",
+           parse = TRUE, size = 5) +
+  annotate("segment", x = 0, xend = 6, y = 1, yend = 4.3,
+           linewidth = 0.6, arrow = arrow(length = unit(0.12, "inches"))) +
+  annotate("segment", x = 0, xend = 2.7, y = 1, yend = -0.5,
+           linewidth = 0.6, arrow = arrow(length = unit(0.12, "inches"))) +
+  annotate("segment", x = 0, xend = 0, y = 1, yend = 5.7,
+           linewidth = 0.6, arrow = arrow(length = unit(0.12, "inches"))) +
+  annotate("text", x = 5.3, y = 4.5, label = expression(x[1]), size = 5) +
+  annotate("text", x = 3.1, y = -0.67, label = expression(x[2]), size = 5) +
+  annotate("text", x = -0.2, y = 5.9, label = expression(y), size = 5) +
+  labs(
+    x = NULL,
+    y = NULL
+  ) +
+  coord_equal(xlim = c(-0.5, 8.8), ylim = c(-0.9, 6.2), clip = "off") +
+  theme_void() + geom_point(
+  data = pts,
+  aes(x = xp_obs, y = yp_obs, size = resid_abs), alpha = 0.7
+) + scale_size_continuous(
+  range = c(0.8, 2.2),
+  guide = "none"
+) + theme(legend.position = "none")
+
+g_hyperplane = p1 + p2
+
+ggsave("book/Figures/svm/hyperplane.png", g_hyperplane,
+       width = 8, height = 3.5, units = "in", dpi = 600)
+
+
 ####
 # log hazard
 ####
