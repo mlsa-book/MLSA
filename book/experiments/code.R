@@ -230,35 +230,50 @@ dev.off()
 # Log-rank test
 set.seed(20241125)
 sf0 <- survfit(Surv(time, status) ~ 1, lung)
-p0 <- ggplot(rbind(data.frame(x=sf0$time, y=sf0$surv), data.frame(x=0,y=1)), aes(x=x,y=y))+geom_step()
+p0 <- ggplot(rbind(data.frame(x=sf0$time, y=sf0$surv), data.frame(x=0,y=1)), aes(x=x,y=y))+geom_step() +
+labs(x = "Time", y = "Survival probability")
 
-opt_1 <- lung$age > 50
-opt_2 <- lung$age > 75
-df_1 <- cbind(lung, split = opt_1)
-df_2 <- cbind(lung, split = opt_2)
+df_1 <- cbind(
+  lung,
+  split = factor(lung$age > 50,
+                 levels = c(FALSE, TRUE),
+                 labels = c("Age ≤ 50", "Age > 50"))
+)
+
+df_2 <- cbind(
+  lung,
+  split = factor(lung$age > 75,
+                 levels = c(FALSE, TRUE),
+                 labels = c("Age ≤ 75", "Age > 75"))
+)
 logrank_1 <- survdiff(Surv(time, status) ~ split, data = df_1)
 logrank_2 <- survdiff(Surv(time, status) ~ split, data = df_2)
 sf_1 <- survfit(Surv(time, status) ~ split, df_1)
 sf_2 <- survfit(Surv(time, status) ~ split, df_2)
-p1 <- ggplot(
-  rbind(data.frame(x=sf_1$time, y=sf_1$surv,group=c(rep(FALSE, sf_1$strata[1]), rep(TRUE, sf_1$strata[2]))), data.frame(x = 0, y = 1, group=c(TRUE, FALSE))),
-  aes(x=x,y=y,color=group)) +
-  geom_step() +
-  geom_label(aes(x=x,y=y), data.frame(x = 750, y = 0.9), label =sprintf("χ²=%.2f (p=%.2f)", logrank_1$chisq, logrank_1$pvalue), inherit.aes = FALSE)
-p2 <- ggplot(
-  rbind(data.frame(x=sf_2$time, y=sf_2$surv,group=c(rep(FALSE, sf_2$strata[1]), rep(TRUE, sf_2$strata[2]))), data.frame(x = 0, y = 1, group=c(TRUE, FALSE))),
-  aes(x=x,y=y,color=group)) +
-  geom_step() +
-  geom_label(aes(x=x,y=y), data.frame(x = 750, y = 0.9), label = sprintf("χ²=%.2f (p=%.2f)", logrank_2$chisq, logrank_2$pvalue), inherit.aes = FALSE)
+make_plot <- function(sf, logrank, split_lab) {
+  strata <- rep(names(sf$strata), sf$strata)
+  ggplot(rbind(
+    data.frame(x = sf$time, y = sf$surv, group = strata),
+    data.frame(x = 0, y = 1, group = names(sf$strata))),
+    aes(x = x, y = y, color = group)
+  ) +
+    geom_step(linewidth = 0.8) +
+    geom_label(data = data.frame(x = 700, y = 0.80), aes(x = x, y = y),
+      label = sprintf("%s\nχ² = %.2f\np = %.2f", split_lab, logrank$chisq, logrank$pvalue),
+      inherit.aes = FALSE
+    ) +
+    labs(x = "Time", y = "Survival probability", color = NULL)
+}
 
-g <- p0 / (p1 + p2) &
-  labs(x = "t", y = "S(t)") &
-  theme_classic() &
+p1 <- make_plot(sf_1, logrank_1, "Split: age > 50")
+p2 <- make_plot(sf_2, logrank_2, "Split: age > 75")
+
+g <- (p0 / (p1 + p2) )&
   guides(color = "none") &
   scale_x_continuous(limits = c(0, 1000),  expand = c(0, 0)) &
   plot_annotation(tag_levels = 'a', tag_suffix = ")")
 
-ggsave("book/Figures/forests/logrank.png", g, height = 6, units = "in",
+ggsave("book/Figures/forests/logrank.png", g, height = 6, width = 8, units = "in",
   dpi = 600)
 
 
@@ -272,8 +287,6 @@ dev.off()
 
 ## bootstrapped rsfs
 
-
-
 x = 0:13
 y1 = c(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.8, 0.1, 0.1)
 y2 = c(1, 1, 0.6, 0.6, 0.6, 0.6, 0.3, 0.3, 0.2, 0.2, 0, 0, 0, 0)
@@ -282,29 +295,27 @@ group = rep(c("blue", "red", "green"), each = 14)
 df = data.frame(x = x, y = c(y1, y2, y3), group = group)
 
 p0 <- ggplot(df, aes(x = x, y = y, color = group))
-p1 <-  p0 + geom_step()
-p2 <- p0 + geom_vline(xintercept = x, lty = 2, color = "gray") + geom_step()
+p1 <-  p0 + geom_step() + labs(x = "t", y = "S(t)") 
+p2 <- p0 + geom_vline(xintercept = x, lty = 2, color = "gray") + geom_step() + labs(x = "t", y = "S(t)") 
 p3 <- p0 + geom_vline(xintercept = x, lty = 2, color = "gray") +  geom_point() +
   geom_label(aes(x=x,y=y),
     data.frame(x=5,y=c(0.9, 0.2, 0.4),group=c("blue", "red", "green")),
-    label = sprintf("S(6) = %s", c(1, 0.3, 0.5)))
+    label = sprintf("S(6) = %s", c(1, 0.3, 0.5))) + labs(x = "t", y = "S(t)") 
 
 df2 = data.frame(x = x, y = apply(data.frame(y1, y2, y3), 1, mean))
 p4 <- ggplot(df2, aes(x = x, y = y)) + geom_step() + geom_point() +
   geom_label(aes(x=x,y=y),
-    data.frame(x=6,y=0.5), label = "S(6) = 0.6")
+    data.frame(x=6,y=0.5), label = "S(6) = 0.6") + labs(x = "t", y = "S(t)") 
 
 ybreaks = seq.int(0, 1, 0.25)
 xbreaks = seq.int(0, 12, 3)
 g = p1 + p2 + p3 + p4 &
-  labs(x = "t", y = "S(t)") &
-  theme_classic() &
   guides(color = "none") &
   scale_y_continuous(limits = c(0, 1), breaks = ybreaks, labels = ybreaks) &
   scale_x_continuous(limits = c(0, 14), breaks = xbreaks, labels = xbreaks, expand = c(0, 0)) &
   plot_annotation(tag_levels = 'a', tag_suffix = ")")
 
-ggsave("book/Figures/forests/bootstrap.png", g, height = 6, units = "in",
+ggsave("book/Figures/forests/bootstrap.png", g, width = 7, height = 6, units = "in",
   dpi = 600)
 
 ## Kaplan Meier
@@ -515,10 +526,26 @@ age = seq.int(1, 100, 1)
 surv = pgompertz(age, 0.00005, 0.09, FALSE)
 ph_surv = surv^5
 aft_surv = round(pgompertz(age*5, 0.00005, 0.09, FALSE), 2)
-df = data.frame(age, survival = c(surv, ph_surv, aft_surv), Species = rep(c("Human", "Dog (PH)", "Dog (AFT)"), each = 100))
+# A 5x acceleration of time (AFT) and a 5x hazard ratio (PH) act on different
+# scales, so the same factor 5 is not comparable. The PH hazard ratio that
+# matches the AFT dog's *median* survival is much larger (~395), because the
+# Gompertz baseline hazard is near zero at young ages.
+med_aft = uniroot(function(a) pgompertz(a * 5, 0.00005, 0.09, FALSE) - 0.5, c(1, 100))$root
+cstar = log(0.5) / log(pgompertz(med_aft, 0.00005, 0.09, FALSE))
+ph_match_surv = surv^cstar
+lab_match = sprintf("Dog (PH, HR=%.0f)", cstar)
+df = data.frame(
+  age = rep(age, 4),
+  survival = c(surv, ph_surv, aft_surv, ph_match_surv),
+  Species = factor(rep(c("Human", "Dog (PH, HR=5)", "Dog (AFT)", lab_match), each = 100),
+                   levels = c("Human", "Dog (AFT)", "Dog (PH, HR=5)", lab_match)))
 
-g <- ggplot(df, aes(x = age, y = survival, group = Species, color = Species)) + geom_line() + xlim(0, 80) + labs(x = "T", y = "S(T)") +
-  scale_color_manual(values = c("Human" = "black", "Dog (AFT)" = "red", "Dog (PH)" = "blue"), aesthetics = c("color","fill"))
+g <- ggplot(df, aes(x = age, y = survival, color = Species, linetype = Species)) +
+  geom_line() + xlim(0, 80) + labs(x = "T", y = "S(T)") +
+  scale_color_manual(values = setNames(c("black", "red", "blue", "blue"),
+    c("Human", "Dog (AFT)", "Dog (PH, HR=5)", lab_match))) +
+  scale_linetype_manual(values = setNames(c("solid", "solid", "solid", "dashed"),
+    c("Human", "Dog (AFT)", "Dog (PH, HR=5)", lab_match)))
 
 ggsave("book/Figures/classical/dogs.png", g, height = 4, units = "in",
   dpi = 600)
@@ -2465,6 +2492,352 @@ ggsave("book/Figures/survtsk/predict_types.svg", final_pt,
 ggsave("book/Figures/survtsk/predict_types.png", final_pt,
        width = 9.5, height = 6.5, units = "in", dpi = 300)
 
+#####
+# SVR
+#####
+
+df <- data.frame(
+  x = c(1.8, 2.4, 2.7, 3.0, 3.3, 4.4, 4.2, 4.5, 5.7, 6.2, 6.5, 5),
+  y = c(1.4, 2.2, 2.6, 3.4, 1.2, 2.0, 2.8, 7, 3.8, 5.2, 6.2, 4.2)
+)
+
+eps <- 1
+line <- function(x) x
+upper <- function(x) x + eps
+lower <- function(x) x - eps
+
+df$support <- with(
+  df,
+  y >= upper(x) | y <= lower(x)
+)
+
+tube <- data.frame(
+  x = seq(0.5, 8.5, length.out = 200)
+)
+
+g_svm = ggplot(df, aes(x, y)) +
+geom_ribbon(
+    data = tube,
+    aes(
+      x = x,
+      ymin = lower(x),
+      ymax = upper(x)
+    ),
+    inherit.aes = FALSE,
+    fill = "grey90",
+    alpha = 0.5
+  ) +
+
+  geom_abline(intercept = 0, slope = 1, linewidth = 0.8) +
+  geom_abline(intercept = eps, slope = 1, linetype = "dashed", color = "#0cb702", linewidth = 0.75) +
+  geom_abline(intercept = -eps, slope = 1, linetype = "dashed", color = "#ed68ed", linewidth = 0.75) +
+
+  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 18)) +
+  scale_color_manual(values = c(`FALSE` = "#f8766d", `TRUE` = "#619cff")) +
+
+  # xi*: point above upper epsilon tube
+  geom_segment(
+    aes(x = 4.5, xend = 4.5, y = upper(4.5), yend = 7),
+    arrow = arrow(ends = "both", length = unit(0.12, "inches")),
+  ) +
+  annotate("text", x = 4.65, y = 6.5, label = expression(zeta[i]^"*"), color = "black", size = 6) +
+
+  # xi': point below lower epsilon tube
+  geom_segment(
+    aes(x = 5.7, xend = 5.7, y = 3.8, yend = lower(5.7)),
+    arrow = arrow(ends = "both", length = unit(0.12, "inches")),
+  ) +
+  annotate("text", x = 5.9, y = 4.3, label = expression(zeta[i]^minute), color = "black", size = 6) +
+
+  annotate("text", x = 6.5, y = 8.2, label = expression(y + epsilon), hjust = 0, color = "#0cb702", size = 6) +
+  annotate("text", x = 7.1, y = line(7.55),  label = "y", hjust = 0, size = 6) +
+  annotate("text", x = 6.9, y = lower(7.55), label = expression(y - epsilon), hjust = 0, color = "#ed68ed", size = 6) +
+
+    geom_point(
+    aes(shape = support, color = support),
+    size = 2.7,
+    show.legend = FALSE
+  ) +
+
+  coord_cartesian(xlim = c(0.5, 8), ylim = c(0.5, 8.7), expand = FALSE) +
+  labs(x = "x", y = "g(x)")
+
+ggsave("book/Figures/svm/regression.png", g_svm,
+       width = 7.5, height = 4.3, units = "in", dpi = 600)
+
+
+#####
+# SSVM
+#####
+
+df <- data.frame(
+  x = c(1.7, 2.2, 2.4, 2.6, 3.0, 3.3, 3.9, 4.2, 5.2, 5.7, 6.1, 6.5),
+  y = c(1.4, 2.2, 2.8, 5.2, 3.5, 2.0, 6.8, 2.4, 7.0, 1.2, 4.7, 7.1),
+  support = c(FALSE, FALSE, FALSE, FALSE, FALSE, FALSE,
+              TRUE, FALSE, TRUE, TRUE, TRUE, FALSE)
+)
+
+line <- function(x) x + 0.2
+
+g_svm_surv <- ggplot(df, aes(x, y)) +
+  geom_abline(intercept = 0.2, slope = 1, linewidth = 0.8) +
+
+
+  scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 18)) +
+  scale_color_manual(values = c(`FALSE` = "#f8766d", `TRUE` = "#619cff")) +
+
+  # xi double dagger: finite upper bound, above fitted line
+  geom_segment(
+    aes(x = 3.9, xend = 3.9, y = line(3.9), yend = 6.8),
+    color = "#0cb702",
+    arrow = arrow(ends = "both", length = unit(0.12, "inches"))
+  ) +
+  annotate(
+    "text",
+    x = 4.4, y = 6.45,
+    label = expression(xi[i]^"*" * "," ~ i %in% U),
+    size = 5
+  ) +
+
+  # xi dagger: finite lower bound, below fitted line
+  geom_segment(
+    aes(x = 5.7, xend = 5.7, y = 1.2, yend = line(5.7)),
+    color = "#ed68ed",
+    arrow = arrow(ends = "both", length = unit(0.12, "inches"))
+  ) +
+  annotate(
+    "text",
+    x = 6.2, y = 2.15,
+    label = expression(xi[i]^minute * "," ~ i %in% L),
+    size = 5
+  ) +
+
+  annotate("text", x = 7.2, y = 7.7, label = "t", size = 6) +
+
+    geom_point(
+    aes(shape = support, color = support),
+    size = 2.8,
+    show.legend = FALSE
+  ) +
+
+  coord_cartesian(xlim = c(0.6, 8), ylim = c(0.5, 8.4), expand = FALSE) +
+  labs(x = "x", y = "g(x)")
+
+ggsave("book/Figures/svm/survival.png", g_svm_surv,
+       width = 7.5, height = 4.3, units = "in", dpi = 600)
+
+####
+# SVM pairs
+####
+set.seed(2)
+
+dat <- data.frame(
+  i = 1:6,
+  t = 1:6,
+  status = c("censored", "uncensored", "censored", "uncensored", "censored", "censored")
+)
+
+pairs <- data.frame(
+  i = c(2, 3, 4, 5, 6),
+  j = c(1, 2, 2, 4, 4),
+  x = c(2, 3, 4, 5, 6),
+  xj = c(1, 2, 2, 4, 4),
+  y_drop = c(0.55, 0.9, 1.4, 1.6, 2.3)
+)
+
+pairs$xj_arrow <- pairs$xj + runif(nrow(pairs), -0.07, 0.07)
+pairs$lab_y <- pairs$y_drop - 0.17
+
+g_cp <- ggplot(dat, aes(t, i)) +
+  geom_segment(data = pairs,
+               aes(x = x, xend = x, y = i, yend = y_drop, colour = factor(i)),
+               inherit.aes = FALSE, linewidth = 0.8) +
+  geom_point(aes(shape = status, fill = status, colour = status),
+             size = 6, stroke = 1.1) +
+  geom_segment(data = pairs,
+               aes(x = x, xend = xj_arrow, y = y_drop, yend = y_drop, colour = factor(i)),
+               inherit.aes = FALSE, linewidth = 0.8) +
+  geom_segment(data = pairs,
+               aes(x = xj_arrow, xend = xj_arrow, y = y_drop, yend = j-0.2, colour = factor(i)),
+               inherit.aes = FALSE, linewidth = 0.8,
+               arrow = arrow(length = unit(0.12, "inches"))) +
+
+  geom_text(data = pairs,
+            aes(x = (x + xj) / 2 + 0.05, y = lab_y,
+                label = paste0("(i=", i, ", j(i)=", j, ")"), colour = factor(i)),
+            inherit.aes = FALSE, size = 5, hjust = 0.5) +
+  scale_shape_manual(values = c(censored = 21, uncensored = 22)) +
+  scale_fill_manual(values = c(censored = "#d9e8ff", uncensored = "#ffd6d6")) +
+  scale_colour_manual(values = c(
+    censored = "#7aa6d9",
+    uncensored = "#e06666",
+    `2` = "#8a8cff", `3` = "#4caf50", `4` = "#66bb6a",
+    `5` = "#f4a742", `6` = "#ff6f69"
+  )) +
+  labs(x = "Outcome time", y = "Observation") +
+  theme(
+    legend.position = "none"
+  )
+
+ggsave("book/Figures/svm/comparable.png", g_cp,
+       width = 7.5, height = 4.3, units = "in", dpi = 600)
+
+#####
+# SVM hyperplane
+#####
+
+set.seed(1)
+
+pts <- data.frame(
+  x1 = runif(10, 0.5, 5.5),
+  x2 = runif(10, 0.5, 5.5)
+)
+
+pts$y_hat <- alpha + beta1 * pts$x1 + beta2 * pts$x2
+pts$resid <- rnorm(10, 0, 0.65)
+pts$y_obs <- pts$y_hat + pts$resid
+
+# Project fitted and observed points
+fit_proj <- project(pts$x1, pts$x2, pts$y_hat)
+obs_proj <- project(pts$x1, pts$x2, pts$y_obs)
+
+pts$xp_fit <- fit_proj$xp
+pts$yp_fit <- fit_proj$yp
+pts$xp_obs <- obs_proj$xp
+pts$yp_obs <- obs_proj$yp
+pts$resid_abs <- abs(pts$resid)
+
+# Panel A: line
+dat_line <- data.frame(
+  x = seq(0, 6, length.out = 30)
+)
+dat_line$y <- 1 + 0.8 * dat_line$x
+
+pts_line <- data.frame(
+  x = seq(0.5, 5.5, length.out = 8)
+)
+pts_line$y <- 1 + 0.8 * pts_line$x + rnorm(8, 0, 0.45)
+
+p1 <- ggplot() +
+ geom_segment(
+  data = pts_line,
+  aes(
+    x = x,
+    xend = x,
+    y = 1 + 0.8 * x,
+    yend = y
+  ),
+  linewidth = 0.3,
+  alpha = 0.7
+) +
+  geom_point(data = pts_line, aes(x, y), size = 2.2, alpha = 0.7) +
+  geom_line(data = dat_line, aes(x, y), linewidth = 0.9) +
+  annotate("text", x = 4.1, y = 2.0,
+           label = "y == alpha + x * beta[1]",
+           parse = TRUE, size = 5) +
+  labs(
+    x = "x", y = "y") +
+  coord_cartesian(xlim = c(0, 6), ylim = c(0.5, 6.5))
+
+# Panel B: projected plane / hyperplane
+grid <- expand.grid(
+  x1 = seq(0, 6, length.out = 13),
+  x2 = seq(0, 6, length.out = 13)
+)
+
+# Oblique projection into 2D
+grid$xp <- grid$x1 + 0.45 * grid$x2
+grid$yp <- 1 + 0.55 * grid$x1 + 0.35 * grid$x2 - 0.25 * grid$x2
+
+lines_x1 <- do.call(rbind, lapply(split(grid, grid$x2), function(d) {
+  d[order(d$x1), ]
+}))
+
+lines_x2 <- do.call(rbind, lapply(split(grid, grid$x1), function(d) {
+  d[order(d$x2), ]
+}))
+
+p2 <- ggplot() +
+geom_segment(
+  data = pts,
+  aes(
+    x = xp_fit,
+    y = yp_fit,
+    xend = xp_obs,
+    yend = yp_obs
+  ),
+  linewidth = 0.3,
+  alpha = 0.7
+) +
+  geom_path(
+    data = lines_x1,
+    aes(x = xp, y = yp, group = x2),
+    linewidth = 0.35,
+    alpha = 0.4
+  ) +
+  geom_path(
+    data = lines_x2,
+    aes(x = xp, y = yp, group = x1),
+    linewidth = 0.35,
+    alpha = 0.4
+  ) +
+  annotate("text", x = 5.2, y = 1.25,
+           label = "y == alpha + x[1] * beta[1] + x[2] * beta[2]",
+           parse = TRUE, size = 5) +
+  annotate("segment", x = 0, xend = 6, y = 1, yend = 4.3,
+           linewidth = 0.6, arrow = arrow(length = unit(0.12, "inches"))) +
+  annotate("segment", x = 0, xend = 2.7, y = 1, yend = -0.5,
+           linewidth = 0.6, arrow = arrow(length = unit(0.12, "inches"))) +
+  annotate("segment", x = 0, xend = 0, y = 1, yend = 5.7,
+           linewidth = 0.6, arrow = arrow(length = unit(0.12, "inches"))) +
+  annotate("text", x = 5.3, y = 4.5, label = expression(x[1]), size = 5) +
+  annotate("text", x = 3.1, y = -0.67, label = expression(x[2]), size = 5) +
+  annotate("text", x = -0.2, y = 5.9, label = expression(y), size = 5) +
+  labs(
+    x = NULL,
+    y = NULL
+  ) +
+  coord_equal(xlim = c(-0.5, 8.8), ylim = c(-0.9, 6.2), clip = "off") +
+  theme_void() + geom_point(
+  data = pts,
+  aes(x = xp_obs, y = yp_obs, size = resid_abs), alpha = 0.7
+) + scale_size_continuous(
+  range = c(0.8, 2.2),
+  guide = "none"
+) + theme(legend.position = "none")
+
+g_hyperplane = p1 + p2
+
+ggsave("book/Figures/svm/hyperplane.png", g_hyperplane,
+       width = 8, height = 3.5, units = "in", dpi = 600)
+
+
+####
+# log hazard
+####
+
+loglogistic_hazard <- function(t, shape, scale = 1) {
+  (shape / scale) * (t / scale)^(shape - 1) /
+    (1 + (t / scale)^shape)
+}
+
+t_grid <- seq(0.001, 5, length.out = 1000)
+shapes <- c(0.5, 1, 1.5, 3, 7)
+
+dat <- expand.grid(
+  T = t_grid,
+  Shape = shapes
+)
+
+dat$hazard <- loglogistic_hazard(dat$T, dat$Shape, scale = 1)
+
+g = ggplot(dat, aes(x = T, y = hazard, color = factor(Shape))) +
+  geom_line(linewidth = 0.8) +
+  labs(x = "t", y = "Log-logistic hazard, h(t)", color = "Shape") +
+  coord_cartesian(xlim = c(0, 5), ylim = c(0, 5))
+
+ggsave("book/Figures/classical/llog_hazard.png", g,
+       width = 6, height = 2.5, units = "in", dpi = 600)
 
 ##------------------
 ## Logloss and Brier
