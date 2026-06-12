@@ -205,7 +205,7 @@ For example, in iteration $1$, the update using age gives a lower loss than the 
 In iteration $2$, the update using the biomarker gives a lower loss, so the coefficients for treatment group and the biomarker are updated instead.
 The optional covariate that is not selected in a given iteration is left unchanged.
 The running coefficient vector $\hat{\bsbeta}_m$ plays the same role as the cumulative boosted predictor $\hatg_m$ in Algorithm 2.
-The vector $\hat{\bsgamma}_{mk}$ is only the candidate increment being considered in iteration $m$ for candidate set $k$.
+The vector $\hat{\bsgamma}_{mk}$ is the candidate increment being considered in iteration $m$ for candidate set $k$.
 For the selected candidate $k^*$, $\hat{\bsgamma}_{mk^*}$ is added to $\hat{\bsbeta}_{m-1}$ to obtain $\hat{\bsbeta}_m$, analogous to adding the new learner contribution $\alpha \tilde{g}_m$ in standard gradient boosting.
 
 | $m$ | Candidate covariate | Loss after update | $\hat{\gamma}_{mk^*,\text{trt}}$ | $\hat{\gamma}_{mk^*,\text{opt}}$ | $\hat{\beta}_{m,\text{trt}}$ | $\hat{\beta}_{m,\text{age}}$ | $\hat{\beta}_{m,\text{bio}}$ |
@@ -215,11 +215,19 @@ For the selected candidate $k^*$, $\hat{\bsgamma}_{mk^*}$ is added to $\hat{\bsb
 | 1 | Biomarker | 1.55 | -- | -- | 0.08 | 0.15 | 0.00 |
 | 2 | Age | 1.31 | -- | -- | 0.08 | 0.15 | 0.00 |
 | 2 | Biomarker | **1.20** | 0.03 | 0.20 | 0.11 | 0.15 | 0.20 |
-| 3 | Age | **1.11** | -0.02 | 0.05 | 0.09 | 0.20 | 0.20 |
-| 3 | Biomarker | 1.18 | -- | -- | 0.09 | 0.20 | 0.20 |
-: Three iterations of the CoxBoost algorithm with one mandatory covariate 'trt' and two optional covariates 'age' and 'bio'. First column is iteration number, with one row per candidate optional covariate. Second column is the covariate under consideration with the resulting loss in third column (bold is the smaller loss and therefore the selected covariate). Columns four and five are the incremental updates in iteration $m$ to the mandatory covariate and the selected optional covariate. Columns six to eight are the accumulated coefficients for all covariates. {#tbl-coxboost}
+| 3 | Age | **1.11** | -0.02 | 0.06 | 0.09 | 0.21 | 0.20 |
+| 3 | Biomarker | 1.18 | -- | -- | 0.09 | 0.21 | 0.20 |
+: Three iterations of the CoxBoost algorithm with one mandatory covariate 'trt' and two optional covariates 'age' and 'bio'. First column is iteration number, with one row per candidate optional covariate. Second column is the covariate under consideration with the resulting loss in third column (bold is the smaller loss and therefore the selected covariate). Columns four and five are the incremental updates in iteration $m$ to the mandatory covariate and the selected optional covariate; in practice, increments are estimated for all candidate sets in each iteration, but only the increments for the selected candidate $k^*$ are shown here for clarity. Columns six to eight are the accumulated coefficients for all covariates. {#tbl-coxboost}
 
-Let $\calI = \{1,\ldots,p\}$ be the indices of the covariates, let $\calI_{\text{mand}}$ be the indices of the mandatory covariates that _must_ be included in all iterations, and let $\calI_{\text{opt}} = \calI \setminus \calI_{\text{mand}}$ be the indices of the optional covariates that _may_ be included in any iteration.
+After the final iteration in @tbl-coxboost, the fitted model for observation $i$ is therefore
+
+$$
+\hat{h}(\tau \mid \xx_i) = \hat{h}_0(\tau)\exp(0.09x_{i,\mathrm{trt}} + 0.21x_{i,\mathrm{age}} + 0.20x_{i,\mathrm{bio}}),
+$$
+
+where the coefficients are the final accumulated values in $\hat{\bsbeta}_3$.
+
+To formally introduce the model, let $\calI = \{1,\ldots,p\}$ be the indices of the covariates, let $\calI_{\text{mand}}$ be the indices of the mandatory covariates that _must_ be included in all iterations, and let $\calI_{\text{opt}} = \calI \setminus \calI_{\text{mand}}$ be the indices of the optional covariates that _may_ be included in any iteration.
 In each iteration, the algorithm considers models that include all mandatory covariates together with a single optional covariate, selecting the covariate that yields the greatest improvement in the penalized likelihood:
 
 $$
