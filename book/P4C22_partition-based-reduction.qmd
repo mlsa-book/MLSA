@@ -190,7 +190,7 @@ The example also raises the question of how to choose the number of intervals $J
 
 Survival stacking\index{reduction!partition reductions!stacking} [@craigreviewsurvival] casts survival tasks to classification tasks similarly to the discrete-time method described in @sec-discrete-time-reduction.
 For estimation purposes, it is a special case of the discrete-time reduction in which the relevant time points are the unique observed event times.
-Its value is mainly conceptual and computational as it provides a familiar risk-set construction, connects partition reductions to Kaplan-Meier and Cox-style estimation, and fixes the interval boundaries in a data-adaptive way.
+It connects partition reductions to Kaplan-Meier and Cox-style estimation, and fixes the interval boundaries in a data-adaptive way.
 
 Let $t_{(1)} < t_{(2)} < \ldots < t_{(m)}$ be the unique, observed event times (as in the construction of the Kaplan-Meier estimator, @sec-surv-km), and let $\calR_{t_{(j)}} = \{i : Y_i \geq t_{(j)}\}$ be the risk set at $t_{(j)},\ j=1,\ldots,m$.
 Survival stacking mirrors the Kaplan-Meier construction.
@@ -209,7 +209,7 @@ For illustration, consider once again the example from @fig-data-trafo.
 The data transformation for survival stacking is shown in @fig-data-trafo-stacking (keeping only the columns needed for stacking).
 At the first event time $t_{(1)} = 0.5$, all subjects are still at risk for the event.
 At time $t_{(2)} = 2.7$, however, only subject $3$ is still at risk for the event.
-In contrast to @fig-data-trafo, here subject $1$ has only one row and subject $3$ has two rather than three rows.
+In contrast to @fig-data-trafo, here subject $1$ has only one row and subject $3$ has two rather than three rows (but it does not hold in general that survival stacking generates smaller data sets than the discrete time reduction).
 
 ![Illustration of the data transformation for survival stacking, keeping only the columns needed for stacking. Left: data in standard time-to-event format. Right: the stacked dataset, with one row per subject per unique observed event time at which the subject is at risk.](Figures/reductions/data-trafo-stacking.png){#fig-data-trafo-stacking fig-alt="Two tables illustrate the survival stacking transformation. The left table contains three subjects in standard time-to-event format with columns subject ID, observed time, event indicator, and a feature value. Subject 1 is censored at time 1.3, subject 2 experiences an event at time 0.5, and subject 3 experiences an event at time 2.7. The right table shows the stacked data with five columns: subject ID, event-time index, the interval-specific event indicator, event time, and the feature value. At event time 0.5 all three subjects are still at risk and each contributes a row, with an event indicator of 1 only for subject 2. At event time 2.7 only subject 3 remains at risk and contributes a second row with an event indicator of 1. An arrow connects the original and stacked tables." width=100%}
 
@@ -230,7 +230,7 @@ $$
 
 be the set of interval boundary points for a discrete-time reduction (@sec-discrete-time-reduction), where $t_{(m+1)}$ is some arbitrary time point after the last observed event time, $t_{(m)}$.
 This defines intervals $I_j = [t_{(j)}, t_{(j+1)})$ for $j = 1,\ldots,m$.
-This differs from the infinitesimal-interval description of survival stacking, $I_j = [t_{(j)}, t_{(j)}+\du)$, but the number of events and the number at risk are identical for both interval definitions and the discrete hazard is the same:
+This differs from the infinitesimal-interval description of survival stacking, $I_j = [t_{(j)}, t_{(j)}+\du)$, but the number of events and the number at risk are identical for both interval definitions:
 
 $$
 \Pr\!\left(Y \in [t_{(j)}, t_{(j)}+\du) \mid Y \geq t_{(j)}\right) = \Pr\!\left(Y \in [t_{(j)}, t_{(j+1)}) \mid Y \geq t_{(j)}\right) = h_{\tilde{Y}}(j).
@@ -239,8 +239,6 @@ $$
 Therefore, survival stacking and the discrete-time reduction with intervals defined by the unique observed event times estimate the same discrete hazards (@eq-discrete-hazard-probability) and produce the same survival probabilities (@eq-discrete-survival).
 This perspective is useful because it allows survival stacking to be implemented using standard discrete-time software.
 
-The practical difference between survival stacking and the general discrete-time reduction is the choice of interval boundaries.
-Survival stacking yields a smaller dataset than a general discrete-time reduction when the number of unique observed event times is smaller than the number of chosen intervals, $m < J$, but at the cost of less flexibility in choosing the interval boundaries (@sec-choice-of-interval-boundaries).
 
 ## Piecewise constant hazards {#sec-piecewise-constant-hazards}
 
@@ -365,8 +363,6 @@ However, using all unique event times can lead to very large transformed dataset
 Since each of the $n$ subjects can contribute up to $m$ rows, where $m$ is the number of unique event times, the transformed dataset contains $\tilde{n} = \sum_{i=1}^n J_i$ rows.
 @Bender2021 showed that using a random subsample of event times as cut points yields comparable predictive performance while keeping the increase in dataset size linear in the number of events, making this a practical strategy when $m$ is large.
 
-<!-- For the PEM approach, @Friedman1982 showed that the PEM estimator is consistent as long as the number of intervals grows with $n$ and the maximum interval length shrinks to zero, even when the true hazard is not a step function. In practice, this means that using a reasonably fine partition is sufficient for good approximation, and the partition does not need to be "correct" --- it only needs to be fine enough relative to the variation in the underlying hazard. -->
-
 
 ### Left-closed or left-open intervals {#sec-left-closed-vs-left-open}
 
@@ -395,7 +391,7 @@ With left-closed, right-open intervals $[a_{j-1}, a_j)$, the left endpoint $a_{j
 A related modeling choice is whether $t_j$ enters the model as a categorical (factor) or continuous variable:
 
 - When $t_j$ is treated as a factor variable, the specific choice of $t_j$ (midpoint, endpoint, etc.) is irrelevant. Each interval receives its own parameter (for example, an interval-specific intercept $\beta_{0j}$), as in the examples in @sec-discrete-time-reduction and @sec-piecewise-constant-hazards. This is the classical PEM approach and provides maximal flexibility, but assumes that the hazard in each interval is estimated independently of neighboring intervals. Without penalization, this can lead to implausible hazard estimates, especially when some intervals contain few events. The number of baseline hazard parameters equals $J$, which becomes prohibitive when $J$ is large (for example, when using all unique event times as cut points).
-- When $t_j$ enters as a continuous variable, the specific choice of $t_j$ is generally of minor importance, except possibly for the final interval and depending on the interval convention. In this setting, a functional relationship between time and the (log-)hazard is assumed. A linear relationship $\log(h_j) = \beta_0 + \beta_1 t_j$ implies that the log-hazard changes at a constant rate over time, which is often too restrictive in practice. Instead, the relationship could be modeled flexibly, for example as $\log(h_j) = f(t_j)$ using penalized splines [@Bender2018Penalized; @Kopper2022] or tree-based methods [@Bender2021]. In this case, the number of baseline hazard parameters depends on the complexity of $f$, not the number of intervals, making the approach scalable to fine partitions. Penalization encourages hazard estimates in neighboring intervals to be similar unless the data provides strong evidence for rapid changes.
+- When $t_j$ enters as a continuous variable, the specific choice of $t_j$ is generally of minor importance, except possibly for the final interval and depending on the interval convention. In this setting, a functional relationship between time and the (log-)hazard is assumed. A linear relationship $\log(h_j) = \beta_0 + \beta_1 t_j$ implies that the log-hazard changes at a constant rate over time, which is often too restrictive in practice. Instead, the relationship could be modeled flexibly (@sec-classical-nonlinear), for example as $\log(h_j) = f(t_j)$ using penalized splines [@Bender2018Penalized; @Kopper2022] or tree-based methods [@Bender2021]. In this case, the number of baseline hazard parameters depends on the complexity of $f$, not the number of intervals, making the approach scalable to fine partitions. Penalization encourages hazard estimates in neighboring intervals to be similar unless the data provides strong evidence for rapid changes.
 
 In practice, the continuous approach with some form of penalization or regularized breakpoint detection (as in gradient boosted trees) combines the flexibility of a fine partition with the stability of regularization and is recommended when the number of intervals is moderate to large.
 
