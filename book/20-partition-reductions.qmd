@@ -1,7 +1,3 @@
----
-abstract: This chapter introduces partition-based reductions, a family of techniques that transform survival data into a format amenable to standard regression and classification methods by partitioning the follow-up time into disjoint intervals. The key idea is that survival data can be restructured into a long-format dataset, with one row per subject per interval at risk, and interval-specific event indicators as targets. Three related reductions are presented. The discrete-time approach treats survival as a sequence of binary classification problems, yielding an estimate of the discrete hazard in each interval. Survival stacking is a special case where interval boundaries are defined by the observed event times, mirroring the construction of the Kaplan-Meier estimator and estimation of the Cox model. The piecewise exponential model instead frames the problem as Poisson regression with an offset, preserving information about the exact event times within intervals and yielding continuous-time hazard estimates. All three approaches support arbitrary machine learning methods as base learners and naturally accommodate time-varying covariates. Practical guidance on the choice of interval boundaries, interval conventions, and time representation is provided.
----
-
 ::: {.content-visible when-format="html"}
 {{< include _macros.tex >}}
 :::
@@ -50,7 +46,6 @@ $$
 \end{cases}\quad j=1,\ldots,J_i,
 $$ {#eq-interval-indicator}
 
-
 with $\delta_{ij}=0$ for all intervals except the last interval of subject $i$, where $\delta_{iJ_i} = \delta_i$. 
 Thus, the total number of events is unchanged by the transformation, and given $\mathcal{A}$, the values $\delta_{ij}$ are determined entirely by the original data.
 
@@ -68,7 +63,7 @@ Let further $t_j$ be a continuous representation of the time axis, one common ch
 
 $$
 t_j = \frac{a_{j-1} + a_j}{2}.
-$$ {#eq-interval-time}
+$$
 
 The transformation is completed by recording the subject's (potentially time-dependent) features $\xx_{ij}$ with $\xx_{ij} = \xx_{i}$ for all $j$ if features are constant over time.
 
@@ -76,7 +71,7 @@ Thus, given the partition $\mathcal{A}$, the standard time-to-event data $\calD 
 
 $$
 \calD_{\mathcal{A}} = \{(i, j, \delta_{ij}, \xx_{ij}, t_{ij}, t_j)\}_{i=1,\ldots,n;\  j=1,\ldots,J_i},
-$$  {#eq-transformed-data}
+$$
 
 where $i$ and $j$ are indices not used in modeling and $t_{ij}$ is only required for the piecewise constant hazards approach (@sec-piecewise-constant-hazards).
 $t_j$ is the only feature that is shared across all subjects within an interval and is used to estimate the baseline hazard; in many software implementations, it is included as another column of $\xx_{ij}$, though it is kept separate in this chapter to emphasize its role.
@@ -90,7 +85,7 @@ $\Pr(Y_i \geq a_{J_i}) = \Pr(\tilde{Y}_i > J_i)$ for censored observations ($\de
 
 Recall also from @sec-distributions-discrete the discrete-time survival and event-probability identities,
 $$
-S_{\tilde{Y}}(j) = \prod_{k \leq j}(1 - h_{\tilde{Y}}(k)) \qquad\text{and}\qquad \Pr(\tilde{Y} = j) = S_{\tilde{Y}}(j-1)\, h_{\tilde{Y}}(j).
+S_{\tilde{Y}}(j) = \prod_{k \leq j}(1 - h_{\tilde{Y}}(k)) \quad\text{and}\quad \Pr(\tilde{Y} = j) = S_{\tilde{Y}}(j-1)\, h_{\tilde{Y}}(j).
 $$ {#eq-discrete-survival}
 
 Applying these to the likelihood contribution of subject $i$, and using the interval-specific event indicators $\delta_{ij}$ from (@eq-interval-indicator) (in particular $\delta_{iJ_i} = \delta_i$ and $\delta_{ij}=0$ for $j<J_i$), gives
@@ -108,7 +103,7 @@ For a random variable $Z \sim \text{Bernoulli}(\pi)$ with $\pi = \Pr(Z = 1)$, th
 The interval-specific event indicators $\delta_{ij}$ can therefore be modeled as independent Bernoulli random variables,
 
 $$
-\Delta_{ij} \stackrel{iid}{\sim} \text{Bernoulli}(\pi_j), \qquad j = 1, \ldots, J_i,
+\Delta_{ij} \stackrel{iid}{\sim} \text{Bernoulli}(\pi_j), \quad j = 1, \ldots, J_i,
 $$
 
 where the success probability $\pi_j$ is the discrete-time hazard,
@@ -121,7 +116,7 @@ This implies that the discrete-time hazards $h_{\tilde{Y}}(j)$ can be estimated 
 
 $$
 \calD_{\mathcal{A}} = \{(\delta_{ij}, t_{j})\}_{i=1,\ldots,n;\quad j=1,\ldots,J_i},
-$${#eq-discrete-data}
+$$
 
 where $\delta_{ij}$ are the targets and $t_j$ is a covariate used to estimate different hazards/probabilities in different intervals.
 
@@ -151,7 +146,7 @@ to the transformed dataset, where $j$ denotes the interval index, $\beta_{0j}$ a
 
 Predicted discrete hazards are obtained by applying the sigmoid to the linear predictor:
 $$
-\hat{h}_{\tilde{Y}}(j \mid \xx_{ij}) = \hat{\pi}_{ij} = \sigma(\hat{\beta}_{0j} + \hat{\beta}_1 x_{i1}), \qquad \sigma(z) = \frac{1}{1 + e^{-z}},
+\hat{h}_{\tilde{Y}}(j \mid \xx_{ij}) = \hat{\pi}_{ij} = \sigma(\hat{\beta}_{0j} + \hat{\beta}_1 x_{i1}), \qquad \sigma(z) = \frac{1}{1 + \exp(-z)},
 $$
 
 where the equality $\pi_{ij} = h_{\tilde{Y}}(j \mid \xx_{ij})$ was established in (@eq-discrete-hazard-probability).
@@ -173,7 +168,7 @@ To estimate separate discrete baseline hazards for each group, $\beta_1$ can be 
 
 $$
 \log\frac{\pi_{ij}}{1-\pi_{ij}} = \beta_{0j} + \beta_{1j} x_{i1},
-$${#eq-discrete-time-glm-interaction}
+$$
 
 where $\beta_{0j}$ are the interval-specific intercepts for the reference group (no complications) and $\beta_{1j}$ are the deviations from the reference group for the complications group.
 This specification allows the shape of the hazard and therefore the survival probability curve to differ between the two groups, resulting in a substantially better fit than the proportional odds model (@fig-discrete-time-glm-interaction).
@@ -201,7 +196,7 @@ $$
 1, & t_i \in [t_{(j)}, t_{(j)}+\du) \wedge \delta_i = 1, \\
 0, & \text{otherwise},
 \end{cases}\quad i \in \calR_{t_{(j)}}.
-$$ {#eq-stacking-indicator}
+$$
 
 The construction of the stacked dataset then proceeds exactly as in @sec-discrete-time-reduction.
 
@@ -217,7 +212,7 @@ Survival stacking yields data:
 
 $$
 \calD_{\mathcal{A}} = \{(\delta_{ij}, \xx_{ij}, t_{j})\}_{i=1,\ldots,n;\ j=1,\ldots,m:\ i \in \calR_{t_{(j)}}},
-$$ {#eq-survival-stacking-data}
+$$
 
 where the $\delta_{ij}$ are the binary targets and $t_j = t_{(j)}$ is the event time, used as the time-representation feature (@sec-partition-timerep). 
 As before, any algorithm that returns binary class probabilities can be used for estimation.
@@ -243,7 +238,7 @@ This perspective is useful because it allows survival stacking to be implemented
 ## Piecewise constant hazards {#sec-piecewise-constant-hazards}
 
 The piecewise constant hazards approach, also known as the piecewise exponential model (PEM), assumes the *continuous-time* hazard function is a step function: constant within each interval but allowed to vary between intervals.\index{reduction!partition reductions!piecewise exponential model}
-The name comes from the fact that the hazard rate of an exponential distribution is constant.
+The name comes from the fact that the hazard function of an exponential distribution is constant.
 Thus, assuming a constant hazard within each interval is equivalent to assuming that event times within that interval follow an exponential distribution.
 In contrast to the discrete-time approach (@sec-discrete-time-reduction), which only models *whether* an event occurs within each interval, PEM uses the exact within-interval event time and yields a continuous-time hazard estimate.
 Intuitively, any underlying continuous hazard function can be approximated arbitrarily well given enough intervals (and events).
@@ -296,27 +291,27 @@ Note that $\calL_{\text{Poisson}, i} \propto \calL_i$ from equation (@eq-pem-lik
 This implies that the model with piecewise constant hazards can be estimated by optimizing the Poisson likelihood (@eq-pem-poisson-likelihood). The $t_{ij}$ term enters as an offset $\log(t_{ij})$ in the Poisson regression model.
 
 More generally, in the presence of features $\xx_{ij}$, assume $\delta_{ij} \mid \xx_{ij} \stackrel{iid}{\sim} \text{Poisson}(\mu_{ij})$, where $\mu_{ij} = h_{ij} t_{ij}$ is the expected number of events in interval $j$ given features $\xx_{ij}$ and $h_{ij} = g(\xx_{ij}, t_j\mid\bstheta)$ is the hazard rate in interval $j$ given features $\xx_{ij}$.
-This can be estimated by fitting a Poisson regression model with log-link to the transformed dataset\index{Poisson}
+This can be estimated by fitting a Poisson regression model with log-link to the transformed dataset\index{Poisson regression}
 
 $$
 \calD_{\mathcal{A}} = \{(\delta_{ij}, \xx_{ij}, t_{ij}, t_j)\}_{i=1,\ldots,n; j=1,\ldots,J_i},
-$$ {#eq-pem-data}
+$$
 
-where the model specification is
+where the model specification is:
 
 $$
 \log(\EE(\Delta_{ij})) = \log(h_{ij}) + \log(t_{ij}),
 $$ {#eq-pem-model}
 
-where $\log(h_{ij}) =\log(g(\xx_{ij}, t_j\mid\bstheta))$ is the interval- and feature-specific log-hazard rate, $g(\cdot)$ is a function learned by the model of choice, and $\log(t_{ij})$ is included as an offset term in the Poisson likelihood/loss function.
+where $\log(h_{ij}) =\log(g(\xx_{ij}, t_j\mid\bstheta))$ is the interval- and feature-specific log-hazard function, $g(\cdot)$ is a function learned by the model of choice, and $\log(t_{ij})$ is included as an offset term in the Poisson likelihood/loss function.
 
-The fitted model returns interval-specific hazard estimates $\hat h_j(\xx) = g(\xx, t_j \mid \hat{\bstheta})$.
-Survival probabilities follow from the cumulative hazard via $\hat S(\tau \mid \xx) = \exp\left(-\int_0^\tau \hat h(u \mid \xx)\,\du\right)$.
+The fitted model returns interval-specific hazard estimates $\hath_j(\xx) = g(\xx, t_j \mid \hat{\bstheta})$.
+Survival probabilities follow from the cumulative hazard via $\hatS(\tau \mid \xx) = \exp\left(-\int_0^\tau \hath(u \mid \xx)\,\du\right)$.
 Because the hazard is piecewise constant, the integral reduces to a sum of areas:
 
 $$
-\hat S(\tau \mid \xx) = \exp\!\left(-\left[\sum_{j: a_j \leq \tau} \hat h_j(\xx)\,(a_j - a_{j-1}) \;+\; \hat h_{J_\tau}(\xx)\,(\tau - a_{J_\tau-1})\right]\right),
-$$ {#eq-pem-survival}
+\hatS(\tau \mid \xx) = \exp\!\left(-\left[\sum_{j: a_j \leq \tau} \hath_j(\xx)\,(a_j - a_{j-1}) \;+\; \hath_{J_\tau}(\xx)\,(\tau - a_{J_\tau-1})\right]\right),
+$$
 
 where $J_\tau$ is the index of the interval containing $\tau$.
 The first sum accumulates the hazard over completed intervals before $\tau$, and the trailing term adds the partial-interval contribution from $a_{J_\tau-1}$ up to $\tau$.
@@ -332,7 +327,7 @@ Then, a Poisson regression model is fit with an interaction between interval and
 
 $$
 \log(\mu_{ij}) = \log(\EE(\Delta_{ij})) = \underbrace{\beta_{0j} + \beta_{1j}x_{i1}}_{\log(h_{ij})} + \log(t_{ij}),
-$$ {#eq-pem-model-interaction}
+$$
 
 where $x_{i1} = \II(\text{complications}_i = \text{``yes''})$, $\beta_{0j}$ are the interval-specific intercepts for the reference group (no complications), $\beta_{1j}$ are the deviations from the reference group for the complications group, and $\log(t_{ij})$ enters as a known offset (fixed by the data).
 Concretely, fitting the model on $\calD_{\mathcal{A}}$ uses $\delta_{ij}$ as the response, $\xx_{ij}$ and $t_j$ as features. Estimation can be performed by any method that can handle the Poisson likelihood (with offset) as the objective function.
@@ -375,12 +370,12 @@ The distinction matters primarily when interval boundaries coincide with event t
 In this situation, with left-closed intervals $[a_{j-1}, a_j)$ and the first cut point equal to the first event time, the interval $[0, t_{(1)})$ contains no events.
 These event-free intervals should be excluded from modeling, since the hazard is zero and the survival probability one by definition.
 With left-open, right-closed intervals, the first event time $t_{(1)}$ is included in the first interval $(0, t_{(1)}]$, avoiding this issue.
-Additionally, the definition of the last interval is somewhat awkward when using left-closed intervals since there is no natural endpoint; for example $[t_{(m)}, t_{(m)}+1)$ and $[t_{(m)}, \infty)$ will yield the same number of zeros and ones in the last interval and thus the same hazard rate estimate.
+Additionally, the definition of the last interval is somewhat awkward when using left-closed intervals since there is no natural endpoint; for example $[t_{(m)}, t_{(m)}+1)$ and $[t_{(m)}, \infty)$ will yield the same number of zeros and ones in the last interval and thus the same hazard function estimate.
 
 
 ### Representation of time within intervals {#sec-partition-timerep}
 
-The time representation feature $t_j$ serves as the "time coordinate" for interval $j$ in the model.
+The time representation feature $t_j$ serves as the 'time coordinate' for interval $j$ in the model.
 As introduced in @sec-data-transformation, one common choice is the interval midpoint $t_j = (a_{j-1} + a_j)/2$, but other choices include the interval start point $t_j = a_{j-1}$ or the endpoint $t_j = a_j$.
 
 The choice of $t_j$ interacts with the interval convention.
@@ -391,7 +386,7 @@ With left-closed, right-open intervals $[a_{j-1}, a_j)$, the left endpoint $a_{j
 A related modeling choice is whether $t_j$ enters the model as a categorical (factor) or continuous variable:
 
 - When $t_j$ is treated as a factor variable, the specific choice of $t_j$ (midpoint, endpoint, etc.) is irrelevant. Each interval receives its own parameter (for example, an interval-specific intercept $\beta_{0j}$), as in the examples in @sec-discrete-time-reduction and @sec-piecewise-constant-hazards. This is the classical PEM approach and provides maximal flexibility, but assumes that the hazard in each interval is estimated independently of neighboring intervals. Without penalization, this can lead to implausible hazard estimates, especially when some intervals contain few events. The number of baseline hazard parameters equals $J$, which becomes prohibitive when $J$ is large (for example, when using all unique event times as cut points).
-- When $t_j$ enters as a continuous variable, the specific choice of $t_j$ is generally of minor importance, except possibly for the final interval and depending on the interval convention. In this setting, a functional relationship between time and the (log-)hazard is assumed. A linear relationship $\log(h_j) = \beta_0 + \beta_1 t_j$ implies that the log-hazard changes at a constant rate over time, which is often too restrictive in practice. Instead, the relationship could be modeled flexibly (@sec-nonlinear), for example as $\log(h_j) = f(t_j)$ using penalized splines [@Bender2018Penalized; @Kopper2022] or tree-based methods [@Bender2021]. In this case, the number of baseline hazard parameters depends on the complexity of $f$, not the number of intervals, making the approach scalable to fine partitions. Penalization encourages hazard estimates in neighboring intervals to be similar unless the data provides strong evidence for rapid changes.
+- When $t_j$ enters as a continuous variable, the specific choice of $t_j$ is generally of minor importance, except possibly for the final interval and depending on the interval convention. In this setting, a functional relationship between time and the (log-)hazard is assumed. A linear relationship $\log(h_j) = \beta_0 + \beta_1 t_j$ implies that the log-hazard changes at a constant rate over time, which is often too restrictive in practice. Instead, the relationship could be modeled flexibly (@sec-nonlinear), for example as $\log(h_j) = f(t_j)$ using penalized splines [@Bender2018Penalized; @Kopper2022] or tree-based methods [@Bender2021]. In this case, the number of baseline hazard parameters depends on the complexity of $f$, not the number of intervals, making the approach scalable to fine partitions. Penalization encourages hazard estimates in neighboring intervals to be similar unless the data provides strong evidence for rapid changes.\index{penalization}
 
 In practice, the continuous approach with some form of penalization or regularized breakpoint detection (as in gradient boosted trees) combines the flexibility of a fine partition with the stability of regularization and is recommended when the number of intervals is moderate to large.
 

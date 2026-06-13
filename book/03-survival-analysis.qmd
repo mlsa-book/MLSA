@@ -1,7 +1,3 @@
----
-abstract: This chapter introduces the core concepts needed to formulate, model, and evaluate survival analysis problems. It begins by defining event-time distributions in continuous and discrete time, including survival function, hazard, cumulative hazard, and their relationships. The chapter then formalizes single-event right-censored data through observed outcome times, event indicators, risk sets, and ordered event times. It distinguishes major censoring mechanisms, including right-, left-, and interval-censoring, and explains why assumptions about the dependence between censoring, covariates, and event times are central to valid modeling. Truncation is contrasted with censoring, with particular attention to left-truncation, delayed entry, and right-truncation in retrospective sampling. The chapter also introduces likelihood-based estimation under censoring and truncation, non-parametric estimators such as Kaplan-Meier and Nelson-Aalen, extensions to left-truncated data, and Turnbull's nonparametric maximum likelihood estimator for interval-censored data. Finally, it describes estimation of the censoring distribution and inverse probability of censoring weighting, which are key tools for evaluating survival models under incomplete observation.
----
-
 ::: {.content-visible when-format="html"}
 {{< include _macros.tex >}}
 :::
@@ -14,10 +10,10 @@ In survival analysis terminology this is referred to as *right-censoring*,\index
 
 This chapter defines basic terminology and mathematical definitions in survival analysis, which are used throughout this book.
 Building upon this chapter, @sec-eha introduces event history analysis\index{event history analysis}, which is a generalization to settings with multiple, potentially competing or recurrent events\index{competing risks}\index{recurrent events}, including multi-state outcomes\index{multi-state models}.
-Concluding this part of the book, @sec-survtsk defines different prediction tasks\index{tasks} in survival analysis.
+Concluding this part of the book, @sec-survtsk defines different prediction tasks\index{machine learning task} in survival analysis.
 
 These definitions and concepts are standard in survival analysis, but are presented explicitly here as precise familiarity with them is essential for building successful models.
-Evaluation functions\index{evaluation} (Part II) can identify if one model is better suited than another to minimize a given objective function.
+Evaluation functions\index{model evaluation} (Part II) can identify if one model is better suited than another to minimize a given objective function.
 However, they cannot identify whether the objective function itself is correctly specified as that specification depends on assumptions about the data-generating process.
 For example, the type(s) of censoring/truncation present\index{censoring}\index{truncation}, whether the censoring time $C$ is independent of the event time $Y$ (marginally or conditionally on covariates $X$), and whether competing events are present.
 Misstating these assumptions yields a mismatched estimand: evaluating under these assumptions produces meaningless (even if plausible looking) results.
@@ -25,7 +21,7 @@ It is therefore vital for practitioners to be able to identify and specify the s
 
 ## Quantifying the distribution of event times {#sec-distributions}
 
-This section introduces functions that can be used to fully characterize a probability distribution\index{probability distribution}, with particular focus on functions that are important in survival analysis.
+This section introduces functions that can be used to fully characterize a probability distribution, with particular focus on functions that are important in survival analysis.
 
 In the temporal domain, events can either be recorded in discrete or continuous time.
 For example, the number of rounds of chemotherapy before remission would be recorded as a discrete-time value\index{discrete-time survival analysis}.
@@ -42,7 +38,7 @@ Moreover, discrete-time methods can be applied to continuous-time data (@sec-par
 
 ::: {.callout-note icon=false}
 
-# Handling events at $\tau = 0$
+## Handling events at $\tau = 0$
 
 In the literature, continuous-time outcomes are usually defined on the non-negative Reals, $\tau \in \NNReals$, which allows events to occur at $\tau = 0$.
 In practice, most model implementations assume time lies on the positive Reals, $\tau \in \PReals$, and therefore cannot accommodate events at $\tau = 0$.
@@ -63,7 +59,8 @@ These choices are context-dependent and it is essential that any decisions are c
 For this section, assume a continuous random variable $Y$ taking values in $\NNReals$.
 A standard representation of the distribution of $Y$ is given by the probability density function\index{probability density function}, $f_Y: \NNReals \rightarrow \NNReals$, and cumulative distribution function\index{cumulative distribution function}, $F_Y: \NNReals \rightarrow [0,1]; F_Y(\tau) = \Pr(Y \leq \tau)$.
 
-In survival analysis, it is more common to describe the distribution of event times $Y$ via the *survival function*\index{survival function} and *hazard function* (or *hazard rate*)\index{hazard function} rather than the probability density function or cumulative distribution function. The survival function is defined as
+In survival analysis, it is more common to describe the distribution of event times $Y$ via the *survival function*\index{survival function} and *hazard function* (or *hazard rate*)\index{hazard function} rather than the probability density function or cumulative distribution function. The survival function is defined as:
+
 $$
 S_Y(\tau) = \Pr(Y > \tau) = \int^\infty_\tau f_Y(u) \ \du,
 $$ {#eq-surv-prob}
@@ -96,7 +93,7 @@ The cumulative hazard function\index{cumulative hazard function} can be derived 
 
 $$
 H_Y(\tau) = \int^\tau_0 h_Y(u) \ \du,
-$$ {#eq-cumu-hazard}
+$$
 
 and relates to the survival function via,
 
@@ -107,7 +104,7 @@ H_Y(\tau) & = \int^\tau_0 h_Y(u) \ \du = \int^\tau_0 \frac{f_Y(u)}{S_Y(u)} \ \du
 \end{aligned}
 $$
 
-These last relationships are particularly important, as many methods estimate the hazard rate, which is then used to calculate the cumulative hazard and survival probability,
+These last relationships are particularly important, as many methods estimate the hazard function, which is then used to calculate the cumulative hazard and survival probability,
 
 $$
 S_Y(\tau) = \exp(-H_Y(\tau)) = \exp\left(-\int_0^\tau h_Y(u)\ \du\right).
@@ -134,7 +131,7 @@ Otherwise, if the hazard function is the target then the cumulative hazard can b
 The formal definitions above take $Y$ to be a *proper* random variable\index{proper distribution}, which means $S_Y(\tau) \to 0$ as $\tau \to \infty$.
 However, many real-world events are *improper* at the population level\index{improper distribution}, $S_Y(\infty) = \pi_0 > 0$, which practically means the event is not guaranteed to occur.
 To continue an example from the introduction, when modeling the time between relapses from multiple sclerosis, not every patient will experience a relapse.
-The value $\pi_0$ is known as the _cure fraction_, for a full treatment of _cure models_ see [@Maller1996; @Lambert2007]\index{cure models}.
+The value $\pi_0$ is known as the _cure fraction_, for a full treatment of _cure models_ see [@Lambert2007; @Maller1996]\index{cure models}.
 
 In practice, for the predictive targets in this book, improper distributions are rarely an obstacle as predictions live on a finite horizon $[0, \tau^*]$ on which $S(\tau)$ and $h(\tau)$ are well-defined regardless of properness of $Y$ when $\tau \in [0, \tau^*]$.
 A quantity that is particularly sensitive to properness is the *mean* survival time $\EE[Y] = \int_0^\infty S_Y(u)\,\du$, which diverges for improper $Y$.
@@ -145,7 +142,7 @@ Informal phrasings later in the chapter such as "the event may occur later in li
 
 Now let $\tilde{Y}$ be a random variable that represents discrete or discretized time, taking values in $\PNaturals$\index{discrete-time survival analysis}.
 
-The discrete-time hazard rate is defined as,
+The discrete-time hazard function is defined as,
 
 $$
 h_{\tilde{Y}}(\tau) = \Pr(\tilde{Y}=\tau \mid \tilde{Y} \geq \tau).
@@ -182,7 +179,7 @@ and the unconditional probability for an event at time $\tau$ is
 <!--  -->
 $$
 \Pr(\tilde{Y}=\tau) = S_{\tilde{Y}}(\tau-1) h_{\tilde{Y}}(\tau).
-$$ {#eq-discrete-prob}
+$$
 <!--  -->
 When applied to continuous time $Y$, the follow-up is divided in $J$ disjoint intervals $[a_0,a_{1}), \ldots, [a_{j-1},a_j), \ldots, [a_{J-1},a_{J}]$, such that
 <!--  -->
@@ -202,7 +199,6 @@ $$
 S_{\tilde{Y}}(j) = \Pr(Y > a_{j}) = S_Y(a_{j})
 $$
 
-#### Definitions of discrete-time cumulative hazard {.unnumbered .unlisted}
 Before moving on, note that the discrete-time cumulative hazard $H_{\tilde{Y}}(\tau)$ may be defined in one of two ways in the literature.
 The additive form (@eq-discrete-cumu-hazard) is the conventional choice, and the one used in this book.
 Under this definition, the continuous-time identity $S(\tau) = \exp(-H(\tau))$ no longer holds, and survival is recovered through the product (@eq-discrete-surv-prob) instead.
@@ -242,7 +238,7 @@ Formally, let $m\leq n$ be the number of unique, observed event times.
 Then the *unique, ordered event times* are,
 
 $$
-t_{(1)}<\cdots<t_{(m)}, \qquad m\le n.
+t_{(1)}<\cdots<t_{(m)}, \quad m\le n.
 $$ {#eq-unique-ordered-event-times}
 
 A common short-hand is to use the subscript '$(k)$' as an index referring to the observation that experienced the event at time $t_{(k)}$.
@@ -286,7 +282,7 @@ Applied to the `tumor` example in @tbl-surv-data-tumor, these quantities are:
 * $n_{1217} = \vert \calR_{1217} \vert = 3$
 * $d_{1217} = 1$
 
-| **id** ($i$) | **age** $(\xx_{\cdot 1})$ | **sex** $(\xx_{\cdot 2})$ | **complications** $(\xx_{\cdot 3})$ | **days** ($\tt$) | **status** ($\bsdelta$) |
+| id ($i$) | age $(\xx_{\cdot 1})$ | sex $(\xx_{\cdot 2})$ | complications $(\xx_{\cdot 3})$ | days ($\tt$) | status ($\bsdelta$) |
 |---:|---:|:------|:-------------|----:|------:|
 |  1|  71|female |no            | 1217|      1|
 |  2|  70|male   |no            |  519|      0|
@@ -305,7 +301,7 @@ Rows are individual observations (ID), $\xx_{\cdot j}$ columns are features, $t$
 This book focuses on prediction using baseline covariates, where all covariate values are assumed known at a fixed starting point.
 
 In some applications, covariates may change during follow-up, for example due to repeated measurements, treatment changes, or disease progression.
-These are commonly referred to as *time-varying*\index{time-varying covariates} or *time-dependent covariates*\index{time-dependent covariates|see{time-varying covariates}}.
+These are commonly referred to as *time-varying*\index{time-varying covariates} or *time-dependent covariates*.
 
 Time-varying covariates require particular care as their misuse can introduce biases, including _immortal time bias_\index{immortal time bias}.
 For example, suppose a treatment can only be received after three years of survival.
@@ -313,11 +309,11 @@ Knowing that a patient received the treatment therefore guarantees that they sur
 If patients are incorrectly assigned to the treatment group at baseline ($\tau=0$) rather than when treatment actually begins ($\tau=3$), the model learns an artificial survival advantage for treated patients, as they must have survived the initial untreated period.
 
 More generally, the same bias arises whenever a baseline covariate is defined using information from after baseline (a form of temporal leakage), for example a retrospective dataset that records `treatment = 1` for any patient who was ever treated.
-The standard remedy is to model treatment as a time-varying covariate that switches on only at the actual treatment time, so the immortal pre-treatment period is correctly attributed to the untreated state [@Suissa2008; @Levesque2010]; a landmark analysis is an alternative [@Suissa2008].
+The standard remedy is to model treatment as a time-varying covariate that switches on only at the actual treatment time, so the immortal pre-treatment period is correctly attributed to the untreated state [@Levesque2010; @Suissa2008]; a landmark analysis is an alternative [@Suissa2008].
 Equivalently, the process can be represented as a multi-state model with a transition into the treated state at time of treatment, although this makes the estimation of the treatment effect less direct.
 
 Full discussion of time-varying covariates is outside the current scope and requires extensions to the standard survival analysis framework, often involving more complex data structures and modeling assumptions.
-Although, note that the reductions introduced in part IV, particularly partition-based reductions @sec-partition-based-reductions, lend themselves to modeling time-varying covariates.
+Although, note that the reductions introduced in Part IV, particularly partition-based reductions @sec-partition-based-reductions, lend themselves to modeling time-varying covariates.
 For classic texts on time-dependent covariates, see @datapbcseq and @Kalbfleisch1980; for a specific focus on predictive modeling, see @vanHouwelingen2011.
 
 ::::
@@ -471,7 +467,7 @@ In this example, left-truncation biases the sample toward healthier infants, as 
 
 ### Right-truncation {#sec-right-truncation}
 
-Right-truncation\index{truncation!right} often occurs in retrospective sampling based on registry data, when data is queried for cases reported by a certain cut-off time (see for example @vakulenko-lagun.inverse.2020).
+Right-truncation\index{truncation!right} often occurs in retrospective sampling based on registry data, when data is queried for cases reported by a certain cutoff time (see for example @vakulenko-lagun.inverse.2020).
 A common example is the estimation of the incubation period of an infectious disease, which is the time from infection to the disease onset.
 Only known, symptomatic (and/or tested) cases are entered into the database.
 At a time $\tau$, one can only observe the subset of the infected population that has already experienced the disease, and not the population that is still incubating the disease, hence biasing the data to shorter incubation periods.
@@ -487,7 +483,7 @@ If subject 2 was right-censored, the subject would be in the sample with a known
 In case of right-truncation on the other hand, the subject is not included in the sample at time of data extraction, as subjects are only included in the registry after disease onset.
 Overall this leads to a bias toward shorter incubation times and potentially feature values that lead to shorter incubation times.
 
-![Illustration of right-truncation for three subjects observed retrospectively from a disease registry. The x-axis is calendar time and subjects are recruited at staggered times (subject 1 at $\tau = 0$, subject 3 at $\tau = 5$, subject 2 at $\tau = 10$). For each subject, the upper steel blue bar runs from recruitment to the database query date (truncation time, $t_i^r$) and the lower black bar runs from recruitment to the event ($t_i$). Subjects 1 and 3 have $t_i < t_i^r$ (event before query) and are included in the registry (solid bars, truncation bar ending in a filled steel blue circle). Subject 2 has $t_2 > t_2^r$ (event after query), so they are absent from the registry — both bars are drawn dotted, the truncation bar ends in a filled steel blue diamond, and the unobserved event marker (filled black diamond) lies beyond the query line. The vertical dashed line marks the database-query date.](Figures/survival/right-truncation.png){#fig-right-truncation fig-alt="Three subjects on the y-axis, calendar time 0-32 days on the x-axis. Each subject has two stacked horizontal bars starting at their recruitment time: an upper steel blue bar (truncation time, ending at the database-query date) and a lower black bar (time-to-event). Subjects 1 and 3 have solid bars with the truncation bars ending in filled steel blue circles and observed-event circles before the query; subject 2 has dotted bars with the truncation bar ending in a filled steel blue diamond and the time-to-event extending past the query line and ending in an unobserved-event black diamond. A vertical dashed grey line marks the database-query date."}
+![Illustration of right-truncation for three subjects observed retrospectively from a disease registry. The x-axis is calendar time and subjects are recruited at staggered times (subject 1 at $\tau = 0$, subject 3 at $\tau = 5$, subject 2 at $\tau = 10$). For each subject, the upper steel blue bar runs from recruitment to the database query date (truncation time, $t_i^r$) and the lower black bar runs from recruitment to the event ($t_i$). Subjects 1 and 3 have $t_i < t_i^r$ (event before query) and are included in the registry (solid bars, truncation bar ending in a filled steel blue circle). Subject 2 has $t_2 > t_2^r$ (event after query), so they are absent from the registry. The vertical dashed line marks the database-query date.](Figures/survival/right-truncation.png){#fig-right-truncation fig-alt="Three subjects on the y-axis, calendar time 0-32 days on the x-axis. Each subject has two stacked horizontal bars starting at their recruitment time: an upper steel blue bar (truncation time, ending at the database-query date) and a lower black bar (time-to-event). Subjects 1 and 3 have solid bars with the truncation bars ending in filled steel blue circles and observed-event circles before the query; subject 2 has dotted bars with the truncation bar ending in a filled steel blue diamond and the time-to-event extending past the query line and ending in an unobserved-event black diamond. A vertical dashed grey line marks the database-query date."}
 
 As for left-truncation\index{truncation!left}, ignoring right-truncation will lead to biased estimations.
 While for left-truncated data simple adjustments of the risk set\index{risk set} (see @sec-non-param-lt) work for non- and semi-parametric methods (see @sec-classical for example), this is not the case for right-truncated data.
@@ -508,7 +504,7 @@ $$
 \calL(\bstheta) = \prod_{i=1}^{n}f_Y(t_i \mid \bstheta).
 $$ {#eq-likelihood}
 
-The corresponding estimation principle is *maximum likelihood estimation (MLE)*\index{maximum likelihood estimation}, where parameters are chosen to maximize the probability of the observed data under the model,
+The corresponding estimation principle is *maximum likelihood estimation (MLE)*\index{maximum likelihood estimator}, where parameters are chosen to maximize the probability of the observed data under the model,
 
 $$
 \hat{\bstheta} = \argmax_{\bstheta} \calL(\bstheta).
@@ -543,7 +539,7 @@ $$
 f_Y(t_i \mid \bstheta),  & \text{observed event}, \\
 \Pr(Y_i > t_i \mid \bstheta) = S_Y(t_i \mid \bstheta),  & \text{right-censoring}, \\
 \Pr(Y_i < t_i \mid \bstheta) = F_Y(t_i \mid \bstheta),  & \text{left-censoring}, \\
-\Pr(l_i < Y_i \leq r_i \mid \bstheta) = S_Y(l_i \mid \bstheta) - S_Y(r_i \mid \bstheta),  & \text{interval-censoring}.
+\Pr(l_i < Y_i \leq r_i \mid \bstheta) = S_Y(l_i \mid \bstheta) - S_Y(r_i \mid \bstheta),  & \text{interval-censoring},
 \end{cases}
 $$ {#eq-likelihood-censoring}
 
@@ -593,7 +589,7 @@ The simplification only breaks down for a few unusual pairings, for example left
 
 As the name suggests, non-parametric estimation \index{non-parametric estimator} techniques do not make (strong) assumptions about the underlying distribution of event times.
 
-A common principle for such techniques is to partition the follow-up into intervals (or to define specific time-points during the follow-up) and to estimate the continuous (@eq-continuous-hazard) or discrete-time (@eq-discrete-hazard) hazards for each interval/time-point.
+A common principle for such techniques is to partition the follow-up into intervals (or to define specific time points during the follow-up) and to estimate the continuous (@eq-continuous-hazard) or discrete-time (@eq-discrete-hazard) hazards for each interval/time point.
 Once the respective hazard estimates are obtained, estimates of other quantities, for example the survival probability, can be derived based on the relationships in @sec-distributions-continuous and @sec-distributions-discrete.
 
 #### Kaplan-Meier estimator {#sec-surv-km}
@@ -629,8 +625,8 @@ By definition, the survival function starts at $S(\tau)=1$ at $\tau=0$ and monot
 However, follow-ups are usually not infinite and in the presence of censoring, the survival function may not reach 0 by the end of the observation period.
 For the Kaplan-Meier estimator specifically, $\KMS(t_{(m)}) = 0$ only if there are no censored observations at the last observed outcome time, or equivalently, $d_{t_{(m)}} = n_{t_{(m)}}$.
 
-Dotted lines in @fig-km-tumor indicate the median survival\index{median survival}, defined as the time at which the survival function reaches $S(\tau) = 0.5$. 
-In this example, the median survival time is approximately 1500 days, which means 50% of the subjects are expected to die within 1500 days of the operation.
+Dotted lines in @fig-km-tumor indicate the median survival\index{median survival time}, defined as the time at which the survival function reaches $S(\tau) = 0.5$. 
+In this example, the median survival time is approximately 1,500 days, which means 50% of the subjects are expected to die within 1,500 days of the operation.
 
 ![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools]. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time.](Figures/survival/km-tumor.png){#fig-km-tumor fig-alt="A curve slowly decreases from S(0) = 1 to S(3000)~0.25 and then plateaus. A dotted line crosses the curve at S(0.5)~1500."}
 
@@ -641,7 +637,7 @@ Dashed lines again illustrate median survival times; in this example, the median
 ![Kaplan-Meier estimate for the `tumor` data [@pkgpammtools] applied to subgroups of subjects of 50 or more years old and less than 50 years old, respectively. The estimated survival probabilities are given by the solid step-function. Dotted lines indicate the median survival time.](Figures/survival/km-age-bin-tumor.png){#fig-km-tumor-age-bin fig-alt="A red curve very slowly decreases from S(0)=1 to S(3000)~0.55. A blue curve more rapidly decreases from S(0)=1 to S(3000)~0.25. A dotted line cuts the blue curve around 1400 days."}
 
 #### Nelson-Aalen {#sec-surv-na}
-Another popular non-parametric estimator is the Nelson-Aalen\index{Nelson-Aalen estimator} estimator [@Nelson1972;@Aalen1978], which is based on the empirical discrete-time hazards estimator (@eq-disc-haz-non-param).
+Another popular non-parametric estimator is the Nelson-Aalen\index{Nelson-Aalen estimator} estimator [@Aalen1978; @Nelson1972], which is based on the empirical discrete-time hazards estimator (@eq-disc-haz-non-param).
 Rather than estimating the survival probability, the Nelson-Aalen estimator estimates the cumulative hazard function\index{cumulative hazard function} as,
 
 $$
@@ -679,7 +675,7 @@ The number of individuals at risk at $\tau$ is then the cardinality of (@eq-risk
 
 $$
 n^\ell_\tau = \vert \calR_\tau^\ell \vert = \sum_i \II(t_i^\ell \leq \tau \leq t_i).
-$$ {#eq-risk-lt-n}
+$$
 
 The Kaplan-Meier\index{Kaplan-Meier estimator} (@eq-km) and Nelson-Aalen\index{Nelson-Aalen estimator} (@eq-nelson-aalen) estimators can be used by substituting $n_{t_{(k)}}$ for $n^\ell_{t_{(k)}}$; $d_{t_{(k)}}$ is calculated as usual.
 
@@ -698,8 +694,7 @@ For illustration, consider an excerpt from the infants data in @tbl-surv-data-in
 |       4|8|     2|  365|     0|alive  |
 |       4|9|     2|  365|     0|alive  |
 
-: Excerpt of the `infants` [@pkgeha] time-to-event dataset.
-Rows are individual observations (id), `group` indicates matched infants, $t^\ell$ is the left-truncation time (time of inclusion into the study), $t$ is the observed time, $\delta$ is the event indicator. {#tbl-surv-data-infants}
+: Excerpt of the `infants` [@pkgeha] time-to-event dataset. Rows are individual observations (id), `group` indicates matched infants, $t^\ell$ is the left-truncation time (time of inclusion into the study), $t$ is the observed time, $\delta$ is the event indicator. {#tbl-surv-data-infants}
 
 In @tbl-surv-data-infants, without stratifying according to mother's status, the first observed event time is $t_{(1)} = t_7=16$. 
 Then, ignoring left-truncation,
@@ -725,18 +720,19 @@ The gap between the curves is more pronounced for infants whose mother died, so 
 
 ![Left: Kaplan-Meier estimate of survival probabilities of infants depending on status of the mother ignoring left-truncation. Right: Kaplan-Meier estimate of survival probabilities adjusting for left-truncation.](Figures/survival/km-infants.png){#fig-infants-lt fig-alt="Two plots both with two Kaplan-Meier curves. The left plot shows a red curve staying relatively close to S(t)=1 and a blue curve with plateauing quickly around S(t)=0.6. The right plot is very similar and the curves have the same shapes except both curves are lower indicating lower survival probabilities for each group."}
 
-#### Interval-censoring {.unnumbered .unlisted}
-For interval-censored\index{censoring!interval} data, the Kaplan-Meier\index{Kaplan-Meier estimator} estimator is replaced by the nonparametric maximum likelihood estimator (NPMLE)\index{nonparametric maximum likelihood estimator} [@Zhigang2010; @Sun2006]. The NPMLE maximizes the likelihood derived in @sec-surv-estimation-param under interval-censoring without assuming a parametric form for $S_Y$.
+#### Interval-censoring
+
+For interval-censored\index{censoring!interval} data, the Kaplan-Meier\index{Kaplan-Meier estimator} estimator is replaced by the non-parametric maximum likelihood estimator (NPMLE)\index{non-parametric maximum likelihood estimator} [@Sun2006; @Zhigang2010]. The NPMLE maximizes the likelihood derived in @sec-surv-estimation-param under interval-censoring without assuming a parametric form for $S_Y$.
 
 Because closed-form maximization is not available, the standard tool is Turnbull's\index{Turnbull estimator} iterative *self-consistency algorithm* [@Turnbull1976], a special case of the expectation-maximization algorithm in which the unobserved exact event times are treated as latent data.
 The intuition is that an observation $i$ should only contribute to the estimated probability of an event at a candidate time $\tau$ if its interval $(L_i, R_i]$ could plausibly have contained that event.
 
-The idea is to first construct an ordered grid $0 = \tau_0 < \tau_1 < \cdots < \tau_m$ by pooling the data's interval endpoints $\{0\} \cup \{L_1, R_1, \ldots, L_n, R_n\}$ and dropping duplicates. 
+The idea (Algorithm 1) is to first construct an ordered grid $0 = \tau_0 < \tau_1 < \cdots < \tau_m$ by pooling the data's interval endpoints $\{0\} \cup \{L_1, R_1, \ldots, L_n, R_n\}$ and dropping duplicates. 
 The candidate event times are the right endpoints of the grid intervals $(\tau_{k-1}, \tau_k]$.
 The NPMLE is a step function on this grid.
-Only intervals contained in some observation interval $(L_i, R_i]$ can carry positive mass [@Peto1973; @Turnbull1976], and Algorithm 2 assigns zero mass to the rest automatically.
+Only intervals contained in some observation interval $(L_i, R_i]$ can carry positive mass [@Peto1973; @Turnbull1976], and Algorithm 1 assigns zero mass to the rest automatically.
 Note that the $\tau_k$ are *constructed* grid points, distinct from the observed ordered event times $t_{(k)}$ (@eq-unique-ordered-event-times) used for the right-censored Kaplan-Meier in @sec-surv-km.
-A convenient initial estimate $\hatS^{0}$ is the *right-endpoint Kaplan-Meier*: for every observation that is not right-censored (those with finite $R_i$), the right endpoint $R_i$ of its censoring interval is used as a surrogate for the unknown event time, and the ordinary Kaplan-Meier estimator is then applied [@Turnbull1974; @Giolo2004].
+A convenient initial estimate $\hatS^{0}$ is the *right-endpoint Kaplan-Meier*: for every observation that is not right-censored (those with finite $R_i$), the right endpoint $R_i$ of its censoring interval is used as a surrogate for the unknown event time, and the ordinary Kaplan-Meier estimator is then applied [@Giolo2004; @Turnbull1974].
 
 ::: {.callout-note icon=false}
 
@@ -748,7 +744,7 @@ A convenient initial estimate $\hatS^{0}$ is the *right-endpoint Kaplan-Meier*: 
 
 $$
 w_{ik} = \II\bigl((\tau_{k-1}, \tau_k] \subseteq (L_i, R_i]\bigr),
-$$ {#eq-turnbull-w}
+$$
 
 recording whether the $k$-th grid interval could have contained subject $i$'s event. Initialize $\hatS^{0}(\tau_k), k = 0, \ldots, m$ as the right-endpoint Kaplan-Meier.
 
@@ -757,19 +753,19 @@ recording whether the $k$-th grid interval could have contained subject $i$'s ev
    
 $$
 p_{\tau_k}^{(j)} = \hatS^{j-1}(\tau_{k-1}) - \hatS^{j-1}(\tau_k).
-$$ {#eq-turnbull-p}
+$$
 
 3. \ \ \ \ \ For $k = 1, \ldots, m$, compute the expected number of events in $(\tau_{k-1}, \tau_k]$ under the current estimate:
 
 $$
 d_{\tau_k}^{(j)} = \sum_{i=1}^{n} \frac{w_{ik}\, p_{\tau_k}^{(j)}}{\sum_{l=1}^{m} w_{il}\, p_{\tau_l}^{(j)}}.
-$$ {#eq-turnbull-d}
+$$
 
 4. \ \ \ \ \ Compute the corresponding number "still at risk just before $\tau_k$":
 
 $$
 n_{\tau_k}^{(j)} = \sum_{l=k}^{m} d_{\tau_l}^{(j)}.
-$$ {#eq-turnbull-n}
+$$
 
 5. \ \ \ \ \ Plug $d_{\tau_k}^{(j)}$ and $n_{\tau_k}^{(j)}$ into the Kaplan-Meier formula (@eq-km) to obtain $\hatS^{j}$.
 6. \ \ \ \ \ **If** $\max_{k}\bigl\vert \hatS^{j}(\tau_k) - \hatS^{j-1}(\tau_k)\bigr\vert < \epsilon$, **stop**.
@@ -779,7 +775,9 @@ The estimator is constant on each grid interval $(\tau_{k-1}, \tau_k]$. For plot
 
 ::::
 
-For illustration of the initial step of the algorithm, consider three subjects with intervals $(0, 5]$, $(2, 8]$, and $(4, 10]$. Pooling the endpoints gives $\{0, 2, 4, 5, 8, 10\}$, so $m=5$ and $\tau_0 = 0$, $\tau_1 = 2$, $\tau_2 = 4$, $\tau_3 = 5$, $\tau_4 = 8$, $\tau_5 = 10$. The plausibility-indicator matrix $\{w_{ik}\}$ from the initialization is
+For illustration of the initial step of the algorithm, consider three subjects with intervals $(0, 5]$, $(2, 8]$, and $(4, 10]$. Pooling the endpoints gives $\{0, 2, 4, 5, 8, 10\}$, so $m=5$ and $\tau_0 = 0$, $\tau_1 = 2$, $\tau_2 = 4$, $\tau_3 = 5$, $\tau_4 = 8$, $\tau_5 = 10$.
+The plausibility-indicator matrix $\{w_{ik}\}$ from the initialization is in @tbl-turnbull.
+Reading the matrix: subject 1's event could fall in any of the first three grid intervals (all contained in $(0, 5]$); the third grid interval $(4, 5]$ is the only one in which all three subjects' events could fall.
 
 | subject $i$ | $(L_i, R_i]$ | $w_{i,1}$ | $w_{i,2}$ | $w_{i,3}$ | $w_{i,4}$ | $w_{i,5}$ |
 |---|---|---|---|---|---|---|
@@ -787,13 +785,12 @@ For illustration of the initial step of the algorithm, consider three subjects w
 | 2 | $(2, 8]$  | 0 | 1 | 1 | 1 | 0 |
 | 3 | $(4, 10]$ | 0 | 0 | 1 | 1 | 1 |
 
-Reading the matrix: subject 1's event could fall in any of the first three grid intervals (all contained in $(0, 5]$); the third grid interval $(4, 5]$ is the only one in which all three subjects' events could fall.
-
+: Plausibility-indicator matrix $\{w_{ik}\}$ from Turnbull example. {#tbl-turnbull}
 
 ## Estimation of the censoring distribution {#sec-censoring-distribution}
 
 The techniques discussed in @sec-surv-estimation can also be used to estimate the distribution of censoring times $(t_i, 1-\delta_i)$\index{censoring distribution}. 
-This is useful to calculate the inverse probability of censoring weights\index{inverse probability of censoring weights} (@sec-surv-ipcw), which are used in the evaluation of survival models (@sec-cindex) and to account for (covariate-)dependent censoring (@willems2018correctingdependent).
+This is useful to calculate the inverse probability of censoring weights\index{inverse probability of censoring weights} (@sec-surv-ipcw), which are used in the evaluation of survival models (@sec-cindex) and to account for (covariate-)dependent censoring [@willems2018correctingdependent].
 
 
 ### The Kaplan-Meier estimator for the censoring distribution {#sec-surv-km-censoring}
@@ -835,7 +832,7 @@ The IPC weights are then obtained by plugging (@eq-km-censoring) into (@eq-ipcw)
 
 $$
 \hat{w}(\tau) = \frac{1}{\KMG(\tau)}.
-$$ {#eq-ipcw-km}
+$$
 
 To illustrate the utility of IPC weights, consider their role in weighting contributions to a loss function.
 Specific losses are introduced in Part II; for now, let $L_i$ be a modified version of the log loss\index{log loss} found in classification:
@@ -851,7 +848,7 @@ The intuition is that the density should be highest at this time, resulting in a
 The effect of IPC-weighting is illustrated in @tbl-ipcw-ex, which compares the unweighted and IPC-weighted loss contributions.
 
 | $t_i$ | $\delta_i$ | $\KMG(t_i)$ | $1 / \KMG(t_i)$ | $-\delta_i \log(\hatf(t_i \mid \xx_i))$ | $L_{NL}(\xx_i, \delta_i, t_i)$ |
-|---|---|---|---|---|---|
+|---:|---:|---:|---:|---:|---:|
 | 2      | 1            | 0.90                 | 1.11                                     | 0.50                                             | 0.56                                   |
 | 5      | 1            | 0.70                 | 1.43                                     | 0.50                                             | 0.71                                   |
 | 8      | 1            | 0.40                 | 2.50                                     | 0.50                                             | 1.25                                   |

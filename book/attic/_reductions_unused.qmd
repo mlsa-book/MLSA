@@ -496,8 +496,8 @@ $$
 Y_{i;\tau} :=
 \begin{cases}
 1, & T_i > \tau \\
-0, & T_i \leq \tau \cap \Delta_i = 1 \\
--1, & T_i \leq \tau \cap \Delta_i = 0
+0, & T_i \leq \tau \wedge \Delta_i = 1 \\
+-1, & T_i \leq \tau \wedge \Delta_i = 0
 \end{cases}
 $$
 At a given discrete time $\tau$, an observation, $i$, is either alive ($Y_{i;\tau} = 1$), dead ($Y_{i;\tau} = 0$), or censored ($Y_{i;\tau} = -1$). Therefore $\hat{P}(Y_{i;\tau} = 1) = \hatS_i(\tau)$, motivating this particular choice of representation.
@@ -525,8 +525,8 @@ In this composition, the data in the transformed dataset represents the discrete
 $$
 Y^*_{i;\tau} :=
 \begin{cases}
-1, & T_i = \tau \cap \Delta_i = 1 \\
--1, & T_i = \tau \cap \Delta_i = 0 \\
+1, & T_i = \tau \wedge \Delta_i = 1 \\
+-1, & T_i = \tau \wedge \Delta_i = 0 \\
 0, & \text{otherwise}
 \end{cases}
 $$
@@ -555,16 +555,16 @@ This composition is demonstrated below with the binned data (left) and the compo
 
 In both compositions, survival data t.v.i. $\Reals^p \times \NNReals \times \bset$ is transformed to multi-label classification data t.v.i. $\Reals^p \times \{-1,0,1\}^K$ for $K$ binned time-intervals. The multi-label classification task is defined in @sec-car-reduxes-r7-mlc with possible algorithms.
 
-The discrete survival representation has a slightly more natural interpretation and is 'easier' for classifiers to use for training as there are more positive events (i.e. more observations alive) to train on, whereas the discrete hazard representation will have relatively few events in each time-point. However the hazard representation leads to more natural predictions (@sec-car-reduxes-r7).
+The discrete survival representation has a slightly more natural interpretation and is 'easier' for classifiers to use for training as there are more positive events (i.e. more observations alive) to train on, whereas the discrete hazard representation will have relatively few events in each time point. However the hazard representation leads to more natural predictions (@sec-car-reduxes-r7).
 
 A particular bias that may easily result from the composition of survival to classification data is now discussed.
 
 #### Reduction to Classification Bias
 The reduction to classification bias is commonly known  [@Zhou2005] but is reiterated briefly here as it must be accounted for in any automated reduction to classification workflow. This bias occurs when making classification predictions about survival at a given time and incorrectly censoring patients who have not been observed long enough, instead of removing them.
 
-By example, say the prediction of interest is five-year survival probabilities after a particular diagnosis, clearly a patient who has only been diagnosed for three years cannot inform this prediction. The bias is introduced if this patient is censored at five-years instead of being removed from the dataset. The result of this bias is to artificially inflate the probability of survival at each time-point as an unknown outcome is treated as censored and therefore alive.
+By example, say the prediction of interest is five-year survival probabilities after a particular diagnosis, clearly a patient who has only been diagnosed for three years cannot inform this prediction. The bias is introduced if this patient is censored at five-years instead of being removed from the dataset. The result of this bias is to artificially inflate the probability of survival at each time point as an unknown outcome is treated as censored and therefore alive.
 
-This bias is simply dealt with by removing patients who have not been alive 'long enough'.\footnote{Accounting for this bias is only possible if the study start and end dates are known, as well as the date the patient entered the study.} Paradoxically, even if a patient is observed to die before the time-point of interest, they should still be removed if they have not been in the dataset 'long enough' as failing to do so will result in a bias in the opposite direction, thus over-inflating the proportion of dead observations.
+This bias is simply dealt with by removing patients who have not been alive 'long enough'.\footnote{Accounting for this bias is only possible if the study start and end dates are known, as well as the date the patient entered the study.} Paradoxically, even if a patient is observed to die before the time point of interest, they should still be removed if they have not been in the dataset 'long enough' as failing to do so will result in a bias in the opposite direction, thus over-inflating the proportion of dead observations.
 
 Accounting for this bias is particularly important in the multi-label reduction as the number of observable patients will decrease over time due to censoring.
 
@@ -639,24 +639,24 @@ Once the datasets have been composed to classification datasets and censoring is
 This final part of the (R7) reduction is described separately for discrete hazard and survival representations of the data (@sec-car-reduxes-r7-out).
 
 #### Discrete Hazard Representation {.unnumbered .unlisted}
-In this representation recall that predictions of the positive class, $P(Y_\tau = 1)$, are estimating the quantity $h(\tau)$. These predictions provide a natural and efficient transformation from predicted hazards to survival probabilities. Let $\hat{h}_i$ be a predicted hazard function for some observation $i$, then the survival function for that observation can be found with a Kaplan-Meier type estimator,
+In this representation recall that predictions of the positive class, $\Pr(Y_\tau = 1)$, are estimating the quantity $h(\tau)$. These predictions provide a natural and efficient transformation from predicted hazards to survival probabilities. Let $\hat{h}_i$ be a predicted hazard function for some observation $i$, then the survival function for that observation can be found with a Kaplan-Meier type estimator,
 $$
 \tilde{S}_i(\tau^*) = \prod_\tau 1 - \hat{h}_i(\tau)
 $$
 Now predictions are for a pseudo-survival function, which is 'pseudo' as it is not right-continuous. Resolving this is discussed below.
 
 #### Discrete Survival Representation {.unnumbered .unlisted}
-In this representation, $P(Y_\tau = 1)$ is estimating $S(\tau)$, which means that predictions from a classification model result in discrete point predictions and not a right-continuous function. More importantly, there is no guarantee that a non-increasing function will be predicted, i.e. there is no guarantee that $P(Y_j = 1) < P(Y_i = 1)$, for time-points $j > i$.
+In this representation, $\Pr(Y_\tau = 1)$ is estimating $S(\tau)$, which means that predictions from a classification model result in discrete point predictions and not a right-continuous function. More importantly, there is no guarantee that a non-increasing function will be predicted, i.e. there is no guarantee that $\Pr(Y_j = 1) < \Pr(Y_i = 1)$, for time points $j > i$.
 
 Unfortunately there is no optimal way of dealing with predictions of this sort and 'mistakes' of this kind have been observed in some software implementation. One point to note is that in practice these are quite rare as the probability of survival will always decrease over time. Therefore the 'usual' approach is quite 'hacky' and involves imputing increasing predictions with the previous prediction, formally,
 $$
-\tilde{S}({i+1}) := \min\{P(Y_{i+1} = 1), P(Y_i = 1)\}, \forall i = \NNReals
+\tilde{S}({i+1}) := \min\{\Pr(Y_{i+1} = 1), \Pr(Y_i = 1)\}, \forall i = \NNReals
 $$
 assuming $\tilde{S}(0) = 1$.
 Future research should seek more robust alternatives.
 
 #### Right-Continuous Survival Function {.unnumbered .unlisted}
-From either representation, a \\ non-increasing but non-continuous pseudo-survival function, $\tilde{S}$, is now predicted. Creating a right-continuous function ('$T_1(\tilde{S})$' in @fig-car-R7) from these point predictions  (@fig-car-survclass (a)) is relatively simple and well-known with accessible off-shelf software. At the very least, one can assume a constant hazard rate between predictions and cast them into a step function (@fig-car-survclass (b)). This is a fairly common assumption and is usually valid as bin-width decreases. Alternatively, the point predictions can be smoothed into a continuous function with off-shelf software, for example with polynomial local regression smoothing (@fig-car-survclass (c)) or generalised linear smoothing (@fig-car-survclass (d)). Whichever method is chosen, the survival function is now non-increasing right-continuous and the (R7) reduction is complete.
+From either representation, a \\ non-increasing but non-continuous pseudo-survival function, $\tilde{S}$, is now predicted. Creating a right-continuous function ('$T_1(\tilde{S})$' in @fig-car-R7) from these point predictions  (@fig-car-survclass (a)) is relatively simple and well-known with accessible off-shelf software. At the very least, one can assume a constant hazard function between predictions and cast them into a step function (@fig-car-survclass (b)). This is a fairly common assumption and is usually valid as bin-width decreases. Alternatively, the point predictions can be smoothed into a continuous function with off-shelf software, for example with polynomial local regression smoothing (@fig-car-survclass (c)) or generalised linear smoothing (@fig-car-survclass (d)). Whichever method is chosen, the survival function is now non-increasing right-continuous and the (R7) reduction is complete.
 
 ::: {#fig-car-survclass layout-ncol=2}
 
@@ -715,7 +715,7 @@ Survival function as a: point prediction (a), step function assuming constant ri
 \label{fig:car_R8}
 \end{figure} -->
 
-Predicting a deterministic survival time from the multi-label classification predictions is relatively straightforward and can be viewed as a discrete analogue to (C3) (@sec-car-pipelines-crank). For the discrete hazard representation, one can simply take the predicted time-point for an individual to be time at which the predicted hazard probability is highest however this could easily be problematic as there may be multiple time-points at which the predicted hazard equals $1$. Instead it is cleaner to first cast the hazard to a pseudo-survival probability (@sec-car-reduxes-r7) and then treat both representations the same.
+Predicting a deterministic survival time from the multi-label classification predictions is relatively straightforward and can be viewed as a discrete analogue to (C3) (@sec-car-pipelines-crank). For the discrete hazard representation, one can simply take the predicted time point for an individual to be time at which the predicted hazard probability is highest however this could easily be problematic as there may be multiple time points at which the predicted hazard equals $1$. Instead it is cleaner to first cast the hazard to a pseudo-survival probability (@sec-car-reduxes-r7) and then treat both representations the same.
 
 Let $\tilde{S}_i$ be the predicted multi-label survival probabilities for an observation $i$ such that $\tilde{S}_i(\tau)$ corresponds with $\hat{P}(Y_{i;\tau} = 1)$ for label $\tau \in \mathcal{K}$ where $Y_{i;\tau}$ is defined in @sec-car-reduxes-r7-out and $\mathcal{K} = \{1,...,K\}$ is the set of labels for which to make predictions. Then the survival time transformation is defined by
 $$
@@ -723,7 +723,7 @@ T_2(\tilde{S}_i) = \inf \{\tau \in \mathcal{K} : \tilde{S}_i(\tau) \leq \beta\}
 $$
 for some $\beta \in [0, 1]$.
 
-This is interpreted as defining the predicted survival time as the first time-point in which the predicted probability of being alive drops below a certain threshold $\beta$. Usually $\beta = 0.5$, though this can be treated as a hyper-parameter for tuning. This composition can be utilised even if predictions are not non-increasing, as only the first time the predicted survival probability drops below the threshold is considered. With this composition the (R8) reduction is now complete.
+This is interpreted as defining the predicted survival time as the first time point in which the predicted probability of being alive drops below a certain threshold $\beta$. Usually $\beta = 0.5$, though this can be treated as a hyper-parameter for tuning. This composition can be utilised even if predictions are not non-increasing, as only the first time the predicted survival probability drops below the threshold is considered. With this composition the (R8) reduction is now complete.
 
 ## Conclusions {#sec-car-conc}
 
