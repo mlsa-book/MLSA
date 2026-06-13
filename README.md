@@ -19,10 +19,11 @@ We will continue to update this version after publication to correct mistakes (b
 
 ## Citing this book
 
-Whilst this book remains a work in progress, please cite it as:
+Please cite this book as:
 
 ```
-Sonabend. R, Bender. A. 2026. Machine Learning in Survival Analysis.
+Sonabend, R., & Bender, A. (2026).
+"Machine Learning in Survival Analysis". CRC Press. ISBN: {coming soon}
 https://www.mlsabook.com.
 ```
 
@@ -30,10 +31,12 @@ Or in BibTeX format:
 
 ```
 @book{MLSA2026,
-  title     = "Machine Learning in Survival Analysis",
-  author    = "Sonabend, Raphael and Bender, Andreas",
-  year      = "2026",
-  note      = "https://www.mlsabook.com"
+    title = {Machine Learning in Survival Analysis},
+    author = {Sonabend, Raphael and Bender, Andreas},
+    url = {https://www.mlsabook.com/},
+    year = {2026},
+    isbn = {coming soon},
+    publisher = {CRC Press}
 }
 ```
 
