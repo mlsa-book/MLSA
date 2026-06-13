@@ -58,7 +58,7 @@ Formally, for any distributions $p_Y, p \in \cal P$ and for any random variables
 * _proper_ if $\EE_Y[L(p_Y, Y)] \leq \EE_Y[L(p, Y)]$ for all $p \in \calP$;
 * _strictly proper_ if in addition to being proper, $\EE_Y[L(p_Y, Y)] = \EE_Y[L(p, Y)]$ if and only if $p = p_Y$.
 
-In addition to the Brier score (@eq-brier), another widely used strictly proper loss is the log loss [@Good1952], defined by\index{log loss}
+In addition to the Brier score (@eq-brier), another widely used strictly proper loss [@Dawid2014] is the log loss [@Good1952], defined by\index{log loss}
 
 $$
 L_{logloss}(\hatp_i, y_i) = -\log \hatp_i(y_i),
@@ -67,10 +67,10 @@ $$ {#eq-logloss}
 where again $y_i \in \{0,1\}$ is the ground truth and $\hatp_i$ is a predicted probability distribution.
 The log loss is minimized at $0$ but is unbounded above.
 
-These losses are visualized in @fig-eval-brierlog, which highlights the properness of both losses [@Dawid2014] as they approach their minima as predicted probabilities come closer to the true outcome.
+These losses are visualized in @fig-eval-brierlog; both approach their minima as predicted probabilities come closer to the observed outcome.
 It can also be seen from the scale of the plots that the log loss penalizes wrong predictions more strongly than the Brier score, which may be beneficial or not depending on the given use case.
 
-![Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in $[0,1]$, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimized when the predicted probability matches the observed outcome.](Figures/evaluation/brier_logloss.png){#fig-eval-brierlog fig-alt="Left plot (x=Brier score, y = predicted probability), shows two crossing curves, a blue curve (when y_i=1) from (0,1) to (1,0) and a red curve (when y_i=0) from (0,0) to (1,1). Right plot (x=Log loss, y = predicted probability), shows two crossing curves, a blue curve (when y_i=1) from (0,3) to (1,0) and a red curve (when y_i=0) from (0,0) to (1,3). "}
+![Brier and log loss scoring rules for a binary outcome and varying probabilistic predictions. x-axis is a probabilistic prediction in $[0,1]$, y-axis is Brier score (left) and log loss (right). Blue lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 1. Red lines are varying Brier score/log loss over different predicted probabilities when the true outcome is 0. Both losses are minimized when the predicted probability matches the observed outcome.](Figures/evaluation/brier_logloss.png){#fig-eval-brierlog fig-alt="Left plot (y=Brier score, x = predicted probability), shows two crossing curves, a blue curve (when y_i=1) from (0,1) to (1,0) and a red curve (when y_i=0) from (0,0) to (1,1). Right plot (y=Log loss, x = predicted probability), shows two crossing curves, a blue curve (when y_i=1) from (0,3) to (1,0) and a red curve (when y_i=0) from (0,0) to (1,3). "}
 
 ## Survival losses {#sec-eval-distr-commonsurv}
 
@@ -130,7 +130,7 @@ $$
 L_{SBS}(\tau, \hatS_i, t_i, \delta_i \mid \hatG) = \frac{\hatS_i^2(\tau) \II(t_i \leq \tau, \delta_i=1)}{\hatG(t_i)} + \frac{\hatF_i^2(\tau) \II(t_i > \tau)}{\hatG(\tau)},
 $$ {#eq-sbs}
 
-where $\hatS_i^2(\tau) = (\hatS_i(\tau))^2$ and $\hatF_i^2(\tau) = (1 - \hatS_i(\tau))^2$, and $\hatG$ is the IPC weighting (Box 3).
+where $\hatS_i^2(\tau) = (\hatS_i(\tau))^2$ and $\hatF_i^2(\tau) = (1 - \hatS_i(\tau))^2$, and $\hatG$ is the estimated censoring survival function used for IPC weighting (Box 3).
 
 At first glance this might seem intimidating but it is worth taking the time to understand the intuition behind the loss.
 Recall the classification Brier score (@eq-brier), which provides a method to evaluate a probability mass function at a single point.
@@ -141,10 +141,10 @@ L(\hatF_i, y_i) = \int (\II(y_i \leq \tau) - \hatF_i(\tau))^2 \dtau,
 $$ {#eq-crps}
 
 where $\hatF_i$ is the predicted cumulative distribution function and $\tau$ is some meaningful threshold.
-As the left-hand indicator can only take one of two values, (@eq-crps) can be represented as two distinct cases, now using $t$ instead of $y$ to represent time:
+As the indicator in (@eq-crps) can only take one of two values, the integrand of (@eq-crps) can be represented as two distinct cases, now using $t_i$ instead of $y_i$ to represent time:
 
 $$
-L(\hatF_i, t_i) =
+(\II(t_i \leq \tau) - \hatF_i(\tau))^2 =
 \begin{cases}
 (1 - \hatF_i(\tau))^2 = \hatS_i^2(\tau), & \text{ if } t_i \leq \tau, \\
 (0 - \hatF_i(\tau))^2 = \hatF_i^2(\tau), & \text{ if } t_i > \tau.
@@ -157,7 +157,7 @@ The loss therefore meaningfully represents the ideal predictions in the two poss
 
 To accommodate censoring, note that at $\tau$ an observation will either have:
 
-1. not experienced any outcome: $t_i > \tau$;
+1. not yet experienced the event or censoring: $t_i > \tau$;
 2. experienced the event: $t_i \leq \tau \wedge \delta_i = 1$; or
 3. been censored: $t_i \leq \tau \wedge \delta_i = 0$.
 
@@ -246,13 +246,13 @@ $$
 L_{ISAS}(\tau^*, \hatS_i, t_i, \delta_i \mid \hatG) = \int^{\tau^*}_0 \frac{\hatS_i(\tau)\II(t_i \leq \tau, \delta_i = 1)}{\hatG(t_i)} + \frac{\hatF_i(\tau)\II(t_i > \tau)}{\hatG(\tau)} \dtau
 $$
 where $\hatG$ and $\tau^*$ are as defined above.
-Analogously to the ISBS, the ISAS consistently estimates the mean absolute error when censoring is fully independent [@Schmid2011].
+Analogously to the ISBS, the ISAS consistently estimates the mean absolute error when censoring is marginally independent [@Schmid2011].
 The ISAS and ISBS tend to yield similar results [@Schmid2011], but in practice the ISAS does not appear to be widely used.
 
 ## Prediction error curves {#sec-pecs}
 
 In addition to evaluating probabilistic outcomes with integrated scoring rules, non-integrated scoring rules can be used for evaluating distributions at a single point.
-For example, instead of evaluating a probabilistic prediction with the ISBS over $\PReals$, one could compute the survival Brier score at a single time point, $\tau \in \PReals$, only.
+For example, instead of evaluating a probabilistic prediction with the ISBS over $\PReals$, one could compute the survival Brier score at a single time point only, $\tau \in \PReals$.
 Plotting these across a range of time points results in *prediction error curves*, which provide a simple visualization for how predictions vary over time.\index{prediction error curve}
 Prediction error curves are mostly used as a graphical guide when comparing a few models, rather than as a formal tool for model comparison.
 Example prediction error curves are provided in @fig-eval-pecs for the ISBS where the Cox PH increasingly outperforms the SVM.
@@ -266,7 +266,7 @@ Two methods can be used to help overcome this problem.
 
 The first method is to make use of baselines\index{model baselines} for model comparison, which are models or reference values used to contextualize a loss and provide a common standard for judging models of the same class.
 In classification, it is possible to derive analytical baseline values, for example a Brier score is considered poor if it is above 0.25 or a log loss if it is above 0.693 (@fig-eval-brierlog).
-These are the values obtained when only predicting probabilities as $0.5$, which is the best uninformed baseline in a binary classification problem (equivalent to a coin flip that uses no information from the available data).
+These are the values obtained when always predicting $0.5$, which is the best _uninformed_ baseline in a binary classification problem (equivalent to a coin flip that uses no information from the available data).
 In survival analysis, simple analytical expressions are not possible as losses are dependent on the unknown distributions of both the survival and censoring time.
 For this reason it is advisable to include baseline models for comparison.
 Common baselines include the Kaplan-Meier estimator (@sec-surv-km) and Cox PH (@sec-ph-semi-parametric). \index{Kaplan-Meier estimator}\index{Cox proportional hazards}

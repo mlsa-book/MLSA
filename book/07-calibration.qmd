@@ -6,12 +6,13 @@
 
 In the survival analysis context, calibration\index{calibration} measures evaluate the _average_ quality of predicted distributions.
 Calibration and discrimination\index{discrimination} emphasize different aspects of predictive performance.
-A model that makes accurate individual predictions (good discrimination) might be overfit to the data and make poor predictions on new, unseen data; whereas a model that makes accurate population-level predictions (good calibration) might not separate individual observations well.
+A model with good discrimination may correctly rank observations while still producing systematically biased probability estimates.
+Conversely, a well-calibrated model may produce accurate population-level predictions but might not separate individual observations well.
 
 The literature on calibration measures for survival analysis is comparatively limited [@Rahman2017], reflecting both conceptual and methodological challenges [@VanHouwelingen2000].
 Unlike metrics that evaluate predictions at the level of individual observations, calibration assesses the average agreement across the population.
 Whereas other measures can accommodate censoring through a combination of reweighting and dynamic restriction of the risk set, calibration requires a principled way to incorporate censored observations when estimating the population-level average.
-The majority of research on survival calibration measures has focused on recalibrating Cox PH models [@Demler2015; @VanHouwelingen2000].
+The majority of research on survival calibration measures has focused on recalibrating Cox proportional hazards (PH) models [@Demler2015; @VanHouwelingen2000].
 However, these methods are considered out of scope for this book, which focuses on measures applicable across all machine learning models.
 
 A useful taxonomy of calibration measures separates them into point calibration and distributional calibration methods [@Andres2018]\index{calibration!point}\index{calibration!distributional}.
@@ -59,7 +60,7 @@ $$
 \chi^2_{GND}(\tau) = \sum^G_{g=1} \frac{(\hat{F}_{g;KM}(\tau) - \bar{\hatF}_{g}(\tau))^2}{\widehat{\Var}(\hat{F}_{g;KM}(\tau))} \sim \chi^2_{G-1},
 $$ {#eq-hosmer-gnd}
 
-where $\widehat{\Var}(\hat{F}_{g;KM}(\tau)) \equiv \widehat{\Var}(\hat{S}_{g;KM})$ is the Greenwood variance estimator (@eq-greenwood).\index{Kaplan-Meier estimator!Greenwood variance}
+where $\widehat{\Var}(\hat{F}_{g;KM}(\tau)) \equiv \widehat{\Var}(\hat{S}_{g;KM}(\tau))$ is the Greenwood variance estimator (@eq-greenwood).\index{Kaplan-Meier estimator!Greenwood variance}
 
 Theoretically, one could apply (@eq-hosmer-gnd) across several time points (accounting for multiple testing) to try to capture calibration across a range of times; however, this would be inefficient in many cases.
 Instead, one might consider D-calibration (@sec-dcalib), which generalizes the $\chi^2$ test idea to evaluate calibration across the full distribution.
@@ -132,8 +133,9 @@ While it is possible to say that the Cox PH and random forest are better calibra
 ![Comparing the calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the Kaplan-Meier estimate of the survival function calculated on a test set. The calibration of RRT notably decreases over time whereas RF and CPH are closer to the Kaplan-Meier curve.](Figures/evaluation/calibKM.png){#fig-eval-calib fig-alt="x-axis is labeled 'T' and ranges from 0 to 5. y-axis is labeled 'S(T)' and ranges from 0 to 1. Four lines are plotted: CPH (red), KM (green), RF (teal), RRT (purple). The RRT line stays high, declining gently from 1 to about 0.8, while the CPH, KM, and RF lines cluster together and decline from 1 to about 0.4 by T=5."}
 
 This method is useful for making broad statements such as "model X is clearly better calibrated than model Y" or "model X appears to make average predictions close to the Kaplan-Meier estimate", but limited quantitative interpretation is provided.
+This is also only a marginal calibration check; it assesses whether the average predicted survival curve agrees with the average experience across the whole test set and does not guarantee calibration within meaningful subgroups.
 This method can be refined for more fine-grained information by instead using predictions to create 'risk groups' that can be plotted against a stratified Kaplan-Meier [@Austin2020].
-However, this method is harder to interpret and adds even more subjectivity around the number of risk groups to create and how to create them [@Austin2020; @Royston2013].
+However, this is harder to interpret and adds subjectivity around the number of risk groups to create and how they are defined [@Austin2020; @Royston2013].
 
 As this approach depends on a non-parametric estimator to represent the ground truth, it can be naturally extended to other censoring and truncation settings.
 For example, replacing the Kaplan-Meier estimator with the non-parametric maximum likelihood estimator (@sec-surv-estimation-non-param) enables calibration when interval censoring is present, or using the left-truncated risk-set definition (@sec-non-param-lt) allows application to left-truncated data.\index{truncation!left}
@@ -154,9 +156,9 @@ $$
 $$ {#eq-surv-su}
 
 D-calibration [@Andres2018; @Haider2020] leverages the fact that the event times, $y_i$, are independent and identically distributed realizations from the distribution of $Y$, which justifies replacing $Y$ with $y_i$ in (@eq-surv-su) [Lemma B.2 @Haider2020].
-A survival model is considered well-calibrated if the predicted survival probabilities at event times follow a standard Uniform distribution: $\hatS(y_i) \SU$ -- for now censoring is ignored.
+A survival model is considered well-calibrated if the predicted survival probabilities at event times follow a standard uniform distribution: $\hatS(y_i) \SU$ --- for now censoring is ignored.
 
-To test whether a random variable follows a particular distribution, in this case if the predicted survival probabilities follow a standard Uniform distribution\index{Uniform distribution}, the $\chi^2$ test statistic can be employed:\index{chi-squared@chi-squared, $\chi^2$}
+To test whether a random variable follows a particular distribution, in this case if the predicted survival probabilities follow a standard uniform distribution\index{uniform distribution}, the $\chi^2$ test statistic can be employed:\index{chi-squared@chi-squared, $\chi^2$}
 
 $$
 \chi^2 := \sum_{g=1}^G \frac{(o_g - e_g)^2}{e_g}
@@ -166,7 +168,7 @@ where $o_g, e_g$ are respectively the number of observed and expected event coun
 
 To estimate the expected number of observations, first note that for this measure the $\chi^2$ statistic tests whether predicted survival probabilities are evenly distributed across the $[0,1]$ interval.
 To do so, the $[0,1]$ range is partitioned into $G$ equal-width bins.
-If $n$ is the total number of observations, then under the null hypothesis of a Uniform distribution, the expected number of events in each bin is $e_g = n/G$.
+If $n$ is the total number of observations, then under the null hypothesis of a uniform distribution, the expected number of events in each bin is $e_g = n/G$.
 
 To define the observed number of events in the $g$th bin, $\calB_g$, first define the bin as the set:
 
@@ -208,13 +210,12 @@ This is visualized in @fig-eval-dcalib for the same models as in @fig-eval-calib
 This figure supports the previous findings that the relative risk tree is poorly calibrated in contrast to the Cox PH and random forest but again direct comparison between the latter models is difficult from visual inspection alone.
 
 While D-calibration shares the same limitations as Kaplan-Meier calibration plots for visual comparison, it additionally provides quantitative summaries that support more concrete conclusions.
-Returning to @fig-eval-dcalib, the relative risk tree is confirmed to be poorly D-calibrated with $p<0.01$, indicating that the null hypothesis, that predicted survival probabilities follow the standard Uniform distribution, can be rejected.
+Returning to @fig-eval-dcalib, the relative risk tree is confirmed to be poorly D-calibrated with $p<0.01$, indicating that the null hypothesis, that predicted survival probabilities follow the standard uniform distribution, can be rejected.
 Although the D-calibration statistics for the Cox PH and random forest differ slightly, the difference does not appear significant, as reflected in the overlapping curves.
 
 ![Comparing the D-calibration of a Cox PH (CPH), random forest (RF), and relative risk tree (RRT) to the expected distribution on y=x. As with @fig-eval-calib, the relative risk tree is clearly not D-calibrated (as supported by the $p$-values in the bottom-right). The CPH and RF are closer to the y=x line; however, neither follows it perfectly.](Figures/evaluation/calibD.png){#fig-eval-dcalib fig-alt="x-axis is labeled 'True (p)' and the y-axis is labeled 'Predicted', both range from 0 to 1. A box in the bottom right says 'DCal (p-values): CPH = 5.6 (0.78); RF = 5.1 (0.83); RRT = 130 (4.8e-23)'. A blue line (RRT) ascends steeply and bows well above the diagonal, reaching 1 by around p=0.6; the red (CPH) and green (RF) lines run close to the diagonal. A gray dashed line marks the y=x line."}
 
 ## Conclusion
-
 
 :::: {.callout-warning icon=false}
 
@@ -223,7 +224,7 @@ Although the D-calibration statistics for the Cox PH and random forest differ sl
 * Calibration measures assess the population-level agreement between predicted survival distributions and observed outcomes. By definition, good calibration does not imply good individual-level predictions. A model can be well calibrated on average while still having poor discrimination, so calibration measures should not be interpreted in isolation from other performance metrics.
 * Graphical approaches provide an intuitive method to assess model calibration qualitatively. Moreover, as they often depend on non-parametric estimators, it is possible to incorporate different censoring and truncation mechanisms. Graphical comparisons alone do not support formal statistical comparison between models and can become difficult to interpret when multiple outcomes or competing risks are present.
 * Event frequency calibration evaluates if the total number of observed and predicted events are roughly equal. This method is particularly informative when interpreted alongside scoring rules (@sec-rules), which capture both calibration and discrimination.
-* D-calibration assesses calibration over the entire predicted distribution by testing if predicted survival probabilities at observed event times follow a Uniform distribution. This method also supports interpretable graphical plots for qualitative assessment.
+* D-calibration assesses calibration over the entire predicted distribution by testing if predicted survival probabilities at observed event times follow a uniform distribution. This method also supports interpretable graphical plots for qualitative assessment.
 * Some numerical methods for calibration in a competing risk setting have been proposed [@Schoop2011; @vanGeloven2022]. These can be complex to implement and interpret and graphical methods appear more often used in practice [@Monterrubio2024].
 
 ::::
@@ -232,7 +233,7 @@ Although the D-calibration statistics for the Cox PH and random forest differ sl
 
 ## Further reading
 
-* A calibration measure based on the Akritas' goodness-of-fit-test was recently introduced in @Simonsen2025.
+* A calibration measure based on the Akritas goodness-of-fit-test was recently introduced in @Simonsen2025.
 * For calibration measures specifically focused on re-calibrating Cox PH models, see @Austin2020, @Demler2015, and @VanHouwelingen2000.
 * @Haider2020 review further calibration measures and suggest algorithms for estimating the Hosmer-Lemeshow test in a survival analysis setting.
 
