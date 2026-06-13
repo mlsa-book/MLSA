@@ -13,7 +13,7 @@ This enables any distribution-predicting single-event model to be applied in the
 
 ## Competing risks: cause-specific hazards {#sec-cr-reduction}
 
-Recall the competing-risks setting of @sec-competing-risks: subjects start in an initial state $0$ and may transition to one of $Q$ absorbing states $q \in \{1,\ldots,Q\}$, observed as data $(\xx_i, t_i, q_i)$ with $q_i \in \{0\}\cup {1,\ldots, Q}$ the status observed for subject $i$, where $q_i=0$ encodes censoring.\index{competing risks}\index{cause-specific hazard function}\index{reduction!event history reductions!competing risks}
+Recall the competing-risks setting of @sec-competing-risks: subjects start in an initial state $0$ and may transition to one of $Q$ absorbing states $q \in \{1,\ldots,Q\}$, observed as data $(\xx_i, t_i, q_i)$ with $q_i \in \{0\}\cup \{1,\ldots, Q\}$ the status observed for subject $i$, where $q_i=0$ encodes censoring.\index{competing risks}\index{cause-specific hazard function}\index{reduction!event history reductions!competing risks}
 Recall also the cause-specific hazard $h_q(\tau \mid \xx)$ (@eq-cause-specific-hazard), cumulative hazard $H_q(\tau \mid \xx)$ (@eq-cause-specific-cumu-hazard), and cumulative incidence function $F_q(\tau \mid \xx)$ (@eq-cif), as well as the all-cause survival probability $S(\tau \mid \xx)$ (@eq-all-cause-surv-prob), which is the probability of remaining free of any event.
 
 The reduction principle is to estimate each cause-specific hazard, $h_q$, separately by treating events of type $q$ as the event of interest and all others as censoring.
@@ -28,7 +28,7 @@ The resulting hazard estimates are then combined to estimate $\hatS$ and $\hatF_
    For each cause $q \in \{1,\ldots,Q\}$, define the cause-specific status, $\delta_{i,q} = \II(q_i = q)$, such that cause $q$ remains the event of interest and all other causes are treated as censored at time $t_i$. Then, define the cause-specific dataset $\calD_q = \{(\xx_i, t_i, \delta_{i,q})\}^n_{i=1}$.
 
 2. **Fit $Q$ single-event models** (Training).
-   Fit any of the distribution-predicting methods in Part III or partition based reduction methods in @sec-partition-based-reductions to the cause-specific datasets, $\calD_q$.
+   Fit any of the distribution-predicting methods in Part III or partition-based reduction methods in @sec-partition-based-reductions to the cause-specific datasets, $\calD_q$.
    
 3. **Predict cause-specific hazards** (Predicting).
    For each cause $q \in \{1,\ldots,Q\}$, for a new observation $\xx_*$, predict the cause-specific hazard function, $\hath_q(\cdot \mid \xx_*)$, or cause-specific cumulative hazard function, $\hatH_q(\cdot \mid \xx_*)$. If required, obtain the corresponding cumulative hazard or hazard function from the predicted quantity via the relationships in @sec-distributions-continuous.
@@ -64,7 +64,7 @@ The resulting CIFs are compared to a non-parametric Aalen-Johansen baseline.
 The reduction-based RSF closely tracks the Aalen-Johansen baseline, with a small offset on the discharge CIF (top panels).
 The Cox PH curves are also close to the Aalen-Johansen estimates but again show differences for discharge, attributable to the proportional-hazards constraint.
 
-![Cumulative incidence functions on `sir.adm` for discharge (top row) and death (bottom row) stratified by pneumonia status at admission (columns), as estimated by the non-parametric Aalen-Johansen estimator, a cause-specific Cox PH model, and a reduction-based random survival forest (two single-event RSFs combined via the reduction). All three curves overlap closely, confirming that the cause-specific reduction is close to the Aalen-Johansen estimator baseline.](Figures/reductions/cif-marg-sir.png){#fig-cif-marg-sir fig-alt="Faceted plot of cumulative incidence functions for two competing risks, discharge (top row) and death (bottom row), stratified by pneumonia status at admission (pneu = no on the left, pneu = yes on the right). Three estimators are compared: Aalen–Johansen (black dotted), cause-specific Cox proportional hazards (red solid), and reduction-based random survival forest (blue solid). Across all four panels, the curves from the three methods overlap closely. For discharge, cumulative incidence rises rapidly and plateaus near 0.9 for patients without pneumonia and near 0.75 for patients with pneumonia. For death, cumulative incidence remains low for patients without pneumonia (around 0.08) and reaches approximately 0.25 for patients with pneumonia. Differences between estimators are small, with only minor deviations visible in the pneumonia group."}
+![Cumulative incidence functions on `sir.adm` for discharge (top row) and death (bottom row) stratified by pneumonia status at admission (columns), as estimated by the non-parametric Aalen-Johansen estimator, a cause-specific Cox PH model, and a reduction-based random survival forest (two single-event RSFs combined via the reduction). All three curves overlap closely, illustrating that the cause-specific reduction is close to the Aalen-Johansen estimator baseline.](Figures/reductions/cif-marg-sir.png){#fig-cif-marg-sir fig-alt="Faceted plot of cumulative incidence functions for two competing risks, discharge (top row) and death (bottom row), stratified by pneumonia status at admission (pneu = no on the left, pneu = yes on the right). Three estimators are compared: Aalen–Johansen (black dotted), cause-specific Cox proportional hazards (red solid), and reduction-based random survival forest (blue solid). Across all four panels, the curves from the three methods overlap closely. For discharge, cumulative incidence rises rapidly and plateaus near 0.9 for patients without pneumonia and near 0.75 for patients with pneumonia. For death, cumulative incidence remains low for patients without pneumonia (around 0.08) and reaches approximately 0.25 for patients with pneumonia. Differences between estimators are small, with only minor deviations visible in the pneumonia group."}
 
 ### Stacked dataset {#sec-cr-stacked}
 
@@ -84,15 +84,13 @@ This approach breaks the problem into the following steps:
    A single learner is fit to the entire stacked dataset with $c$ included as a feature. Either a full $c \times \xx$ interaction can be added so each cause retains its own hazard structure, or interactions can be discovered automatically by a flexible learner (such as a random forest or neural network).
 
 3. **Predict cause-specific hazards** (Predicting).
-   Predictions of the cause-specific hazard are made by conditioning the fitted hazard on the cause. For a new observation $\xx_i$,
+   Predictions of the cause-specific hazard are made by conditioning the fitted hazard on the cause. For a new observation $\xx_*$,
    $$
    \hath_q(\tau \mid \xx_*) = \hath(\tau \mid \xx_*, c = q), \quad q \in \{1,\ldots,Q\}.
    $$
 
 4. **Predict all-cause survival and CIFs** (Predicting).
    Combine the cause-specific hazards into all-cause survival and CIF predictions using the same process as in the separate cause approach (@sec-cr-separate). \index{cumulative incidence function}\index{all-cause survival function}
-
-<!-- TODO (ANDREAS; MINOR): COULD CUMULATIVE HAZARD BE PREDICTED IN (3)? IF SO SHOULD WE ADD A NOTE? -->
 
 This approach addresses some of the limitations of @sec-cr-separate.
 In particular, information can be shared across causes through common parameters, and implementation is simplified as only a single model must be fitted and tuned.
@@ -125,7 +123,7 @@ Similar to the competing risks case, this multi-state reduction pipeline builds 
    For each admissible transition, $\ell \to q$, build a transition-specific dataset, $\calD_{\ell q}$ with one row for each spell during which a subject occupies state $\ell$. For each spell, the dataset includes $t_{i,\text{start}}$, the time at which subject $i$ entered state $\ell$ for that spell, $t_{i,\text{stop}}$, the time at which they left the state or were censored, and $\delta_{i,\ell q}$ which is $1$ if they transitioned from $\ell$ to $q$ or $0$ otherwise. Subjects therefore contribute to every transition-specific dataset for which they were at risk, _but only_ from their subject-specific entry time into that dataset. For example, in @fig-ms-reduction-pipeline, subject 1 only enters the $1 \to 0$ and $1 \to 2$ datasets at time $2$, whereas subject $2$ never even enters those datasets. When $t_{i,\text{start}} > 0$, the subject is left truncated as they entered the state after the process began.
 
 2. **Fit single-event models** (Training).
-   Use the transition-specific datasets, $\calD_{\ell q}$, to fit any of the distribution-predicting methods in Part III or partition based reduction methods in @sec-partition-based-reductions that can handle left truncation.
+   Use the transition-specific datasets, $\calD_{\ell q}$, to fit any of the distribution-predicting methods in Part III or partition-based reduction methods in @sec-partition-based-reductions that can handle left truncation.
    
 3. **Predict transition-specific hazards** (Predicting).
    For each transition $\ell \to q$, for a new observation $\xx_*$, predict the transition-specific hazards, $\hath_{\ell q}(\tau \mid \xx_*)$, or cumulative hazards, $\hatH_{\ell q}(\tau \mid \xx_*)$. If required, the corresponding cumulative hazard or hazard function may then be obtained from the predicted quantity.\index{transition-specific hazard}
@@ -193,8 +191,8 @@ Again, rows whose originating state $\ell$ is reached after $\tau = 0$ carry a n
 
 * @aalen2008survivalevent develop event history analysis from a counting-process perspective, including the product-integral construction of transition probabilities from transition-specific hazards.
 * @beyersmann.competing.2012 give an accessible, R-based account of competing risks and multi-state models, including the cause- and transition-specific hazard view that motivates treating each cause or transition as a separate single-event problem.
-* @Bender2021 set out the reduction based framework, casting (multi-state and competing-risks) hazard estimation as a piecewise-exponential Poisson learning task that any boosting or other regression learner can solve.
-* @Tutz2016 develop discrete-time survival modelling, including competing risks formulated as a multinomial (per-cause binary) hazard model fit on a stacked, person-period dataset.
+* @Bender2021 set out the reduction-based framework, casting (multi-state and competing-risks) hazard estimation as a piecewise-exponential Poisson learning task that any boosting or other regression learner can solve.
+* @Tutz2016 develop discrete-time survival modeling, including competing risks formulated as a multinomial (per-cause binary) hazard model fit on a stacked, person-period dataset.
 * @putter2018 discuss non-parametric estimation of transition probabilities from transition-specific hazards in (possibly non-Markov) multi-state models, complementing the product-integral construction used here.
 
 ::::
