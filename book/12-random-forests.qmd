@@ -18,10 +18,10 @@ This section will start by discussing decision trees and will then introduce the
 ### Decision trees
 
 *Decision trees* are machine learning models that are comparatively simple to implement in software and are highly interpretable.\index{decision tree}
-A decision tree algorithm takes a dataset as input and partitions the data into distinct, non-overlapping subsets known as _nodes_ or _leaves_. \index{random forests!node}\index{random forests!leaf}
+A decision tree algorithm takes a dataset as input and partitions the data into distinct, non-overlapping subsets known as _nodes_. \index{random forests!node}
 Partitioning is performed by applying a _splitting rule_ to a single feature, creating _branches_ that divide the data according to a selected cutoff or category.\index{random forests!splitting rule}\index{random forests!branch}
 This process is repeated recursively, potentially using different features at each split, until a _stopping rule_ is reached.
-The final leaves are referred to as *terminal nodes*.\index{random forests!splitting rule}\index{random forests!terminal node}
+The final nodes are referred to as *terminal nodes* or _leaves_.\index{random forests!splitting rule}\index{random forests!terminal node}\index{random forests!leaf}
 
 For example, (@fig-surv-ranfor) demonstrates a decision tree\index{decision tree} predicting the price that a car sells for in India (price in thousands of dollars).
 The dataset includes as variables: transmission type (manual or automatic), registration year, fuel type (petrol or diesel), number of owners, kilometers driven, and seller type.
@@ -38,23 +38,23 @@ The graphic highlights several core features of decision trees:
 
 To understand how random forests work, it is worth looking a bit more into the most important components of decision trees: splitting rules, stopping rules, and terminal node predictions.
 
-![Predicting the price a vehicle is sold for in India using a regression tree, dataset from kaggle.com/datasets/nehalbirla/vehicle-dataset-from-cardekho. Rounded rectangles are leaves, which indicate the variable that is being split. Edges are branches, which indicate the cutoff at which the variable is split. Variables are car transmission type (manual or automatic), fuel type (petrol or diesel) and registration year. The number at the top of the terminal nodes is the average selling price for all observations in that leaf. The numbers at the bottom of each leaf are the number of observations in the leaf, and the proportion of data contained in the leaf.](Figures/forests/cars.png){#fig-surv-ranfor fig-alt="Decision tree diagram with 7 boxes in a hierarchical top-down structure. The top box splits the data by transmission type, manual or automatic. Manual cars are then split into registration before or after 2014. Manual cars registered before 2014 are predicted to sell for $3.4K, whereas manual cars registered on or after 2014 are predicted to sell for $7.6K. On the other side of the plot, automatic cars are split according to whether they use petrol or diesel. Automatic, petrol cars are predicted to sell for $10K whereas automatic, diesel cars are predicted to sell for $26K."}
+![Predicting the price a vehicle is sold for in India using a regression tree, dataset from kaggle.com/datasets/nehalbirla/vehicle-dataset-from-cardekho. Blue, rounded rectangles are nodes, which indicate the variable that is being split. Edges are branches, which indicate the cutoff at which the variable is split. Variables are car transmission type (manual or automatic), fuel type (petrol or diesel) and registration year. The number at the top of the terminal nodes (yellow, rounded rectangles) is the average selling price for all observations in that leaf. The numbers at the bottom of each leaf are the number of observations in the leaf, and the proportion of data contained in the leaf.](Figures/forests/cars.png){#fig-surv-ranfor fig-alt="Decision tree diagram with 7 boxes in a hierarchical top-down structure. The top box splits the data by transmission type, manual or automatic. Manual cars are then split into registration before or after 2014. Manual cars registered before 2014 are predicted to sell for $3.4K, whereas manual cars registered on or after 2014 are predicted to sell for $7.6K. On the other side of the plot, automatic cars are split according to whether they use petrol or diesel. Automatic, petrol cars are predicted to sell for $10K whereas automatic, diesel cars are predicted to sell for $26K."}
 
 #### Splitting and stopping rules
 
 Precisely how the data partitions/splits are derived and which variables are utilized is determined by the *splitting rule*.\index{random forests!splitting rule}
-The goal in each partition is to find two resulting leaves that have the greatest difference between them and thus the maximal homogeneity within each leaf. 
+The goal in each partition is to find two resulting nodes that have the greatest difference between them and thus the maximal homogeneity within each node. 
 Hence, after each split, the data in each node should become increasingly similar.
 The splitting rule provides a way to measure the difference between nodes or the homogeneity within the resulting nodes.
-In regression, the most common splitting rule is to select a variable and cutoff (a threshold on the variable at which to separate observations) that minimizes the mean squared error in the two potential resulting leaves.
+In regression, the most common splitting rule is to select a variable and cutoff (a threshold on the variable at which to separate observations) that minimizes the mean squared error in the two potential resulting nodes.
 
-For all decision tree and random forest algorithms going forward, let $\mathcal{A}$ denote the set of observation indices in a leaf, with mean outcome:
+For all decision tree and random forest algorithms going forward, let $\mathcal{A}$ denote the set of observation indices in a node, with mean outcome:
 
 $$
 \bar{y}_{\mathcal{A}} = \frac{1}{\vert \mathcal{A} \vert}\sum_{i \in \mathcal{A}} y_i.
 $$
 
-Let $j = 1,\ldots,p$ index the features and let $c_j$ be a possible cutoff value for feature $j$. For parent leaf $\mathcal{A}$, define:
+Let $j = 1,\ldots,p$ index the features and let $c_j$ be a possible cutoff value for feature $j$. For parent node $\mathcal{A}$, define:
 
 $$
 \begin{aligned}
@@ -63,20 +63,20 @@ $$
 \end{aligned}
 $$
 
-as the two leaves resulting from partitioning feature $j$ at cutoff $c_j$. To simplify notation, let $\mathcal{A}^l, \mathcal{A}^r$ denote $\mathcal{A}^l(j,c_j)$ and $\mathcal{A}^r(j,c_j)$ respectively.
-The optimal split is determined by the arguments $(j^*, c^*_{j^*})$ that minimize the residual sum of squares across both leaves [@Hastie2013],
+as the two nodes resulting from partitioning feature $j$ at cutoff $c_j$. To simplify notation, let $\mathcal{A}^l, \mathcal{A}^r$ denote $\mathcal{A}^l(j,c_j)$ and $\mathcal{A}^r(j,c_j)$ respectively.
+The optimal split is determined by the arguments $(j^*, c^*_{j^*})$ that minimize the residual sum of squares across both nodes [@Hastie2013],
 
 $$
 (j^*, c_{j^*}^*) = \argmin_{j, c_j} \sum_{i \in \mathcal{A}^l} (y_i - \bar{y}_{\mathcal{A}^l})^2 + \sum_{i \in \mathcal{A}^r} (y_i - \bar{y}_{\mathcal{A}^r})^2.
 $$
 
-This method is repeated from the first leaf to the last such that observations are included in a given leaf $\mathcal{A}$ if they satisfy all conditions from all previous branches (splits); features may be considered multiple times in the growing process allowing complex interaction effects to be captured.
+This method is repeated from the first node to the last such that observations are included in a given node $\mathcal{A}$ if they satisfy all conditions from all previous branches (splits); features may be considered multiple times in the growing process allowing complex interaction effects to be captured.
 
-Leaves are repeatedly split until a *stopping rule* has been triggered --- a criterion that tells the algorithm to stop partitioning data.\index{random forests!stopping rule}
-The stopping rule is usually a condition on the number of observations in each leaf such that leaves will continue to be split until some minimum number of observations has been reached in a leaf.
+Nodes are repeatedly split until a *stopping rule* has been triggered --- a criterion that tells the algorithm to stop partitioning data.\index{random forests!stopping rule}
+The stopping rule is usually a condition on the number of observations in each node such that nodes will continue to be split until some minimum number of observations has been reached in a node.
 Other conditions may be on the depth of the tree (as in @fig-surv-ranfor which is restricted to a maximum depth of 2), which corresponds to the number of levels of splitting.\index{random forests!hyperparameters!maximum depth}
 Stopping rules are often used together, for example by setting a maximum tree depth *and* prespecifying a minimum number of observations per leaf.
-Deciding the number of minimum observations and/or the maximum depth can be performed with tuning (@sec-ml-opt).
+Deciding the minimum number of observations and/or the maximum depth can be performed with tuning (@sec-ml-opt).
 
 #### Terminal node predictions {#sec-tree-terminal-nodes}
 
@@ -115,7 +115,7 @@ However, as the same value may be sampled multiple times, on average the resulti
 Randomness is further injected to decorrelate the trees by randomly subsetting the candidates of features to consider at each split of a tree.
 Therefore, every split of every tree may consider a different subset of variables.\index{random forests!decorrelation}
 This process is repeated for $B$ trees, with the final output being a collection of trained decision trees.
-The number of trees is a hyperparameter, but in practice\index{random forests!hyperparameters!number of trees} $B$ is usually chosen to be large, with early stopping (@sec-ml-early-stopping) used to grow trees until validation performance stabilizes.\index{early stopping} 
+The number of trees is a hyperparameter, but in practice\index{random forests!hyperparameters!number of trees} $B$ is usually chosen to be large, with an early stopping-type procedure (@sec-ml-early-stopping) used to grow trees until validation performance stabilizes.\index{early stopping} 
 Beyond this point, additional trees mainly increase computational cost while providing diminishing improvements in predictive performance.
 
 Prediction from a random forest for new data $\xx_*$ follows by making predictions from the individual trees and aggregating the results by some function $\sigma$, which is usually the sample mean for regression:
@@ -124,7 +124,7 @@ $$
 \hatg(\xx_*) = \sigma(\hatg_1(\xx_*),\ldots,\hatg_B(\xx_*)) = \frac{1}{B} \sum^B_{b=1} \hatg_b(\xx_*)
 $$
 
-where $\hatg_b(\xx_*)$ is the prediction from the $b$th tree for some new data $\xx_*$ and $B$ are the total number of grown trees.
+where $\hatg_b(\xx_*)$ is the prediction from the $b$th tree for some new data $\xx_*$ and $B$ is the total number of grown trees.
 
 As discussed above, individual decision trees result in predictions with high variance that are not robust to small changes in the underlying data.
 Random forests decrease this variance by aggregating predictions over a large sample of decorrelated trees, where a high degree of difference between trees is promoted through the use of bootstrapped samples and random candidate feature selection at each split.
@@ -150,28 +150,28 @@ Likelihood rules are more complex and may require assumptions that are not reali
 
 #### Log-rank test
 
-The log-rank test statistic has been widely utilized as a splitting-rule for survival analysis  [@Ciampi1986; @Ishwaran2008; @LeBlanc1993; @Segal1988].\index{random survival forests!splitting rules!log-rank test}
+The log-rank test statistic has been widely utilized as a splitting rule for survival analysis  [@Ciampi1986; @Ishwaran2008; @LeBlanc1993; @Segal1988].\index{random survival forests!splitting rules!log-rank test}
 The log-rank test compares the survival distributions of two groups under the null hypothesis that both groups have the same underlying risk of (immediate) events, with the hazard function used to compare underlying risk.
 
-Let $\mathcal{A}^l$ and $\mathcal{A}^r$ be two leaves, and as before $i \in \mathcal{A}$ indexes the observations in leaf $\mathcal{A}$.
+Let $\mathcal{A}^l$ and $\mathcal{A}^r$ be two nodes, and as before $i \in \mathcal{A}$ indexes the observations in node $\mathcal{A}$.
 Define:
 
-* $n_\tau^l$, the number of observations at risk at time point $\tau$ in leaf $\mathcal{A}^l$
+* $n_\tau^l$, the number of observations at risk at time point $\tau$ in node $\mathcal{A}^l$
 $$
 n_\tau^l = \sum_{i \in \mathcal{A}^l} \II(t_i \geq \tau);
 $$
 
-* $o^l_{\tau}$, the observed number of events at time point $\tau$ in leaf $\mathcal{A}^l$ 
+* $o^l_{\tau}$, the observed number of events at time point $\tau$ in node $\mathcal{A}^l$ 
 
 $$
 o^l_{\tau} = \sum_{i \in \mathcal{A}^l} \II(t_i = \tau, \delta_i = 1);
 $$
 
-* $n_\tau = n_\tau^l + n_\tau^r$, the number of observations at risk at $\tau$ in both leaves;
-* $o_\tau = o^l_{\tau} + o^r_{\tau}$, the observed number of events at $\tau$ in both leaves.
+* $n_\tau = n_\tau^l + n_\tau^r$, the number of observations at risk at $\tau$ in both nodes;
+* $o_\tau = o^l_{\tau} + o^r_{\tau}$, the observed number of events at $\tau$ in both nodes.
 
 Recall $\tbk$ is the $k$th ordered event time.
-The log-rank test evaluates if hazard functions are equal in both leaves, $H_0: h^l = h^r$, with test statistic [@Segal1988],
+The log-rank test evaluates if hazard functions are equal in both nodes, $H_0: h^l = h^r$, with test statistic [@Segal1988],
 
 $$
 LR(\mathcal{A}^l) = \frac{\sum_{k=1}^m (o^l_{\tbk} - e^l_{\tbk})}{\sqrt{\sum_{k=1}^m v_{\tbk}^l}},
@@ -179,21 +179,21 @@ $$
 
 where:
 
-* $e^l_{\tau}$ is the expected number of events in leaf $\mathcal{A}^l$ at $\tau$:
+* $e^l_{\tau}$ is the expected number of events in node $\mathcal{A}^l$ at $\tau$:
 
 $$
 e^l_{\tau} := o_\tau\frac{n_\tau^l}{n_\tau};
 $$
 
-* $v^l_\tau$ is the variance of the number of events in leaf $\mathcal{A}^l$ at $\tau$:
+* $v^l_\tau$ is the variance of the number of events in node $\mathcal{A}^l$ at $\tau$:
 
 $$
 v^l_{\tau} := e^l_{\tau} \Big(\frac{n_\tau - o_\tau}{n_\tau}\Big)\Big(\frac{n_\tau - n^l_\tau}{n_\tau - 1}\Big).
 $$
 
-These results follow from the assumption that, under equal hazards in both leaves, the number of events at each unique event time follows a hypergeometric distribution. \index{hypergeometric distribution}
+These results follow from the assumption that, under equal hazards in both nodes, the number of events at each unique event time follows a hypergeometric distribution. \index{hypergeometric distribution}
 Under $H_0$, $LR(\mathcal{A}^l)^2$ follows a $\chi^2$ distribution with one degree of freedom and the log-rank statistic is commonly reported alongside its corresponding $p$-value.
-In the two group setting,  $LR(\mathcal{A}^l) = -LR(\mathcal{A}^r)$, hence it is sufficient to compute the statistic for only one of the two leaves.
+In the two group setting,  $LR(\mathcal{A}^l) = -LR(\mathcal{A}^r)$, hence it is sufficient to compute the statistic for only one of the two nodes.
 
 The higher the (absolute) log-rank statistic, the greater the dissimilarity between the two groups (@fig-surv-ranfor-logrank), thereby making it a sensible splitting rule for random forests; it has also been shown that it works well for splitting censored data  [@LeBlanc1993].
 Additionally, the log-rank test requires no knowledge about the shape of the survival curves or distribution of the outcomes in either group  [@Bland2004], making it ideal for an automated process that requires no user intervention.
@@ -228,7 +228,7 @@ As seen throughout this book, the choice of estimator in the survival setting de
 This section focuses on probabilistic predictions for the single-event setting, extensions to competing risks are discussed in @sec-surv-ranfor-cr, and then relative risk predictions for both settings are described in  @sec-rsf-risks.
 
 Terminal node predictions are only useful when there are sufficient uncensored observations in each terminal node.
-Hence, a common RSF stopping rule is to set a threshold on the minimum number of _uncensored_ observations per leaf, meaning that a leaf is not split if doing so would result in too few uncensored observations to make meaningful predictions.\index{random survival forests!stopping rule}\index{random survival forests!hyperparameters!minimum node size}
+Hence, a common RSF stopping rule is to set a threshold on the minimum number of _uncensored_ observations per node, meaning that a node is not split if doing so would result in too few uncensored observations to make meaningful predictions.\index{random survival forests!stopping rule}\index{random survival forests!hyperparameters!minimum node size}
 When the minimum uncensored node size is not exposed as a hyperparameter, it can be tuned indirectly through the standard minimum node size.
 Alternatively, a useful heuristic is to take the recommended default minimum node size and divide it by the uncensored proportion in the data.
 For example, if the default minimum node size is $10$ and $30\%$ of the data are censored, then the adjusted minimum node size is $\lceil 10/0.7 \rceil = 15$.
@@ -252,7 +252,7 @@ where $d_{t^*_{(k)}}$ and $n_{t^*_{(k)}}$ are the observed number of events and 
 Direct calculation of the cumulative hazard using (@eq-rsf-surv-nelson) avoids $\log(0)$ errors which could occur if transforming from the Kaplan-Meier estimates in (@eq-rsf-surv-kaplan).
 See @fig-surv-ranfor-lung for an example using the `lung` dataset [@Therneau2024].
 
-![Survival tree trained on the `lung` dataset from the $\Rstats$ package `survival`. The terminal node predictions are survival curves.](Figures/forests/lung.png){#fig-surv-ranfor-lung fig-alt="Decision tree with two splits, the first is 'ph.ecog' with a p-value of <0.001, when ph.ecog > 1 a terminal prediction is made, otherwise the data is split at 'sex' with - = 0.015. Terminal node predictions are plots of survival functions."}
+![Survival tree trained on the `lung` dataset from the $\Rstats$ package `survival`. The terminal node predictions are survival curves.](Figures/forests/lung.png){#fig-surv-ranfor-lung fig-alt="Decision tree with two splits, the first is 'ph.ecog' with a p-value of <0.001, when ph.ecog > 1 a terminal prediction is made, otherwise the data is split at 'sex'. Terminal node predictions are shown as plots of survival functions."}
 
 The bootstrapped prediction may be formed either by averaging survival or cumulative hazard functions over individual trees.\index{random survival forests!bagging}
 By definition, a mixture of $n$ distributions with cumulative distribution functions $F_i, i = 1,\ldots,n$ is given by,\index{random survival forests!terminal node prediction}
@@ -311,13 +311,13 @@ o^l_{q,{\tau}} = \sum_{i \in \mathcal{A}^l} \II(t_i = \tau,\, q_i = q),
 $$
 
 where $q_i$ is the observed cause for observation $i$.
-The expected number of events under the null of equal cause-$q$ hazards in both leaves is:
+The expected number of events under the null of equal cause-$q$ hazards in both nodes is:
 
 $$
 e^l_{q,{\tau}} = o_{q,{\tau}}\frac{n^l_{\tau}}{n_{\tau}},
 $$ {#eq-cr-exp}
 
-where $o_{q,{\tau}}$ and $n_{\tau}$ are the corresponding totals over both leaves.
+where $o_{q,{\tau}}$ and $n_{\tau}$ are the corresponding totals over both nodes.
 The per-cause statistic for $m$ ordered event times, $\tbk$, is:
 
 $$

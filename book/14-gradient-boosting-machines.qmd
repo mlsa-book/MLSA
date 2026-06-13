@@ -47,7 +47,7 @@ Motivated by the success of bagging in random forests, stochastic gradient boost
 Subsampling appears to perform best when combined with shrinkage [@Hastie2001].
 
 In addition to these parameters, the hyperparameters of the underlying weak learner are also commonly tuned.
-When using decision trees, it is usual to restrict the number of terminal nodes in the tree to be between $4$ and $8$, which corresponds to two or three splits in the tree.\index{decision tree}
+When using decision trees, it is usual to restrict the number of terminal nodes in the tree to be between four and eight, corresponding to shallow trees with limited interaction depth.\index{decision tree}
 With these hyperparameters and some differentiable loss $L$, the general gradient boosting machine algorithm is given in Algorithm 2.
 
 :::: {.callout-note icon=false}
@@ -81,8 +81,6 @@ $$
 GBMs provide a flexible, modular algorithm, primarily composed of a differentiable loss to minimize, $L$, and the selection of weak learners.
 Perhaps the most common weak learners are decision trees, linear least squares [@Friedman2001] and smoothing splines [@Buhlmann2003].\index{gradient boosting machines!decision tree}
 Trees allow the structure of the resulting prediction function to vary substantially; for example, using stumps (trees with only one split) results in an additive model with main effects only, whereas decision trees with an extra layer yield two-way interactions.
-This chapter focuses on tree-based learners, which are primarily used for survival analysis, due to the flexibility demonstrated in @sec-ranfor.
-See references at the end of the chapter for other weak learners.
 
 ## GBMs for survival analysis {#sec-surv-ml-models-boost-surv}
 
@@ -124,7 +122,7 @@ $$
 -\ell_{PL}(\bsbeta) = -\sum_{k=1}^{\tilde{n}} \left(\eta_{i_{(k)}} - \log \left(\sum_{j \in \calR_{\tbk}} \exp(\eta_j)\right)\right),
 $$ {#eq-lpartial-two}
 
-where $\tbk$ is the $k$th ordered event time for $\tilde{n} < n$ event times, $\calR_{t_i}$ is the set of patients at risk at time $t_i$ (assuming no ties).
+where $\tbk$ is the $k$th ordered event time for $\tilde{n} < n$ event times, $\calR_{\tbk}$ is the set of patients at risk at time $\tbk$ (assuming no ties).
 
 The negative gradient of $-\ell_{PL}(\bsbeta)$ at iteration $m$ is then given by substituting (@eq-boost-lp) for $\eta_i$ into the negative log-likelihood (@eq-lpartial-two) and differentiating [@Ridgeway1999]:
 
@@ -159,7 +157,7 @@ By assuming a distribution on $\epsilon_i$, a distribution is assumed for the fu
 
 $$
 \begin{aligned}
--l^{AFT}(g, \sigma)
+-\ell^{AFT}(g, \sigma)
 & = -\sum^n_{i=1} \Bigg[ \delta_i\Bigg(- \log{\sigma} + \log f_{\epsilon}\Big(\frac{\log(t_i) - g(\xx_i)}{\sigma}\Big)\Bigg) \\
 & + (1-\delta_i)\Bigg(\log S_{\epsilon}\Big(\frac{\log(t_i) - g(\xx_i)}{\sigma}\Big)\Bigg) \Bigg]
 \end{aligned},
@@ -169,13 +167,13 @@ where $f_{\epsilon}, S_{\epsilon}$ are the density and survival functions of $\e
 At iteration $m$, (@eq-aft-likelihood) is evaluated at $(\hat{g}_{m-1}, \hat{\sigma}_{m-1})$ to compute the pseudo-residuals used to update $\hat{g}_m$ following Algorithm 2,
 
 $$
-r_{im} = -\frac{\partial(-l^{AFT}(\hat{g}_{m-1}, \hat{\sigma}_{m-1}))}{\partial \hat{g}_{m-1}(\xx_i)}.
+r_{im} = -\frac{\partial(-\ell^{AFT}(\hat{g}_{m-1}, \hat{\sigma}_{m-1}))}{\partial \hat{g}_{m-1}(\xx_i)}.
 $$
 
 The only change to the algorithm is a final step in each iteration where the scale parameter is re-estimated conditional on the updated $\hat{g}_m$, by minimizing (@eq-aft-likelihood) with respect to $\sigma$:
 
 $$
-\hat{\sigma}_m := \argmin_{\sigma > 0} \ -l^{AFT}(\hatg_m, \sigma),
+\hat{\sigma}_m := \argmin_{\sigma > 0} \ -\ell^{AFT}(\hatg_m, \sigma),
 $$
 
 which is the conditional maximum likelihood estimate of $\sigma$ given the current boosted fit and is usually obtained by a one-dimensional numerical optimization over $\sigma > 0$.
@@ -235,7 +233,7 @@ In practice, this is usually a diagonal matrix [@Binder2008] and by setting $P_{
 The penalty matrix *can* vary with each iteration, which allows for a highly flexible approach.
 In practice, a simpler approach is to use the same penalty matrix in each iteration and to apply the same penalty factor to all penalized covariates [@pkgcoxboost].
 
-At the $m$-th iteration and the $k$-th set of indices to consider, the loss to optimize is the penalized partial log-likelihood given by,
+At the $m$th iteration and the $k$th set of indices to consider, the penalized partial log-likelihood is given by,
 
 $$
 \begin{aligned}
