@@ -75,7 +75,7 @@ $$
 
 where $\mathbf{b}^{(3)}$ and $\mathbf{W}^{(3)}$ are the bias and weights in the final layer, and $\hh^{(2)}$ are the outputs from the hidden units in layer 2.
 
-Putting everything together, the FFNN is defined by the recursion:\index{neural networks!recursion}
+Putting everything together, the FFNN is defined by the recursion:
 
 $$
 \begin{aligned}
@@ -310,7 +310,7 @@ They include the learning rate $\alpha$,\index{neural networks!hyperparameters!l
 Adaptive optimizers, such as Adam, are relatively insensitive to the choice of learning rate.
 It is therefore common to set a small learning rate (such as $0.001$ [@pkgkeras]) rather than performing extensive tuning.\index{neural networks!optimizer!Adam}
 As with gradient boosting machines, the number of epochs is also usually not tuned but instead a sufficiently large number is chosen and then early stopping (@sec-ml-early-stopping) is used to terminate training once a held-out validation loss stops improving.\index{gradient boosting machines}
-The remaining mathematical hyperparameters can then be tuned using nested cross-validation (@sec-ml-opt). \index{cross-validation}\index{tuning}
+The remaining mathematical hyperparameters can then be tuned using nested cross-validation (@sec-ml-opt). \index{resampling!cross-validation}\index{hyperparameter optimization}
 
 ### Probabilistic predictions {#sec-nnet-deterministic-vs-probabilistic}
 
@@ -335,14 +335,14 @@ $$
 -\sum_i \log f(y_i \mid \bsphi(\xx_i)).
 $$ {#eq-nnet-nll}
 
-For this example, consider the Normal distribution which predicts the conditional mean $\mu(\xx \mid \bstheta)$ and the conditional scale $\sigma(\xx \mid \bstheta)$ jointly:
+For this example, consider the normal distribution which predicts the conditional mean $\mu(\xx \mid \bstheta)$ and the conditional scale $\sigma(\xx \mid \bstheta)$ jointly:
 
 $$
 g(\xx_i \mid \bstheta) = \bigl(\mu(\xx_i \mid \bstheta),\; \sigma(\xx_i \mid \bstheta)\bigr)^\trans \in \Reals \times \PReals.
 $$
 
 Positivity of the scale is enforced internally by an exponential response function (@sec-nnet-activations) on the $\sigma$-output, $\sigma = \exp(z_\sigma)$, while the mean uses the identity response.
-The training objective is the Normal negative log-likelihood (@eq-nnet-nll),
+The training objective is the normal negative log-likelihood (@eq-nnet-nll),
 
 $$
 \begin{aligned}
@@ -352,7 +352,7 @@ $$
 \end{aligned}
 $$ {#eq-nnet-gauss-nll}
 
-where $f$ is the Normal density with mean $\mu(\xx_i \mid \bstheta)$ and standard deviation $\sigma(\xx_i \mid \bstheta)$.
+where $f$ is the normal density with mean $\mu(\xx_i \mid \bstheta)$ and standard deviation $\sigma(\xx_i \mid \bstheta)$.
 The parameters $\bstheta$ now parametrize a whole conditional density $f(y \mid \xx, \bstheta)$ rather than a single conditional mean, so the prediction at a new $\xx_*$ is the full distribution $f(\,\cdot \mid \xx_*, \hat{\bstheta})$, from which means, quantiles, and prediction intervals can be extracted.
 
 @fig-ffnn-distributional illustrates three ways a network can produce the two outputs $\mu(\xx)$ and $\sigma(\xx)$ that parametrize (@eq-nnet-gauss-nll).
@@ -363,15 +363,15 @@ In @fig-ffnn-distributional (b), the outputs still share an initial representati
 Finally, in @fig-ffnn-distributional (c), separate networks predict $\mu(\xx)$ and $\sigma(\xx)$ but are still trained jointly through the same distributional loss.
 This is the most flexible approach, particularly when the parameters require different representations or regularization, but it also has the largest number of parameters.
 
-![Three architectural variants for probabilistic regression. Top, a): Shared hidden layers whose final layer splits into two pre-response values $z_\mu, z_\sigma$, each mapped through its own response function to produce $\mu(\xx)$ and $\sigma(\xx)$. Middle, b): Shared hidden layers followed by two small per-parameter sub-networks before each $z$. Bottom, c): Two entirely separate networks for $\mu$ and $\sigma$. In all three variants the two outputs feed into the same conditional distribution $\mathcal{N}(\mu(\xx), \sigma(\xx)^2)$, so the network is trained jointly under one distributional loss.](Figures/neuralnetworks/ffnn-distributional.png){#fig-ffnn-distributional fig-alt="Three diagrams stacked vertically. (a): input feeds a block of shared hidden layers, which directly produces two pre-response values z_mu and z_sigma, each passing through a response function box and then the corresponding output mu(x) and sigma(x), converging into a conditional Normal distribution box labeled N(mu(x), sigma(x)^2). (b): same as (a) but with an extra small sub-network for mu and an extra small sub-network for sigma inserted between the shared hidden layers and the z nodes, colored pink and blue respectively. (c): two entirely separate networks, one labeled 'network for mu' (pink) and one labeled 'network for sigma' (blue), each taking the input x and producing its own z, response function and output, both feeding into the same conditional Normal distribution box." width=85%}
+![Three architectural variants for probabilistic regression. Top, a): Shared hidden layers whose final layer splits into two pre-response values $z_\mu, z_\sigma$, each mapped through its own response function to produce $\mu(\xx)$ and $\sigma(\xx)$. Middle, b): Shared hidden layers followed by two small per-parameter sub-networks before each $z$. Bottom, c): Two entirely separate networks for $\mu$ and $\sigma$. In all three variants the two outputs feed into the same conditional distribution $\mathcal{N}(\mu(\xx), \sigma(\xx)^2)$, so the network is trained jointly under one distributional loss.](Figures/neuralnetworks/ffnn-distributional.png){#fig-ffnn-distributional fig-alt="Three diagrams stacked vertically. (a): input feeds a block of shared hidden layers, which directly produces two pre-response values z_mu and z_sigma, each passing through a response function box and then the corresponding output mu(x) and sigma(x), converging into a conditional normal distribution box labeled N(mu(x), sigma(x)^2). (b): same as (a) but with an extra small sub-network for mu and an extra small sub-network for sigma inserted between the shared hidden layers and the z nodes, colored pink and blue respectively. (c): two entirely separate networks, one labeled 'network for mu' (pink) and one labeled 'network for sigma' (blue), each taking the input x and producing its own z, response function and output, both feeding into the same conditional normal distribution box." width=85%}
 
 @fig-mcycle-det-vs-prob visualizes the contrast between deterministic and probabilistic regression on the `mcycle` data.\index{regression!probabilistic}
 Both panels share the *same* FFNN architecture (@fig-ffnn-arch); only the output head and the loss differ.\index{neural networks!feed-forward neural network}
 The left panel is a single-output FFNN trained with the MSE (@eq-nnet-mse); the prediction is a single curve and does not quantify predictive uncertainty.
-The right panel uses fully shared hidden layers (@fig-ffnn-distributional (a)) with two output heads, identity response for $\mu(\xx)$ and exponential response for $\sigma(\xx)$, trained with the Normal negative log-likelihood (@eq-nnet-gauss-nll).
+The right panel uses fully shared hidden layers (@fig-ffnn-distributional (a)) with two output heads, identity response for $\mu(\xx)$ and exponential response for $\sigma(\xx)$, trained with the normal negative log-likelihood (@eq-nnet-gauss-nll).
 Estimation of $\sigma(\xx)$ allows uncertainty to be captured at each time point after impact.
 
-![Deterministic vs. probabilistic regression on the `mcycle` data using the FFNN reference architecture of @fig-ffnn-arch in both panels. *Left*: a single-output FFNN trained with the MSE of (@eq-nnet-mse); the prediction is a single conditional-mean curve $\hat{y}(x)$. *Right*: variant *(a)* of @fig-ffnn-distributional trained with the Normal negative log-likelihood of (@eq-nnet-gauss-nll); the prediction is a whole conditional Normal $\mathcal{N}(\mu(x), \sigma(x)^2)$, shown as the mean $\mu(x)$ together with the pointwise central 95\% interval $\mu(x) \pm 1.96\,\sigma(x)$ of the predicted outcome distribution.](Figures/neuralnetworks/mcycle-det-vs-prob.png){#fig-mcycle-det-vs-prob fig-alt="Two side-by-side scatter plots of head acceleration against time after impact for the mcycle dataset. Left: a scatter plot using the tanh activation with a smooth line running through the points. Right: the same curve but with a ribbon around it indicating uncertainty, the ribbon is narrow at first and then widens around time=20ms before narrowing again around time=40ms." width=100%}
+![Deterministic vs. probabilistic regression on the `mcycle` data using the FFNN reference architecture of @fig-ffnn-arch in both panels. *Left*: a single-output FFNN trained with the MSE of (@eq-nnet-mse); the prediction is a single conditional-mean curve $\hat{y}(x)$. *Right*: variant *(a)* of @fig-ffnn-distributional trained with the normal negative log-likelihood of (@eq-nnet-gauss-nll); the prediction is a whole conditional normal $\mathcal{N}(\mu(x), \sigma(x)^2)$, shown as the mean $\mu(x)$ together with the pointwise central 95\% interval $\mu(x) \pm 1.96\,\sigma(x)$ of the predicted outcome distribution.](Figures/neuralnetworks/mcycle-det-vs-prob.png){#fig-mcycle-det-vs-prob fig-alt="Two side-by-side scatter plots of head acceleration against time after impact for the mcycle dataset. Left: a scatter plot using the tanh activation with a smooth line running through the points. Right: the same curve but with a ribbon around it indicating uncertainty, the ribbon is narrow at first and then widens around time=20ms before narrowing again around time=40ms." width=100%}
 
 ### Beyond feed-forward networks {#sec-nnet-beyond-ffnn}
 
@@ -471,7 +471,7 @@ $$ {#eq-nnet-cox-loss}
 where $\calR_{\tbk}$ is the risk set at the $k$th ordered event time, $\tbk$, for $m \leq n$ unique event times (assuming no ties).
 
 This loss is differentiable in $\bstheta$ and can be minimized by backpropagation.
-To obtain a full predicted survival distribution from the risk score $\hat{\eta}_i = g(\xx_i \mid \hat{\bstheta})$, the Breslow estimator of the baseline cumulative hazard $\hatH_0$ (@eq-breslow) is combined with $\hat{\eta}_i$, exactly as in the standard Cox model (@sec-classical-cox). \index{Breslow estimator}\index{Cox proportional hazards}
+To obtain a full predicted survival distribution from the risk score $\hat{\eta}_i = g(\xx_i \mid \hat{\bstheta})$, the Breslow estimator of the baseline cumulative hazard $\hatH_0$ (@eq-breslow) is combined with $\hat{\eta}_i$, exactly as in the standard Cox model (@sec-classical-cox). \index{Cox proportional hazards}\index{Cox proportional hazards!Breslow estimator}
 
 One practical complication is that the inner sum in (@eq-nnet-cox-loss) ranges over the *entire* risk set $\calR_{\tbk}$, which is not compatible with mini-batch gradient descent of Algorithm 3 and can become prohibitively expensive on large or multi-modal datasets.
 A common fix is *risk-set sub-sampling*: instead of taking the full risk set $\calR_{\tbk}$ at each event, the risk set is restricted to the subjects in the current mini-batch, which yields a stochastic estimate of the partial-likelihood gradient [@Kvamme2019a]. \index{risk-set sub-sampling}
