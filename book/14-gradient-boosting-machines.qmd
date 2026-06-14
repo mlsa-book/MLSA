@@ -1,0 +1,345 @@
+::: {.content-visible when-format="html"}
+{{< include _macros.tex >}}
+:::
+
+# Gradient Boosting Machines {#sec-boost}
+
+Similarly to random forests\index{random forests}, boosting is an ensemble method that creates a powerful model from a combination of *weak* learners that make poor predictions individually.\index{gradient boosting machines}\index{weak learner}
+However, the two methods differ in how individual learners are selected and combined: in random forests, each decision tree is grown independently and predictions are averaged.
+In boosting, weak learners are fit sequentially with errors from one learner used to train the next, and predictions are made by a weighted linear combination of all learners (@fig-boosting).
+
+## GBMs for regression {#sec-surv-ml-models-boost-regr}
+
+Gradient boosting machines (GBMs) are among the most widely used families of boosting algorithms.
+The general idea, inspired by gradient descent (@sec-ml-gradient-descent), is to choose a differentiable loss function and iteratively improve predictions by fitting weak learners to the remaining errors from the current model.
+These errors correspond to the negative gradients, or pseudo-residuals.\index{pseudo-residuals}
+@fig-boosting illustrates this process in a least-squares regression setting, where the negative gradient corresponds to the ordinary residual, which is the observed outcome minus the current prediction.\index{gradient descent}
+This procedure can be understood as follows:
+
+1. An initial, simple model is fit to the data to obtain the first set of predictions.
+2. The errors of this model are computed by comparing predictions to the observed outcomes.
+3. A weak learner is fit to these errors, focusing on patterns that the previous model failed to capture.
+4. The new learner is added to the existing model, improving the overall prediction.
+5. This is repeated with each learner correcting the errors of the current model.
+
+Predictions are therefore built up gradually as a sum of many weak learners, each making a small contribution to the final model.
+
+![Least squares gradient boosting, where each weak learner (here, a decision tree) is fit to the residuals (negative gradient of squared error loss).](Figures/boosting/boosting.png){#fig-boosting fig-alt="Diagram of least-squares gradient boosting shown for iterations 1, 2, and M, with horizontal dots marking the iterations omitted in between, arranged in three horizontal bands. Bottom band (training data): the covariates paired with the current target, as (X, y) for iteration 1, then (X, r_1), and (X, r_M-1) for iteration M. Middle band (weak learner): a small decision tree g_m(X) is fit to each dataset. Top band (residuals): the updated residuals r_m = r_m-1 minus g_m(X), drawn as point clusters that shrink across iterations. In the first iteration an upward 'Fit' arrow runs from the data to the tree and an upward 'Predict' arrow runs from the tree to the residuals; an arrow labelled 'Use residuals as target' carries the residuals down to the next iteration's training data. A final orange 'Aggregate' arrow sums the weak learners into the prediction y-hat = g_1(X) + ... + g_M(X)."}
+
+Practically, a number of important hyperparameters are used to control and optimize the algorithm while reducing overfitting.\index{gradient boosting machines!hyperparameters}
+These are:
+
+**Number of iterations**, $M$:\index{gradient boosting machines!hyperparameters!iterations}
+The number of iterations is often claimed to be the most important hyperparameter in GBMs and it has been demonstrated that a value too small will result in underfitting, while a value too large will result in overfitting [@Buhlmann2006; @Hastie2001; @Schmid2008a].\index{overfitting}
+This underlines the general idea of boosting weak learners to slowly construct a single powerful model.
+
+**Step size**, $\alpha$:\index{gradient boosting machines!hyperparameters!step size}
+The step size parameter is a shrinkage parameter that controls the contribution of the weak learner at each iteration.
+Several studies have demonstrated that GBMs perform better when shrinkage is applied and a value of $\alpha \leq 0.1$ is often suggested [@Buhlmann2007; @Friedman2001; @Hastie2001; @Lee2018; @Schmid2008a].
+The optimal values of $\alpha$ and $M$ depend on each other, such that smaller values of $\alpha$ require larger values of $M$, and vice versa.
+This is intuitive as smaller $\alpha$ results in slower learning and therefore more iterations are required to fit the model.
+A practical procedure is to set $\alpha$ to a small value (such as $0.1$) and $M$ to a very large value (such as $10,\!000$), then use early stopping (@sec-ml-early-stopping) to halt the algorithm once performance on a validation set stops improving.\index{early stopping}
+This avoids the need for computationally expensive tuning to find the optimal combination of $\alpha$ and $M$.
+
+**Subsampling proportion**, $\phi$:\index{gradient boosting machines!hyperparameters!subsampling}
+Sampling a fraction, $\phi$, of the training data at each iteration can improve performance and reduce runtime [@Hastie2001], with $\phi = 0.5$ often used although ideally it should be tuned.
+Motivated by the success of bagging in random forests, stochastic gradient boosting [@Friedman1999] randomly samples the data in each iteration.
+Subsampling appears to perform best when combined with shrinkage [@Hastie2001].
+
+In addition to these parameters, the hyperparameters of the underlying weak learner are also commonly tuned.
+When using decision trees, it is usual to restrict the number of terminal nodes in the tree to be between four and eight, corresponding to shallow trees with limited interaction depth.\index{decision tree}
+With these hyperparameters and some differentiable loss $L$, the general gradient boosting machine algorithm is given in Algorithm 2.
+
+:::: {.callout-note icon=false}
+
+## Algorithm 2  (Gradient boosting)
+
+1. $\hatg_0 \gets \text{ Initial guess}$
+2. **for** $m = 1,\ldots,M$:
+3. \ \ \ \ \ $\{(\xx_i', y_i')\}^{n'}_1 \gets$ Random sample of size $n' = \lfloor \phi n \rfloor$ from $\{(\xx_i, y_i)\}_1^n$
+4. \ \ \ \ \ $\displaystyle r_{im} \gets -\frac{\partial L(y'_i, \hat{g}_{m-1}(\xx'_i))}{\partial \hat{g}_{m-1}(\xx'_i)}, \forall i \in \{1,\ldots,n'\}$
+5. \ \ \ \ \ $\tilde{g}_m \gets$ Fit the weak learner to $(\XX', \rr_m)$
+6. \ \ \ \ \ $\hat{g}_m \gets \hat{g}_{m-1} + \alpha \tilde{g}_m$
+7. **end for**
+8.  **return** $\hat{g}_0, \{\tilde{g}_m\}^M_1$
+
+Note:
+
+1. $\tilde{g}_m$ is the weak learner in iteration $m$ trained on pseudo-residuals\index{pseudo-residuals} computed from the cumulative model from the previous iteration, $\hat{g}_{m-1}$. The returned object can be written as the final cumulative model, $\hat{g}_M$, although in practice the model is computationally stored as the set of trained learners.
+2. The initial guess (or *offset*), $\hat{g}_0$, is often the best constant prediction under the chosen loss, $\hat{g}_0 = \argmin_c \sum_{i=1}^n L(y_i, c)$. For regression, using the mean squared error loss reduces to the mean of the training data, $\hat{g}_0 = \bar{y}$.
+3. Line 4 is the calculation of the negative gradient (@sec-ml-gradient-descent), which is equivalent to calculating the residuals in a regression problem with the mean squared error loss.\index{gradient descent}
+4. Lines 5--6 differ between implementations, with some fitting _multiple_ weak learners and selecting the one that minimizes the objective function. When candidate learners are fit separately to individual features, this is known as _componentwise_ boosting; see Further Reading for references. The version above is conceptually simplest and straightforward to implement, while still providing good model performance.\index{gradient boosting machines!componentwise}
+
+::::
+
+Once the model is trained, predictions are made for new data, $\xx_*$ with:
+
+$$
+\hat{g}_M(\xx_*) = \hat{g}_0 + \alpha \sum^M_{m=1} \tilde{g}_m(\xx_*).
+$$
+
+GBMs provide a flexible, modular algorithm, primarily composed of a differentiable loss to minimize, $L$, and the selection of weak learners.
+Perhaps the most common weak learners are decision trees, linear least squares [@Friedman2001] and smoothing splines [@Buhlmann2003].\index{gradient boosting machines!decision tree}
+Trees allow the structure of the resulting prediction function to vary substantially; for example, using stumps (trees with only one split) results in an additive model with main effects only, whereas decision trees with an extra layer yield two-way interactions.
+
+## GBMs for survival analysis {#sec-surv-ml-models-boost-surv}
+
+Unlike other model classes, survival analysis was considered in early GBM papers [@Ridgeway1999], although there appears to have been a decade-long gap before further advances were made.
+Subsequently, @Hothorn2005, @Schmid2008b, @Schmid2008a, and @Binder2008 further developed GBM frameworks for survival analysis, which are discussed in this chapter.
+
+In principle, boosting could be applied to models that directly predict a full survival distribution by optimizing a proper scoring rule (@sec-rules).
+However, standard boosting updates a single real-valued function at each iteration by fitting to the residual errors.
+When the target is a full survival distribution, scoring rules aggregate prediction errors across time, making it difficult to attribute errors to specific regions of the prediction and construct effective updates.
+This may partly explain why boosting methods in survival analysis are often applied to models that produce scalar risk scores.
+
+This section begins with boosting approaches based on the core models introduced in @sec-classical, specifically proportional hazards (PH) and accelerated failure time (AFT) models (@sec-boost-likelihood). \index{proportional hazards}\index{accelerated failure time}
+In the case of the AFT models, the model parameters are estimated directly, which specifies a full survival distribution prediction.
+The discussion then extends to approaches that do not assume a specific model form, but instead directly optimize discriminatory ability by using a concordance index (@sec-eval-crank) as the loss (@sec-boost-loss).
+
+### Likelihood boosting {#sec-boost-likelihood}
+
+The negative log-likelihood of the semi-parametric PH and fully-parametric AFT models can be derived from the (partial) likelihoods presented in @sec-ph-parametric and @sec-surv-models-param respectively.
+
+#### Cox proportional hazards boosting
+
+To boost a Cox-type model, at each iteration, the weak learner in Algorithm 2 is taken to be a linear predictor,
+
+$$
+g_m(\xx_i) = \eta_{m;i} = \xx_i^\trans \bsbeta_m,
+$$ {#eq-boost-lp}
+
+where $\eta_{m;i}$ is the updated linear predictor in iteration $m$ and $\eta_{0;i} = 0$.
+
+Recall the Cox partial likelihood (@eq-partial) given by [@Cox1972; @Cox1975],\index{gradient boosting machines!proportional hazards}
+
+$$
+\mathcal{L}_{PL}(\bsbeta) = \prod_{k=1}^{\tilde{n}} \left(\frac{\exp(\eta_{i_{(k)}})}{\sum_{j \in \calR_{\tbk}} \exp(\eta_j)}\right),
+$$
+
+with corresponding negative log-likelihood (@eq-lpartial):
+
+$$
+-\ell_{PL}(\bsbeta) = -\sum_{k=1}^{\tilde{n}} \left(\eta_{i_{(k)}} - \log \left(\sum_{j \in \calR_{\tbk}} \exp(\eta_j)\right)\right),
+$$ {#eq-lpartial-two}
+
+where $\tbk$ is the $k$th ordered event time for $\tilde{n} < n$ event times, $\calR_{\tbk}$ is the set of patients at risk at time $\tbk$ (assuming no ties).
+
+The negative gradient of $-\ell_{PL}(\bsbeta)$ at iteration $m$ is then given by substituting (@eq-boost-lp) for $\eta_i$ into the negative log-likelihood (@eq-lpartial-two) and differentiating [@Ridgeway1999]:
+
+$$
+r_{im} := \delta_i - \sum^{\tilde{n}}_{k=1} \frac{\II(t_i \geq \tbk) \exp(\hat{g}_{m-1}(\xx_i))}{\sum_{j \in \calR_{\tbk}} \exp(\hat{g}_{m-1}(\xx_j))}.
+$$
+
+#### Accelerated failure time boosting
+
+For non-PH data, boosting an AFT model can outperform boosted PH models [@Schmid2008b].
+Recall from @sec-surv-models-param the log-linear AFT model (@eq-aft-log) defined by:\index{gradient boosting machines!accelerated failure time}
+
+$$
+\log(t_i) = \mu + \eta_i + \sigma\epsilon_i,
+$$
+
+where $\sigma$ is a scale parameter, $\epsilon_i$ is an error term, and $\mu$ is an intercept.
+The model is now boosted by updating
+
+$$
+\hatg_m(\xx_i) = \mu + \eta_i,
+$$
+
+and then estimating $\hat{\sigma}_m$ using the updated $\hatg_m$; usually $\sigma_0 = 1$ [@Schmid2008b].
+Rearranging (@eq-aft-log) in terms of $\epsilon_i$ and $\hatg$ gives,
+
+$$
+\epsilon_i = \frac{\log(t_i) - \hatg_m(\xx_i)}{\sigma}.
+$$ {#eq-aft-error}
+
+By assuming a distribution on $\epsilon_i$, a distribution is assumed for the full parametric distribution of the survival time, giving the AFT log-likelihood [@Klein2003],
+
+$$
+\begin{aligned}
+-\ell^{AFT}(g, \sigma)
+& = -\sum^n_{i=1} \Bigg[ \delta_i\Bigg(- \log{\sigma} + \log f_{\epsilon}\Big(\frac{\log(t_i) - g(\xx_i)}{\sigma}\Big)\Bigg) \\
+& + (1-\delta_i)\Bigg(\log S_{\epsilon}\Big(\frac{\log(t_i) - g(\xx_i)}{\sigma}\Big)\Bigg) \Bigg]
+\end{aligned},
+$$ {#eq-aft-likelihood}
+
+where $f_{\epsilon}, S_{\epsilon}$ are the density and survival functions of $\epsilon$ respectively assuming a shared error distribution for all observations, and the expressions within $f_{\epsilon}$ and $S_{\epsilon}$ are a substitution of the error term (@eq-aft-error).
+At iteration $m$, (@eq-aft-likelihood) is evaluated at $(\hat{g}_{m-1}, \hat{\sigma}_{m-1})$ to compute the pseudo-residuals used to update $\hat{g}_m$ following Algorithm 2,
+
+$$
+r_{im} = -\frac{\partial(-\ell^{AFT}(\hat{g}_{m-1}, \hat{\sigma}_{m-1}))}{\partial \hat{g}_{m-1}(\xx_i)}.
+$$
+
+The only change to the algorithm is a final step in each iteration where the scale parameter is re-estimated conditional on the updated $\hat{g}_m$, by minimizing (@eq-aft-likelihood) with respect to $\sigma$:
+
+$$
+\hat{\sigma}_m := \argmin_{\sigma > 0} \ -\ell^{AFT}(\hatg_m, \sigma),
+$$
+
+which is the conditional maximum likelihood estimate of $\sigma$ given the current boosted fit and is usually obtained by a one-dimensional numerical optimization over $\sigma > 0$.
+
+As well as boosting fully-parametric AFTs, one could consider boosting semi-parametric AFTs, for example, with the Gehan loss [@Johnson2011] or using Buckley-James imputation [@Wang2010].\index{gradient boosting machines!Buckley-James}
+However, known problems with semi-parametric AFT models and the Buckley-James procedure [@Wei1992], as well as a lack of off-the-shelf implementation, mean that these methods appear to be rarely used in practice.
+
+The flexibility of boosting allows extensions to other censoring and truncation types to follow simply by replacing the likelihood functions above with the corresponding objective functions in @sec-surv-estimation-param.
+
+#### Penalized boosting
+
+'CoxBoost' [@Binder2008] is an alternative method to boost Cox models and has been demonstrated to perform well in experiments [@Burk2026].
+The algorithm can be interpreted as a _componentwise_ boosting procedure for Cox models, where at each iteration a single covariate is selected, alongside mandatory (or 'forced') covariates, and coefficients are updated using a penalized second-order optimization step [@Binder2008].\index{gradient boosting machines!CoxBoost}\index{gradient boosting machines!componentwise}\index{penalization}
+In medical domains the inclusion of mandatory covariates may be essential, either for model interpretability, or due to prior expert knowledge.
+CoxBoost deviates from Algorithm 2 by instead using an offset-based approach for generalized linear models [@Tutz2007].
+
+As this method is more technically involved than standard gradient boosting, consider the following motivational example (@tbl-coxboost).
+Suppose treatment group is considered clinically essential and must always be included in the model, while age and a biomarker are optional covariates.
+In each boosting iteration, CoxBoost considers candidate updates componentwise by adding one optional covariate at a time to the mandatory covariate.
+In this example, the two candidate updates are therefore treatment group with age or treatment group with the biomarker.
+At each iteration, the candidate update with the lower loss (in bold) is selected and added to the coefficient vector.
+For example, in iteration $1$, the update using age gives a lower loss than the update using the biomarker, so the coefficients for treatment group and age are updated.
+In iteration $2$, the update using the biomarker gives a lower loss, so the coefficients for treatment group and the biomarker are updated instead.
+The optional covariate that is not selected in a given iteration is left unchanged.
+The running coefficient vector $\hat{\bsbeta}_m$ plays the same role as the cumulative boosted predictor $\hatg_m$ in Algorithm 2.
+The vector $\hat{\bsgamma}_{mk}$ is the candidate increment being considered in iteration $m$ for candidate set $k$.
+For the selected candidate $k^*$, $\hat{\bsgamma}_{mk^*}$ is added to $\hat{\bsbeta}_{m-1}$ to obtain $\hat{\bsbeta}_m$, analogous to adding the new learner contribution $\alpha \tilde{g}_m$ in standard gradient boosting.
+
+| $m$ | Candidate covariate | Loss after update | $\hat{\gamma}_{mk^*,\text{trt}}$ | $\hat{\gamma}_{mk^*,\text{opt}}$ | $\hat{\beta}_{m,\text{trt}}$ | $\hat{\beta}_{m,\text{age}}$ | $\hat{\beta}_{m,\text{bio}}$ |
+|---:|:---|---:|:---:|---:|---:|---:|---:|
+| 0 | -- | -- | -- | -- | 0.00 | 0.00 | 0.00 |
+| 1 | Age | **1.42** | 0.08 | 0.15 | 0.08 | 0.15 | 0.00 |
+| 1 | Biomarker | 1.55 | -- | -- | 0.08 | 0.15 | 0.00 |
+| 2 | Age | 1.31 | -- | -- | 0.08 | 0.15 | 0.00 |
+| 2 | Biomarker | **1.20** | 0.03 | 0.20 | 0.11 | 0.15 | 0.20 |
+| 3 | Age | **1.11** | -0.02 | 0.06 | 0.09 | 0.21 | 0.20 |
+| 3 | Biomarker | 1.18 | -- | -- | 0.09 | 0.21 | 0.20 |
+: Three iterations of the CoxBoost algorithm with one mandatory covariate 'trt' and two optional covariates 'age' and 'bio'. First column is iteration number, with one row per candidate optional covariate. Second column is the covariate under consideration with the resulting loss in third column (bold is the smaller loss and therefore the selected covariate). Columns four and five are the incremental updates in iteration $m$ to the mandatory covariate and the selected optional covariate; in practice, increments are estimated for all candidate sets in each iteration, but only the increments for the selected candidate $k^*$ are shown here for clarity. Columns six to eight are the accumulated coefficients for all covariates. {#tbl-coxboost}
+
+After the final iteration in @tbl-coxboost, the fitted model for observation $i$ is therefore
+
+$$
+\hat{h}(\tau \mid \xx_i) = \hat{h}_0(\tau)\exp(0.09x_{i,\mathrm{trt}} + 0.21x_{i,\mathrm{age}} + 0.20x_{i,\mathrm{bio}}),
+$$
+
+where the coefficients are the final accumulated values in $\hat{\bsbeta}_3$.
+
+To formally introduce the model, let $\calI = \{1,\ldots,p\}$ be the indices of the covariates, let $\calI_{\text{mand}}$ be the indices of the mandatory covariates that _must_ be included in all iterations, and let $\calI_{\text{opt}} = \calI \setminus \calI_{\text{mand}}$ be the indices of the optional covariates that _may_ be included in any iteration.
+In each iteration, the algorithm considers models that include all mandatory covariates together with a single optional covariate, selecting the covariate that yields the greatest improvement in the penalized likelihood:
+
+$$
+\calI_{mk} = \calI_{\text{mand}} \cup \{k\}, \quad k \in \calI_{\text{opt}}.
+$$
+
+In addition, a penalty matrix $\mathbf{P} \in \Reals^{p \times p}$ is considered such that $P_{ii} > 0$ implies that covariate $i$ is penalized and $P_{ii} = 0$ means no penalization.
+In practice, this is usually a diagonal matrix [@Binder2008] and by setting $P_{ii} = 0, i \in \calI_{\text{mand}}$ and $P_{ii} > 0, i \not\in \calI_{\text{mand}}$, only optional (non-mandatory) covariates are penalized.
+The penalty matrix *can* vary with each iteration, which allows for a highly flexible approach.
+In practice, a simpler approach is to use the same penalty matrix in each iteration and to apply the same penalty factor to all penalized covariates [@pkgcoxboost].
+
+At the $m$th iteration and the $k$th set of indices to consider, the penalized partial log-likelihood is given by,
+
+$$
+\begin{aligned}
+&l_{pen}(\bsgamma_{mk}) = \\
+&\sum_{\tau=1}^{\tilde{n}} \left[\eta_{i_{(\tau)},m-1} + \xx_{i_{(\tau)},\calI_{mk}}^\trans\bsgamma_{mk} - \log\left(\sum_{j \in \calR_{t_{(\tau)}}} \exp\left(\eta_{j,m-1} + \xx_{j,\calI_{mk}}^\trans\bsgamma_{mk}\right)\right)\right] - \lambda\bsgamma^\trans_{mk}\mathbf{P}\bsgamma_{mk}.
+\end{aligned}
+$$ {#eq-coxboost}
+
+where $\eta_{i,m} = \xx_i^\trans \bsbeta_m$, $\bsgamma_{mk}$ are the coefficient updates corresponding to the candidate covariate set $\calI_{mk}$, $\mathbf{P}$ is the penalty matrix (assuming the same in every iteration), $\lambda$ is a penalty hyperparameter, and $t_{(\tau)}$ is the $\tau$th ordered event time for $\tilde{n} < n$ unique event times (assuming no ties).
+
+In each iteration, all potential candidate sets are considered and the optimal set is the one that results in the largest improvement in the penalized partial log-likelihood.
+Note that CoxBoost uses Fisher scoring iterations to update the coefficient estimates, using both first and second derivatives, whereas standard GBMs only use first derivatives.
+
+The optimal set is then found as,
+
+$$
+k^* := \argmax_k \ l_{pen}(\hat{\bsgamma}_{mk}),
+$$
+
+and the estimated coefficients are updated by,
+
+$$
+\hat{\beta}_{m, j} =
+\begin{cases}
+\hat{\beta}_{m-1, j} + \hat{\gamma}_{mk^*,j}, & j \in \calI_{mk^*}, \\
+\hat{\beta}_{m-1, j}, & j \notin \calI_{mk^*},
+\end{cases}
+\quad j = 1, \ldots, p,
+$$
+
+where $\hat{\gamma}_{mk^*,j}$ is the $j$th element in $\hat{\bsgamma}_{mk^*}$.
+In words, $\hat{\bsbeta}_m$ is the cumulative coefficient vector after iteration $m$, while $\hat{\bsgamma}_{mk^*}$ is the selected increment at that iteration.
+Thus CoxBoost updates the fitted linear predictor by adding the selected coefficient increment, analogous to adding a new weak learner in standard gradient boosting.
+At iteration $m$, the components of $\hat{\bsbeta}$ in the optimal set $\calI_{mk^*}$ are increased by $\hat{\bsgamma}_{mk^*}$, while all other components remain unchanged.
+
+CoxBoost is extended to the competing risks setting by boosting a subdistribution PH model [@Binder2009].
+In this setting, (@eq-coxboost) is replaced by the log-likelihood from the Fine and Gray model (@sec-classical-ph-cr) with an analogous penalty function, and the remaining steps proceed similarly.\index{gradient boosting machines!CoxBoost!competing risks}
+
+### Measure-based boosting {#sec-boost-loss}
+
+Instead of optimizing a likelihood tied to a specific model form, such as a PH or AFT model, boosting can also directly optimize an evaluation measure (Part II).\index{gradient boosting machines!concordance boosting}
+Common choices are discrimination measures, such as Uno's or Harrell's C [@Chen2013; @Mayr2014].
+
+Consider Uno's C (@sec-cindex), which at iteration $m$ is evaluated using the prediction from the previous iteration, $\hat{g}_{m-1}$:
+
+$$
+\begin{aligned}
+&C_U(\hat{g}_{m-1}, \XX, \tt, \bsdelta \mid \tau) =\\
+&\quad\frac
+{\sum_{i\neq j} \delta_i(\KMG(t_i))^{-2}\II(t_i < t_j, t_i < \tau)\II(\hat{g}_{m-1}(\xx_i) > \hat{g}_{m-1}(\xx_j))}
+{\sum_{i\neq j}\delta_i(\KMG(t_i))^{-2}\II(t_i < t_j, t_i < \tau)},
+\end{aligned}
+$$ {#eq-unoc}
+
+where $\KMG$ is the Kaplan-Meier estimate of the censoring distribution.
+
+The GBM algorithm requires that the optimized objective be differentiable with respect to $\hat{g}(\xx)$.
+However, the indicator term is not differentiable with respect to the prediction scores.
+The measure can be made differentiable by replacing the indicator with a logistic sigmoid function [@Ma2006]:
+
+$$
+K(x, y \mid \omega) = \frac{1}{1 + \exp((y - x)/\omega)},
+$${#eq-boost-logistic}
+
+where $\omega$ is a tunable hyperparameter controlling the smoothness of the approximation.
+Smaller values of $\omega$ produce a closer approximation to the indicator function but may lead to unstable gradients, whereas larger values yield smoother gradients at the cost of a poorer approximation to the indicator function.
+
+Replacing $\II(\hat{g}_{m-1}(\xx_i) > \hat{g}_{m-1}(\xx_j))$ in (@eq-unoc) with (@eq-boost-logistic) yields the smooth objective to optimize,
+
+$$
+\begin{aligned}
+&C_{\tilde{U}}(\hat{g}_{m-1}, \XX, \tt, \bsdelta \mid \omega, \tau) =\\
+&\quad\frac{\sum_{i \neq j} \delta_i (\KMG(t_i))^{-2}\II(t_i < t_j, t_i < \tau)K(\hat{g}_{m-1}(\xx_i), \hat{g}_{m-1}(\xx_j) \mid \omega)}
+{\sum_{i \ne j} \delta_i (\KMG(t_i))^{-2}\II(t_i < t_j, t_i < \tau)}.
+\end{aligned}
+$$ {#eq-surv-gbm-cus}
+
+The GBM algorithm is then followed as normal with the _negative_ smoothed C-index (@eq-surv-gbm-cus) and its gradient.
+One advantage of this method is that it may be relatively insensitive to overfitting, meaning discrimination performance can remain stable even with many boosting iterations [@Mayr2016].
+
+Similarly to likelihood boosting, flexibility is again a key advantage here for extensions to other censoring and truncation types and also to competing risks.
+For example, the all-cause logarithmic score (@sec-rules-ext) can be used to boost survival models by optimizing overall predictive performance across all competing event types [@Alberge2025].\index{gradient boosting machines!competing risks}
+
+## Conclusion
+
+:::: {.callout-warning icon=false}
+
+## Key takeaways
+
+* GBMs are a highly flexible and powerful machine learning tool due to their modular nature, where many differentiable losses and weak base learners can be combined. This makes them particularly useful in survival analysis as they can be easily adapted to different settings.
+* GBMs can perform very well in high-dimensional settings due to variable selection that can take place both during covariate selection (for componentwise models) and within the base learners (especially when using trees).
+* Boosting, especially with tree-based learners, can be increasingly difficult to interpret as the number of iterations increases. However, there are several methods for increasing interpretability, such as built-in variable importance methods and SHAP values [@Lundberg2017].
+* Boosting methods are often computationally intensive. However, dedicated software packages such as `xgboost` [@pkgxgboost] offer highly optimized implementations. This allows more complex models and extensive hyperparameter tuning to be performed within reasonable time and memory constraints, which can translate into improved predictive performance.
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* Many boosting implementations use a componentwise approach, where candidate base learners are fit to single features in each iteration and only the learner providing the greatest improvement in the objective is updated. For more information, see @Buhlmann2003; @pkgmboost; @Wang2010.
+* For linear least squares weak learners, see @Friedman2001; @Wang2010.
+* For decision tree weak learners, see @Buhlmann2003; @Friedman2001.
+* Early research into GBMs for survival analysis can be found in @Ridgeway1999.
+* Semi-parametric AFT boosting is explored in @Johnson2011 and @Wang2010.
+* The accelerated failure time model is implemented at scale in XGBoost with log-normal, log-logistic, and Weibull error distributions, providing full parametric survival distribution predictions and supporting left-, right-, and interval-censoring [@Barnwal2022].
+* For fully non-parametric hazard estimation, BoXHED is a tree-based gradient-boosted estimator of the (possibly time-varying) hazard function that accommodates time-dependent covariates, with later versions extending to recurrent events and competing risks [@pakbin.boxhed2.2023; @Wang2020].
+
+::::

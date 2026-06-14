@@ -1,0 +1,108 @@
+::: {.content-visible when-format="html"}
+{{< include _macros.tex >}}
+:::
+
+# IPCW Classification {#sec-ipcw-reduction}
+
+The inverse probability of censoring weights (IPCW; @sec-surv-ipcw) reduction transforms a survival task to a weighted classification task [@Vock2016].\index{inverse probability of censoring weights}
+It is applicable for single-event, right-censored data when the task of interest is to predict the survival probability at a single time point $\tau$ (sometimes referred to as $\tau$-year prediction in survival analysis).\index{reduction!IPCW classification}\index{t-year survival probability@$\tau$-year survival probability}
+This method is therefore particularly useful for predicting a single meaningful time point when the entire survival distribution prediction is not required.
+The reduction assumes censoring is marginally independent of the event time.
+This reduction is presented in terms of event probabilities, which are more natural in a classification setting because the positive class corresponds to the event having occurred.
+This is the complement of the usual survival probability, which can be recovered as $1$ minus the event probability.
+
+Consider a right-censored dataset $\calD = \{(\xx_i, t_i, \delta_i)\}_{i=1}^n$ with $\xx_i \in \Reals^p$ as introduced in @sec-surv. 
+The probability of an event occurring by time $\tau$ is given by the cumulative distribution function,
+
+$$
+\Pr(Y \leq \tau \mid \xx_i) = F(\tau \mid \xx_i) = 1-S(\tau \mid \xx_i),
+$$
+
+where $Y$ is the random variable representing the true event time.
+It might be tempting to estimate this probability by defining a binary target variable:
+
+$$
+e_i(\tau):= \II(t_i \leq \tau \wedge \delta_i = 1),
+$$ {#eq-binary-target}
+
+where all observations with event by time $\tau$ are considered ones (events) and all other observations zeros (non-events).
+Using (@eq-binary-target), the quantity of interest could naively be estimated with any binary classification method that outputs probabilities as
+$$
+\Pr(Y \leq \tau \mid \xx_i) = \Pr(e_i(\tau) = 1 \mid \xx_i) =: \pi(\xx_i;\tau).
+$$ {#eq-binary-prob}
+
+This approach would only work if there was no censoring before $\tau$ in the data.
+In the presence of censoring, (@eq-binary-target) does not define a valid target variable: an observation $i$ censored before $\tau$ is neither an event, nor a confirmed non-event; it is simply unknown if the event would have occurred had follow-up been allowed to continue.
+Removing such observations would introduce a form of selection bias (@sec-intro), skewing the average survival time to be longer than in reality, but treating them as events would introduce another form of bias by artificially increasing the probability of experiencing the event.
+
+@Vock2016 adapt the estimation procedure to obtain unbiased estimates of (@eq-binary-prob) by calculating weights for each observation,
+
+$$
+\tilde{w}_i(\tau) = \begin{cases}
+0, & \text{if } t_i < \tau \wedge \delta_i = 0,\\
+\left[\KMG(\min(t_i, \tau))\right]^{-1}, & \text{otherwise},
+\end{cases}
+$$ {#eq-adapted-ipc-weights}
+
+where $\KMG$ is the Kaplan-Meier estimate of the censoring distribution (@sec-surv-ipcw).
+Hence, observations censored before $\tau$ receive weight zero (thus removed) and the remaining observations are upweighted to compensate for information loss.
+
+These weights are integrated into the estimation procedure by optimizing a weighted objective function, allowing the binary target variable in (@eq-binary-target) to be used as the target in a weighted classification problem.
+Let $\ell(e_i(\tau), \pi(\xx_i;\tau))$ be some pointwise loss, then any learner that can handle weights (true for most popular machine learning methods) can be trained to optimize:
+<!--  -->
+$$
+L(\pi,\tau) = \sum_{i=1}^n \tilde{w}_i(\tau) \ell(e_i(\tau), \pi(\xx_i;\tau)).
+$$ {#eq-ipcw-loss-weighted}
+<!--  -->
+
+The exact form of (@eq-ipcw-loss-weighted) depends on the choice of learner and objective function. 
+For example, let $\ell$ be the log loss,
+
+$$
+\ell(e_i(\tau), \pi(\xx_i;\tau)) = -\left[e_i(\tau)\log(\pi(\xx_i;\tau)) + (1-e_i(\tau))\log(1 - \pi(\xx_i;\tau))\right],
+$$
+
+then (@eq-ipcw-loss-weighted) becomes:
+
+$$
+L(\pi,\tau) = -\sum_{i=1}^n \tilde{w}_i(\tau) \left[e_i(\tau)\log(\pi(\xx_i;\tau)) + (1-e_i(\tau))\log(1 - \pi(\xx_i;\tau))\right].
+$$
+
+This simple reduction lets practitioners estimate $\tau$-year survival probabilities\index{t-year survival probability@$\tau$-year survival probability} for right-censored data using classification learners, but several important aspects warrant consideration.
+First, while the weighting in (@eq-ipcw-loss-weighted) takes into account censoring, the success of the predictions still depends on the choice of model and loss function.
+For example, the estimates might not be well-calibrated if the chosen loss function does not yield well-calibrated probabilities (like the hinge loss used by support vector machines).
+Second, predictions cannot be evaluated using binary classification metrics as the test data will still include censored observations.
+Instead, one should use survival metrics, such as survival scoring rules\index{scoring rules} (@sec-rules) and concordance indices\index{concordance index} (@sec-eval-crank). 
+Finally, (@eq-adapted-ipc-weights) implies that contributions of observations censored before time $\tau$ are multiplied by zero in (@eq-ipcw-loss-weighted).
+Algorithmically, it may be more efficient to remove censored observations from the training data to avoid unnecessary computations of the loss.
+However, this should only be done with care, especially when using resampling techniques such as cross-validation, as censored observations are still required for evaluation.
+
+## Conclusion
+
+:::: {.callout-warning icon=false}
+
+## Key takeaways
+
+* The IPCW reduction transforms a survival task to a weighted classification task and can greatly simplify the estimation of survival probabilities at a specific time point of interest by enabling binary classification learners to be used.
+* Learners that support gradient-based optimization such as gradient boosting and deep learning are particularly well suited for this task, as they support specification of (custom) loss functions and integration of weights.
+* Currently, the IPCW approach has only been described in detail for right-censored data. Extensions to other settings might be possible, but have not yet been explored.
+* Extensions to event history analysis have also not been well-explored, though an extension to competing risks has been recently proposed (see further reading).
+
+::::
+
+:::: {.callout-tip icon=false}
+
+## Further reading
+
+* @Vock2016 provide the main reference where they explicitly show how different learners (logistic regression, Bayesian networks, decision trees and k-nearest neighbors) can be adapted to obtain estimates of the event probability.
+* @gonzalezginestet2021stackedinverse introduce extensions to the competing risks setting.
+  
+::::
+
+
+
+
+
+
+
+
