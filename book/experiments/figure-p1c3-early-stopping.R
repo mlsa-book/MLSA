@@ -6,12 +6,12 @@
 # tracked over iterations. Because the fully converged (OLS) fit overfits the
 # small training set, the validation loss is U-shaped, illustrating early stopping.
 #
-# Output: book/Figures/introduction/early-stopping.png
+# Output: book/Figures/ml/fig-p1c3-early-stopping.png
 
 library(ggplot2)
 
 exp_dir <- "book/experiments"
-fig_dir <- "book/Figures/introduction"
+fig_dir <- "book/Figures/ml"
 dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
 
 ## ---- Data: reuse the gradient-descent example dataset --------------------
@@ -91,12 +91,15 @@ g <- ggplot(dat, aes(iter, loss, colour = set)) +
   scale_y_continuous(expand = expansion(mult = c(0.04, 0.08))) +
   scale_colour_manual(values = cols, name = NULL) +
   labs(x = "Iteration", y = "Loss (MSE)") +
-  theme_bw() +
-  theme(legend.position = c(0.015, 0.985), legend.justification = c(0, 1),
-        legend.background = element_rect(fill = "white", colour = "grey80"))
+  theme_bw(base_size = 13) +
+  theme(legend.position = "right", aspect.ratio = 1)
 
-ggsave(file.path(fig_dir, "early-stopping.png"), g,
-       width = 6, height = 3, units = "in", dpi = 600)
+ggsave(file.path(fig_dir, "fig-p1c3-early-stopping.png"), g,
+       width = 6.5, height = 5.5, units = "in", dpi = 600)
+## crop surrounding white margin (square panel leaves vertical whitespace)
+system2("convert", c(file.path(fig_dir, "fig-p1c3-early-stopping.png"),
+                     "-trim", "+repage", "-bordercolor", "white", "-border", "12x12",
+                     file.path(fig_dir, "fig-p1c3-early-stopping.png")))
 
 cat(sprintf("Early-stopping iteration: %d (of %d)\n", stop_it, n_steps))
 cat(sprintf("Val MSE at stop = %.1f; final val MSE = %.1f\n",

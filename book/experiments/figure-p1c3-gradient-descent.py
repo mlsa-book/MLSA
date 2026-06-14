@@ -1,7 +1,7 @@
 """Generate the loss-surface + gradient-descent figure for the
 "Gradient descent" section of the ML chapter (P1C3).
 
-Output: ``book/Figures/introduction/gradient-descent.png``.
+Output: ``book/Figures/ml/fig-p1c3-gradient-descent.png``.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ import pandas as pd  # noqa: E402
 
 
 EXP_DIR = Path(__file__).resolve().parent
-FIG_DIR = EXP_DIR.parent / "Figures" / "introduction"
+FIG_DIR = EXP_DIR.parent / "Figures" / "ml"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -112,7 +112,7 @@ ax.set_ylim(t1_grid.min(), t1_grid.max())
 ax.legend(loc="upper right", frameon=True, fontsize=14)
 
 fig.tight_layout()
-out = FIG_DIR / "gradient-descent.png"
+out = FIG_DIR / "fig-p1c3-gradient-descent.png"
 fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="white")
 plt.close(fig)
 print(f"Saved {out}")

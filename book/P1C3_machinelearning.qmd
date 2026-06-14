@@ -23,7 +23,7 @@ For example, predicting someone's height is a supervised learning problem as dat
 Alternatives to supervised learning include *unsupervised learning*\index{unsupervised learning}, *semi-supervised learning*\index{semi-supervised learning}, and *reinforcement learning*\index{reinforcement learning}.
 This book is primarily concerned with *predictive* survival analysis, which means making future predictions based on observed outcomes, a paradigm that fits naturally within supervised learning\index{predicting}.
 
-The basic machine learning workflow is represented in @fig-ml-basic:
+The basic machine learning workflow is represented in @fig-p1c3-ml-basic:
 
 1. **Data splitting:** Data is split into training and test datasets\index{training data}\index{testing data}.
 2. **Training:** A learner\index{learner} is selected and is trained on the training data, inducing a fitted model.
@@ -33,9 +33,8 @@ The basic machine learning workflow is represented in @fig-ml-basic:
 The process of (repeatedly) splitting the data into training and test data is called *resampling*\index{resampling} and running multiple resampling experiments with different models is called *benchmarking*\index{benchmarking}.
 All these concepts will be explained in this chapter. 
 
-![Basic machine learning workflow with data splitting, model training, predicting, and evaluating. Image from @Foss2024 (CC BY-NC-SA 4.0).](Figures/ml/resampling.png){#fig-ml-basic}
+![Basic machine learning workflow. The available data $\mathcal{D}$ is split into a training and a test set. A learner is trained on the training data, inducing a fitted model $\hat{g}$; the model is applied to the test features $\mathbf{X}_*$ to produce predictions $\hat{\mathbf{y}}_*$, which are compared with the test labels $\mathbf{y}_*$ by a performance measure.](Figures/ml/fig-p1c3-ml-basic.png){#fig-p1c3-ml-basic width=100% fig-align="center" fig-alt="Flow diagram in four stages from left to right. Data splitting: a Data hexagon branches into a Training data hexagon and a Test data hexagon. Training: the training data feeds a Learner box, which produces a Model box. Prediction: an arrow from the model and an arrow from the test Features hexagon meet at a junction that forms the Predictions hexagon. Evaluation: the predictions and the test Labels hexagon feed a Measure box, which outputs a Performance hexagon."}
 
-<!-- TODO (ANDREAS): OPTIONAL REMAKE FIGURE USING THE SAME STYLE AS THE REST OF THE BOOK OR KEEP THIS BUT ASK BERND FOR PERMISSION. ADD FIG-ALT -->
 
 ## Tasks {#sec-ml-tasks}
 
@@ -173,7 +172,7 @@ $k$-fold cross-validation (CV)\index{resampling!cross-validation} can be used as
 $k$-fold CV partitions the data into $k$ subsets, called *folds*.
 The training data consists of $k-1$ of the folds and the remaining one is used for testing and evaluation.
 This is repeated $k$ times until each of the folds has been used exactly once as the testing data.
-The performance from each fold is averaged into a final performance estimate (@fig-ml-cv).
+The performance from each fold is averaged into a final performance estimate (@fig-p1c3-cv).
 It is common to use $k = 5$ or $k = 10$ [@Breiman1992; @Kohavi1995].
 This process can be repeated multiple times (*repeated $k$-fold CV*)\index{resampling!cross-validation} and/or $k$ can even be set to $n$, which is known as *leave-one-out cross-validation*.
 
@@ -182,9 +181,8 @@ This is important, and often recommended, in survival analysis to ensure that th
 Other resampling mechanisms may also be useful for event history analysis\index{event history analysis} (@sec-eha).
 For example, stratifying with respect to different competing risks\index{competing risks}, or using more complex resampling schemes that can handle non-independent observations for recurrent events\index{recurrent events} data [@Hornung2023].
 
-![Three-fold cross-validation. In each iteration a different dataset is used for predictions and the other two for training. The performance from each iteration is averaged into a final, single metric. Image from @Casalicchio2024 (CC BY-NC-SA 4.0).](Figures/ml/cv.png){#fig-ml-cv}
+![Three-fold cross-validation. The data is partitioned into three folds; across the three iterations each fold is held out once for testing (highlighted) while the remaining two folds are used for training. The same learner is trained on every fold's training data, yielding a fold-specific model $\hat{g}^{(k)}$ that is evaluated on the held-out fold via a performance measure. The three per-fold measures are averaged into a single cross-validation performance estimate.](Figures/ml/fig-p1c3-cv.png){#fig-p1c3-cv width=100% fig-align="center" fig-alt="Diagram with three rows, one per fold. In each row the data is drawn as three hexagons, two training folds and one test fold, with the held-out test fold in a different position in each row. The training folds of every row connect, via a bracket per fold, into a single shared Learner box in the centre. The Learner emits three Models, one per fold row. For each fold the test fold supplies features and labels (dotted lines) that combine with the model output in a Measure box, and the three Measure boxes feed a single CV performance hexagon (mean score) on the right."}
 
-<!-- TODO (ANDREAS): OPTIONAL REMAKE FIGURE USING THE SAME STYLE AS THE REST OF THE BOOK OR KEEP THIS BUT ASK BERND FOR PERMISSION. ADD FIG-ALT -->
 
 Repeating resampling experiments with multiple models is referred to as a *benchmark experiment*\index{benchmarking}.
 A benchmark experiment compares models by evaluating their performance on *identical* data, which means the same resampling\index{resampling} strategy and folds should be used for all models.
@@ -223,12 +221,12 @@ For example, the regularization parameter, $\gamma$, in ridge regression\index{r
 This hyperparameter may be tuned over a range of values, say $[0.1, 25]$, or over a discrete subset, for example $\{0.1, 10, 25\}$.
 Using the discrete example, tuning the regularization parameter would effectively involve comparing three independent ridge regression models in a benchmark experiment with $\gamma=0.1$, $\gamma=10$, and $\gamma=25$ respectively.
 The value of $\gamma$ that results in the model with the optimal performance is then selected for the hyperparameter value going forward.
-*Nested resampling*\index{resampling!nested} is a method to reduce bias that could occur from using overlapping data for tuning, training, or testing [@Simon2007].
-Nested resampling is the process of resampling the training set again for tuning before then refitting the optimal model on the entire training data (@fig-ml-nested).
-
-![An illustration of nested resampling. The large blocks represent three-fold CV for the outer resampling for model evaluation and the small blocks represent four-fold CV for the inner resampling for hyperparameter optimization. The light blue blocks are the training sets and the dark blue blocks are the test sets. Image and caption from @Becker2024 (CC BY-NC-SA 4.0).](Figures/ml/nested.png){#fig-ml-nested}
-
-<!-- TODO (ANDREAS): OPTIONAL REMAKE FIGURE USING THE SAME STYLE AS THE REST OF THE BOOK OR KEEP THIS BUT ASK BERND FOR PERMISSION. ADD FIG-ALT -->
+*Nested resampling*\index{resampling!nested} reduces the optimistic bias that arises when the same data is used both to tune hyperparameters and to estimate performance [@Simon2007].
+It nests two resampling loops.
+In the *outer* loop, the data is split by an outer resampling scheme (for example, three-fold CV as in @fig-p1c3-cv) into outer-training and outer-test sets that are used to estimate performance.
+Each outer-training set is then resampled again in an *inner* loop (for example, four-fold CV), and this inner resampling is used only for tuning: the candidate hyperparameter configurations are compared on the inner folds, which never include the corresponding outer-test set.
+The best configuration found in the inner loop is then used to refit the model on the entire outer-training set, and this refitted model is evaluated once on the held-out outer-test set.
+Averaging the outer-test scores over all outer folds yields an approximately unbiased estimate of the performance of the entire modelling pipeline, tuning included.
 
 ## Parameter optimization
 
@@ -316,12 +314,12 @@ $$
 As can be seen, each gradient-descent step updates all parameters simultaneously.
 
 Linear regression minimized by the mean squared error has a known, closed form expression (ordinary least squares, OLS).
-@fig-gradient-descent illustrates gradient descent for an example with more observations, comparing the gradient descent procedure to the known closed form optimum.
+@fig-p1c3-gradient-descent illustrates gradient descent for an example with more observations, comparing the gradient descent procedure to the known closed form optimum.
 The contours show the loss surface of $L(\bstheta)$ over the two-dimensional parameter space; lighter colors correspond to a smaller loss.
 Starting from a deliberately poor initial guess (green square), gradient descent traces the blue path along the loss surface and finishes (red circle) at the known closed form optimum (black cross).
 At every step, the update moves in the direction $-\nabla_{\bstheta} L$; as the gradient becomes smaller near the optimum, the parameter updates also become smaller.
 
-![Gradient descent on a two-parameter linear regression problem. Contours and color show the mean squared error loss $L(\bstheta)$ from (@eq-ml-mse) in the parameter space $(\beta_0 \ \beta_1)^\trans$. The black cross marks the closed-form ordinary least squares (OLS) optimum. From the start point (green square), gradient descent follows the blue path of (@eq-ml-gd), ending close to the optimum (red circle).](Figures/introduction/gradient-descent.png){#fig-gradient-descent fig-alt="Filled contour plot of the loss over the two-dimensional parameter space with beta_0 (intercept) on x-axis and beta_1 (slope) on y-axis. The plot shows that the initial guess (around (8, 1) and represented by a green square) is far from the truth but through using gradient descent each guess is one step closer to the optimum, which eventually is found (around (-6, 5.5) and represented by a red dot that is on top of a black cross)." width=70%}
+![Gradient descent on a two-parameter linear regression problem. Contours and color show the mean squared error loss $L(\bstheta)$ from (@eq-ml-mse) in the parameter space $(\beta_0 \ \beta_1)^\trans$. The black cross marks the closed-form ordinary least squares (OLS) optimum. From the start point (green square), gradient descent follows the blue path of (@eq-ml-gd), ending close to the optimum (red circle).](Figures/ml/fig-p1c3-gradient-descent.png){#fig-p1c3-gradient-descent fig-align="center" fig-alt="Filled contour plot of the loss over the two-dimensional parameter space with beta_0 (intercept) on x-axis and beta_1 (slope) on y-axis. The plot shows that the initial guess (around (8, 1) and represented by a green square) is far from the truth but through using gradient descent each guess is one step closer to the optimum, which eventually is found (around (-6, 5.5) and represented by a red dot that is on top of a black cross)." width=70%}
 
 Adaptations to gradient descent, including stochastic gradient descent and mini-batching, are discussed in @sec-nn-batches.
 
@@ -337,11 +335,11 @@ This validation set is typically a subset of the training dataset, meaning that 
 These datasets can be created using any of the resampling methods in @sec-ml-resampling.
 As discussed in @sec-ml-evaluation, evaluating a model on the training data results in overoptimistic estimates of the true generalization error.
 As the number of iterations increases, the training error decreases steadily, whereas the validation error typically decreases at first and then begins to increase once the model starts to overfit.
-@fig-early-stopping illustrates this on the gradient-descent example of @sec-ml-gradient-descent, using part of the data for training and the remainder for validation.
+@fig-p1c3-early-stopping illustrates this on the gradient-descent example of @sec-ml-gradient-descent, using part of the data for training and the remainder for validation.
 
-![Early stopping on the gradient-descent example (@sec-ml-gradient-descent), with part of the data used for training and the rest for validation. As gradient descent proceeds, the training loss decreases steadily, whereas the validation loss first decreases and then increases as the model begins to overfit. Early stopping returns the model from the iteration with the lowest validation loss (dashed line); the shaded region marks the overfitting iterations that are avoided.](Figures/introduction/early-stopping.png){#fig-early-stopping fig-alt="Line plot with iteration on a logarithmic x-axis (1, 10, 100, 1000, 10000) and loss (mean squared error) on the y-axis. A blue training-loss curve decreases steadily and flattens at a low value. A red validation-loss curve decreases to a minimum around iteration 200, marked by a dashed vertical line and a red point, and then rises steeply to a high value. The region to the right of the minimum is lightly shaded to indicate the overfitting iterations that early stopping avoids."}
+![Early stopping on the gradient-descent example (@sec-ml-gradient-descent), with part of the data used for training and the rest for validation. As gradient descent proceeds, the training loss decreases steadily, whereas the validation loss first decreases and then increases as the model begins to overfit. Early stopping returns the model from the iteration with the lowest validation loss (dashed line); the shaded region marks the overfitting iterations that are avoided.](Figures/ml/fig-p1c3-early-stopping.png){#fig-p1c3-early-stopping width=70% fig-align="center" fig-alt="Line plot with iteration on a logarithmic x-axis (1, 10, 100, 1000, 10000) and loss (mean squared error) on the y-axis. A blue training-loss curve decreases steadily and flattens at a low value. A red validation-loss curve decreases to a minimum around iteration 200, marked by a dashed vertical line and a red point, and then rises steeply to a high value. The region to the right of the minimum is lightly shaded to indicate the overfitting iterations that early stopping avoids."}
 
-Theoretically, training could be stopped as soon as the validation loss starts to increase, visualized by the red point in @fig-early-stopping.
+Theoretically, training could be stopped as soon as the validation loss starts to increase, visualized by the red point in @fig-p1c3-early-stopping.
 However, the validation loss rarely improves smoothly from one iteration to the next, so a _patience_ hyperparameter is used, which is the number of consecutive iterations in which the validation loss must fail to improve before stopping the training algorithm.\index{early stopping!patience}
 Early stopping is computationally cheaper than tuning the number of iterations directly (@sec-ml-opt), which would require repeatedly fitting complete models.
 Early stopping can also be viewed as a form of regularization\index{regularization}, as limiting the number of iterations restricts how closely the model can fit the training data, in a similar spirit to how shrinkage or penalty terms constrain model complexity.
