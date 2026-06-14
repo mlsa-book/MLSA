@@ -52,7 +52,7 @@ plot_rmst <- function(df, group, tau = 6) {
       parse = TRUE,
       ## Left-anchored (hjust = 0) just inside the y-axis. Kept moderate so the
       ## label does not run into the dotted tau guide line at x = tau.
-      size = 4.5,
+      size = 4,
       hjust = 0
     ) +
     labs(
