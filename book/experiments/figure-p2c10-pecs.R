@@ -1,6 +1,8 @@
-## Prediction error curves (PECs) for @fig-eval-pecs (P2C10_rules.qmd)
+## Prediction error curves (PECs) for @fig-p2c10-pecs (P2C10_rules.qmd)
 ##
-## Recreates book/Figures/evaluation/pecs.png:
+## Output: book/Figures/evaluation/fig-p2c10-pecs.png
+##
+## Recreates book/Figures/evaluation/fig-p2c10-pecs.png:
 ##   x = time, y = survival Brier / Graf score (the "loss") at each time point
 ##   Cox PH (red) vs survival SVM (blue); Cox PH is the better (lower) curve.
 ##
@@ -90,15 +92,18 @@ g <- ggplot(df, aes(x = time, y = Loss, color = Model)) +
   geom_line(linewidth = 0.8) +
   scale_color_manual(values = c("Cox PH" = "#D7191C", "SVM" = "#2C7BB6")) +
   labs(x = "Time", y = "Loss", color = "Model") +
-  ylim(0, NA)
+  ylim(0, NA) +
+  theme(aspect.ratio = 1)            # square panel, consistent with sibling curves
 
-ggsave("book/Figures/evaluation/pecs.png", g,
-       width = 7, height = 4.5, units = "in", dpi = 300)
+pecs_png <- "book/Figures/evaluation/fig-p2c10-pecs.png"
+ggsave(pecs_png, g, width = 6, height = 5, units = "in", dpi = 600)
+## crop surrounding white margin (square panel leaves vertical whitespace)
+system2("convert", c(pecs_png, "-trim", "+repage",
+                     "-bordercolor", "white", "-border", "12x12", pecs_png))
 
 ## keep the rendered _book copy in sync
 if (dir.exists("book/_book/Figures/evaluation")) {
-  ggsave("book/_book/Figures/evaluation/pecs.png", g,
-         width = 7, height = 4.5, units = "in", dpi = 300)
+  file.copy(pecs_png, "book/_book/Figures/evaluation/fig-p2c10-pecs.png", overwrite = TRUE)
 }
 
 cat("Cox PH integrated Brier:", as.numeric(pcox$score(msr("surv.graf"))), "\n")
