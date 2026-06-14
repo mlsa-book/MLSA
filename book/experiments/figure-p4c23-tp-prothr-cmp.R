@@ -1,13 +1,16 @@
+## Output: book/Figures/reductions/fig-p4c23-tp-prothr-cmp.png
+##
 ## Standalone reproducer for the multi-state reduction example in P4C23:
 ##   AJ (split by treatment) vs XGBoost-Poisson trained on the multi-state
 ##   PED via the two-stage reduction
 ##     (1) multi-state -> transition-specific single-event with left-truncation
 ##     (2) single-event LT -> Poisson regression on PED (partition-based)
-##   producing book/Figures/reductions/tp-prothr-cmp.png.
 ##
 ## The integrated version is in code.R (the prothr MS comparison block);
 ## this script duplicates the dependencies inline so it can be run on its
 ## own as a quick check.
+
+source("book/experiments/figure-prep.R")
 
 suppressPackageStartupMessages({
   library(mstate); library(survival)
@@ -126,15 +129,15 @@ p_tp_cmp <- ggplot(df_tp_cmp,
                        colour = Treatment, linetype = method)) +
   geom_step(linewidth = 0.7) +
   facet_wrap(~ transition) +
-  scale_colour_manual(values = c("steelblue", "firebrick4")) +
-  scale_linetype_manual(values = c("AJ" = "solid", "XGBoost" = "dotted")) +
+  scale_colour_manual(values = c(Placebo = "#0072B2", Prednisone = "#D55E00"),
+                      name = "Treatment") +
+  scale_linetype_manual(values = c("AJ" = "dotted", "XGBoost" = "solid"),
+                        name = "Method") +
   coord_cartesian(xlim = c(0, 4000), ylim = c(0, 1)) +
-  labs(x = "Time", y = "Transition probability", linetype = "Method") +
-  theme_bw(base_size = 12) +
-  theme(legend.position = "bottom", legend.box = "horizontal",
-        panel.grid.minor = element_blank(),
-        strip.text = element_text(face = "bold"))
+  labs(x = "Time", y = "Transition probability") +
+  theme(legend.position = "right",
+        panel.grid.minor = element_blank(), text = element_text(size = 15))
 
-ggsave("Figures/reductions/tp-prothr-cmp.png", p_tp_cmp,
-       width = 8, height = 6.5, dpi = 300)
-cat("Saved book/Figures/reductions/tp-prothr-cmp.png\n")
+save_fig(p_tp_cmp, "book/Figures/reductions/fig-p4c23-tp-prothr-cmp.png",
+         width = 8, height = 6.5, trim = FALSE)
+cat("Saved fig-p4c23-tp-prothr-cmp.png\n")
