@@ -47,7 +47,7 @@ plot_rmst <- function(df, group, tau = 6) {
       x = 0.25,
       y = 0.4,
       label = as.expression(
-        bquote(RMST[.(group)] * "(" * .(tau) * ")" == .(round(rmst_hat, 1)))
+        bquote(RMST[.(group)] * "(" * .(tau) * ")" == .(format(round(rmst_hat, 2), nsmall = 2)))
       ),
       parse = TRUE,
       ## Left-anchored (hjust = 0) just inside the y-axis. Kept moderate so the
