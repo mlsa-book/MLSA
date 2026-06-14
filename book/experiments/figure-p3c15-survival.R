@@ -32,8 +32,8 @@ g_svm_surv <- ggplot(df, aes(x, y)) +
   ) +
   annotate(
     "text",
-    x = 4.6, y = 6.45,
-    label = expression(zeta[i]^"*" * "," ~ i %in% U),
+    x = 4.8, y = 6.45,
+    label = expression(zeta[i]^"*" * "," ~ i %in% LB),
     size = 5
   ) +
 
@@ -45,12 +45,10 @@ g_svm_surv <- ggplot(df, aes(x, y)) +
   ) +
   annotate(
     "text",
-    x = 6.2, y = 2.15,
-    label = expression(zeta[i]^minute * "," ~ i %in% L),
+    x = 6.5, y = 2.15,
+    label = expression(zeta[i]^minute * "," ~ i %in% UB),
     size = 5
   ) +
-
-  annotate("text", x = 7.2, y = 7.7, label = "t", size = 6) +
 
   geom_point(
     aes(shape = support, color = support),
@@ -59,7 +57,7 @@ g_svm_surv <- ggplot(df, aes(x, y)) +
   ) +
 
   coord_cartesian(xlim = c(0.6, 8), ylim = c(0.5, 8.4), expand = FALSE) +
-  labs(x = "x", y = "g(x)") +
+  labs(x = "x", y = "t") +
   theme(aspect.ratio = 1)            # square panel -> diagonal reads at ~45 deg
 
 save_fig(g_svm_surv, "book/Figures/svm/fig-p3c15-survival.png",

@@ -60,11 +60,11 @@ g_svm <- ggplot(df, aes(x, y)) +
     aes(x = 5.7, xend = 5.7, y = 3.8, yend = lower(5.7)),
     arrow = arrow(ends = "both", length = unit(0.12, "inches")),
   ) +
-  annotate("text", x = 5.9, y = 4.3, label = expression(zeta[i]^minute), color = "black", size = 6) +
+  annotate("text", x = 5.9, y = 4.3, label = expression(zeta[i]^minute), color = "black", size = 5) +
 
-  annotate("text", x = 6.3, y = 8.2, label = expression(y + epsilon), hjust = 0, color = "#0cb702", size = 6) +
-  annotate("text", x = 7.1, y = line(7.55),  label = "y", hjust = 0, size = 6) +
-  annotate("text", x = 6.9, y = 5.5, label = expression(y - epsilon), hjust = 0, color = "#ed68ed", size = 6) +
+  annotate("text", x = 5.9, y = 8.2, label = expression(g(x) + epsilon), hjust = 0, color = "#0cb702", size = 5) +
+
+  annotate("text", x = 6.7, y = 5.5, label = expression(g(x) - epsilon), hjust = 0, color = "#ed68ed", size = 5) +
 
   geom_point(
     aes(shape = support, color = support),
@@ -73,7 +73,7 @@ g_svm <- ggplot(df, aes(x, y)) +
   ) +
 
   coord_cartesian(xlim = c(0.5, 8), ylim = c(0.5, 8.7), expand = FALSE) +
-  labs(x = "x", y = "g(x)") +
+  labs(x = "x", y = "y") +
   theme(aspect.ratio = 1)            # square panel -> diagonal reads at ~45 deg
 
 save_fig(g_svm, "book/Figures/svm/fig-p3c15-regression.png",
