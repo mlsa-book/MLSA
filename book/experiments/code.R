@@ -454,7 +454,7 @@ plotWeib = function(type = c("hazard", "survival"), shape = 3, scale = 2) {
   baseline = fun(shape, scale, 0, t, "PH")
   PH = fun(shape, scale, log(2), t, "PH")
   AFT = fun(shape, scale, log(2), t, "AFT")
-  ylabel = ifelse(type == "hazard", "h(t)", "S(t)")
+  ylabel = ifelse(type == "hazard", expression(h(tau)), expression(S(tau)))
   
   df = data.frame(
     y = c(baseline, PH, AFT),
@@ -468,10 +468,9 @@ plotWeib = function(type = c("hazard", "survival"), shape = 3, scale = 2) {
       type == "hazard" & Model == "AFT" |
       type == "survival" & Model == "PH",
       0, 1))) +
-    theme(legend.position = "bottom") +
     guides(alpha = "none") +
-    ylab(ylabel) +
-    scale_color_manual(values = c("Baseline" = "black", "AFT" = "red", "PH" = "blue"), aesthetics = c("color","fill"))
+    ylab(ylabel) + xlab(expression(tau)) +
+    scale_color_manual(values = c("Baseline" = "black", "AFT" = "#F8766D", "PH" = "#619CFF"), aesthetics = c("color","fill"))
 }
 
 
@@ -503,35 +502,36 @@ p1 = plotWeib("hazard") +
   ylim(0, 5) +
   segment(1, "PH") + segment(1.5, "PH") + segment(2, "PH") +
   geom_label(aes(x = x, y = y), data.frame(x = 1.45, y = hweib(3, 2, log(2), 2, "PH")), 
-    label = expression(h[PH](t)==2*h[0](t)),
-    inherit.aes = FALSE)
+    label = expression(h[PH](tau)==2*h[0](tau)),
+    inherit.aes = FALSE) + theme(legend.position = "bottom")
 
 p2 = plotWeib("survival") +
   ylim(0, 1) +
   segment(0.5, "AFT") + segment(0.75, "AFT") +
   segment(1, "AFT") +
   geom_label(aes(x = x, y = y), data.frame(x = 2.08, y = sweib(3, 2, 0, 1.5, "AFT")), 
-    label = expression(S[AFT](t)==S[0]("2t")),
-    inherit.aes = FALSE)
+    label = expression(S[AFT](tau)==S[0]("2t")),
+    inherit.aes = FALSE)+ theme(legend.position = "bottom")
 
-g <- (p1 + p2) +
-  plot_layout(guides = "collect") & 
-  theme(legend.position = "bottom")
+g <- p1 + p2 +
+  plot_layout(guides = "collect") &
+  plot_annotation(theme = theme(legend.position = "bottom"))
+  
 
 ggsave("book/Figures/classical/compare.png", g, height = 4, units = "in",
   dpi = 600)
 
 ## Humans vs dogs
 age = seq.int(1, 100, 1)
-surv = pgompertz(age, 0.00005, 0.09, FALSE)
+surv = pgompertz(age, rate=0.00005, shape=0.09, FALSE)
 ph_surv = surv^5
-aft_surv = round(pgompertz(age*5, 0.00005, 0.09, FALSE), 2)
+aft_surv = round(pgompertz(age*5, rate=0.00005, shape=0.09, FALSE), 2)
 # A 5x acceleration of time (AFT) and a 5x hazard ratio (PH) act on different
 # scales, so the same factor 5 is not comparable. The PH hazard ratio that
 # matches the AFT dog's *median* survival is much larger (~395), because the
 # Gompertz baseline hazard is near zero at young ages.
-med_aft = uniroot(function(a) pgompertz(a * 5, 0.00005, 0.09, FALSE) - 0.5, c(1, 100))$root
-cstar = log(0.5) / log(pgompertz(med_aft, 0.00005, 0.09, FALSE))
+med_aft = uniroot(function(a) pgompertz(a * 5, rate=0.00005, shape=0.09, FALSE) - 0.5, c(1, 100))$root
+cstar = log(0.5) / log(pgompertz(med_aft, rate=0.00005, shape=0.09, FALSE))
 ph_match_surv = surv^cstar
 lab_match = sprintf("Dog (PH, HR=%.0f)", cstar)
 df = data.frame(
@@ -541,8 +541,8 @@ df = data.frame(
                    levels = c("Human", "Dog (AFT)", "Dog (PH, HR=5)", lab_match)))
 
 g <- ggplot(df, aes(x = age, y = survival, color = Species, linetype = Species)) +
-  geom_line() + xlim(0, 80) + labs(x = "T", y = "S(T)") +
-  scale_color_manual(values = setNames(c("black", "red", "blue", "blue"),
+  geom_line() + xlim(0, 80) + labs(x = expression(tau), y = expression(S(tau))) +
+  scale_color_manual(values = setNames(c("black", "#F8766D", "#619CFF", "#619CFF"),
     c("Human", "Dog (AFT)", "Dog (PH, HR=5)", lab_match))) +
   scale_linetype_manual(values = setNames(c("solid", "solid", "solid", "dashed"),
     c("Human", "Dog (AFT)", "Dog (PH, HR=5)", lab_match)))
@@ -553,27 +553,20 @@ ggsave("book/Figures/classical/dogs.png", g, height = 4, units = "in",
 
 ## KM for testing
 
-
 fit = survfit(Surv(rats$time, rats$status) ~ 1)
-fit$time[1:4]
-fit$surv
-fit$time
 g = ggplot(data.frame(x = fit$time,y = fit$surv), aes(x = x, y =y)) +
-  geom_step() + labs(x = "t", y = "S(t)") +
+  geom_step() + labs(x = expression(tau), y = expression(S(tau))) +
   scale_x_continuous(expand = c(0, 0))
 
 g1 = g +
-  geom_vline(xintercept = fit$time[5:7], lty = 2, alpha = 1, color = 3, lwd = 1) +
-  geom_vline(xintercept = fit$time[9:10], lty = 3, alpha = 1,color = 4,lwd=1)
+  geom_vline(xintercept = fit$time[5:7], lty = 2, alpha = 1, color = 3, lwd = 0.8) +
+  geom_vline(xintercept = fit$time[9:10], lty = 3, alpha = 1,color = 4,lwd=0.8)
 
 g2 = g +
-  geom_segment(x = 60, y = 0, yend = fit$surv[12], color = 2, lwd = 1, arrow = arrow()) +
-  geom_segment(x = 23, xend = fit$time[12], y = fit$surv[12], color = 2, lwd = 1, arrow = arrow(ends = "first")) 
+  geom_segment(x = 60, y = 0, yend = fit$surv[12], color = 2, lwd = 0.8, arrow = arrow()) +
+  geom_segment(x = 23, xend = fit$time[12], y = fit$surv[12], color = 2, lwd = 0.8, arrow = arrow(ends = "first")) 
 
-g3 = g1 / g2  
-
-ggsave("book/Figures/classical/km_test.png", g3, height = 6.5, units = "in",
-  dpi = 600)
+ggsave("book/Figures/classical/km_test.png", g1 / g2 , height = 5, width = 7, units = "in", dpi = 600)
 
 
 ## competing risks
@@ -2636,7 +2629,7 @@ g_svm_surv <- ggplot(df, aes(x, y)) +
   annotate(
     "text",
     x = 4.4, y = 6.45,
-    label = expression(xi[i]^"*" * "," ~ i %in% U),
+    label = expression(zeta[i]^"*" * "," ~ i %in% U),
     size = 5
   ) +
 
@@ -2649,7 +2642,7 @@ g_svm_surv <- ggplot(df, aes(x, y)) +
   annotate(
     "text",
     x = 6.2, y = 2.15,
-    label = expression(xi[i]^minute * "," ~ i %in% L),
+    label = expression(zeta[i]^minute * "," ~ i %in% L),
     size = 5
   ) +
 

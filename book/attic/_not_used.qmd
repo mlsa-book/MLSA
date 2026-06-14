@@ -24,7 +24,7 @@ The survival outcome notation, $(Y, \Delta)$, thus has to be extended to accommo
 Previously, we defined the status indicator $\Delta \in \{0,1\}$ for right-censored data.
 In the competing risks setting we have $\Delta = I(Y_i \leq C_i) \wedge E_i = e$, such that
 $\Delta \in \{0, 1, \ldots, q\}$ where $\Delta = 0$ indicates censoring as before (that is subject remained in state 0 until end of follow up) and $\Delta = e$ means the $e$th event occurred.
-Rather than estimating the distribution of event times $P(Y\leq \tau)$, the goal is to estimate the joint distribution of $Y$ and $E$, $P(Y\leq \tau, E=e)$.
+Rather than estimating the distribution of event times $\Pr(Y\leq \tau)$, the goal is to estimate the joint distribution of $Y$ and $E$, $\Pr(Y\leq \tau, E=e)$.
 
 ## recurrent events
 
@@ -133,10 +133,10 @@ mention limitation: baseline hazard is assumed to be smooth over entire follow-u
 
 ### Example: Gradient boosted trees
 
-Recall from section @sec-surv-ml-models-boost-regr the definition of boosting. Such models can be used to estimate the GAM model from @sec-pam using univariate GAM models as base learners (reference mboost and friends XXX). However, we can also use trees as base learners, which is often preferred, especially in combination with the popular XGBoost implementation (@cheng2016xgboost).
+Recall from @sec-surv-ml-models-boost-regr the definition of boosting. Such models can be used to estimate the GAM model from @sec-pam using univariate GAM models as base learners (reference mboost and friends XXX). However, we can also use trees as base learners, which is often preferred, especially in combination with the popular XGBoost implementation (@cheng2016xgboost).
 (Cite Bender 2021 XXX)
 
-Once again, the variable representing time $t_j$ is included as numeric variable in the model. A split w.r.t. to $t_j$ implies a change in the hazard rate before and after the split. Interactions between other features and $t_j$ are also learned automatically and allow time-varying effects and non-proportional hazards. 
+Once again, the variable representing time $t_j$ is included as numeric variable in the model. A split w.r.t. to $t_j$ implies a change in the hazard function before and after the split. Interactions between other features and $t_j$ are also learned automatically and allow time-varying effects and non-proportional hazards. 
 
 To apply gradient boosting to the piecewise exponential model, we need to specify the loss function and derive the corresponding gradients (pseudo-residuals) for the Poisson regression model with offset.
 
@@ -147,7 +147,7 @@ where $g(\xx_i, t_j)$ is the function to be learned and $\log(t_{ij})$ is the of
 The negative log-likelihood for the Poisson model with offset is given by
 $$\begin{aligned}
 L(\delta_{ij}, g(\xx_i, t_j)) 
-& = -\log P(\Delta_{ij} = \delta_{ij})\\
+& = -\log \Pr(\Delta_{ij} = \delta_{ij})\\
 & = -\left[\delta_{ij}\log(\mu_{ij}) - \mu_{ij} - \log(\delta_{ij}!)\right]\\
 & = -\left[\delta_{ij}(\log(h_{ij}) + \log(t_{ij})) - h_{ij}t_{ij} - \log(\delta_{ij}!)\right]\\
 & = -\left[\delta_{ij}g(\xx_i, t_j) + \delta_{ij}\log(t_{ij}) - \exp(g(\xx_i, t_j))t_{ij} - \log(\delta_{ij}!)\right],
@@ -163,9 +163,9 @@ where $g_{m-1}(\xx_i, t_j)$ is the current estimate of the log-hazard from the p
 
 The pseudo-residual @eq-poisson-pseudo-residual represents the difference between the observed event indicator $\delta_{ij}$ and the predicted expected number of events $\hat{\mu}_{ij}^{(m-1)}$, which is the natural residual for Poisson regression.
 
-**Initial guess:** The initial guess $g_0(\xx_i, t_j)$ is typically set to a constant value. A common choice is to set $g_0(\xx_i, t_j) = \log(\bar{h})$, where $\bar{h}$ is the overall average hazard rate, estimated as
+**Initial guess:** The initial guess $g_0(\xx_i, t_j)$ is typically set to a constant value. A common choice is to set $g_0(\xx_i, t_j) = \log(\bar{h})$, where $\bar{h}$ is the overall average hazard function, estimated as
 $$\bar{h} = \frac{\sum_{i=1}^n \sum_{j=1}^{J_i} \delta_{ij}}{\sum_{i=1}^n \sum_{j=1}^{J_i} t_{ij}},$$
-which is the total number of events divided by the total time at risk. Alternatively, one can simply initialize $g_0(\xx_i, t_j) = 0$ for all observations, which corresponds to an initial hazard rate of $h_0 = 1$.
+which is the total number of events divided by the total time at risk. Alternatively, one can simply initialize $g_0(\xx_i, t_j) = 0$ for all observations, which corresponds to an initial hazard function of $h_0 = 1$.
 
 **Update step:** At each iteration $m$, a regression tree $h_m$ is fitted to the pseudo-residuals $r_{ijm}$ using the features $(\xx_i, t_j)$ as predictors. The tree partitions the feature space and assigns a constant value to each leaf node. The model is then updated as
 $$g_m(\xx_i, t_j) = g_{m-1}(\xx_i, t_j) + \nu h_m(\xx_i, t_j),$${#eq-poisson-boost-update}
@@ -189,7 +189,7 @@ The complete gradient boosting algorithm for Poisson regression with offset usin
 
 3. **Return:** Final model $\hat{g}(\xx_i, t_j) = g_M(\xx_i, t_j)$.
 
-**Prediction:** For new observations with features $\xx^*$ and time $t_j^*$, the predicted log-hazard is $\hat{g}(\xx^*, t_j^*) = g_M(\xx^*, t_j^*)$, and the predicted hazard rate is $\hat{h}(\xx^*, t_j^*) = \exp(\hat{g}(\xx^*, t_j^*))$.
+**Prediction:** For new observations with features $\xx^*$ and time $t_j^*$, the predicted log-hazard is $\hat{g}(\xx^*, t_j^*) = g_M(\xx^*, t_j^*)$, and the predicted hazard function is $\hat{h}(\xx^*, t_j^*) = \exp(\hat{g}(\xx^*, t_j^*))$.
 
 The algorithm iteratively improves the model by fitting trees to the residuals from the previous iteration. Each tree captures patterns in the data that were not well explained by the previous model, and the shrinkage parameter $\nu$ ensures that updates are gradual, reducing overfitting. The offset term $\log(t_{ij})$ is implicitly accounted for in the pseudo-residual calculation, as the predicted expected number of events $\hat{\mu}_{ij}^{(m-1)} = \exp(g_{m-1}(\xx_i, t_j))t_{ij}$ includes the time at risk $t_{ij}$. 
 
@@ -246,7 +246,7 @@ The competing events are discharge alive from the ICU ($e=1$) and death in the I
 Using the piecewise-exponential additive model (PAM) framework (@sec-piecewise-constant-hazards, @pkgpammtools), the reduction is carried out explicitly:
 
 1. Two cause-specific datasets are created by defining $\delta_{i,1} = \II(e_i = 1)$ (discharge) and $\delta_{i,2} = \II(e_i = 2)$ (death).
-Each dataset is then transformed to the piece-wise exponential data (PED) format using `as_ped()`.
+Each dataset is then transformed to the piecewise exponential data (PED) format using `as_ped()`.
 2. A PAM is fit to each PED using `mgcv::gam()` with a Poisson likelihood:
     - Discharge: `ped_status ~ s(tend) + pneu + s(age) + sex`
     - Death: `ped_status ~ s(tend) + pneu + s(age) + sex`
@@ -318,7 +318,7 @@ For instance, one might use a gradient boosting for cause $1$ and a random fores
 
 # Time points for prediction
 
-In practice, most software implementations produce survival predictions over a discrete set of time-points.
+In practice, most software implementations produce survival predictions over a discrete set of time points.
 These time points are often chosen to coincide with the observed event times in the training data.
 This approach is often sensible, particularly when outcomes are recorded on a coarse scale, for example as years until an event occurs.
 However, in other datasets this can lead to substantial computational burden without a practical benefit.
@@ -374,28 +374,28 @@ A direct empirical demonstration on the same data (with the cause-specific Cox m
 #### Application: state occupation in the `prothr` cohort
 
 For the `prothr` cohort we now contrast the pairwise transition picture above with the marginal state-occupation view obtained from the same Aalen-Johansen pipeline.
-Recall that the transition probabilities $\hat P_{\ell e}(0,\tau)$ shown in @fig-multi-state-prothr are *conditional*: each curve fixes a reference entry state $\ell\in\{0,1\}$ at $\tau = 0$ and reports the probability of being in state $e$ at $\tau$ for that sub-cohort.
-Because the `prothr` cohort contains substantial numbers of patients entering in *both* transient states (the empirical entry distribution is approximately $\hat\pi_0 \approx 0.45$ normal, $\hat\pi_1 \approx 0.55$ abnormal across treatment arms), the more informative population-level summary is the marginal state-occupation probability $\hat P_q(\tau)$ from @eq-ms-state-occupation-est, which mixes the two reference entry states according to their empirical weights.
+Recall that the transition probabilities $\hatP_{\ell e}(0,\tau)$ shown in @fig-multi-state-prothr are *conditional*: each curve fixes a reference entry state $\ell\in\{0,1\}$ at $\tau = 0$ and reports the probability of being in state $e$ at $\tau$ for that sub-cohort.
+Because the `prothr` cohort contains substantial numbers of patients entering in *both* transient states (the empirical entry distribution is approximately $\hat\pi_0 \approx 0.45$ normal, $\hat\pi_1 \approx 0.55$ abnormal across treatment arms), the more informative population-level summary is the marginal state-occupation probability $\hatP_q(\tau)$ from @eq-ms-state-occupation-est, which mixes the two reference entry states according to their empirical weights.
 
-![Estimated state-occupation probabilities $\hat P_q(\tau)$ for the liver cirrhosis cohort, stratified by treatment arm. Bands are stacked so that at every $\tau$ they sum to one: the green band at the bottom is the probability of occupying state $0$ (normal prothrombin), the blue band is state $1$ (abnormal prothrombin), and the red band on top is the absorbing state $2$ (death). The Aalen-Johansen plug-in @eq-ms-aj-trans-prob is computed separately within each arm and then marginalised over the empirical entry-state distribution $\hat\pi_\ell = n_\ell^{(0)}/n$ as in @eq-ms-state-occupation-est.](Figures/survival/prothr-state-occupation.png){#fig-prothr-state-occupation fig-alt="Stacked area plot with two panels (Placebo on the left, Prednisone on the right). The horizontal axis is follow-up time in days from 0 to about 4000, the vertical axis is probability from 0 to 1. Within each panel three colour bands stack to a total height of one: a green band at the bottom for state 0 (normal prothrombin), a blue band above it for state 1 (abnormal prothrombin), and a red band on top for state 2 (death). The red death band grows monotonically with time in both arms, reaching roughly 0.55 at 1825 days for placebo and roughly 0.49 for prednisone. The green normal-prothrombin band widens early before contracting as mortality accumulates; the blue abnormal band shrinks gradually over follow-up."}
+![Estimated state-occupation probabilities $\hatP_q(\tau)$ for the liver cirrhosis cohort, stratified by treatment arm. Bands are stacked so that at every $\tau$ they sum to one: the green band at the bottom is the probability of occupying state $0$ (normal prothrombin), the blue band is state $1$ (abnormal prothrombin), and the red band on top is the absorbing state $2$ (death). The Aalen-Johansen plug-in @eq-ms-aj-trans-prob is computed separately within each arm and then marginalised over the empirical entry-state distribution $\hat\pi_\ell = n_\ell^{(0)}/n$ as in @eq-ms-state-occupation-est.](Figures/survival/prothr-state-occupation.png){#fig-prothr-state-occupation fig-alt="Stacked area plot with two panels (Placebo on the left, Prednisone on the right). The horizontal axis is follow-up time in days from 0 to about 4000, the vertical axis is probability from 0 to 1. Within each panel three colour bands stack to a total height of one: a green band at the bottom for state 0 (normal prothrombin), a blue band above it for state 1 (abnormal prothrombin), and a red band on top for state 2 (death). The red death band grows monotonically with time in both arms, reaching roughly 0.55 at 1825 days for placebo and roughly 0.49 for prednisone. The green normal-prothrombin band widens early before contracting as mortality accumulates; the blue abnormal band shrinks gradually over follow-up."}
 
 @fig-prothr-state-occupation tells a different and complementary story to the pairwise transition probabilities.
-At each $\tau$ the three bands partition the cohort exhaustively: the red band on top is the cumulative probability of having reached the absorbing state, $\hat P_2(\tau)$, and its width is precisely the total mortality experienced by time $\tau$, regardless of how patients reached it.
+At each $\tau$ the three bands partition the cohort exhaustively: the red band on top is the cumulative probability of having reached the absorbing state, $\hatP_2(\tau)$, and its width is precisely the total mortality experienced by time $\tau$, regardless of how patients reached it.
 Reading off the figure at $\tau = 1825$ days (five years), roughly $56\%$ of the placebo arm and $49\%$ of the prednisone arm have died, the remaining mass being distributed between the two transient states.
 Among the survivors, the green band (state $0$, normal prothrombin) is consistently wider than the blue band (state $1$, abnormal prothrombin) under prednisone, whereas in the placebo arm the two transient bands are closer to parity over much of follow-up — consistent with a treatment-induced shift in steady-state prothrombin status among the still-alive cohort.
 
 It is worth contrasting what the two presentations make visible.
 The pairwise transition probabilities in @fig-multi-state-prothr expose the *flow* dynamics conditional on a fixed reference entry state and are interpretable only under the Markov assumption.
 The state-occupation curves in @fig-prothr-state-occupation, by contrast, summarise the cohort-level *prevalence* of each state at $\tau$ and, crucially, remain a consistent target of the Aalen-Johansen plug-in even if the Markov assumption fails [@putter2018; @niessl2023].
-For descriptive reporting and for prediction questions of the form "what fraction of treated patients will be alive in normal-prothrombin status at five years?", $\hat P_q(\tau)$ is the more direct quantity; the conditional $\hat P_{\ell e}(0,\tau)$ remain useful when the scientific question is explicitly about transitions from a specified starting state.
+For descriptive reporting and for prediction questions of the form "what fraction of treated patients will be alive in normal-prothrombin status at five years?", $\hatP_q(\tau)$ is the more direct quantity; the conditional $\hatP_{\ell e}(0,\tau)$ remain useful when the scientific question is explicitly about transitions from a specified starting state.
 
 If we are willing to assume Markovianity, we can refine the picture further by stratifying the state-occupation view by entry state, that is, by re-expressing each row of the Aalen-Johansen transition-probability matrix as a stacked area summing to one (@fig-prothr-state-occupation-by-entry).
 This re-uses exactly the numbers underlying @fig-multi-state-prothr; only the presentation differs, with each row of the matrix collapsed into a single panel that shows how a sub-cohort with a fixed entry state $\ell$ redistributes across the three states over time.
 
-![Conditional state-occupation probabilities $\hat P_{\ell q}(0,\tau)$ for the liver cirrhosis cohort, by entry state (rows) and treatment arm (columns). Within each panel the three bands stack to one and represent the same row $\ell$ of the Aalen-Johansen transition-probability matrix shown line-by-line in @fig-multi-state-prothr. Top row: sub-cohort entering in state $0$ (normal prothrombin); bottom row: sub-cohort entering in state $1$ (abnormal prothrombin). Consistency of these conditional curves relies on the Markov assumption.](Figures/survival/prothr-state-occupation-by-entry.png){#fig-prothr-state-occupation-by-entry fig-alt="Two-by-two grid of stacked-area plots. Rows correspond to entry state (top: normal; bottom: abnormal); columns to treatment arm (left: placebo; right: prednisone). Horizontal axis is follow-up time in days from 0 to 4000; vertical axis is probability from 0 to 1. Each panel shows three coloured bands summing to one: a green band for state 0 (normal prothrombin), a blue band for state 1 (abnormal prothrombin), and a red band on top for state 2 (death). In the top row the red death band climbs from 0 to roughly 0.5 over follow-up while the green band gradually narrows; the blue band is thin throughout. In the bottom row (entry state abnormal) the green band rises quickly from 0 to about 0.45 within the first year before contracting; the blue band starts at 1 and shrinks; the red band grows faster than in the top row, reaching about 0.6 by 1825 days in the placebo arm and about 0.55 in the prednisone arm."}
+![Conditional state-occupation probabilities $\hatP_{\ell q}(0,\tau)$ for the liver cirrhosis cohort, by entry state (rows) and treatment arm (columns). Within each panel the three bands stack to one and represent the same row $\ell$ of the Aalen-Johansen transition-probability matrix shown line-by-line in @fig-multi-state-prothr. Top row: sub-cohort entering in state $0$ (normal prothrombin); bottom row: sub-cohort entering in state $1$ (abnormal prothrombin). Consistency of these conditional curves relies on the Markov assumption.](Figures/survival/prothr-state-occupation-by-entry.png){#fig-prothr-state-occupation-by-entry fig-alt="Two-by-two grid of stacked-area plots. Rows correspond to entry state (top: normal; bottom: abnormal); columns to treatment arm (left: placebo; right: prednisone). Horizontal axis is follow-up time in days from 0 to 4000; vertical axis is probability from 0 to 1. Each panel shows three coloured bands summing to one: a green band for state 0 (normal prothrombin), a blue band for state 1 (abnormal prothrombin), and a red band on top for state 2 (death). In the top row the red death band climbs from 0 to roughly 0.5 over follow-up while the green band gradually narrows; the blue band is thin throughout. In the bottom row (entry state abnormal) the green band rises quickly from 0 to about 0.45 within the first year before contracting; the blue band starts at 1 and shrinks; the red band grows faster than in the top row, reaching about 0.6 by 1825 days in the placebo arm and about 0.55 in the prednisone arm."}
 
 The bottom row of @fig-prothr-state-occupation-by-entry exposes a clinically relevant dynamic that the marginal view averages out: among patients entering with abnormal prothrombin, the probability of having normalised within the first year is substantial (the green band climbs from $0$ to roughly $0.45$ before mortality starts to dominate), and prednisone shifts this redistribution further toward normalisation than placebo does.
-Numerically, $\hat P_{1,0}(0,\,1825) \approx 0.29$ under placebo versus $\approx 0.35$ under prednisone, with a corresponding gap in five-year mortality ($\hat P_{1,2}(0,\,1825) \approx 0.60$ vs. $\approx 0.55$).
+Numerically, $\hatP_{1,0}(0,\,1825) \approx 0.29$ under placebo versus $\approx 0.35$ under prednisone, with a corresponding gap in five-year mortality ($\hatP_{1,2}(0,\,1825) \approx 0.60$ vs. $\approx 0.55$).
 For patients entering in state $0$ (top row), mortality at five years is markedly lower in both arms and the blue band remains thin throughout, reflecting that conversions to the abnormal state are short-lived because they tend to be followed promptly by either recovery or death.
 ## Popular Models {#sec-nnet-popular}
 
@@ -450,7 +450,7 @@ The third strategy makes no parametric or proportional-hazards assumption and in
 Given a partition $\mathcal{A} = \{a_0, \ldots, a_J\}$ of the follow-up period into $J$ intervals $(a_{j-1}, a_j]$, let $J_i$ be the index of the interval in which observation $i$'s outcome falls.
 The *discrete hazard* in interval $j$ conditional on covariates $\xx$ is
 $$
-h^d(j \mid \xx) = P(T \in (a_{j-1}, a_j] \mid T > a_{j-1}, \xx),
+h^d(j \mid \xx) = \Pr(T \in (a_{j-1}, a_j] \mid T > a_{j-1}, \xx),
 $$
 and the corresponding discrete survival function is
 $$

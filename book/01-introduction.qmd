@@ -1,7 +1,3 @@
----
-abstract: This chapter introduces the foundations of machine learning survival analysis and motivates why time-to-event data require methods beyond standard regression and classification. Survival analysis is framed as a general paradigm for modeling the timing of events that may be incompletely observed due to censoring. The chapter begins to clarify key distinctions between survival analysis, event history analysis, and conventional supervised learning (regression and classification). In addition, the chapter starts to outline the prediction tasks that appear throughout the book including predicting survival distributions, time-to-event, and relative risks.
----
-
 ::: {.content-visible when-format="html"}
 {{< include _macros.tex >}}
 :::
@@ -40,13 +36,13 @@ These situations are examples of right-censoring events\index{censoring!right}.
 Treating an observation that was censored as a negative label (that is, "the event did not occur") in a classification model would introduce bias.
 Survival analysis models allow valid estimation of the three-year survival probability by taking into account the information from all observations, including the censored ones.
 
-#### Risk-score calculation {.unnumbered .unlisted}
+#### Risk score calculation {.unnumbered .unlisted}
 
 Another common survival problem is to _rank_ observations rather than predicting an absolute probability\index{relative risk}.
-Consider the allocation of donor hearts to eligible candidates on a transplant\index{transplant} waiting list, which requires estimating which candidate is most likely to die soonest without a transplant.
-Candidates could be ranked in a list of least to highest risk of death, or assigned to risk groups: for example, patients at low or high risk of dying within one year.
+Consider the allocation of donor hearts to eligible candidates on a transplant waiting list, which requires estimating which candidate is most likely to die soonest without a transplant.
+Candidates could be ranked in a list of lowest to highest risk of death, or assigned to risk groups: for example, patients at low or high risk of dying within one year.
 A naive approach would be to train a classification model on historical waiting-list data, labeling each patient as "died within one year" or "survived to one year".
-However, waiting-list records are full of censoring and competing events\index{competing risks}: some patients will receive a transplant before the one-year mark (hence their natural waiting-list outcome is no longer observable after transplant) and others will be lost to follow-up or remain on the list at the end of the study.
+However, waiting-lists contain many censored records and competing events\index{competing risks}: some patients will receive a transplant before the one-year mark (hence their natural waiting-list outcome is no longer observable after transplant) and others will be lost to follow-up or remain on the list at the end of the study.
 A classifier\index{classification} restricted to patients with a fully observed one-year outcome may discard the cases that most inform the ranking and thus yield biased predictions.
 A survival model uses the partial information in censored records to produce a risk ranking that reflects the relative ordering of event times (under appropriate assumptions about the censoring process).
 
@@ -60,7 +56,7 @@ This unemployment setting has further structure that standard regression cannot 
 Workers may exhibit multiple unemployment spells (recurrent events\index{recurrent events}) and the ways in which they exit unemployment may be mutually exclusive: someone cannot both find full-time work _and_ be permanently removed from the workforce.
 Treating only one exit type as the event of interest and lumping the others in with censoring would mis-specify the problem; a more appropriate analysis would use competing risks\index{competing risks} or multi-state models\index{multi-state models} (@sec-eha).
 
-These examples also demonstrate the nuance of a survival analysis prediction (@sec-survtsk), which may involve predicting the probability of an event at a certain time (survival probabilities)\index{survival distribution}, ranking observations within a sample (risk-scores)\index{relative risk}, or estimating the time until an event takes place (duration)\index{survival time}.
+These examples also demonstrate the nuance of a survival analysis prediction (@sec-survtsk), which may involve predicting the probability of an event at a certain time (survival probabilities)\index{survival distribution}, ranking observations within a sample (risk scores)\index{relative risk}, or estimating the time until an event takes place (duration)\index{survival time}.
 
 
 ## Machine learning survival analysis {#sec-intro-mlsa}
@@ -68,10 +64,10 @@ These examples also demonstrate the nuance of a survival analysis prediction (@s
 Machine learning is an interdisciplinary field primarily concerned with building models that learn structure from data, for example to predict outputs from inputs or to identify patterns within observed data [@Hastie2001].
 Defining if a model should be called 'machine learning'\index{machine learning} is surprisingly difficult; there is no clear boundary separating straightforward statistical models from what is now often termed machine learning.
 This book defines _machine learning_ in a pragmatic sense to denote models whose parameters or structure are learned from data by optimizing an explicit objective function and whose success is judged by empirical performance on unseen data.
-This definition tightly couples the concept of machine learning with the need for robust evaluation\index{evaluation} (Part II) and allows for a broad range of models (Part III) to be considered machine learning, including those that would commonly be considered statistical models.
+This definition tightly couples the concept of machine learning with the need for robust evaluation\index{model evaluation} (Part II) and allows for a broad range of models (Part III) to be considered machine learning, including those that would commonly be considered statistical models.
 
 This book focuses on the supervised learning\index{machine learning!supervised learning} setting, where the goal is to predict outcomes from labeled training data.
-Development of machine learning survival analysis\index{machine learning survival analysis} models has converged on three primary tasks\index{prediction tasks} of interest (formally defined in @sec-survtsk), or _survival problems_, which are defined by the type of prediction the model makes.
+Development of machine learning survival analysis\index{machine learning survival analysis} models has converged on three primary tasks\index{prediction types} of interest (formally defined in @sec-survtsk), or _survival problems_, which are defined by the type of prediction the model makes.
 Generally, a survival problem arises when a model is trained on censored data to predict one of:
 
 i. A _survival distribution:_ The probability distribution over event times.\index{survival distribution}
@@ -80,15 +76,15 @@ i. A _survival time:_ A predicted event time.\index{survival time}
 
 Each prediction type serves a different purpose and a practitioner may be required to develop multiple models for optimal estimation of each prediction type.
 As an example, an engineer is unlikely to care about the exact time at which a plane engine fails, but they might greatly value knowing when the probability of failure increases above 5\%, which is a survival distribution prediction.
-Returning to the transplant example\index{transplant}, clearly choices cannot be made on a full survival distribution for every candidate on the waiting list, but an allocation can be made if it is clear one candidate is at substantially greater risk of death in the near term than another, a relative risk prediction.
+Returning to the transplant example, clearly choices cannot be easily made on a full survival distribution for every candidate on the waiting list, but an allocation can be made if it is clear one candidate is at substantially greater risk of death in the near term than another, a relative risk prediction.
 As will be seen in @sec-survtsk, these tasks are mathematically related and, subject to certain assumptions, may be transformed into one another.
 
 When it comes to making distribution predictions, survival analysis stands out again.
-Common _distribution defining functions_, functions used to characterize probability distributions, are the probability density function\index{probability density function} (for continuous distributions) and the cumulative distribution function\index{cumulative distribution function} (CDF).
+Common _distribution-defining functions_\index{distribution-defining function} used to characterize probability distributions, are the probability density function\index{probability density function} (for continuous distributions) and the cumulative distribution function\index{cumulative distribution function} (CDF).
 In survival settings, interpreting the density function can be counter-intuitive because it is an unconditional density over event times measured from a common time origin, such as diagnosis or treatment initiation.
 In other words, it describes how event times are distributed when following individuals forward from a shared starting point.
 The CDF is the probability that the event has 'already' taken place at a given time, which is opposite to the usual survival prediction: whether the event 'will' take place.
-Therefore, survival analysis focuses instead on predicting the *survival function*\index{survival function}\index{survival probability}, which is simply one minus the CDF, and the *hazard function*\index{hazard function}\index{hazard}.
+Therefore, survival analysis focuses instead on predicting the *survival function*\index{survival function}, which is simply one minus the CDF, and the *hazard function*\index{hazard function}.
 Unlike the density function, which describes the unconditional distribution of event times from baseline, the hazard function describes the instantaneous risk of the event at a given time conditional on having survived up to that time.
 
 These functions are formally defined in @sec-surv and are visualized in @fig-p0c1-gompertz using a Gompertz distribution\index{Gompertz distribution}, often used to model adult lifespans, fit to Swedish mortality data [@pkgeha].
@@ -96,10 +92,10 @@ The survival function (bottom right) decreases from one to zero and gives the pr
 The density (top left) peaks around age 88, which is the age at which unconditional deaths are most common.
 The hazard (top right) is a conditional rate and is not bounded above by one; on this fit it doubles roughly every seven years and is still climbing steeply at the oldest ages.
 Because the time axis is age in years, the hazard has units of *per year*.
-For example, the fitted hazard is approximately $0.014$/yr at age 70 ($\approx 1.4\%$ chance of dying within the next year given survival to 70).
-To help exemplify the difference between the density and hazard, consider the probability of death at age 100.
-Given that someone is alive at 100, their instantaneous risk of death (hazard) is approximately $18$ times higher than at age 70.
-In contrast, the event-time density around age 100 is substantially lower than around age 70, as far fewer individuals survive to age 100 overall.
+For example, the fitted hazard is approximately $0.08$/yr at age 88 ($\approx 8\%$ chance of dying within the next year given survival to 88).
+To help exemplify the difference between the density and hazard, consider the risk of death at age 100.
+Given that someone is alive at 100, their instantaneous risk of death (hazard) is approximately $3$ times higher than at age 88.
+In contrast, the event-time density around age 100 is half the density at age 88, as far fewer individuals survive to age 100 overall.
 
 ![Probability density (top left), hazard (top right), cumulative distribution (bottom left), and survival (bottom right) functions of a Gompertz distribution with parameters fit to Swedish age-specific mortality rates for 2019 (sexes combined, ages 30–100). Fitted hazard: $h(\tau) = a\,e^{b(\tau-30)}$ with $a \approx 2.9 \times 10^{-4}$ and $b \approx 0.097$ per year.](Figures/introduction/fig-p0c1-gompertz.png){#fig-p0c1-gompertz fig-align="center" fig-alt="Four line graphs, each on an x-axis of age in years from 30 to about 110. The density f(t) rises slowly from near zero at age 30, peaks around age 88 at about 0.035, then falls to near zero by age 110. The hazard h(t) is close to zero through middle age and climbs exponentially to about 0.65 by age 110. The cumulative distribution F(t) is near zero at age 30 and rises in an S-shape to nearly one by age 110. The survival function S(t) is the mirror image, starting at one at age 30 and decreasing to near zero by age 110." width=80%}
 
@@ -115,8 +111,8 @@ Left-censoring\index{censoring!left} is recorded when the event of interest is l
 @sec-surv provides an example of someone telling an interviewer that they started using a phone (the event of interest) before the interview, but they do not remember when.
 If the time-to-event outcome is "age at first phone use" then a $23$-year-old who is using a phone but cannot remember when they started is left-censored at $23$.
 Often, the censoring event is assumed to be independent of the event of interest (for example, random dropout).
-However, when the occurrence of another event is not independent of the event of interest and precludes observation of the primary event, it is known as a _competing risk_\index{competing risks} (@sec-eha).
-For example, if an unemployed worker is still looking for a job when the study window closes, the censoring is independent\index{censoring!independent}.
+However, when the occurrence of another event precludes observation of the primary event, it is known as a _competing risk_\index{competing risks} (@sec-eha).
+For example, if an unemployed worker is still looking for a job when the study window closes, the reason for censoring is independent of the outcome\index{censoring!independent}.
 In contrast, finding a part-time job is a competing event as it precludes the primary event (finding full-time employment) and may depend on the same factors (skills, availability, local labor market).
 
 _Left-truncation_\index{truncation!left} is the more common form of truncation and involves data before the truncation time being excluded.
@@ -125,10 +121,10 @@ Left-truncation happens when subjects experience the event before meeting the in
 Truncation affects whether an individual is included in the observed sample, whereas censoring affects how much of an included individual's outcome time is observed.
 
 As a concrete example, consider a study on time until death in patients diagnosed with tuberculosis (TB).
-Assume enrolment is open to anyone with a TB diagnosis, including those diagnosed before the study opened.
+Assume enrollment is open to anyone with a TB diagnosis, including those diagnosed before the study opened.
 Left-truncation arises if patients die between their diagnosis and the study start.
 These patients are never observed and are absent from the data, inducing a form of selection bias: the highest-risk cases (those dying earliest) are systematically missing (@fig-p0c1-censoring, fourth row).
-Those who do survive to the study start will enter with a known gap between diagnosis and enrolment (@fig-p0c1-censoring, third row).
+Those who do survive to the study start will enter with a known gap between diagnosis and enrollment (@fig-p0c1-censoring, third row).
 Bias\index{selection bias} occurs when delayed entry and the implicit selection bias are not explicitly accounted for (discussed in full in @sec-surv).
 
 Another bias that often occurs when time-dependent dynamics of survival data collection are not explicitly accounted for is _immortal time bias_\index{immortal time bias}. 
@@ -137,5 +133,5 @@ Immortal time bias is also discussed further in @sec-surv.
 
 The first part of this book will formally introduce and develop these concepts further.
 
-![Common forms of censoring and truncation, shown on a shared time axis where an observation period (green) is flanked by unobserved periods (blue). Solid lines show time during which a subject is observed and at risk, dashed lines show unobserved time, a bracket marks entry into the risk set, filled circles mark events (deaths), and an open circle marks censoring. First row (fully observed): a patient is diagnosed and enrolled at the start of the observation period and is observed to die during the study. Second row (right-censoring): a patient is diagnosed and enrolled but exits the study before the event, so their true death occurs later and is unobserved. Third row (delayed entry): a patient is diagnosed before the observation period and enrolled only later, so the time between diagnosis and entry is excluded from the risk set. Fourth row (selection bias): a patient is diagnosed and dies before the study begins, and so never enters the sample. Delayed entry and selection bias are both forms of left-truncation.](Figures/introduction/fig-p0c1-censoring.png){#fig-p0c1-censoring width=90% fig-align="center" fig-alt="Timeline infographic with a horizontal time axis. A central green 'observation period' band is flanked by two blue 'unobserved' bands, and four patient rows are drawn with icons along a timeline. Row 1, fully observed: a stethoscope marks diagnosis and enrolment at the start of the observation period, and a solid line runs to a filled circle and thermometer marking death within the period. Row 2, right-censoring: diagnosis and enrolment at the start, a solid line to an open circle and door icon labeled 'exits study', then a dashed line continuing into the right unobserved band to a faded filled circle marking the unobserved death. Row 3, delayed entry: a stethoscope in the left unobserved band marks diagnosis, a dashed line runs to a bracket marking study entry, then a solid line to a death circle. Row 4, selection bias, drawn faded: diagnosis and death both occur in the left unobserved band, so the patient never enters the sample. Rows three and four are bracketed together as 'left-truncation'. A legend distinguishes solid observed/at-risk lines from dashed unobserved lines."}
+![Common forms of censoring and truncation, shown on a shared time axis where an observation period (green) is flanked by unobserved periods (blue). Solid lines show time during which a subject is observed and at risk, dashed lines show unobserved time, a bracket marks entry into the risk set, filled circles mark events (deaths), and an open circle marks censoring. First row (fully observed): a patient is diagnosed and enrolled at the start of the observation period and is observed to die during the study. Second row (right-censoring): a patient is diagnosed and enrolled but exits the study before the event, so their true death occurs later and is unobserved. Third row (delayed entry): a patient is diagnosed before the observation period and enrolled only later, so the time between diagnosis and entry is excluded from the risk set. Fourth row (selection bias): a patient is diagnosed and dies before the study begins, and so never enters the sample. Delayed entry and selection bias are both related to left-truncation.](Figures/introduction/fig-p0c1-censoring.png){#fig-p0c1-censoring width=90% fig-align="center" fig-alt="Timeline infographic with a horizontal time axis. A central green 'observation period' band is flanked by two blue 'unobserved' bands, and four patient rows are drawn with icons along a timeline. Row 1, fully observed: a stethoscope marks diagnosis and enrollment at the start of the observation period, and a solid line runs to a filled circle and thermometer marking death within the period. Row 2, right-censoring: diagnosis and enrollment at the start, a solid line to an open circle and door icon labeled 'exits study', then a dashed line continuing into the right unobserved band to a faded filled circle marking the unobserved death. Row 3, delayed entry: a stethoscope in the left unobserved band marks diagnosis, a dashed line runs to a bracket marking study entry, then a solid line to a death circle. Row 4, selection bias, drawn faded: diagnosis and death both occur in the left unobserved band, so the patient never enters the sample. Rows three and four are bracketed together as 'left-truncation'. A legend distinguishes solid observed/at-risk lines from dashed unobserved lines."}
 

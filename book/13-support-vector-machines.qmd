@@ -1,7 +1,3 @@
----
-abstract: This chapter introduces support vector machines (SVMs) for regression and then describes the extensions to survival analysis. Regression SVMs extend simple linear methods by estimating flexible, non-linear hyperplanes that minimize the difference between predictions and the truth for individual observations. In survival analysis, SVMs may make survival time or ranking predictions, however there is no widely used SSVM formulation for survival distribution predictions. The chapter begins by discussing survival time SVMs and then ranking models before concluding with a hybrid formulation that combines both model forms. This primarily covers the work of Shivaswamy and Van Belle. SVMs are a powerful method for estimating non-linear relationships in data and have proven to be well-performing models in regression and classification. However, SVMs appear less developed in survival analysis than other algorithms and have been shown to perform worse than other models in experiments.
----
-
 ::: {.content-visible when-format="html"}
 {{< include _macros.tex >}}
 :::
@@ -44,7 +40,7 @@ $$
 $$ {#eq-penalized}
 
 for some penalty term $\xi \in \NNReals$.
-The first term minimizes the total squared difference between predictions and observed outcomes, while the second penalizes large coefficients.
+The first term minimizes the total squared difference between predictions and observed outcomes, while the second penalizes large coefficients.\index{penalization}
 Larger values of $\xi$ place greater emphasis on shrinkage and model simplicity, whereas smaller values prioritize closer fit to the training data.
 Minimizing this objective results in a hyperplane representing the best regularized linear relationship between covariates and outcomes.
 
@@ -58,9 +54,9 @@ $$
 & \min_{\bstheta, \bszeta^\dagger, \bszeta^\ddagger} \frac{1}{2} \|\bsbeta\|^2 + C \sum^n_{i=1}(\zeta^\dagger_i + \zeta_i^\ddagger) \\
 & \textrm{subject to}
 \begin{dcases}
-g(\xx_i \mid \bstheta) & \geq y_i -\epsilon - \zeta^\dagger_i, \\
-g(\xx_i \mid \bstheta) & \leq y_i + \epsilon + \zeta_i^\ddagger, \\
-\zeta^\dagger_i, \zeta_i^\ddagger & \geq 0, \\
+g(\xx_i \mid \bstheta), & \geq y_i -\epsilon - \zeta^\dagger_i, \\
+g(\xx_i \mid \bstheta), & \leq y_i + \epsilon + \zeta_i^\ddagger, \\
+\zeta^\dagger_i, \zeta_i^\ddagger, & \geq 0, \\
 \forall i = 1,\ldots,n,
 \end{dcases}
 \end{aligned}
@@ -104,7 +100,7 @@ The optimization in (@eq-svm-opt) is written in its primal form, where the model
 In practice, SVMs are typically estimated using an equivalent dual formulation based on Lagrange multipliers, $\mu_i$, which gives rise to the prediction function in (@eq-svm-pred).
 In this form, $\hat{\bstheta} = (\hat{\boldsymbol{\mu}}, \hat{\alpha})$ are the estimated dual parameters.
 The dual formulation absorbs information from the primal coefficients and slack parameters, replacing explicit estimation of $\bsbeta$ and $\bszeta$ with an equivalent representation based on Lagrange multipliers, $\hat{\boldsymbol{\mu}}$, kernels, $K$, and the intercept, $\hat{\alpha}$.
-In the dual formulation, the support vectors are those with $\hat{\mu}_i > 0$.
+In the dual formulation, the support vectors are those with $\hat{\mu}_i \ne 0$.
 Details of estimation of $\hat{\mu}_i$ are beyond the scope of this book.
 
 The symbol $K$ in (@eq-svm-pred) is a kernel function, with common choices including the:\index{support vector machines!kernels!linear}\index{support vector machines!kernels!radial}\index{support vector machines!kernels!polynomial}
@@ -113,8 +109,8 @@ The symbol $K$ in (@eq-svm-pred) is a kernel function, with common choices inclu
 * radial kernel: $K(\xx_i, \xx_*) = \exp(-\omega\|\xx_i - \xx_*\|^2); \quad \omega \in \PReals$;
 * polynomial kernel: $K(\xx_i, \xx_*) = (1 + \xx_i^\trans\xx_*)^d; \quad d \in \PNaturals$.
 
-The choice of kernel, its parameters, the regularization parameter $C$, and the acceptable error $\epsilon$, are all tunable hyperparameters (@sec-ml-opt), which makes the support vector machine a highly adaptable and often well-performing machine learning method.\index{hyperparameters}
-The parameters $C$ and $\epsilon$ often have no clear a priori meaning (especially in the survival setting, where the rankings are abstract) and thus require tuning over a great range of values; inadequate tuning often results in a poor model fit [@Probst2019].
+The choice of kernel, its parameters, the regularization parameter $C$, and the acceptable error $\epsilon$, are all tunable hyperparameters (@sec-ml-opt), which makes the support vector machine a highly adaptable and often well-performing machine learning method.\index{hyperparameter}
+The parameters $C$ and $\epsilon$ often have no clear a priori meaning (especially in the survival setting, where the rankings are abstract) and thus require tuning over a wide range of values; inadequate tuning often results in a poor model fit [@Probst2019].
 
 ## SVMs for survival analysis {#sec-surv-ml-models-svm-surv}
 
@@ -131,9 +127,9 @@ $$
 & \min_{\bstheta, \bszeta^\dagger, \bszeta^\ddagger} \frac{1}{2} \|\bsbeta\|^2 + C_s \sum^n_{i=1}(\zeta^\dagger_i + \zeta_i^\ddagger) \\
 & \textrm{subject to}
 \begin{dcases}
-g(\xx_i \mid \bstheta) & \geq t_i -\epsilon - \zeta^\dagger_i, \\
-g(\xx_i \mid \bstheta) & \leq t_i + \epsilon + \zeta_i^\ddagger, \\
-\zeta^\dagger_i, \zeta_i^\ddagger & \geq 0, \\
+g(\xx_i \mid \bstheta), & \geq t_i -\epsilon - \zeta^\dagger_i, \\
+g(\xx_i \mid \bstheta), & \leq t_i + \epsilon + \zeta_i^\ddagger, \\
+\zeta^\dagger_i, \zeta_i^\ddagger, & \geq 0, \\
 \forall i = 1,\ldots,n,
 \end{dcases}
 \end{aligned}
@@ -150,9 +146,9 @@ g(\xx_i \mid \bstheta) \geq t_i - \epsilon - \zeta^\dagger_i,
 $$
 
 where the right-hand side is conditioned on the observed outcome time.
-In words, this constraint is ensuring the predicted survival time is greater than some lower-bound as a function of the observed outcome time $t_i$.
-For right-censored and uncensored observations, this lower-bound is defined as the right-censoring or true event time respectively.
-In contrast, for left-censored observations, there is no informative lower-bound as all that is known is the event occurred at some time before $t_i$.
+In words, this constraint is ensuring the predicted survival time is greater than some lower bound as a function of the observed outcome time $t_i$.
+For right-censored and uncensored observations, this lower bound is defined as the right-censoring or true event time respectively.
+In contrast, for left-censored observations, there is no informative lower bound as all that is known is the event occurred at some time before $t_i$.
 Technically, left-censored observations are bounded below at $0$, however this lower bound provides little useful information for constraining predictions at the individual level.
 
 Analogously, the second constraint,
@@ -161,8 +157,8 @@ $$
 g(\xx_i \mid \bstheta) \leq t_i + \epsilon + \zeta_i^\ddagger,
 $$
 
-places an upper-bound on the prediction, which is only defined for left-censored and uncensored observations.
-In contrast, it is unknown when a right-censored observation's event actually occurred, so there is no meaningful upper-bound.
+places an upper bound on the prediction, which is only defined for left-censored and uncensored observations.
+In contrast, it is unknown when a right-censored observation's event actually occurred, so there is no meaningful upper bound.
 
 Let $\mathcal{RC}$ be the set of right-censored observations, whose outcomes are bounded below by the right-censoring time, $\mathcal{LC}$ be the set of left-censored observations, with outcomes bounded above by the left-censoring time, and $\mathcal{UC}$ be the set of uncensored observations whose outcomes are bounded above and below by the exact outcome time.
 Let $\mathcal{LB}$ be the set of observations bounded below,
@@ -177,15 +173,15 @@ $$
 \mathcal{UB} = \mathcal{LC} \cup \mathcal{UC}.
 $$
 
-These definitions lead to the following optimization problem, also visualized in @fig-p3c15-survival [@Shivaswamy2007]:
+These definitions lead to the following optimization problem (@fig-p3c15-survival) [@Shivaswamy2007]:
 
 $$
 \begin{aligned}
 & \min_{\bstheta, \bszeta^\dagger, \bszeta^\ddagger} \frac{1}{2}\|\bsbeta\|^2 + C_s\Big(\sum_{i \in \mathcal{LB}} \zeta^\dagger_i + \sum_{i \in \mathcal{UB}} \zeta_i^\ddagger\Big) \\
 & \textrm{subject to}
 \begin{dcases}
-g(\xx_i \mid \bstheta) & \geq t_i -\zeta^\dagger_i, i \in \mathcal{LB}, \\
-g(\xx_i \mid \bstheta) & \leq t_i + \zeta^\ddagger_i, i \in \mathcal{UB}, \\
+g(\xx_i \mid \bstheta), & \geq t_i -\zeta^\dagger_i, i \in \mathcal{LB}, \\
+g(\xx_i \mid \bstheta), & \leq t_i + \zeta^\ddagger_i, i \in \mathcal{UB}, \\
 \zeta^\dagger_i \geq 0, \forall i\in \mathcal{LB}; \zeta^\ddagger_i \geq 0, \forall i \in \mathcal{UB}.
 \end{dcases}
 \end{aligned}
@@ -203,9 +199,9 @@ $$
 & \min_{\bstheta, \bszeta^\dagger, \bszeta^\ddagger} \frac{1}{2}\|\bsbeta\|^2 + C_s \sum_{i = 1}^n (\zeta^\dagger_i + \zeta_i^\ddagger) \\
 & \textrm{subject to}
 \begin{dcases}
-g(\xx_i \mid \bstheta) & \geq t_i - \zeta^\dagger_i, \\
-g(\xx_i \mid \bstheta) & \leq t_i + \zeta^\ddagger_i, i:\delta_i=1, \\
-\zeta^\dagger_i, \zeta_i^\ddagger & \geq 0, \\
+g(\xx_i \mid \bstheta), & \geq t_i - \zeta^\dagger_i, \\
+g(\xx_i \mid \bstheta), & \leq t_i + \zeta^\ddagger_i, i:\delta_i=1, \\
+\zeta^\dagger_i, \zeta_i^\ddagger, & \geq 0, \\
 \forall i = 1,\ldots,n.
 \end{dcases}
 \end{aligned}
@@ -224,16 +220,16 @@ where again $K$ is a kernel function and $\hat{\mu}_i^\dagger, \hat{\mu}_i^\ddag
 ### Ranking SSVMs
 
 Support vector machines can be used to estimate rankings by penalizing predictions that result in disconcordant pairs.\index{survival support vector machines!risk prediction}
-Recall the definition of concordance from @sec-eval-crank: a pair of observations $(i, j)$ is comparable if $t_i < t_j \wedge \delta_i = 1$, and concordant if $r_i > r_j$ where $r_i, r_j$ are the predicted ranks for observations $i$ and $j$ respectively and a higher value implies greater risk.\index{survival support vector machines!comparable pairs}
-Using the prognostic index as a ranking prediction (@sec-survtsk-PI), a pair of observations is concordant if $g(\xx_i) > g(\xx_j)$ when $t_i < t_j$, leading to [@VanBelle2007; @VanBelle2008]:
+Recall the definition of concordance from @sec-eval-crank: a pair of observations $(i, j)$ is comparable if $t_i < t_j \wedge \delta_i = 1$, and concordant if $r_i > r_j$ where $r_i, r_j$ are the predicted ranks for observations $i$ and $j$ respectively and a higher value implies greater risk.\index{concordant pairs}
+Using the prognostic index as a ranking prediction (@sec-survtsk-PI), a pair of observations is concordant if $g(\xx_i) > g(\xx_j)$ when $t_i < t_j$, leading to [@VanBelle2007; @VanBelle2008]:\index{survival support vector machines!comparable pairs}
 
 $$
 \begin{aligned}
 & \min_{\bstheta, \bszeta} \frac{1}{2}\|\bsbeta\|^2 + C_r\sum_{(i,j) \in \mathcal{CP}} \zeta_{ij} \\
 & \textrm{subject to}
 \begin{dcases}
-g(\xx_i \mid \bstheta) - g(\xx_j \mid \bstheta) & \geq 1 - \zeta_{ij}, \\
-\zeta_{ij} & \geq 0, \\
+g(\xx_i \mid \bstheta) - g(\xx_j \mid \bstheta), & \geq 1 - \zeta_{ij}, \\
+\zeta_{ij}, & \geq 0, \\
 \forall (i,j) \in \mathcal{CP},
 \end{dcases}
 \end{aligned}
@@ -244,7 +240,7 @@ The addition of the constant $1$ in the first constraint defines the SSVM margin
 The value $1$ itself is arbitrary and conventional, as the overall scale is absorbed by the model coefficients, slack parameters, and hyperparameters.
 The constraint encourages not only correct ordering but also a minimum separation between comparable predictions.
 
-Given that the number of possible pairs grows quadratically with the number of observations, the optimization problem (@eq-vanbelle-rank) quickly becomes difficult to solve with a very long runtime.
+Given that the number of possible pairs grows quadratically with the number of observations, the optimization problem (@eq-vanbelle-rank) quickly becomes difficult to solve with high computational cost.
 One solution is a nearest neighbor approach that sorts observations in order of outcome time and then compares each data point $i$ with the observation that has the next smallest *survival* time, skipping over censored observations [@VanBelle2008; @VanBelle2011b]:
 
 $$
@@ -253,9 +249,9 @@ $$ {#eq-vb-neighbor}
 
 This is visualized in @fig-p3c15-comparable where six observations are sorted by outcome time from largest (right) to smallest (left).
 From right to left, the first pair is made by matching the observation to the first uncensored outcome to the left, this continues to the end.
-In implementation, to ensure all observations are used in the optimization, the algorithm sets the first outcome to be uncensored hence observation $2$ being compared to observation $1$ in @fig-p3c15-comparable.
+In implementation, to ensure all observations are used in the optimization, the algorithm sets the first outcome to be uncensored; hence observation $2$ being compared to observation $1$ in @fig-p3c15-comparable.
 
-<!-- FIXME (ANDREAS; MINOR): If you have time this could be better but I think it's not a problem as it is -->
+<!-- FIXME (ANDREAS; MINOR): If you have time this could be better but I think it is not a problem as it is -->
 ![Van Belle SVM nearest neighbors approach for comparable pairs. Sorted observations are paired with the nearest uncensored outcome 'to the left'. Red squares are uncensored observations and blue circles are censored. The observation with the smallest outcome time is always treated as uncensored.](Figures/svm/fig-p3c15-comparable.png){#fig-p3c15-comparable width=60% fig-align="center" fig-alt="x-axis says 'observation', y-axis says 'outcome time'. There are six observations that increase linearly from bottom-left to top-right. The order is: 1-censored, 2-uncensored, 3-censored, 4-uncensored, 5-censored, 6-censored. Arrows show observation 6 matched with 4, 5 matched with 4, 4 matched with 2, 3 matched with 2, 2 matched with 1."}
 
 Using this method, the algorithm becomes:
@@ -265,8 +261,8 @@ $$
 & \min_{\bstheta, \bszeta} \frac{1}{2}\|\bsbeta\|^2 + C_r\sum_{i =1}^n \zeta_i \\
 & \textrm{subject to}
 \begin{dcases}
-g(\xx_{j(i)}) - g(\xx_i \mid \bstheta) & \geq t_i - t_{j(i)} - \zeta_i, \\
-\zeta_i & \geq 0, \\
+g(\xx_{j(i)}) - g(\xx_i \mid \bstheta), & \geq t_i - t_{j(i)} - \zeta_i, \\
+\zeta_i, & \geq 0, \\
 \forall i = 1,\ldots,n.
 \end{dcases}
 \end{aligned}
@@ -274,7 +270,7 @@ $$ {#eq-ssvm-rank}
 
 Note that $j(i)$ is defined in (@eq-vb-neighbor) so that $t_{j(i)} < t_i$.
 Under the convention that larger values of $g(\xx)$ imply greater risk, the constraint in (@eq-ssvm-rank) requires $g(\xx_{j(i)}) - g(\xx_i) > 0$ (thus, $g(\xx_{j(i)}) > g(\xx_i)$) whenever the slack term, $\zeta_i$, is sufficiently small as $t_i - t_{j(i)} > 0$.
-The updated right hand side of the constraint defines a margin that increases with the difference in observed outcome times, while the slack term, $\zeta_i$, captures violations beyond this difference.
+The updated right-hand side of the constraint defines a margin that increases with the difference in observed outcome times, while the slack term, $\zeta_i$, captures violations beyond this difference.
 
 Predictions for a new observation $\xx_*$ are calculated as,
 
@@ -288,7 +284,7 @@ There do not appear to be any adaptations to the ranking SSVM for other censorin
 
 ### Hybrid SSVMs
 
-Finally, @VanBelle2011b noted that the ranking algorithm could be updated to add the constraints of the survival time model, thus providing a model that simultaneously optimizes for ranking whilst providing continuous values that can be interpreted as survival time predictions.
+Finally, @VanBelle2011b noted that the ranking algorithm could be updated to add the constraints of the survival time model, thus providing a model that simultaneously optimizes for ranking while providing continuous values that can be interpreted as survival time predictions.
 This results in the hybrid SSVM:\index{survival support vector machines!hybrid prediction}
 
 $$
@@ -296,34 +292,35 @@ $$
 & \min_{\bstheta, \bszeta, \bszeta^\dagger, \bszeta^\ddagger} \frac{1}{2}\|\bsbeta\|^2 + \textcolor{CornflowerBlue}{C_r\sum_{i =1}^n \zeta_i} + \textcolor{Rhodamine}{C_s \sum^n_{i=1}(\zeta_i^\dagger + \zeta_i^\ddagger)} \\
 & \textrm{subject to}
 \begin{dcases}
-\textcolor{CornflowerBlue}{g(\xx_{j(i)} \mid \bstheta) - g(\xx_i \mid \bstheta)} & \textcolor{CornflowerBlue}{\geq t_i - t_{j(i)} - \zeta_i}, \\
-\textcolor{Rhodamine}{g(\xx_i \mid \bstheta)} & \textcolor{Rhodamine}{\leq t_i + \zeta^\ddagger_i, i:\delta_i=1}, \\
-\textcolor{Rhodamine}{g(\xx_i \mid \bstheta)} & \textcolor{Rhodamine}{\geq t_i - \zeta^\dagger_i}, \\
-\textcolor{CornflowerBlue}{\zeta_i}, \textcolor{Rhodamine}{\zeta_i^\dagger, \zeta_i^\ddagger} & \geq 0, \\
+\textcolor{CornflowerBlue}{-(g(\xx_{j(i)} \mid \bstheta) - g(\xx_i \mid \bstheta))}, & \textcolor{CornflowerBlue}{\geq t_i - t_{j(i)} - \zeta_i}, \\
+\textcolor{Rhodamine}{g(\xx_i \mid \bstheta)}, & \textcolor{Rhodamine}{\leq t_i + \zeta^\ddagger_i, i:\delta_i=1}, \\
+\textcolor{Rhodamine}{g(\xx_i \mid \bstheta)}, & \textcolor{Rhodamine}{\geq t_i - \zeta^\dagger_i}, \\
+\textcolor{CornflowerBlue}{\zeta_i}, \textcolor{Rhodamine}{\zeta_i^\dagger, \zeta_i^\ddagger}, & \geq 0, \\
 \forall i = 1,\ldots,n.
 \end{dcases}
 \end{aligned}
 $$
 
 The blue parts of the equation make up the ranking model and the red parts are the survival time model.
+Note the addition of the negative sign in the first constraint, which is required to ensure larger values of $g$ correspond to both longer survival times and lower risk.
 
-Setting $C_r = 0$ recovers the survival time SSVM (@eq-shivaswamy-right) while $C_s = 0$ results in the ranking SSVM (@eq-ssvm-rank) (removing associated constraints for both).
+Setting $C_r = 0$ recovers the survival time SSVM (@eq-shivaswamy-right), while setting $C_s = 0$ recovers the ranking SSVM (@eq-ssvm-rank) up to a sign reversal.
 Hence, fitting the hybrid model and tuning these parameters is an efficient way to automatically detect which SSVM is best suited to a given task.
 
 Once the model is fit, a prediction from given features $\xx_* \in \Reals^p$, can be made using the equation below, again with the ranking and survival time contributions highlighted in blue and red respectively.
 
 $$
-\hatg(\xx_* \mid \hat{\bstheta}) = \sum^n_{i=1} \left[\textcolor{CornflowerBlue}{\hat{\mu}_i(K(\xx_{j(i)}, \xx_*) - K(\xx_i, \xx_*))} + \textcolor{Rhodamine}{\hat{\mu}^\dagger_i K(\xx_i, \xx_*) - \delta_i\hat{\mu}_i^\ddagger K(\xx_i, \xx_*)}\right] + \hat{\alpha}
+\hatg(\xx_* \mid \hat{\bstheta}) = \sum^n_{i=1} \left[\textcolor{CornflowerBlue}{-\hat{\mu}_i(K(\xx_{j(i)}, \xx_*) - K(\xx_i, \xx_*))} + \textcolor{Rhodamine}{\hat{\mu}^\dagger_i K(\xx_i, \xx_*) - \delta_i\hat{\mu}_i^\ddagger K(\xx_i, \xx_*)}\right] + \hat{\alpha}
 $$
 
 where $\hat{\mu}_i, \hat{\mu}_i^\dagger, \hat{\mu}_i^\ddagger$ are Lagrange multipliers and $K$ is a chosen kernel function, which may have further hyperparameters to select or tune.
 
 ### Competing risks
 
-As of the time of publication, no SSVMs for competing risks appear to have been published [@Kantidakis2023; @Monterrubio2024; @Djangang2025].\index{survival support vector machines!competing risks}
+As of the time of publication, no SSVMs for competing risks appear to have been published [@Djangang2025; @Kantidakis2023; @Monterrubio2024].\index{survival support vector machines!competing risks}
 As discussed in @sec-survtsk-time, there is not a straightforward concept of time-to-event competing risks predictions so survival time SSVMs are unlikely to be extended to competing risks.
 For the ranking SSVMs, theoretically one could use any of the methods to estimate per-cause risk by considering each risk separately and censoring observations that experience a different risk, however this has not been validated in the literature.
-Moreover, the risks predicted by SSVMs correspond to abstract relative risks and not to an interpretable hazard, meaning there is no clear method to transform these predictions into a CIF or any other distribution function (@sec-survtsk-risk).
+Moreover, the risks predicted by SSVMs correspond to abstract relative risks and not to an interpretable hazard, meaning there is no clear method to transform these predictions into a CIF or any other distribution-defining function (@sec-survtsk-risk).
 Theoretically, one could consider a transformation based on survival time predictions; however, this approach also does not appear to have been explored in the literature.
 
 ## Conclusion
@@ -335,7 +332,7 @@ Theoretically, one could consider a transformation based on survival time predic
 * Support vector machines (SVMs) are a highly flexible machine learning method that can use the 'kernel trick' to implicitly represent high- or infinite-dimensional feature spaces while computing in the original input space.
 * Survival SVMs (SSVMs) extend regression SVMs by either making survival time predictions, ranking predictions, or a combination of the two.
 * The hybrid SSVM provides an efficient method that encapsulates all the elements of survival time and ranking SSVMs and is therefore a good model to include in benchmark experiments to test the potential of SSVMs.
-* SSVMs can only perform well with extensive tuning of hyperparameters over a wide parameter space. To date, no papers have experimented with the tuning range for the $C_r$ and $C_s$ parameters, though [@Fouodo2018] tune over $(2^{-5}, 2^5)$.
+* SSVMs can only perform well with extensive tuning of hyperparameters over a wide parameter space. To date, published guidance on tuning ranges for $C_r$ and $C_s$ appears limited, though [@Fouodo2018] tune over $(2^{-5}, 2^5)$.
 
 ::::
 
