@@ -24,7 +24,7 @@ dat$hazard <- loglogistic_hazard(dat$T, dat$Shape, scale = 1)
 
 g <- ggplot(dat, aes(x = T, y = hazard, color = factor(Shape))) +
   geom_line(linewidth = 0.8) +
-  labs(x = "Time", y = "Log-logistic hazard, h(t)", color = "Shape") +
+  labs(x = "Time", y = "Log-logistic hazard", color = "Shape") +
   coord_cartesian(xlim = c(0, 5), ylim = c(0, 5)) +
   theme(aspect.ratio = 1)            # square panel, consistent with sibling curves
 

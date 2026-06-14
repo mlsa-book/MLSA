@@ -53,7 +53,7 @@ g_svm <- ggplot(df, aes(x, y)) +
     aes(x = 4.5, xend = 4.5, y = upper(4.5), yend = 7),
     arrow = arrow(ends = "both", length = unit(0.12, "inches")),
   ) +
-  annotate("text", x = 4.65, y = 6.5, label = expression(zeta[i]^"*"), color = "black", size = 6) +
+  annotate("text", x = 4.7, y = 6.5, label = expression(zeta[i]^"*"), color = "black", size = 6) +
 
   # xi': point below lower epsilon tube
   geom_segment(
@@ -62,9 +62,9 @@ g_svm <- ggplot(df, aes(x, y)) +
   ) +
   annotate("text", x = 5.9, y = 4.3, label = expression(zeta[i]^minute), color = "black", size = 6) +
 
-  annotate("text", x = 6.5, y = 8.2, label = expression(y + epsilon), hjust = 0, color = "#0cb702", size = 6) +
+  annotate("text", x = 6.3, y = 8.2, label = expression(y + epsilon), hjust = 0, color = "#0cb702", size = 6) +
   annotate("text", x = 7.1, y = line(7.55),  label = "y", hjust = 0, size = 6) +
-  annotate("text", x = 6.9, y = lower(7.55), label = expression(y - epsilon), hjust = 0, color = "#ed68ed", size = 6) +
+  annotate("text", x = 6.9, y = 5.5, label = expression(y - epsilon), hjust = 0, color = "#ed68ed", size = 6) +
 
   geom_point(
     aes(shape = support, color = support),

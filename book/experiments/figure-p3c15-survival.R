@@ -32,8 +32,8 @@ g_svm_surv <- ggplot(df, aes(x, y)) +
   ) +
   annotate(
     "text",
-    x = 4.4, y = 6.45,
-    label = expression(xi[i]^"*" * "," ~ i %in% U),
+    x = 4.6, y = 6.45,
+    label = expression(zeta[i]^"*" * "," ~ i %in% U),
     size = 5
   ) +
 
@@ -46,7 +46,7 @@ g_svm_surv <- ggplot(df, aes(x, y)) +
   annotate(
     "text",
     x = 6.2, y = 2.15,
-    label = expression(xi[i]^minute * "," ~ i %in% L),
+    label = expression(zeta[i]^minute * "," ~ i %in% L),
     size = 5
   ) +
 
