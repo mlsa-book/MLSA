@@ -21,7 +21,7 @@ PNG into the appropriate ``book/Figures/...`` sub-folder.
 # complications so the effect of letting the network parametrise more
 # pieces of the Weibull distribution is directly visible.
 #
-# Output: book/Figures/neuralnetworks/weibull-aft-nn.png
+# Output: book/Figures/neuralnetworks/fig-p3c17-weibull-aft-nn.png
 # ---------------------------------------------------------------------------
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ import pandas as pd  # noqa: E402
 EXP_DIR = Path(__file__).resolve().parent
 CSV_PATH = EXP_DIR / "tumor.csv"
 FIG_OUT = (
-    EXP_DIR.parent / "Figures" / "neuralnetworks" / "weibull-aft-nn.png"
+    EXP_DIR.parent / "Figures" / "neuralnetworks" / "fig-p3c17-weibull-aft-nn.png"
 )
 FIG_DIR = FIG_OUT.parent
 FIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -287,8 +287,8 @@ with torch.no_grad():
 
 # ---- Plotting ------------------------------------------------------------
 
-COL_NO = "#2C7FB8"
-COL_YES = "#C2185B"
+COL_NO = "#0072B2"   # agreed complications palette: no = blue
+COL_YES = "#D55E00"  # yes = vermillion
 GRID_T = grid.numpy()
 
 fig, axes = plt.subplots(2, 2, figsize=(9.5, 7.0), sharey=True, sharex=True)
@@ -300,15 +300,17 @@ titles = [
 ]
 
 for ax, title in zip(axes.flat, titles):
-    ax.set_title(title, fontsize=11)
+    ax.set_title(title, fontsize=13)
     ax.set_xlim(0, float(tumor["days"].max()))
     ax.set_ylim(0, 1.02)
+    ax.tick_params(labelsize=12)
+    ax.set_box_aspect(1)            # square panels
     ax.grid(alpha=0.25)
 
-axes[1, 0].set_xlabel("days")
-axes[1, 1].set_xlabel("days")
-axes[0, 0].set_ylabel("$\\hat S(t \\mid \\mathbf{x})$")
-axes[1, 0].set_ylabel("$\\hat S(t \\mid \\mathbf{x})$")
+axes[1, 0].set_xlabel("days", fontsize=13)
+axes[1, 1].set_xlabel("days", fontsize=13)
+axes[0, 0].set_ylabel("$\\hat S(t \\mid \\mathbf{x})$", fontsize=13)
+axes[1, 0].set_ylabel("$\\hat S(t \\mid \\mathbf{x})$", fontsize=13)
 
 
 def overlay_km(ax: plt.Axes) -> None:
@@ -347,27 +349,30 @@ axes[1, 0].plot(GRID_T, S3_yes, color=COL_YES, linewidth=2.0)
 plot_individual(axes[1, 1], S4_ind)
 overlay_km(axes[1, 1])
 
-# Legend: colour = complications status, linestyle = model type.
-legend_handles = [
-    Line2D([0], [0], color=COL_NO, linewidth=2.0,
-           label="no complications"),
-    Line2D([0], [0], color=COL_YES, linewidth=2.0,
-           label="complications"),
+# Two separate legends: colour = Complications (yes/no), linestyle = Model.
+compl_handles = [
+    Line2D([0], [0], color=COL_NO, linewidth=2.0, label="no"),
+    Line2D([0], [0], color=COL_YES, linewidth=2.0, label="yes"),
+]
+model_handles = [
     Line2D([0], [0], color="#555", linewidth=2.0, linestyle="-",
            label="Weibull AFT NN"),
     Line2D([0], [0], color="#555", linewidth=1.6, linestyle=":",
            label="Kaplan-Meier"),
 ]
+leg_compl = fig.legend(
+    handles=compl_handles, title="Complications",
+    loc="center left", frameon=False,
+    fontsize=12, title_fontsize=12, bbox_to_anchor=(0.88, 0.60),
+)
+fig.add_artist(leg_compl)
 fig.legend(
-    handles=legend_handles,
-    loc="lower center",
-    ncol=4,
-    frameon=False,
-    fontsize=10,
-    bbox_to_anchor=(0.5, -0.04),
+    handles=model_handles, title="Model",
+    loc="center left", frameon=False,
+    fontsize=12, title_fontsize=12, bbox_to_anchor=(0.88, 0.40),
 )
 
-fig.tight_layout(rect=(0, 0.04, 1, 1))
+fig.tight_layout(rect=(0, 0, 0.86, 1))
 fig.savefig(FIG_OUT, dpi=200, bbox_inches="tight")
 plt.close(fig)
 print(f"Saved {FIG_OUT}")
@@ -378,7 +383,7 @@ print(f"Saved {FIG_OUT}")
 #
 # Small individual plots for the activation table (@tbl-activations).
 #
-# Output: book/Figures/neuralnetworks/activation-{relu,sigmoid,tanh,softplus}.png
+# Output: book/Figures/neuralnetworks/fig-p3c17-activation-{relu,gelu,silu,sigmoid,tanh,softplus}.png
 # ---------------------------------------------------------------------------
 
 v = np.linspace(-4, 4, 400)
@@ -400,12 +405,12 @@ for name, vals in _activations:
     ax.axhline(0, color="#888", lw=0.5, ls="--")
     ax.axvline(0, color="#888", lw=0.5, ls="--")
     ax.set_xlim(-4, 4)
-    ax.set_xlabel("v", fontsize=13)
-    ax.set_ylabel("a(v)", fontsize=13)
-    ax.tick_params(labelsize=11)
+    ax.set_xlabel("v", fontsize=15)
+    ax.set_ylabel("a(v)", fontsize=15)
+    ax.tick_params(labelsize=13)
     ax.grid(alpha=0.2)
     fig.tight_layout()
-    out = FIG_DIR / f"activation-{name}.png"
+    out = FIG_DIR / f"fig-p3c17-activation-{name}.png"
     fig.savefig(out, dpi=180, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {out}")
@@ -417,7 +422,7 @@ for name, vals in _activations:
 # Two-panel figure showing the same FFNN architecture (5, 3) fitted to
 # mcycle with tanh and ReLU activations respectively.
 #
-# Output: book/Figures/neuralnetworks/mcycle-tanh-vs-relu.png
+# Output: book/Figures/neuralnetworks/fig-p3c17-mcycle-tanh-vs-relu.png
 # ---------------------------------------------------------------------------
 
 mcycle = pd.read_csv(EXP_DIR / "mcycle.csv")
@@ -459,17 +464,19 @@ with torch.no_grad():
     _p_tanh = _m_tanh(_gt).squeeze(-1).numpy() * _ys + _ym
     _p_relu = _m_relu(_gt).squeeze(-1).numpy() * _ys + _ym
 
-fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
+fig, axes = plt.subplots(1, 2, figsize=(10, 5), sharey=True)
 for ax, pred, title in zip(axes, [_p_tanh, _p_relu],
                            ["tanh activation", "ReLU activation"]):
     ax.scatter(_x, _y, s=14, alpha=0.55, color="#5B7CA8", edgecolor="none")
     ax.plot(_grid, pred, color="#C2185B", lw=2.2)
-    ax.set_title(title)
-    ax.set_xlabel("time after impact (ms)")
+    ax.set_title(title, fontsize=14)
+    ax.set_xlabel("time after impact (ms)", fontsize=13)
+    ax.tick_params(labelsize=12)
+    ax.set_box_aspect(1)            # square sub-plot
     ax.grid(alpha=0.25)
-axes[0].set_ylabel("head acceleration (g)")
+axes[0].set_ylabel("head acceleration (g)", fontsize=13)
 fig.tight_layout()
-fig.savefig(FIG_DIR / "mcycle-tanh-vs-relu.png", dpi=220, bbox_inches="tight")
+fig.savefig(FIG_DIR / "fig-p3c17-mcycle-tanh-vs-relu.png", dpi=220, bbox_inches="tight")
 plt.close(fig)
 print(f"Saved {FIG_DIR / 'mcycle-tanh-vs-relu.png'}")
 
@@ -527,7 +534,7 @@ _sigma_mc = np.exp(_ls_mc.numpy()) * _ys
 # head trained with MSE, the right has the existing two-headed (mu, log
 # sigma) model trained with heteroscedastic Gaussian NLL.
 #
-# Output: book/Figures/neuralnetworks/mcycle-det-vs-prob.png
+# Output: book/Figures/neuralnetworks/fig-p3c17-mcycle-det-vs-prob.png
 # ---------------------------------------------------------------------------
 
 
@@ -560,16 +567,18 @@ with torch.no_grad():
     _mu_det = _det_model(_gt).numpy() * _ys + _ym
 
 
-fig, axes = plt.subplots(1, 2, figsize=(11, 4), sharey=True)
+fig, axes = plt.subplots(1, 2, figsize=(11, 5), sharey=True)
 
 # Left: deterministic.
 ax = axes[0]
 ax.scatter(_x, _y, s=14, alpha=0.55, color="#5B7CA8", edgecolor="none")
 ax.plot(_grid, _mu_det, color="#C2185B", lw=2.2, label=r"$\hat y(x)$")
-ax.set_title("Deterministic")
-ax.set_xlabel("time after impact (ms)")
-ax.set_ylabel("head acceleration (g)")
-ax.legend(frameon=False, loc="upper left")
+ax.set_title("Deterministic", fontsize=14)
+ax.set_xlabel("time after impact (ms)", fontsize=13)
+ax.set_ylabel("head acceleration (g)", fontsize=13)
+ax.tick_params(labelsize=12)
+ax.set_box_aspect(1)            # square sub-plot
+ax.legend(frameon=False, loc="upper left", fontsize=12)
 ax.grid(alpha=0.25)
 
 # Right: probabilistic (reuse _mu_mc / _sigma_mc from distributional block).
@@ -579,13 +588,15 @@ ax.fill_between(_grid, _mu_mc - 1.96 * _sigma_mc, _mu_mc + 1.96 * _sigma_mc,
                 color="#C2185B", alpha=0.18,
                 label=r"$\hat\mu(x) \pm 1.96\,\hat\sigma(x)$")
 ax.plot(_grid, _mu_mc, color="#C2185B", lw=2.2, label=r"$\hat\mu(x)$")
-ax.set_title("Probabilistic")
-ax.set_xlabel("time after impact (ms)")
-ax.legend(frameon=False, loc="upper left")
+ax.set_title("Probabilistic", fontsize=14)
+ax.set_xlabel("time after impact (ms)", fontsize=13)
+ax.tick_params(labelsize=12)
+ax.set_box_aspect(1)            # square sub-plot
+ax.legend(frameon=False, loc="upper left", fontsize=12)
 ax.grid(alpha=0.25)
 
 fig.tight_layout()
-fig.savefig(FIG_DIR / "mcycle-det-vs-prob.png",
+fig.savefig(FIG_DIR / "fig-p3c17-mcycle-det-vs-prob.png",
             dpi=220, bbox_inches="tight")
 plt.close(fig)
-print(f"Saved {FIG_DIR / 'mcycle-det-vs-prob.png'}")
+print(f"Saved {FIG_DIR / 'fig-p3c17-mcycle-det-vs-prob.png'}")

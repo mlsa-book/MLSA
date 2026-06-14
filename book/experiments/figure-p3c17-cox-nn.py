@@ -1,11 +1,11 @@
 """Fit two Cox-NN variants (proportional hazards) on the tumor data with
-the @fig-ffnn-arch (p -> 3 -> 4 -> 1, tanh) architecture and save the
+the @fig-p3c17-ffnn-arch (p -> 3 -> 4 -> 1, tanh) architecture and save the
 comparison figure.
 
     C1: Cox-NN on `complications` only (1 input)
     C2: Cox-NN on all 7 features      (p inputs)
 
-Output: book/Figures/neuralnetworks/cox-nn-tumor.png
+Output: book/Figures/neuralnetworks/fig-p3c17-cox-nn-tumor.png
 """
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ torch.set_num_threads(1)
 
 import matplotlib  # noqa: E402
 matplotlib.use("Agg")
+matplotlib.rcParams.update({"font.size": 12})   # +2 over matplotlib default
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 
@@ -31,7 +32,7 @@ import pandas as pd  # noqa: E402
 
 
 EXP = Path(__file__).resolve().parent
-FIG = EXP.parent / "Figures" / "neuralnetworks" / "cox-nn-tumor.png"
+FIG = EXP.parent / "Figures" / "neuralnetworks" / "fig-p3c17-cox-nn-tumor.png"
 
 tumor = pd.read_csv(EXP / "tumor.csv")
 tumor["complications_bin"] = (tumor["complications"] == "yes").astype(int)
@@ -136,7 +137,7 @@ km_t_yes, km_yes = km(tumor.loc[tumor["complications"] == "yes", "days"].values,
 
 # ---- plot ----------------------------------------------------------------
 
-COL_NO, COL_YES = "#2C7FB8", "#C2185B"
+COL_NO, COL_YES = "#0072B2", "#D55E00"   # agreed complications palette (no=blue, yes=vermillion)
 yes = (tumor["complications"].values == "yes")
 no = ~yes
 
@@ -147,9 +148,10 @@ ax.step(km_t_no, km_no, where="post", color=COL_NO, ls=":", lw=1.6, alpha=0.85)
 ax.step(km_t_yes, km_yes, where="post", color=COL_YES, ls=":", lw=1.6, alpha=0.85)
 ax.plot(grid, S1[0], color=COL_NO, lw=2.0)
 ax.plot(grid, S1[1], color=COL_YES, lw=2.0)
-ax.set_title("C1: Cox-NN on complications", fontsize=11)
+ax.set_title("C1: Cox-NN on complications", fontsize=13)
 ax.set_xlabel("days"); ax.set_ylabel(r"$\hat S(t \mid \mathbf{x})$")
 ax.set_ylim(0, 1.02); ax.set_xlim(0, float(tumor["days"].max()))
+ax.set_box_aspect(1)            # square panel
 ax.grid(alpha=0.25)
 
 ax = axes[1]
@@ -159,20 +161,28 @@ for i in np.where(yes)[0]:
     ax.plot(grid, S3[i], color=COL_YES, lw=0.5, alpha=0.18)
 ax.step(km_t_no, km_no, where="post", color=COL_NO, ls=":", lw=1.6, alpha=0.85)
 ax.step(km_t_yes, km_yes, where="post", color=COL_YES, ls=":", lw=1.6, alpha=0.85)
-ax.set_title("C2: Cox-NN on all features", fontsize=11)
+ax.set_title("C2: Cox-NN on all features", fontsize=13)
 ax.set_xlabel("days")
 ax.set_ylim(0, 1.02); ax.set_xlim(0, float(tumor["days"].max()))
+ax.set_box_aspect(1)            # square panel
 ax.grid(alpha=0.25)
 
-handles = [
-    Line2D([0], [0], color=COL_NO, lw=2, label="no complications"),
-    Line2D([0], [0], color=COL_YES, lw=2, label="complications"),
+compl_handles = [
+    Line2D([0], [0], color=COL_NO, lw=2, label="no"),
+    Line2D([0], [0], color=COL_YES, lw=2, label="yes"),
+]
+model_handles = [
     Line2D([0], [0], color="#555", lw=2, label="Cox-NN"),
     Line2D([0], [0], color="#555", lw=1.6, ls=":", label="Kaplan-Meier"),
 ]
-fig.legend(handles=handles, loc="lower center", ncol=4, frameon=False,
-           bbox_to_anchor=(0.5, -0.04), fontsize=10)
-fig.tight_layout(rect=(0, 0.06, 1, 1))
+leg_compl = fig.legend(handles=compl_handles, title="Complications",
+                       loc="center left", frameon=False,
+                       bbox_to_anchor=(0.86, 0.60), fontsize=12, title_fontsize=12)
+fig.add_artist(leg_compl)
+fig.legend(handles=model_handles, title="Model",
+           loc="center left", frameon=False,
+           bbox_to_anchor=(0.86, 0.40), fontsize=12, title_fontsize=12)
+fig.tight_layout(rect=(0, 0, 0.84, 1))
 fig.savefig(FIG, dpi=200, bbox_inches="tight")
 plt.close(fig)
 print(f"Saved {FIG}")

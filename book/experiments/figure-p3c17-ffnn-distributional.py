@@ -49,15 +49,19 @@ def circle(cx, cy, r, fill, stroke, sw=1.6):
     return f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
 
 def rect(x, y, w, h, fill, stroke, rx=10, sw=1.6):
+    # boxes: no coloured border, soft drop shadow instead (stroke arg ignored)
     return (f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" ry="{rx}" '
-            f'fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>')
+            f'fill="{fill}" stroke="none" filter="url(#nnshadow)"/>')
 
 def text(x, y, s, size=15, weight="normal", anchor="middle", fill="#111"):
-    return (f'<text x="{x}" y="{y}" text-anchor="{anchor}" font-size="{size}" '
+    # body text bumped +2; panel headers use label() which bypasses this bump
+    return (f'<text x="{x}" y="{y}" text-anchor="{anchor}" font-size="{size + 2}" '
             f'font-weight="{weight}" fill="{fill}">{s}</text>')
 
 def label(x, y, s, size=18):
-    return text(x, y, s, size=size, weight="bold", anchor="start")
+    # panel headers "(a) ..." — NOT bumped (own <text>, not routed through text())
+    return (f'<text x="{x}" y="{y}" text-anchor="start" font-size="{size}" '
+            f'font-weight="bold" fill="#111">{s}</text>')
 
 def sub(base, sub_chars):
     """μ̂ / σ̂ with subscript trick using <tspan>."""
@@ -211,28 +215,24 @@ for sep_y in (PANEL_TOP[0] + PANEL_H + PANEL_GAP // 2,
     parts.append(f'<line x1="40" y1="{sep_y}" x2="{CANVAS_W-40}" y2="{sep_y}" '
                  f'stroke="#bbb" stroke-width="1.2" stroke-dasharray="6,6"/>')
 
+DEFS = (
+    '<defs><filter id="nnshadow" x="-20%" y="-20%" width="140%" height="140%">'
+    '<feDropShadow dx="2.5" dy="2.5" stdDeviation="2.5" '
+    'flood-color="#000000" flood-opacity="0.22"/></filter></defs>'
+)
 svg = (
     f'<svg xmlns="http://www.w3.org/2000/svg" width="{CANVAS_W}" height="{CANVAS_H}" '
     f'viewBox="0 0 {CANVAS_W} {CANVAS_H}" font-family="DejaVu Sans">'
+    + DEFS
     + "".join(parts)
     + '</svg>'
 )
 
-html = f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta http-equiv="refresh" content="2">
-  <title>FFNN distributional regression — three architectural variants</title>
-  <style>
-    body {{ margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: transparent; font-family: 'DejaVu Sans', sans-serif; }}
-    svg {{ max-width: 95vw; max-height: 90vh; }}
-  </style>
-</head>
-<body>
-{svg}
-</body>
-</html>
-"""
-Path("/tmp/ffnn-distributional.html").write_text(html)
-print("wrote /tmp/ffnn-distributional.html")
+OUT = (Path(__file__).resolve().parent.parent / "Figures" / "neuralnetworks"
+       / "fig-p3c17-ffnn-distributional")
+OUT.parent.mkdir(parents=True, exist_ok=True)
+OUT.with_suffix(".svg").write_text(svg)
+import cairosvg  # noqa: E402
+cairosvg.svg2png(bytestring=svg.encode(), write_to=str(OUT.with_suffix(".png")),
+                 output_width=CANVAS_W * 3, output_height=CANVAS_H * 3)
+print(f"wrote {OUT}.svg and .png")

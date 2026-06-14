@@ -1,5 +1,5 @@
-"""Generate the ``ffnn-architecture`` schematic for the neural networks
-chapter.
+"""Generate the ``fig-p3c17-ffnn-architecture`` schematic for the neural
+networks chapter.
 
 The figure is written as a standalone SVG to the chapter figure folder
 and then rasterised into a transparent-background PNG with ImageMagick
@@ -459,7 +459,7 @@ def fig_ffnn():
                       "z = W⁽³⁾h⁽²⁾ + b⁽³⁾,   y = r(z)",
                       size=23, fill="#444"))
 
-    svg_path = write_svg("ffnn-architecture", W, H, "".join(parts))
+    svg_path = write_svg("fig-p3c17-ffnn-architecture", W, H, "".join(parts))
     rasterise(svg_path)
     return svg_path
 
