@@ -108,7 +108,7 @@ build_aj_long <- function(tp, arm) {
     time       = rep(ts, 4),
     transition = rep(c("0->1", "0->2", "1->0", "1->2"), each = length(ts)),
     Treatment  = factor(arm, levels = c("Placebo", "Prednisone")),
-    method     = factor("AJ", levels = c("AJ", "XGBoost")),
+    method     = factor("AJ", levels = c("AJ", "GBM")),
     trans_prob = c(tp[[1]]$pstate2, tp[[1]]$pstate3,
                    tp[[2]]$pstate1, tp[[2]]$pstate3))
 }
@@ -120,7 +120,7 @@ df_tp_cmp <- bind_rows(
   tp_xgb_df |>
     mutate(transition = unname(relabel_mstate[transition]),
            Treatment  = factor(treat, levels = c("Placebo", "Prednisone")),
-           method     = factor("XGBoost", levels = c("AJ", "XGBoost"))) |>
+           method     = factor("GBM", levels = c("AJ", "GBM"))) |>
     select(time, transition, Treatment, method, trans_prob)
 )
 
@@ -131,7 +131,7 @@ p_tp_cmp <- ggplot(df_tp_cmp,
   facet_wrap(~ transition) +
   scale_colour_manual(values = c(Placebo = "#0072B2", Prednisone = "#D55E00"),
                       name = "Treatment") +
-  scale_linetype_manual(values = c("AJ" = "dotted", "XGBoost" = "solid"),
+  scale_linetype_manual(values = c("AJ" = "dotted", "GBM" = "solid"),
                         name = "Method") +
   coord_cartesian(xlim = c(0, 4000), ylim = c(0, 1)) +
   labs(x = "Time", y = "Transition probability") +
