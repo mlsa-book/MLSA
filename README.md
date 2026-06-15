@@ -11,7 +11,6 @@ Retrieved 2026-06-12, License - CC BY-SA 4.0
   <img src="book/Figures/cover-new.svg" align="right" width="200">
 </picture>
 
-
 This book is a work in progress, the final work will be published by Chapman and Hall/CRC.
 This electronic version will always be free and open access ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)).
 
@@ -22,7 +21,7 @@ We will endeavor to update this version after publication to correct mistakes (b
 Please cite this book as:
 
 ```
-Sonabend, R., & Bender, A. (2026).
+Bender, A., Sonabend, R.  (2026).
 "Machine Learning in Survival Analysis". CRC Press. ISBN: {coming soon}
 https://www.mlsabook.com.
 ```
@@ -32,7 +31,7 @@ Or in BibTeX format:
 ```
 @book{MLSA2026,
     title = {Machine Learning in Survival Analysis},
-    author = {Sonabend, Raphael and Bender, Andreas},
+    author = {Bender, Andreas and Sonabend, Raphael},
     url = {https://www.mlsabook.com/},
     year = {2026},
     isbn = {coming soon},
