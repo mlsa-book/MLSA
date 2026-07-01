@@ -29,7 +29,7 @@ https://www.mlsabook.com.
 Or in BibTeX format:
 
 ```
-@book{MLSA2026,
+@book{MLSA2027,
     title = {Machine Learning for Survival Analysis},
     author = {Bender, Andreas and Sonabend, Raphael},
     url = {https://www.mlsabook.com/},
