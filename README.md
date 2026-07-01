@@ -1,4 +1,4 @@
-# Machine Learning in Survival Analysis
+# Machine Learning for Survival Analysis
 
 <!--
 Source - https://stackoverflow.com/a/72317451
@@ -21,8 +21,8 @@ We will endeavor to update this version after publication to correct mistakes (b
 Please cite this book as:
 
 ```
-Bender, A., Sonabend, R.  (2026).
-"Machine Learning in Survival Analysis". CRC Press.
+Bender, A., Sonabend, R.  (2027).
+"Machine Learning for Survival Analysis". CRC Press.
 https://www.mlsabook.com.
 ```
 
@@ -30,10 +30,11 @@ Or in BibTeX format:
 
 ```
 @book{MLSA2026,
-    title = {Machine Learning in Survival Analysis},
+    title = {Machine Learning for Survival Analysis},
     author = {Bender, Andreas and Sonabend, Raphael},
     url = {https://www.mlsabook.com/},
-    year = {2026},
+    year = {2027},
+    isbn = {9781032537498},
     publisher = {CRC Press}
 }
 ```
