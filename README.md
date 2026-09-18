@@ -11,19 +11,19 @@ Retrieved 2026-06-12, License - CC BY-SA 4.0
   <img src="book/Figures/cover-new.svg" align="right" width="200">
 </picture>
 
-This book is a work in progress, the final work will be published by Taylor and Francis, CRC Press.
-This electronic version will always be free and open access ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)).
-
-We will endeavor to update this version after publication to correct mistakes (big and small) and to potentially make minor and major additions.
+This electronic version (including a PDF download) will always be free and open access ([CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)).
+[Buying the book](https://www.routledge.com/Machine-Learning-for-Survival-Analysis/Bender-Sonabend/p/book/9781032537498) will be the greatest indicator to us that a second edition may be useful in the future.
+We will strive to update this version after publication to correct mistakes (big and small).
+If you notice any mistakes, please feel free to [open an issue](https://github.com/mlsa-book/MLSA/issues).
 
 ## Citing this book
 
 Please cite this book as:
 
 ```
-Bender, A., Sonabend, R.  (2026).
-"Machine Learning for Survival Analysis". CRC Press.
-https://www.mlsabook.com.
+Bender, Andreas, & Sonabend, Raphael. (2027).
+Machine Learning for Survival Analysis.
+Chapman and Hall/CRC.
 ```
 
 Or in BibTeX format:
@@ -33,9 +33,9 @@ Or in BibTeX format:
     title = {Machine Learning for Survival Analysis},
     author = {Bender, Andreas and Sonabend, Raphael},
     url = {https://www.mlsabook.com/},
-    year = {2026},
+    year = {2027},
     isbn = {9781032537498},
-    publisher = {CRC Press}
+    publisher = {Chapman and Hall/CRC}
 }
 ```
 
